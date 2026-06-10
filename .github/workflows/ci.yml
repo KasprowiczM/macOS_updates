@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    name: bash -n + py_compile + unittest
+    # macOS runner: closest to the real target environment (bash 3.2 default).
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show environment
+        run: |
+          bash --version | head -1
+          python3 --version
+          sw_vers || true
+          test -f VERSION && echo "VERSION=$(tr -d '[:space:]' < VERSION)"
+
+      - name: Run full test suite
+        run: bash run_tests.sh
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y shellcheck
+
+      - name: Lint all shell scripts
+        run: |
+          set -o pipefail
+          count="$(find . -type f -name '*.sh' \
+            ! -path './.git/*' \
+            ! -path './graphify-out/*' \
+            ! -path './dev_sync_logs/*' \
+            | wc -l | tr -d ' ')"
+          echo "Linting ${count} shell scripts (see .shellcheckrc)"
+          find . -type f -name '*.sh' \
+            ! -path './.git/*' \
+            ! -path './graphify-out/*' \
+            ! -path './dev_sync_logs/*' \
+            -print0 | xargs -0 shellcheck --severity=warning

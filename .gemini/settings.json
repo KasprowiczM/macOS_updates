@@ -1,0 +1,45 @@
+{
+  "model": {
+    "id": "gemini-pro-3.1"
+  },
+  "thinkingLevel": "low",
+  "profiles": {
+    "orchestrator": {
+      "model": {
+        "id": "gemini-pro-3.1-high"
+      },
+      "thinkingLevel": "high"
+    },
+    "advisor": {
+      "model": {
+        "id": "gemini-pro-3.1-high"
+      },
+      "thinkingLevel": "high",
+      "allowedTools": [
+        "view_file",
+        "list_dir",
+        "grep_search",
+        "read_url_content"
+      ]
+    },
+    "flash-worker": {
+      "model": {
+        "id": "gemini-3-flash"
+      },
+      "thinkingLevel": "low"
+    }
+  },
+  "tools": {
+    "disabled": [
+      "jira",
+      "github",
+      "notion",
+      "memory"
+    ],
+    "outputLimits": {
+      "maxLines": 200,
+      "maxChars": 150000,
+      "summarizeLongOutput": true
+    }
+  }
+}

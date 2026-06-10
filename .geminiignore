@@ -1,0 +1,69 @@
+# Private / secrets — never read by Gemini
+.env
+.env.*
+.dev_sync_config.json
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Private cloud-only docs (auto-managed; manual edits overwritten)
+APPLICATIONS.md
+UPDATES.md
+
+# Session handoff files (potentially contain sensitive task context)
+docs/agents/handoffs/
+
+# Logs
+dev_sync_logs/
+*.log
+*.log.*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Git internals (duże obiekty binarne)
+.git/objects/
+.git/pack/
+.git/lfs/
+
+# Binaries / images / media
+*.dmg
+*.pkg
+*.iso
+*.zip
+*.tar.gz
+*.tgz
+*.gz
+*.rar
+*.7z
+*.exe
+*.bin
+*.app
+*.dSYM/
+
+# IDE
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# Temp / session dirs
+/tmp/

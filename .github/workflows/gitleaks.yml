@@ -1,0 +1,35 @@
+name: Secret scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  gitleaks:
+    name: gitleaks + forbidden tracked files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+      - name: Forbidden tracked private files
+        run: |
+          set -e
+          for f in .env .dev_sync_config.json APPLICATIONS.md UPDATES.md; do
+            if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+              echo "FORBIDDEN tracked file: $f"
+              exit 1
+            fi
+          done
+          echo "No forbidden private files tracked"

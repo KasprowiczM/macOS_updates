@@ -1,0 +1,18 @@
+# MCP Server Setup
+
+## Critical: Always Use Absolute Paths
+
+Prevents `exec: "npx": executable file not found in $PATH` errors.
+
+```json
+{
+  "command": "/Users/<you>/.local/share/mac-update/node/bin/npx",
+  "env": {
+    "PATH": "/Users/<you>/.local/share/mac-update/npm-global/bin:/Users/<you>/.local/share/mac-update/node/bin:/Users/<you>/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  }
+}
+```
+
+- Preferred: `~/.local/share/mac-update/node/bin/npx` (managed by `update_npm_cli.sh`)
+- Legacy Homebrew fallback: `/opt/homebrew/bin/npx` on arm64 or `/usr/local/bin/npx` on Intel
+- Always include `PATH` in `env` block — Claude Code does not inherit shell PATH.
