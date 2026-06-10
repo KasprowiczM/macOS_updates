@@ -1,0 +1,26 @@
+# Private/local state
+APPLICATIONS.md
+UPDATES.md
+.env
+.dev_sync_config.json
+.dev_sync_config_test.json
+.mac_update_prefs
+data/
+dev_sync_logs/
+
+# Generated/cache artifacts
+__pycache__/
+*.pyc
+.DS_Store
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/graph.json
+graphify-out/graph.html
+graphify-out/GRAPH_REPORT.md
+graphify-out/AGENT_PROJECT_MAP.md
+graphify-out/.graphify_*.json
+graphify-out/.graphify_python
+
+# Tool-local settings
+.claude/settings.local.json

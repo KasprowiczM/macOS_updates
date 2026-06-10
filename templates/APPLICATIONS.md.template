@@ -1,0 +1,70 @@
+# Installed Applications — MacBook USER (macOS VERSION)
+
+> **Analysis date:** YYYY-MM-DD
+> **User:** USER | **Home:** `/Users/USER`
+> **System:** macOS VERSION (Build BUILD)
+> **Architecture:** Apple Silicon (arm64)
+> **Scripts folder:** `~/Dev_Env/macOS_updates`
+
+---
+
+This file is **private** (gitignored). New users get a fresh copy from
+`bash build_inventory.sh` — never from another user's cloud backup.
+
+## GRUPA 1 — Apple System Apps
+
+| Name | Version |
+|-------|--------|
+
+---
+
+## GRUPA 2 — App Store
+
+| App name | Apple ID |
+|----------|----------|
+
+> iPad apps on Apple Silicon may need Accessibility permission for GUI updates.
+
+---
+
+## GRUPA 3 — Internet-downloaded apps
+
+### Newly detected (categorize)
+
+| Name | Publisher | Update URL |
+|------|-----------|------------|
+
+### Cloud storage
+
+| Name | Version | Update page |
+|------|---------|-------------|
+
+---
+
+## GRUPA 4 — Homebrew
+
+### 4a. Key packages
+
+| Package | Version | Description |
+|---------|---------|-------------|
+
+### 4b. Formulae
+
+| Package | Version | Description |
+|---------|---------|-------------|
+
+### 4c. Casks
+
+| Package | Version | Description |
+|---------|---------|-------------|
+
+### 4d. Native CLI + npm global
+
+| Package | Version | Description |
+|---------|---------|-------------|
+
+---
+
+## Summary
+
+*Updated: YYYY-MM-DD*

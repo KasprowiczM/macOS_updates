@@ -1,0 +1,45 @@
+# Canonical update method per internet app (config/internet_apps.txt order)
+# Format: AppName|method|STATUS_VAR
+# Methods: keystone | github_dmg | silent_launch | msupdate | docker_cli | manual
+Google Chrome|keystone|STATUS_CHROME
+Firefox Developer Edition|github_dmg|STATUS_FIREFOX
+Brave Browser|silent_launch|STATUS_BRAVE
+ChatGPT Atlas|github_dmg|STATUS_ATLAS
+ChatGPT|silent_launch|STATUS_CHATGPT
+Claude|silent_launch|STATUS_CLAUDE_APP
+Comet|silent_launch|STATUS_COMET
+Gemini|silent_launch|STATUS_GEMINI
+Perplexity|silent_launch|STATUS_PERPLEXITY
+Antigravity|silent_launch|STATUS_ANTIGRAVITY
+Antigravity IDE|silent_launch|STATUS_ANTIGRAVITY_IDE
+LM Studio|silent_launch|STATUS_LMSTUDIO
+Codex|silent_launch|STATUS_CODEX
+OpenCode|silent_launch|STATUS_OPENCODE
+Cursor|silent_launch|STATUS_CURSOR
+Ascendo|silent_launch|STATUS_ASCENDO
+Obsidian|silent_launch|STATUS_OBSIDIAN
+ProtonVPN|silent_launch|STATUS_PROTONVPN
+KeePassXC|github_dmg|STATUS_KEEPASSXC
+Proton Mail|silent_launch|STATUS_PROTONMAIL
+zoom.us|silent_launch|STATUS_ZOOM
+Google Drive|keystone|STATUS_GOOGLEDRIVE
+MEGAsync|silent_launch|STATUS_MEGASYNC
+Proton Drive|silent_launch|STATUS_PROTONDRIVE
+Microsoft Excel|msupdate|STATUS_MICROSOFT
+Microsoft Word|msupdate|STATUS_MICROSOFT
+Microsoft Outlook|msupdate|STATUS_MICROSOFT
+Microsoft PowerPoint|msupdate|STATUS_MICROSOFT
+Microsoft OneNote|msupdate|STATUS_MICROSOFT
+Microsoft Teams|msupdate|STATUS_MICROSOFT
+Visual Studio Code|github_dmg|STATUS_VSCODE
+Warp|silent_launch|STATUS_WARP
+CodeEdit|github_dmg|STATUS_CODEEDIT
+Docker Desktop|docker_cli|STATUS_DOCKER
+AppCleaner|silent_launch|STATUS_APPCLEANER
+Spotify|silent_launch|STATUS_SPOTIFY
+Ledger Live|github_dmg|STATUS_LEDGER
+Ledger Wallet|github_dmg|STATUS_LEDGER
+Trezor Suite|github_dmg|STATUS_TREZOR
+Remote Desktop Manager|silent_launch|STATUS_RDMANAGER
+IPMIView|manual|STATUS_IPMIVIEW
+Inkscape|manual|STATUS_INKSCAPE

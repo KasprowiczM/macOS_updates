@@ -1,0 +1,50 @@
+/.DS_Store
+**/.DS_Store
+/.env
+/.env.*
+!/.env.example
+/.dev_sync_config.json
+/.dev_sync_config_test.json
+/.dev_sync_manifest.json
+/dev_sync_cleanup_plan*.json
+/dev_sync_quarantine/
+/data/
+/dev_sync_logs/
+/dev_sync/dev_sync_logs/
+/dev_sync/dev_sync_quarantine/
+/logs/
+/__pycache__/
+/dev_sync/__pycache__/
+/i18n/__pycache__/
+*.pyc
+*.bak
+
+# ── Personal data files → cloud storage only ─────────────────────
+# These files contain your personal app catalog and update session history.
+# They are NOT tracked by git. After cloning, restore them with:
+#   bash dev_sync/dev-sync-import.sh
+/APPLICATIONS.md
+/UPDATES.md
+
+# ── User preferences (language + cloud provider selection) ────────
+/.mac_update_prefs
+
+# ── Local-only / generated — not for public GitHub ───────────────
+/graphify-out/
+/scratch/
+/.claude/settings.local.json
+
+# ── Private overlay examples (real files sync via dev_sync) ─────
+/.env.example.local
+
+# ── Proton Drive Private Overlay (Ignored by Git) ───────
+.antigravitycli/
+FABLE5_Project_Review_Report.md
+DEV_SCRIPTS_README.md
+docs/IMPLEMENTATION_REPORT_20260609.md
+docs/agents/handoffs/
+docs/agents/handoff.md
+docs/agents/codex_notes.md
+docs/agents/audit_2026-04-26.md
+/scratch/
+git_history_archive.md

@@ -1,0 +1,15 @@
+{
+  "model": "claude-sonnet-4-6",
+  "env": {
+    "MAX_THINKING_TOKENS": "10000",
+    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-6",
+    "ECC_GATEGUARD": "off"
+  },
+  "disabledMcpServers": [
+    "mcp__claude_ai_Gmail",
+    "mcp__claude_ai_Google_Calendar",
+    "mcp__claude_ai_Google_Drive",
+    "memory"
+  ]
+}

@@ -1,0 +1,11 @@
+# display_name|package_name|method|brew_formula|command
+node|node|native-node|node|node
+npm|npm|npm||npm
+pnpm|pnpm|npm||pnpm
+claude-code|@anthropic-ai/claude-code|npm||claude
+codex-cli|@openai/codex|npm||codex
+gemini-cli|@google/gemini-cli|npm|gemini-cli|gemini
+qwen-code|@qwen-code/qwen-code|npm|qwen-code|qwen
+opencode-cli|opencode-ai|npm|opencode|opencode
+agy-cli|agy|self-update||agy
+bun|bun|native-bun|bun|bun

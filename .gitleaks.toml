@@ -1,0 +1,13 @@
+# Gitleaks config — matches CI; local .env is gitignored and not scanned in git mode.
+title = "macOS_updates gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Template placeholders and docs"
+paths = [
+  '''\.env\.example$''',
+  '''^docs/''',
+  '''^README\.md$''',
+]
