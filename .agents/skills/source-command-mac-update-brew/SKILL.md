@@ -25,7 +25,7 @@ Steps performed:
 
 Key Homebrew packages on this system: bun, node, python@3.11, python@3.14, uv,
 postgresql@16, ripgrep, ffmpeg, imagemagick, tesseract, openai-whisper, opencode,
-gemini-cli, qwen-code, supabase, midnight-commander, pytorch, inkscape (cask), blackhole-2ch (cask)
+supabase, midnight-commander, pytorch, inkscape (cask), blackhole-2ch (cask)
 
 If `brew: command not found`: run `eval "$(/opt/homebrew/bin/brew shellenv)"` first.
 If disk space error: `brew cleanup --prune=all` to free space before upgrading.

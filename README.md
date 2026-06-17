@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.18** — Production-ready one-command updater for **Apple Silicon Macs**. Keeps macOS, App Store, Homebrew, and 40+ internet-downloaded apps up to date — **only software you already have installed**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.0.19** — Production-ready one-command updater for **Apple Silicon Macs**. Keeps macOS, App Store, Homebrew, and 40+ internet-downloaded apps up to date — **only software you already have installed**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -91,7 +91,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Package version (1.0.18)
+├── VERSION                     # Package version (1.0.19)
 ├── install.sh                  # One-line installer entrypoint
 ├── uninstall.sh                # Remove clone (keeps Homebrew/apps)
 ├── setup.sh                    # First-run setup (no cloud)

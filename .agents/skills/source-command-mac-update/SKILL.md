@@ -15,7 +15,7 @@ Run the full MacBook update sequence:
 cd ~/Dev_Env/macOS_updates && bash update_all.sh
 ```
 
-Steps (v1.0.17):
+Steps (v1.0.19):
 0. Prescan → `APPLICATIONS.md` (installed apps on **this** Mac only)
 1. macOS (`softwareupdate -ia -R`)
 2. App Store (`sudo mas upgrade` + AppleScript for iPad apps)

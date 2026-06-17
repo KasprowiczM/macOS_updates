@@ -1,6 +1,6 @@
 # Guia do utilizador (Português)
 
-**Versão:** 1.0.18 · **Apenas Apple Silicon**
+**Versão:** 1.0.19 · **Apenas Apple Silicon**
 
 ## O que faz
 

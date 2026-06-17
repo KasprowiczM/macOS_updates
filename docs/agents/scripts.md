@@ -11,7 +11,7 @@
 | `update_system.sh` | macOS via `softwareupdate -ia -R --verbose` |
 | `update_appstore.sh` | `sudo mas upgrade` + AppleScript GUI for iPad apps |
 | `update_internet_apps.sh` | 40+ apps (see `config/internet_apps.txt`): GitHub API, Keystone, msupdate, Docker CLI, Sparkle, auto-updaters |
-| `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `gemini`, `qwen`, `codex`, `opencode`) + self-updating `agy` |
+| `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `codex`, `opencode`) + self-updating `agy` |
 | `update_brew.sh` | `brew upgrade` + cleanup + doctor |
 | `dev_sync/*.sh` | Export/import/verify private files to/from cloud storage |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |

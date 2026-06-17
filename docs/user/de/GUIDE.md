@@ -1,6 +1,6 @@
 # Benutzerhandbuch (Deutsch)
 
-**Version:** 1.0.18 · **Nur Apple Silicon**
+**Version:** 1.0.19 · **Nur Apple Silicon**
 
 ## Funktion
 
