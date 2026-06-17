@@ -835,7 +835,19 @@ class RCloneProvider(CloudProvider):
         remote_root = self._remote_root()
         if not dry_run:
             run_command(["rclone", "copy", remote_root, str(dest_root), "--checksum"], cwd=dest_root)
-        return [], "rclone"
+        # rclone copy does not return a file list, so list the remote explicitly
+        # to report what was imported. Best-effort: a listing failure must not
+        # break an otherwise-successful import.
+        try:
+            listing = run_command(
+                ["rclone", "lsf", "--files-only", "-R", remote_root],
+                cwd=dest_root,
+                check=False,
+            )
+            files = sorted(line.strip() for line in listing.stdout.splitlines() if line.strip())
+        except Exception:
+            files = []
+        return files, "rclone"
 
 
 def create_provider(config: DevSyncConfig) -> CloudProvider:

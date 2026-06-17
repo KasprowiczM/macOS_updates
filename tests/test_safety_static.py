@@ -12,7 +12,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEV_SYNC_DIR = REPO_ROOT / "dev_sync"
 sys.path.insert(0, str(DEV_SYNC_DIR))
 
-from dev_sync_core import DevSyncError, read_manifest, safe_relpath  # noqa: E402
+from dev_sync_core import (  # noqa: E402
+    DevSyncConfig,
+    DevSyncError,
+    RCloneProvider,
+    path_matches_pattern,
+    read_manifest,
+    safe_relpath,
+    should_include_candidate,
+    should_keep_path,
+)
 from dev_sync_prune_excluded import quarantine_from_plan  # noqa: E402
 
 
@@ -66,6 +75,63 @@ class DevSyncPathSafetyTests(unittest.TestCase):
             }
             with self.assertRaises(DevSyncError):
                 quarantine_from_plan(plan, base, base / "dev_sync_quarantine", NullLogger())
+
+
+class DevSyncMatchingTests(unittest.TestCase):
+    """Behavioral coverage for the include/exclude matching engine and the
+    rclone dry-run plan (previously only path-safety was exercised)."""
+
+    def test_hard_exclude_cannot_be_overridden(self) -> None:
+        # .git and the manifest must never sync, even if a user lists them in
+        # include_always — HARD_EXCLUDE_PATTERNS wins over everything else.
+        self.assertFalse(should_keep_path(".git/config", [], [".git/"]))
+        self.assertFalse(
+            should_keep_path(".dev_sync_manifest.json", [], [".dev_sync_manifest.json"])
+        )
+
+    def test_include_always_overrides_plain_exclude(self) -> None:
+        self.assertTrue(should_keep_path("secret.key", ["*.key"], ["secret.key"]))
+
+    def test_plain_exclude_and_default_keep(self) -> None:
+        self.assertFalse(should_keep_path("debug.log", ["*.log"], []))
+        self.assertTrue(should_keep_path("src/main.py", ["*.log"], []))
+
+    def test_path_matches_pattern_directory_and_glob(self) -> None:
+        self.assertTrue(path_matches_pattern("node_modules/foo/bar.js", "node_modules/"))
+        self.assertTrue(path_matches_pattern("src/node_modules/x.js", "node_modules/"))
+        self.assertTrue(path_matches_pattern("dev_sync_logs/x.log", "dev_sync_logs/"))
+        self.assertTrue(path_matches_pattern("a/b/.DS_Store", ".DS_Store"))
+        self.assertTrue(path_matches_pattern("logs/run.log", "*.log"))
+        self.assertFalse(path_matches_pattern("src/main.py", "*.log"))
+        self.assertFalse(path_matches_pattern("src/main.py", "node_modules/"))
+
+    def test_should_include_candidate_with_default_config(self) -> None:
+        config = DevSyncConfig(project_name="proj")
+        keep = ["src/app.py", ".env.local", "APPLICATIONS.md"]
+        drop = [".DS_Store", "node_modules/pkg/index.js", ".git/config", "debug.log"]
+        for rel in keep:
+            with self.subTest(keep=rel):
+                self.assertTrue(should_include_candidate(rel, config))
+        for rel in drop:
+            with self.subTest(drop=rel):
+                self.assertFalse(should_include_candidate(rel, config))
+
+    def test_rclone_sync_to_dry_run_plans_without_mutating(self) -> None:
+        # dry-run must return the planned (sorted, de-duplicated) relpaths and
+        # must NOT exec rclone — proven here by the call succeeding with no
+        # rclone binary present.
+        config = DevSyncConfig(
+            project_name="proj",
+            provider="rclone",
+            rclone_remote="remote",
+            rclone_remote_path="base",
+        )
+        provider = RCloneProvider(config)
+        files, transport = provider.sync_to(
+            ["b.txt", "a.txt", "a.txt"], Path("/tmp"), dry_run=True
+        )
+        self.assertEqual(transport, "rclone")
+        self.assertEqual(files, ["a.txt", "b.txt"])
 
 
 class StaticShellSafetyTests(unittest.TestCase):

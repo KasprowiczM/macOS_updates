@@ -180,7 +180,14 @@ fi
 # tylko symlink, który i tak należy do tego kega po stronie Cellar.
 # ============================================================
 LINK_FAILED_KEGS=$(awk '
-    /^==> Upgrading / { kegname = $3; sub(/[[:space:]]*$/, "", kegname); next }
+    # A per-formula header ("==> Upgrading uv") names a keg. Skip the
+    # "==> Upgrading N outdated packages:" summary so its count is never
+    # mistaken for a keg name. $3 stays the formula even if brew later adds
+    # trailing "old -> new" version text to the header line.
+    /^==> Upgrading / {
+        if ($0 !~ /outdated package/) { kegname = $3 }
+        next
+    }
     /Error: The .brew link. step did not complete successfully/ {
         if (kegname != "") { print kegname; kegname = "" }
     }

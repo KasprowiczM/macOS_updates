@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.18** — Atualizador de comando único, pronto para produção, para **Macs Apple Silicon**. Mantém o macOS, a App Store, o Homebrew e mais de 40 aplicativos da internet atualizados — **apenas os softwares que você já tem instalados**. **Multilíngue** (7 idiomas). Camada de nuvem privada opcional via [`dev_sync/`](dev_sync/README.md).
+> **v1.0.19** — Atualizador de comando único, pronto para produção, para **Macs Apple Silicon**. Mantém o macOS, a App Store, o Homebrew e mais de 40 aplicativos da internet atualizados — **apenas os softwares que você já tem instalados**. **Multilíngue** (7 idiomas). Camada de nuvem privada opcional via [`dev_sync/`](dev_sync/README.md).
 
 **Repositório público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Lançamento: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 

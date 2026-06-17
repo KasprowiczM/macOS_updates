@@ -1,6 +1,6 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.0.18 · **Tylko Apple Silicon**
+**Wersja:** 1.0.19 · **Tylko Apple Silicon**
 
 ## Co robi ten zestaw
 

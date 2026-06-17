@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.18** — Gotowy do produkcji jednokomendowy aktualizator dla **Maców z procesorem Apple Silicon**. Utrzymuje w aktualności system macOS, App Store, Homebrew oraz ponad 40 aplikacji pobieranych z internetu — **tylko to oprogramowanie, które masz już zainstalowane**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka w chmurze przez [`dev_sync/`](dev_sync/README.md).
+> **v1.0.19** — Gotowy do produkcji jednokomendowy aktualizator dla **Maców z procesorem Apple Silicon**. Utrzymuje w aktualności system macOS, App Store, Homebrew oraz ponad 40 aplikacji pobieranych z internetu — **tylko to oprogramowanie, które masz już zainstalowane**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka w chmurze przez [`dev_sync/`](dev_sync/README.md).
 
 **Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -91,7 +91,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Wersja pakietu (1.0.18)
+├── VERSION                     # Wersja pakietu (1.0.19)
 ├── install.sh                  # Jednolinijkowy instalator
 ├── uninstall.sh                # Usuwa sklonowane pliki (zachowuje Homebrew/aplikacje)
 ├── setup.sh                    # Konfiguracja pierwszego uruchomienia (bez chmury)

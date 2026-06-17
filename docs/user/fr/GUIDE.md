@@ -1,6 +1,6 @@
 # Guide utilisateur (Français)
 
-**Version :** 1.0.18 · **Apple Silicon uniquement**
+**Version :** 1.0.19 · **Apple Silicon uniquement**
 
 ## Fonctionnement
 

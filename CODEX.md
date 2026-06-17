@@ -2,7 +2,7 @@
 
 Codex is a cloud-based coding agent for this repo — read shared rules before modifying any script.
 
-**Version:** 1.0.18 · **Platform:** Apple Silicon (arm64) only
+**Version:** 1.0.19 · **Platform:** Apple Silicon (arm64) only
 
 ## Shared Rules & Architecture
 

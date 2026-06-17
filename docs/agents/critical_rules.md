@@ -35,7 +35,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 | Google Keystone | Chrome, Google Drive |
 | msupdate CLI | Word, Excel, PowerPoint, Outlook, OneNote, Teams |
 | Docker CLI | Docker Desktop v4.37+ |
-| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Gemini CLI, Qwen Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
+| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
 | Homebrew cask --greedy | Inkscape |
 | Built-in auto-updater | Brave, ChatGPT, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, Codex, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, Remote Desktop Manager, Cursor, Obsidian, Ascendo |
 | Manual only | IPMIView |

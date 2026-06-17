@@ -1,6 +1,6 @@
 # Public GitHub vs Private Cloud Overlay
 
-**Production release:** v**1.0.18** · Repository: [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates)
+**Production release:** v**1.0.19** · Repository: [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates)
 
 This repository is designed for **public GitHub** plus an optional **private overlay** synced to your cloud provider (Proton Drive, iCloud, Google Drive, etc.).
 
@@ -64,7 +64,7 @@ bash dev_sync/dev-sync-verify-full.sh
 
 - [x] `APPLICATIONS.md` and `UPDATES.md` gitignored
 - [x] `.env`, `.dev_sync_config.json` gitignored
-- [x] `bash run_tests.sh` passes (56 tests + gitleaks)
+- [x] `bash run_tests.sh` passes (62 tests + gitleaks)
 - [x] CI: macOS test job + Ubuntu shellcheck (see `.shellcheckrc`)
 - [x] One-line install documented in `README.md` and `docs/INSTALL.md`
 - [x] New users build inventory locally (`build_inventory.sh`)

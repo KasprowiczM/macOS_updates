@@ -114,10 +114,24 @@ copy_verified_app() {
         return 1
     fi
     local dest="/Applications/$app_label"
+    # Copy to a staging path on the same volume FIRST, so a failed or partial
+    # copy never destroys the currently-installed app. Swap into place only
+    # after a complete copy (mv = atomic rename on the same volume), which also
+    # preserves the bundle's signature/xattrs better than a second cp would.
+    local staging="${dest}.macupd_new.$$"
+    rm -rf "$staging" 2>/dev/null || true
+    if ! cp -R "$app_path" "$staging" 2>/dev/null; then
+        rm -rf "$staging" 2>/dev/null || true
+        return 1
+    fi
     if [ -d "$dest" ]; then
         rm -rf "$dest" || true
     fi
-    cp -R "$app_path" "$dest" 2>/dev/null
+    if ! mv "$staging" "$dest" 2>/dev/null; then
+        rm -rf "$staging" 2>/dev/null || true
+        return 1
+    fi
+    return 0
 }
 
 run_with_timeout() {
@@ -347,8 +361,20 @@ for status in \
     "$STATUS_LEDGER" "$STATUS_TREZOR" \
     "$STATUS_RDMANAGER" "$STATUS_IPMIVIEW" "$STATUS_INKSCAPE"
 do
+    # Flag a failure only when the status equals an explicit error-status
+    # constant — do not scan for the ⚠️ glyph, which would silently break if a
+    # translation used a different warning symbol. Every failure status below is
+    # a static string (no %s substitution), so an exact match is safe and
+    # locale-independent.
     case "$status" in
-        *"⚠️"*)
+        "$L_INTERNET_STATUS_OFFLINE"|\
+        "$L_INTERNET_STATUS_INSTALL_ERROR"|\
+        "$L_INTERNET_STATUS_MOUNT_ERROR"|\
+        "$L_INTERNET_STATUS_DOWNLOAD_ERROR"|\
+        "$L_INTERNET_STATUS_EXTRACT_ERROR"|\
+        "$L_INTERNET_STATUS_NO_URL"|\
+        "$L_INTERNET_STATUS_CHECK_MAU"|\
+        "$L_INTERNET_STATUS_MAU_MISSING")
             INTERNET_EXIT=1
             ;;
     esac

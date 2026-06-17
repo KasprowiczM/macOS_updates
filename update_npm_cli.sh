@@ -145,7 +145,7 @@ detect_command_version() {
         node)
             version="$("$command_path" -v </dev/null 2>/dev/null | head -1)"
             ;;
-        npm|pnpm|gemini-cli|qwen-code|opencode-cli|bun)
+        npm|pnpm|opencode-cli|bun)
             version="$("$command_path" --version </dev/null 2>/dev/null | head -1)"
             ;;
         claude-code)
@@ -173,7 +173,7 @@ resolve_command_path() {
                 return 0
             fi
             ;;
-        npm|pnpm|claude|gemini|qwen|codex|opencode)
+        npm|pnpm|claude|codex|opencode)
             if [ -x "$NPM_GLOBAL_BIN/$command_name" ]; then
                 echo "$NPM_GLOBAL_BIN/$command_name"
                 return 0
@@ -570,14 +570,12 @@ remove_legacy_brew_formulas() {
     local brew_prefix
 
     brew_prefix="$(brew --prefix 2>/dev/null || echo "/opt/homebrew")"
-    for formula in gemini-cli qwen-code opencode bun node; do
+    for formula in opencode bun node; do
         if ! brew list --formula "$formula" >/dev/null 2>&1; then
             continue
         fi
 
         case "$formula" in
-            gemini-cli) command_name="gemini" ;;
-            qwen-code)  command_name="qwen" ;;
             opencode)   command_name="opencode" ;;
             bun)        command_name="bun" ;;
             node)       command_name="node" ;;
