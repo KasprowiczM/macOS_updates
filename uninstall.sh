@@ -37,6 +37,22 @@ fi
 
 PARENT="$SCRIPT_DIR"
 cd "$(dirname "$SCRIPT_DIR")" || exit 1
+# Safety guard: refuse to rm -rf if PARENT is root, home, or too shallow
+case "$PARENT" in
+    ""|"/"|"/Users"|"/Users/"*[!/]*[!/]) ;;  # these are fine (specific subdirectories)
+    *)
+        # Additional check: require at least 3 path components (e.g. /Users/mk/something)
+        _depth=$(echo "$PARENT" | tr -cd '/' | wc -c)
+        if [ "$_depth" -lt 3 ]; then
+            echo "  SAFETY: refusing to rm -rf '$PARENT' (too shallow)"
+            exit 1
+        fi
+        ;;
+esac
+if [ -z "$PARENT" ] || [ "$PARENT" = "/" ]; then
+    echo "  SAFETY: refusing to delete root or empty path"
+    exit 1
+fi
 rm -rf "$PARENT" 2>/dev/null || rm -rf "$SCRIPT_DIR" 2>/dev/null || {
     echo "  $L_UNINSTALL_MANUAL"
     echo "    rm -rf $SCRIPT_DIR"

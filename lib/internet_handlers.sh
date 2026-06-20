@@ -16,11 +16,15 @@ internet_handler_silent_launch() {
     ver="$(app_version "$app_path")"
     print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
-    silent_launch_app "$launch_target" || true
-    if [ -n "$verify_hint" ]; then
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
+    if silent_launch_app "$launch_target"; then
+        if [ -n "$verify_hint" ]; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
+        fi
+        echo "$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+    else
+        print_warn "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display") — failed"
+        echo "$L_INTERNET_STATUS_LAUNCH_FAILED"
     fi
-    echo "$L_INTERNET_STATUS_CHECKED"
 }
 
 internet_handler_manual() {
@@ -75,12 +79,13 @@ internet_handler_keystone() {
         print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "$app_label")"
     else
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$launch_name")"
-        silent_launch_app "$launch_name" || true
-        if [ -n "$verify_hint" ]; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
+        if silent_launch_app "$launch_name"; then
+            if [ -n "$verify_hint" ]; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
+            fi
         fi
     fi
-    echo "$L_INTERNET_STATUS_CHECKED"
+    echo "$L_INTERNET_STATUS_CHECKED_CLI"
 }
 
 # Standard silent-launch block with optional extra info line

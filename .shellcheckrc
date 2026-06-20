@@ -1,6 +1,6 @@
 # Project-wide shellcheck defaults (used by CI and local lint).
 # SC1091 — cannot follow dynamic $SCRIPT_DIR sources
 # SC2155 — declare and assign (stylistic)
-# SC2086 — intentional unquoted expansions in legacy bash
 # SC2034 — STATUS_* / INTERNET_EXIT set in sourced handler libs, read by orchestrators
-disable=SC1091,SC2155,SC2086,SC2034
+# NOTE: SC2086 removed from global disable — use inline overrides where intentional
+disable=SC1091,SC2155,SC2034

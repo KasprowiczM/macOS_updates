@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -o pipefail
 # ============================================================
 # setup.sh — macOS Updates: Quick Setup for New Users
 # ============================================================
