@@ -6,11 +6,14 @@
 - **Apple Silicon only** — `lib/platform.sh` exits on non-arm64
 - **Homebrew prefix:** `/opt/homebrew` (arm64)
 - **Native CLI toolchain:** keep npm global binaries outside Homebrew, under user-space paths managed by `update_npm_cli.sh`
+- **Internet-app bundle replacement:** `copy_verified_app` quits the running app, copies with `ditto` (not `cp -R`) to a staging path, swaps in atomically with `mv`, and `spctl`-verifies before and after. Status reporting is honest — `LAUNCHED_UNVERIFIED` / `LAUNCH_FAILED` / `CURRENT` / `UPDATED`, never an unconditional "checked".
+- **Version detection:** `app_version()` reads `CFBundleShortVersionString`, then `CFBundleVersion`, then falls back to `mdls -name kMDItemVersion` (covers iOS/iPadOS apps on Apple Silicon that have no `Contents/Info` plist).
 
 ## Python
 - Update pipeline Python is inline via heredocs written to session dir.
 - Existing standalone Python is limited to the `dev_sync/` backend and `scripts/fix_mcp_configs.py`.
 - Used for `APPLICATIONS.md` / `UPDATES.md` processing, cloud sync, and MCP config repair.
+- **Atomic config writes:** JSON writes (`dev_sync/`, `scripts/fix_mcp_configs.py`) use a temp file + `os.replace()`; user-owned configs (`~/.claude.json`, MCP) are copied to `.bak` first.
 
 ## Session Dir
 - Path: `mktemp -d "${TMPDIR:-/tmp}/mac_update.XXXXXX"` stored in `$MAC_UPDATE_SESSION_DIR`

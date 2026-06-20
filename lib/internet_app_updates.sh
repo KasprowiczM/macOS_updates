@@ -876,9 +876,9 @@ iu_docker_desktop() {
         if command -v docker >/dev/null 2>&1; then
             print_step "$L_INTERNET_DOCKER_CHECKING"
             # Check if an update is available first (non-destructive)
-            if docker desktop update --check-only --quiet 2>/dev/null; then
+            if run_with_timeout 60 docker desktop update --check-only --quiet 2>/dev/null; then
                 print_info "Update available — applying..."
-                if docker desktop update --quiet 2>/dev/null; then
+                if run_with_timeout 600 docker desktop update --quiet 2>/dev/null; then
                     print_ok "$L_INTERNET_DOCKER_CLI_OK"
                     STATUS_DOCKER="$L_INTERNET_STATUS_CHECKED_CLI"
                 else
@@ -946,9 +946,16 @@ iu_cursor() {
 
 iu_ascendo() {
     print_header "📊 Ascendo"
-    APP_PATH="$(capture_app_path "Ascendo")"
-    if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
-        STATUS_ASCENDO="$(internet_handler_silent_launch "Ascendo" "Ascendo" "Ascendo → Check for updates" "$APP_PATH")"
+    if [ -d "/Applications/Ascendo.app" ]; then
+        VER=$(app_version "/Applications/Ascendo.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Ascendo")"
+        if silent_launch_app "Ascendo"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Ascendo → Check for updates")"
+            STATUS_ASCENDO="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_ASCENDO="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Ascendo")"
     fi
@@ -1275,8 +1282,8 @@ iu_unifi() {
     if [ -d "/Applications/UniFi.app" ]; then
         VER=$(app_version "/Applications/UniFi.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "iPad app on Apple Silicon — updated via App Store (Track 2)"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Updates")"
+        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "UniFi (iPad/iOS app)")"
+        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Account → Updates")"
         STATUS_UNIFI="$L_INTERNET_STATUS_MANUAL_UPDATE"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "UniFi")"
@@ -1288,8 +1295,8 @@ iu_wifiman() {
     if [ -d "/Applications/WiFiman.app" ]; then
         VER=$(app_version "/Applications/WiFiman.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "iPad app on Apple Silicon — updated via App Store (Track 2)"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Updates")"
+        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "WiFiman (iPad/iOS app)")"
+        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Account → Updates")"
         STATUS_WIFIMAN="$L_INTERNET_STATUS_MANUAL_UPDATE"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "WiFiman")"
