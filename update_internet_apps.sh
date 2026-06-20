@@ -189,10 +189,16 @@ silent_launch_app() {
 
 # ── Pomocnik: wersja aplikacji ──────────────────────────────
 app_version() {
-    local app_path="$1"
-    defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
-        || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null \
-        || echo "$L_INTERNET_VERSION_UNKNOWN"
+    local app_path="$1" v=""
+    v=$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
+        || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null)
+    if [ -z "$v" ]; then
+        # Fallback for iOS/iPadOS apps on Apple Silicon (wrapped bundles, no
+        # Contents/Info plist) and any odd bundle — read Spotlight metadata.
+        v=$(mdls -name kMDItemVersion -raw "$app_path" 2>/dev/null)
+        [ "$v" = "(null)" ] && v=""
+    fi
+    [ -n "$v" ] && echo "$v" || echo "$L_INTERNET_VERSION_UNKNOWN"
 }
 
 capture_app_path() {
