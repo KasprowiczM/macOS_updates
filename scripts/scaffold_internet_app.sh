@@ -46,8 +46,11 @@ case "$METHOD" in
     silent_launch)
         cat <<'EOF'
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "APP_NAME")"
-    silent_launch_app "APP_NAME" || true
-    STATUS_VAR="$L_INTERNET_STATUS_CHECKED"
+    if silent_launch_app "APP_NAME"; then
+        STATUS_VAR="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+    else
+        STATUS_VAR="$L_INTERNET_STATUS_LAUNCH_FAILED"
+    fi
 EOF
         ;;
     manual)

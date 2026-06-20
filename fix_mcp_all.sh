@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -o pipefail
 # ============================================================
 # fix_mcp_all.sh — Global MCP Configuration Patcher
 # ============================================================

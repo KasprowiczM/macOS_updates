@@ -36,9 +36,14 @@ CodeEdit
 Docker Desktop
 AppCleaner
 Spotify
+CapCut
 Ledger Live
 Ledger Wallet
 Trezor Suite
 Remote Desktop Manager
 IPMIView
 Inkscape
+DJI Assistant 2
+UniFi
+WiFiman
+Picsart

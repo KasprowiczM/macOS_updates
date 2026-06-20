@@ -37,9 +37,14 @@ CodeEdit|github_dmg|STATUS_CODEEDIT
 Docker Desktop|docker_cli|STATUS_DOCKER
 AppCleaner|silent_launch|STATUS_APPCLEANER
 Spotify|silent_launch|STATUS_SPOTIFY
+CapCut|silent_launch|STATUS_CAPCUT
 Ledger Live|github_dmg|STATUS_LEDGER
 Ledger Wallet|github_dmg|STATUS_LEDGER
 Trezor Suite|github_dmg|STATUS_TREZOR
 Remote Desktop Manager|silent_launch|STATUS_RDMANAGER
 IPMIView|manual|STATUS_IPMIVIEW
 Inkscape|manual|STATUS_INKSCAPE
+DJI Assistant 2|manual|STATUS_DJI
+UniFi|manual|STATUS_UNIFI
+WiFiman|manual|STATUS_WIFIMAN
+Picsart|manual|STATUS_PICSART

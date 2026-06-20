@@ -98,6 +98,12 @@ create_config_json() {
     local rclone_remote="$3"
     local rclone_remote_path="$4"
     local project_folder="$5"
+    # Sanitize user-provided values for safe JSON embedding (strip backslashes and double-quotes)
+    provider="$(echo "$provider" | tr -d '\\"')"
+    provider_path="$(echo "$provider_path" | tr -d '\\"')"
+    rclone_remote="$(echo "$rclone_remote" | tr -d '\\"')"
+    rclone_remote_path="$(echo "$rclone_remote_path" | tr -d '\\"')"
+    project_folder="$(echo "$project_folder" | tr -d '\\"')"
 
     cat > "$CONFIG_FILE" <<EOF
 {

@@ -81,11 +81,20 @@ def fix_mcp_config(config_path):
 
     if modified:
         try:
-            with open(config_path, 'w') as f:
+            # Create backup before modifying
+            bak_path = config_path + '.bak'
+            shutil.copy2(config_path, bak_path)
+            # Atomic write: tmp file + os.replace
+            tmp_path = config_path + f'.tmp.{os.getpid()}'
+            with open(tmp_path, 'w') as f:
                 json.dump(data, f, indent=2)
+                f.write('\n')
+            os.replace(tmp_path, config_path)
             print(f"Successfully updated: {config_path}")
             return True
         except Exception as e:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
             print(f"Error writing JSON: {e}")
             return False
     else:

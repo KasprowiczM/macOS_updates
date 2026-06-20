@@ -29,8 +29,13 @@ iu_ascendo
 iu_appcleaner
 iu_obsidian
 iu_spotify
+iu_capcut
 iu_ledger
 iu_trezor_suite
 iu_remote_desktop_manager
 iu_ipmiview
 iu_inkscape
+iu_dji_assistant
+iu_unifi
+iu_wifiman
+iu_picsart

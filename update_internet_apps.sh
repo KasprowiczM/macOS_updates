@@ -114,13 +114,18 @@ copy_verified_app() {
         return 1
     fi
     local dest="/Applications/$app_label"
+    # Quit the running app before replacing its bundle (ignore errors if not running)
+    local app_name
+    app_name="$(echo "$app_label" | sed 's/\.app$//')"
+    osascript -e "tell application \"$app_name\" to quit" 2>/dev/null || true
+    sleep 1
     # Copy to a staging path on the same volume FIRST, so a failed or partial
     # copy never destroys the currently-installed app. Swap into place only
-    # after a complete copy (mv = atomic rename on the same volume), which also
-    # preserves the bundle's signature/xattrs better than a second cp would.
+    # after a complete copy (mv = atomic rename on the same volume).
+    # ditto preserves code signatures, xattrs, and resource forks — cp -R does not.
     local staging="${dest}.macupd_new.$$"
     rm -rf "$staging" 2>/dev/null || true
-    if ! cp -R "$app_path" "$staging" 2>/dev/null; then
+    if ! ditto "$app_path" "$staging" 2>/dev/null; then
         rm -rf "$staging" 2>/dev/null || true
         return 1
     fi
@@ -130,6 +135,11 @@ copy_verified_app() {
     if ! mv "$staging" "$dest" 2>/dev/null; then
         rm -rf "$staging" 2>/dev/null || true
         return 1
+    fi
+    # Post-install signature verification (log failures but don't block)
+    if ! verify_app_signature "$dest"; then
+        print_warn "Post-install signature check failed for $app_label"
+        internet_diag_log "WARN: post-install spctl failed for $dest"
     fi
     return 0
 }
@@ -251,12 +261,17 @@ STATUS_ASCENDO="$L_INTERNET_STATUS_SKIPPED"
 STATUS_APPCLEANER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_OBSIDIAN="$L_INTERNET_STATUS_SKIPPED"
 STATUS_SPOTIFY="$L_INTERNET_STATUS_SKIPPED"
+STATUS_CAPCUT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_LEDGER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_TREZOR="$L_INTERNET_STATUS_SKIPPED"
 STATUS_IPMIVIEW="$L_INTERNET_STATUS_SKIPPED"
 STATUS_RDMANAGER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_OPENCODE="$L_INTERNET_STATUS_SKIPPED"
 STATUS_INKSCAPE="$L_INTERNET_STATUS_SKIPPED"
+STATUS_DJI="$L_INTERNET_STATUS_SKIPPED"
+STATUS_UNIFI="$L_INTERNET_STATUS_SKIPPED"
+STATUS_WIFIMAN="$L_INTERNET_STATUS_SKIPPED"
+STATUS_PICSART="$L_INTERNET_STATUS_SKIPPED"
 
 # ============================================================
 # App handlers — config/internet_dispatch_order.txt
@@ -333,7 +348,9 @@ echo ""
 
 echo -e "  ${BOLD}$L_INTERNET_SECTION_MULTIMEDIA${NC}"
 printf "  %-32s %s\n" "Spotify:"                  "$STATUS_SPOTIFY"
+printf "  %-32s %s\n" "CapCut:"                   "$STATUS_CAPCUT"
 printf "  %-32s %s\n" "Inkscape:"                 "$STATUS_INKSCAPE"
+printf "  %-32s %s\n" "Picsart:"                  "$STATUS_PICSART"
 echo ""
 
 echo -e "  ${BOLD}$L_INTERNET_SECTION_CRYPTO${NC}"
@@ -344,6 +361,12 @@ echo ""
 echo -e "  ${BOLD}$L_INTERNET_SECTION_NETWORK${NC}"
 printf "  %-32s %s\n" "Remote Desktop Manager:"   "$STATUS_RDMANAGER"
 printf "  %-32s %s\n" "IPMIView:"                 "$STATUS_IPMIVIEW"
+printf "  %-32s %s\n" "DJI Assistant 2:"          "$STATUS_DJI"
+echo ""
+
+echo -e "  ${BOLD}IoT / iPad on Apple Silicon${NC}"
+printf "  %-32s %s\n" "UniFi:"                    "$STATUS_UNIFI"
+printf "  %-32s %s\n" "WiFiman:"                  "$STATUS_WIFIMAN"
 
 echo ""
 echo -e "  ${YELLOW}──────────────────────────────────────────────────────${NC}"
@@ -357,9 +380,10 @@ for status in \
     "$STATUS_PROTONVPN" "$STATUS_KEEPASSXC" "$STATUS_PROTONMAIL" "$STATUS_ZOOM" \
     "$STATUS_GOOGLEDRIVE" "$STATUS_MEGASYNC" "$STATUS_PROTONDRIVE" "$STATUS_MICROSOFT" \
     "$STATUS_VSCODE" "$STATUS_CODEEDIT" "$STATUS_DOCKER" "$STATUS_WARP" "$STATUS_CURSOR" "$STATUS_ASCENDO" \
-    "$STATUS_APPCLEANER" "$STATUS_OBSIDIAN" "$STATUS_SPOTIFY" \
+    "$STATUS_APPCLEANER" "$STATUS_OBSIDIAN" "$STATUS_SPOTIFY" "$STATUS_CAPCUT" \
     "$STATUS_LEDGER" "$STATUS_TREZOR" \
-    "$STATUS_RDMANAGER" "$STATUS_IPMIVIEW" "$STATUS_INKSCAPE"
+    "$STATUS_RDMANAGER" "$STATUS_IPMIVIEW" "$STATUS_INKSCAPE" \
+    "$STATUS_DJI" "$STATUS_UNIFI" "$STATUS_WIFIMAN" "$STATUS_PICSART"
 do
     # Flag a failure only when the status equals an explicit error-status
     # constant — do not scan for the ⚠️ glyph, which would silently break if a
@@ -374,7 +398,8 @@ do
         "$L_INTERNET_STATUS_EXTRACT_ERROR"|\
         "$L_INTERNET_STATUS_NO_URL"|\
         "$L_INTERNET_STATUS_CHECK_MAU"|\
-        "$L_INTERNET_STATUS_MAU_MISSING")
+        "$L_INTERNET_STATUS_MAU_MISSING"|\
+        "$L_INTERNET_STATUS_LAUNCH_FAILED")
             INTERNET_EXIT=1
             ;;
     esac

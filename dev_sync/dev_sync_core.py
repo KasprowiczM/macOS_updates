@@ -349,7 +349,14 @@ def read_json(path: Path) -> dict:
 
 
 def write_json(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    content = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    tmp_path = path.with_suffix(f".tmp.{os.getpid()}")
+    try:
+        tmp_path.write_text(content, encoding="utf-8")
+        os.replace(str(tmp_path), str(path))
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def _ordered_unique(values: Sequence[str]) -> list[str]:

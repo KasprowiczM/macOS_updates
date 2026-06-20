@@ -14,12 +14,16 @@ iu_google_chrome() {
             "$KEYSTONE_AGENT" --runMode ondemand 2>/dev/null &
             sleep 3
             print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
+            STATUS_CHROME="$L_INTERNET_STATUS_CHECKED_CLI"
         else
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Chrome")"
-            silent_launch_app "Google Chrome" || true
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Chrome → Pomoc → O Google Chrome")"
+            if silent_launch_app "Google Chrome"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Chrome → Pomoc → O Google Chrome")"
+                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         fi
-        STATUS_CHROME="$L_INTERNET_STATUS_CHECKED"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Chrome")"
     fi
@@ -46,11 +50,20 @@ iu_firefox_developer_edition() {
 
         if [ "$LATEST_FF" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "Mozilla API")"
-            silent_launch_app "Firefox Developer Edition" || true
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Firefox → Pomoc → O Firefoksie")"
-            STATUS_FIREFOX="$L_INTERNET_STATUS_OFFLINE"
+            if silent_launch_app "Firefox Developer Edition"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Firefox → Pomoc → O Firefoksie")"
+                STATUS_FIREFOX="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_FIREFOX="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         elif [ "$LATEST_FF" = "$VER" ] || [ "$LATEST_FF_BASE" = "$VER" ]; then
+            # Exact match — already current
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$VER")"
+            STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
+        elif [ "$(printf '%s\n%s\n' "$LATEST_FF_BASE" "$VER" | sort -V | tail -1)" = "$VER" ]; then
+            # Local version is newer or equal to remote base (e.g. local=150.0.1, remote=150.0b5)
+            # DevEdition = beta channel — local may legitimately be ahead
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$VER (remote: $LATEST_FF)")"
             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_FF" "$VER")"
@@ -59,7 +72,7 @@ iu_firefox_developer_edition() {
             TEMP_DMG="$(make_temp_dmg Firefox_DevEd)"
             if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL" 2>/dev/null \
                 && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet 2>/dev/null; then
+                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
                     sleep 1
                     if copy_verified_app "/Volumes/Firefox Developer Edition/Firefox Developer Edition.app" "Firefox Developer Edition.app"; then
                         NEW_VER=$(firefox_dev_version)
@@ -98,9 +111,12 @@ iu_brave_browser() {
         VER=$(app_version "/Applications/Brave Browser.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Brave")"
-        silent_launch_app "Brave Browser" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Brave → Pomoc → O Brave Browser")"
-        STATUS_BRAVE="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Brave Browser"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Brave → Pomoc → O Brave Browser")"
+            STATUS_BRAVE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_BRAVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Brave Browser")"
     fi
@@ -120,10 +136,12 @@ iu_chatgpt_atlas() {
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
         # Pobierz najnowszą wersję z Sparkle appcast OpenAI
-        ATLAS_XML=$(curl -s --max-time 20 --retry 3 --retry-delay 2 \
+        ATLAS_XML=$(curl -s --compressed --max-time 20 --retry 3 --retry-delay 2 \
             "https://persistent.oaistatic.com/atlas/public/sparkle_public_appcast.xml" 2>/dev/null)
-        ATLAS_LATEST=$(echo "$ATLAS_XML" | grep -m1 'sparkle:shortVersionString' | \
-            sed 's|.*<sparkle:shortVersionString>\(.*\)</sparkle:shortVersionString>.*|\1|')
+        # Parse the highest shortVersionString (appcast may have multiple items)
+        ATLAS_LATEST=$(echo "$ATLAS_XML" | grep 'sparkle:shortVersionString' | \
+            sed 's|.*<sparkle:shortVersionString>\(.*\)</sparkle:shortVersionString>.*|\1|' | \
+            sort -V | tail -1)
         ATLAS_DMG_URL=$(echo "$ATLAS_XML" | grep -m1 'enclosure url=".*\.dmg"' | \
             sed 's|.*enclosure url="\([^"]*\.dmg\)".*|\1|')
 
@@ -140,7 +158,7 @@ iu_chatgpt_atlas() {
                 TEMP_DMG="$(make_temp_dmg ChatGPT_Atlas)"
                 if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$ATLAS_DMG_URL" 2>/dev/null \
                     && verify_dmg "$TEMP_DMG"; then
-                    if hdiutil attach "$TEMP_DMG" -quiet 2>/dev/null; then
+                    if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
                         sleep 1
                         ATLAS_VOL=$(find /Volumes -maxdepth 1 -type d \
                             \( -iname "*atlas*" -o -iname "*chatgpt*" \) 2>/dev/null | head -1)
@@ -202,9 +220,12 @@ iu_chatgpt() {
         VER=$(app_version "/Applications/ChatGPT.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "ChatGPT")"
-        silent_launch_app "ChatGPT" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ChatGPT → Check for updates")"
-        STATUS_CHATGPT="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "ChatGPT"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ChatGPT → Check for updates")"
+            STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT")"
     fi
@@ -218,9 +239,12 @@ iu_claude() {
         VER=$(app_version "/Applications/Claude.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Claude")"
-        silent_launch_app "Claude" || true
-        print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
-        STATUS_CLAUDE_APP="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Claude"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
+            STATUS_CLAUDE_APP="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_CLAUDE_APP="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Claude Desktop")"
     fi
@@ -234,9 +258,12 @@ iu_comet() {
         VER=$(app_version "/Applications/Comet.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Comet")"
-        silent_launch_app "Comet" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Comet → Pomoc → O Comet")"
-        STATUS_COMET="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Comet"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Comet → Pomoc → O Comet")"
+            STATUS_COMET="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_COMET="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Comet")"
     fi
@@ -250,9 +277,12 @@ iu_antigravity() {
         VER=$(app_version "/Applications/Antigravity.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Antigravity")"
-        silent_launch_app "Antigravity" || true
-        print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity")"
-        STATUS_ANTIGRAVITY="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Antigravity"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity")"
+            STATUS_ANTIGRAVITY="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_ANTIGRAVITY="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Antigravity")"
     fi
@@ -266,9 +296,12 @@ iu_antigravity_ide() {
         VER=$(app_version "/Applications/Antigravity IDE.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Antigravity IDE")"
-        silent_launch_app "Antigravity IDE" || true
-        print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity IDE")"
-        STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Antigravity IDE"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity IDE")"
+            STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Antigravity IDE")"
         STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_SKIPPED"
@@ -283,9 +316,12 @@ iu_gemini() {
         VER=$(app_version "/Applications/Gemini.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Gemini")"
-        silent_launch_app "Gemini" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Gemini → app menu → Check for updates")"
-        STATUS_GEMINI="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Gemini"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Gemini → app menu → Check for updates")"
+            STATUS_GEMINI="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_GEMINI="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Gemini")"
         STATUS_GEMINI="$L_INTERNET_STATUS_SKIPPED"
@@ -300,9 +336,12 @@ iu_lm_studio() {
         VER=$(app_version "/Applications/LM Studio.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "LM Studio")"
-        silent_launch_app "LM Studio" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "LM Studio → menu → Check for updates")"
-        STATUS_LMSTUDIO="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "LM Studio"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "LM Studio → menu → Check for updates")"
+            STATUS_LMSTUDIO="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_LMSTUDIO="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "LM Studio")"
     fi
@@ -320,10 +359,13 @@ iu_perplexity_desktop() {
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "bundle: $BUNDLE_ID")"
         if echo "$BUNDLE_ID" | grep -q "perplexity"; then
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Perplexity")"
-            silent_launch_app "Perplexity" || true
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Perplexity → Perplexity → Check for updates")"
-            print_info "Strona pobierania: https://www.perplexity.ai/platforms"
-            STATUS_PERPLEXITY="$L_INTERNET_STATUS_CHECKED"
+            if silent_launch_app "Perplexity"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Perplexity → Perplexity → Check for updates")"
+                print_info "Strona pobierania: https://www.perplexity.ai/platforms"
+                STATUS_PERPLEXITY="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_PERPLEXITY="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         else
             print_info "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Perplexity")"
             STATUS_PERPLEXITY="$L_INTERNET_STATUS_UNKNOWN_VERSION"
@@ -344,10 +386,13 @@ iu_codex_desktop() {
         VER=$(app_version "/Applications/Codex.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Codex")"
-        silent_launch_app "Codex" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Codex → About Codex → Check for updates")"
-        print_info "Strona pobierania: https://chatgpt.com/codex"
-        STATUS_CODEX="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Codex"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Codex → About Codex → Check for updates")"
+            print_info "Strona pobierania: https://chatgpt.com/codex"
+            STATUS_CODEX="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_CODEX="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Codex Desktop")"
         print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://chatgpt.com/codex (tylko Apple Silicon)")"
@@ -374,10 +419,13 @@ iu_opencode_desktop() {
         VER=$(app_version "$OPENCODE_APP_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "$OPENCODE_APP_PATH")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "OpenCode Desktop")"
-        silent_launch_app "$OPENCODE_APP_PATH" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://opencode.ai")"
-        print_info "Uwaga: CLI 'opencode' aktualizowane osobno przez update_npm_cli.sh"
-        STATUS_OPENCODE="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "$OPENCODE_APP_PATH"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://opencode.ai")"
+            print_info "Uwaga: CLI 'opencode' aktualizowane osobno przez update_npm_cli.sh"
+            STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED_AS_APP" "OpenCode Desktop")"
         print_info "$(internet_msg "$L_INTERNET_CLI_MANAGED_SEPARATE" "opencode")"
@@ -398,9 +446,12 @@ iu_protonvpn() {
         VER=$(app_version "/Applications/ProtonVPN.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "ProtonVPN")"
-        silent_launch_app "ProtonVPN" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ProtonVPN → Check for updates")"
-        STATUS_PROTONVPN="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "ProtonVPN"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ProtonVPN → Check for updates")"
+            STATUS_PROTONVPN="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_PROTONVPN="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ProtonVPN")"
     fi
@@ -421,8 +472,12 @@ iu_keepassxc() {
 
         if [ "$LATEST_KPX" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
-            silent_launch_app "KeePassXC" || true
-            STATUS_KEEPASSXC="$L_INTERNET_STATUS_OFFLINE"
+            if silent_launch_app "KeePassXC"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "KeePassXC → Check for updates")"
+                STATUS_KEEPASSXC="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_KEEPASSXC="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         elif [ "$LATEST_KPX" = "$VER" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "KeePassXC" "$VER")"
             STATUS_KEEPASSXC="$L_INTERNET_STATUS_CURRENT"
@@ -433,7 +488,7 @@ iu_keepassxc() {
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
             if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" 2>/dev/null \
                 && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet 2>/dev/null; then
+                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
                     sleep 1
                     VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*keepass*" 2>/dev/null | head -1)
                     if [ -n "$VOLUME_PATH" ] && [ -d "$VOLUME_PATH/KeePassXC.app" ]; then
@@ -484,14 +539,24 @@ iu_proton_mail() {
         LATEST_PROTON_TAG=$(github_latest_tag "ProtonMail/proton-mail-desktop")
         LATEST_PROTON=$(echo "$LATEST_PROTON_TAG" | sed 's/^v//')
 
-        if [ "$LATEST_PROTON" != "?" ] && [ "$LATEST_PROTON" != "$VER" ]; then
-            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_MAYBE" "$LATEST_PROTON" "$VER")"
-        else
+        if [ "$LATEST_PROTON" = "?" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
+        elif [ "$LATEST_PROTON" = "$VER" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Proton Mail" "$VER")"
+            STATUS_PROTONMAIL="$L_INTERNET_STATUS_CURRENT"
+        else
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_MAYBE" "$LATEST_PROTON" "$VER")"
         fi
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Proton Mail")"
-        silent_launch_app "Proton Mail" || true
-        STATUS_PROTONMAIL="$L_INTERNET_STATUS_CHECKED"
+        # If not already marked current, launch for self-update
+        if [ "${STATUS_PROTONMAIL:-}" != "$L_INTERNET_STATUS_CURRENT" ]; then
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Proton Mail")"
+            if silent_launch_app "Proton Mail"; then
+                print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Mail")"
+                STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Proton Mail")"
     fi
@@ -503,15 +568,18 @@ iu_zoom() {
     print_header "📹 Zoom"
     ZOOM_PATH=""
     for p in "/Applications/zoom.us.app" "${HOME}/Applications/zoom.us.app"; do
-        [ -d "$p" ] && ZOOM_PATH="$p" && break
+        if [ -d "$p" ]; then ZOOM_PATH="$p"; break; fi
     done
     if [ -n "$ZOOM_PATH" ]; then
         VER=$(app_version "$ZOOM_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "$ZOOM_PATH")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Zoom")"
-        silent_launch_app "zoom.us" || silent_launch_app "$ZOOM_PATH" || true
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "zoom.us → Check for updates")"
-        STATUS_ZOOM="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "zoom.us" || silent_launch_app "$ZOOM_PATH"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "zoom.us → Check for updates")"
+            STATUS_ZOOM="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_ZOOM="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Zoom")"
     fi
@@ -537,12 +605,16 @@ iu_google_drive() {
             "$KEYSTONE_AGENT" --runMode ondemand 2>/dev/null &
             sleep 2
             print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
+            STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_CHECKED_CLI"
         else
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Google Drive")"
-            silent_launch_app "Google Drive" || true
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Google Drive → O Google Drive")"
+            if silent_launch_app "Google Drive"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Google Drive → O Google Drive")"
+                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         fi
-        STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_CHECKED"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Drive")"
     fi
@@ -556,9 +628,12 @@ iu_megasync() {
         VER=$(app_version "/Applications/MEGAsync.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "MEGAsync")"
-        silent_launch_app "MEGAsync" || true
-        print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "MEGAsync")"
-        STATUS_MEGASYNC="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "MEGAsync"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "MEGAsync")"
+            STATUS_MEGASYNC="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_MEGASYNC="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "MEGAsync")"
     fi
@@ -572,9 +647,12 @@ iu_proton_drive() {
         VER=$(app_version "/Applications/Proton Drive.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Proton Drive")"
-        silent_launch_app "Proton Drive" || true
-        print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Drive")"
-        STATUS_PROTONDRIVE="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Proton Drive"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Drive")"
+            STATUS_PROTONDRIVE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_PROTONDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Proton Drive")"
     fi
@@ -667,13 +745,23 @@ iu_visual_studio_code() {
         VER=$(app_version "/Applications/Visual Studio Code.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        LATEST_VSCODE=$(github_latest_tag "microsoft/vscode" | tr -d 'v')
+        LATEST_VSCODE=$(github_latest_tag "microsoft/vscode" | sed 's/^v//')
 
-        if [ "$VER" = "$LATEST_VSCODE" ] && [ "$LATEST_VSCODE" != "?" ]; then
+        if [ "$LATEST_VSCODE" = "?" ]; then
+            # Offline or GitHub unreachable — launch app for built-in updater
+            print_warn "$L_INTERNET_STATUS_OFFLINE"
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Visual Studio Code")"
+            if silent_launch_app "Visual Studio Code"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "VS Code → Help → Check for Updates")"
+                STATUS_VSCODE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_VSCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        elif [ "$VER" = "$LATEST_VSCODE" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER")"
             STATUS_VSCODE="$L_INTERNET_STATUS_CURRENT"
         else
-            [ "$LATEST_VSCODE" != "?" ] && print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "Visual Studio Code" "$LATEST_VSCODE")"
             VSCODE_URL="https://update.code.visualstudio.com/latest/darwin-arm64/stable"
             TEMP_ZIP="$(mktemp "$INTERNET_TEMP_ROOT/vscode.XXXXXX.zip")"
@@ -726,8 +814,11 @@ iu_codeedit() {
 
         if [ "$LATEST_CE" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
-            silent_launch_app "CodeEdit" || true
-            STATUS_CODEEDIT="$L_INTERNET_STATUS_OFFLINE"
+            if silent_launch_app "CodeEdit"; then
+                STATUS_CODEEDIT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_CODEEDIT="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         elif [ "$LATEST_CE" = "$VER" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "CodeEdit" "$VER")"
             STATUS_CODEEDIT="$L_INTERNET_STATUS_CURRENT"
@@ -738,7 +829,7 @@ iu_codeedit() {
             TEMP_DMG="$(make_temp_dmg CodeEdit)"
             if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL" 2>/dev/null \
                 && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet 2>/dev/null; then
+                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
                     sleep 1
                     VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*codeedit*" 2>/dev/null | head -1)
                     if [ -n "$VOLUME_PATH" ] && [ -d "$VOLUME_PATH/CodeEdit.app" ]; then
@@ -779,25 +870,34 @@ iu_docker_desktop() {
     print_header "🐳 Docker Desktop"
     if [ -d "/Applications/Docker.app" ]; then
         VER=$(app_version "/Applications/Docker.app")
-    print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-    # Próba użycia Docker Desktop CLI (dostępne od v4.37+)
-    if command -v docker >/dev/null 2>&1; then
-        print_step "$L_INTERNET_DOCKER_CHECKING"
-        if docker desktop update 2>/dev/null; then
-            print_ok "$L_INTERNET_DOCKER_CLI_OK"
-                STATUS_DOCKER="$L_INTERNET_STATUS_CHECKED_CLI"
+        # Docker Desktop CLI (available from v4.37+)
+        if command -v docker >/dev/null 2>&1; then
+            print_step "$L_INTERNET_DOCKER_CHECKING"
+            # Check if an update is available first (non-destructive)
+            if docker desktop update --check-only --quiet 2>/dev/null; then
+                print_info "Update available — applying..."
+                if docker desktop update --quiet 2>/dev/null; then
+                    print_ok "$L_INTERNET_DOCKER_CLI_OK"
+                    STATUS_DOCKER="$L_INTERNET_STATUS_CHECKED_CLI"
+                else
+                    print_warn "Docker desktop update command failed"
+                    STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+                fi
             else
-                print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Docker Desktop")"
-                silent_launch_app "Docker" || true
-                print_info "$L_INTERNET_DOCKER_MENU_NOTIFY"
-                STATUS_DOCKER="$L_INTERNET_STATUS_CHECKED"
+                print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Docker Desktop" "$VER")"
+                STATUS_DOCKER="$L_INTERNET_STATUS_CURRENT"
             fi
         else
+            # No CLI — visible launch for menu-bar notification
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Docker Desktop")"
-            silent_launch_app "Docker" || true
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Docker icon w menu bar → Software updates")"
-            STATUS_DOCKER="$L_INTERNET_STATUS_CHECKED"
+            if open -a Docker 2>/dev/null; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Docker icon w menu bar → Software updates")"
+                STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Docker Desktop")"
@@ -812,10 +912,13 @@ iu_warp() {
         VER=$(app_version "/Applications/Warp.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Warp")"
-        silent_launch_app "Warp" || true
-        print_info "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Warp")"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Warp → Warp → O Warp / Check for Updates")"
-        STATUS_WARP="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Warp"; then
+            print_info "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Warp")"
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Warp → Warp → O Warp / Check for Updates")"
+            STATUS_WARP="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_WARP="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Warp")"
     fi
@@ -829,10 +932,13 @@ iu_cursor() {
         VER=$(app_version "/Applications/Cursor.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Cursor")"
-        silent_launch_app "Cursor" || true
-        print_info "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Cursor → Cursor → Check for updates")"
-        STATUS_CURSOR="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Cursor"; then
+            print_info "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Cursor → Cursor → Check for updates")"
+            STATUS_CURSOR="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_CURSOR="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Cursor")"
     fi
@@ -854,9 +960,12 @@ iu_appcleaner() {
         VER=$(app_version "/Applications/AppCleaner.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "AppCleaner")"
-        silent_launch_app "AppCleaner" || true
-        print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "AppCleaner")"
-        STATUS_APPCLEANER="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "AppCleaner"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "AppCleaner")"
+            STATUS_APPCLEANER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_APPCLEANER="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "AppCleaner")"
     fi
@@ -870,9 +979,12 @@ iu_obsidian() {
         VER=$(app_version "/Applications/Obsidian.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Obsidian")"
-        silent_launch_app "Obsidian" || true
-        print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Obsidian")"
-        STATUS_OBSIDIAN="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Obsidian"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Obsidian")"
+            STATUS_OBSIDIAN="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_OBSIDIAN="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Obsidian")"
     fi
@@ -890,10 +1002,13 @@ iu_spotify() {
         VER=$(app_version "/Applications/Spotify.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Spotify")"
-        silent_launch_app "Spotify" || true
-        print_info "$L_INTERNET_SPOTIFY_PROFILE_DOT"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Spotify → Spotify → O Spotify")"
-        STATUS_SPOTIFY="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Spotify"; then
+            print_info "$L_INTERNET_SPOTIFY_PROFILE_DOT"
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Spotify → Spotify → O Spotify")"
+            STATUS_SPOTIFY="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_SPOTIFY="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Spotify")"
     fi
@@ -903,6 +1018,23 @@ iu_spotify() {
     # ============================================================
 
     # ── 30. LEDGER LIVE / LEDGER WALLET ───────────────────────────
+}
+
+iu_capcut() {
+    print_header "🎬 CapCut"
+    if [ -d "/Applications/CapCut.app" ]; then
+        VER=$(app_version "/Applications/CapCut.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "CapCut")"
+        if silent_launch_app "CapCut"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "CapCut → CapCut → Check for Updates")"
+            STATUS_CAPCUT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_CAPCUT="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "CapCut")"
+    fi
 }
 
 iu_ledger() {
@@ -921,7 +1053,8 @@ iu_ledger() {
         VER=$(app_version "$LEDGER_APP")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_APP" "$LEDGER_NAME" "$VER")"
 
-        LATEST_LEDGER=$(curl -s --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
+        LEDGER_YML=$(curl -s --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml" 2>/dev/null)
+        LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
 
         if [ -z "$LATEST_LEDGER" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
@@ -932,11 +1065,16 @@ iu_ledger() {
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_LEDGER" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "$LEDGER_NAME" "$LATEST_LEDGER")"
-            LEDGER_URL="https://download.live.ledger.com/ledger-live-desktop-${LATEST_LEDGER}-mac.dmg"
+            # Parse the actual DMG filename from the YAML 'path:' field
+            LEDGER_DMG_FILE=$(echo "$LEDGER_YML" | grep "^  *- url:" | head -1 | sed 's|.*url: *||' | tr -d '[:space:]')
+            if [ -z "$LEDGER_DMG_FILE" ]; then
+                LEDGER_DMG_FILE="ledger-live-desktop-${LATEST_LEDGER}-mac.dmg"
+            fi
+            LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
             if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL" 2>/dev/null \
                 && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet 2>/dev/null; then
+                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
                     sleep 1
                     VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*ledger*" 2>/dev/null | head -1)
                     if [ -n "$VOLUME_PATH" ] && { [ -d "$VOLUME_PATH/Ledger Live.app" ] || [ -d "$VOLUME_PATH/Ledger Wallet.app" ]; }; then
@@ -985,7 +1123,24 @@ iu_trezor_suite() {
         VER=$(app_version "/Applications/Trezor Suite.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        LATEST_TS_TAG=$(github_latest_tag "trezor/trezor-suite")
+        # Monorepo: trezor-suite publishes both suite (desktop) and connect (library)
+        # releases. /releases/latest may return a connect release. Filter to desktop-only
+        # tags matching v?NN.N.N (no slashes, no connect prefix).
+        LATEST_TS_TAG=$(curl -s --max-time 20 --retry 3 --retry-delay 2 \
+            -H "User-Agent: macos-updates-toolkit" \
+            ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} \
+            "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" 2>/dev/null \
+            | python3 -c 'import json,sys,re
+try:
+    releases=json.load(sys.stdin)
+    for r in releases:
+        tag=r.get("tag_name","")
+        if not r.get("prerelease") and re.match(r"^v?\d{2}\.\d+\.\d+$", tag):
+            print(tag); break
+    else:
+        print("?")
+except Exception:
+    print("?")' 2>/dev/null)
         LATEST_TS=$(echo "$LATEST_TS_TAG" | sed 's/^v//')
 
         if [ "$LATEST_TS" = "?" ]; then
@@ -1001,7 +1156,7 @@ iu_trezor_suite() {
             TEMP_DMG="$(make_temp_dmg TrezorSuite)"
             if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL" 2>/dev/null \
                 && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet 2>/dev/null; then
+                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
                     sleep 1
                     VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*trezor*" 2>/dev/null | head -1)
                     if [ -n "$VOLUME_PATH" ] && [ -d "$VOLUME_PATH/Trezor Suite.app" ]; then
@@ -1049,10 +1204,13 @@ iu_remote_desktop_manager() {
         VER=$(app_version "/Applications/Remote Desktop Manager.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Remote Desktop Manager")"
-        silent_launch_app "Remote Desktop Manager" || true
-        print_info "$(internet_msg "$L_INTERNET_UPDATE_NOTIFY_LAUNCH" "Remote Desktop Manager")"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://devolutions.net/remote-desktop-manager/release-notes/mac/")"
-        STATUS_RDMANAGER="$L_INTERNET_STATUS_CHECKED"
+        if silent_launch_app "Remote Desktop Manager"; then
+            print_info "$(internet_msg "$L_INTERNET_UPDATE_NOTIFY_LAUNCH" "Remote Desktop Manager")"
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://devolutions.net/remote-desktop-manager/release-notes/mac/")"
+            STATUS_RDMANAGER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_RDMANAGER="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Remote Desktop Manager")"
     fi
@@ -1091,4 +1249,62 @@ iu_inkscape() {
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Inkscape")"
     fi
 
+}
+
+iu_dji_assistant() {
+    print_header "🚁 DJI Assistant 2"
+    # Note: The app name has parentheses in the bundle name
+    DJI_PATH=""
+    for dpath in "/Applications/DJI Assistant 2(Consumer Drones Series).app" \
+                 "/Applications/DJI Assistant 2.app"; do
+        [ -d "$dpath" ] && DJI_PATH="$dpath" && break
+    done
+    if [ -n "$DJI_PATH" ]; then
+        VER=$(app_version "$DJI_PATH")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "DJI Assistant 2")"
+        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://www.dji.com/downloads/djiapp/dji-assistant-2-consumer-drones-series")"
+        STATUS_DJI="$L_INTERNET_STATUS_MANUAL_UPDATE"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "DJI Assistant 2")"
+    fi
+}
+
+iu_unifi() {
+    print_header "📡 UniFi"
+    if [ -d "/Applications/UniFi.app" ]; then
+        VER=$(app_version "/Applications/UniFi.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        print_warn "iPad app on Apple Silicon — updated via App Store (Track 2)"
+        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Updates")"
+        STATUS_UNIFI="$L_INTERNET_STATUS_MANUAL_UPDATE"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "UniFi")"
+    fi
+}
+
+iu_wifiman() {
+    print_header "📶 WiFiman"
+    if [ -d "/Applications/WiFiman.app" ]; then
+        VER=$(app_version "/Applications/WiFiman.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        print_warn "iPad app on Apple Silicon — updated via App Store (Track 2)"
+        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Updates")"
+        STATUS_WIFIMAN="$L_INTERNET_STATUS_MANUAL_UPDATE"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "WiFiman")"
+    fi
+}
+
+iu_picsart() {
+    print_header "🎨 Picsart"
+    if [ -d "/Applications/Picsart.app" ]; then
+        VER=$(app_version "/Applications/Picsart.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "Picsart")"
+        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://picsart.com/apps")"
+        STATUS_PICSART="$L_INTERNET_STATUS_MANUAL_UPDATE"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Picsart")"
+    fi
 }
