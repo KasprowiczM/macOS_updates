@@ -15,7 +15,7 @@ This repository is designed for **public GitHub** plus an optional **private ove
 | `config/` | Internet app registry (`internet_apps.txt`, methods, dispatch) |
 | `i18n/` | 7 language packs (English is source of truth) |
 | `templates/APPLICATIONS.md.template` | Reference structure (not a user catalog) |
-| `tests/`, `run_tests.sh`, `.github/workflows/` | CI (56 unittest + shellcheck + gitleaks) |
+| `tests/`, `run_tests.sh`, `.github/workflows/` | CI (62 unittest + shellcheck + gitleaks) |
 | `docs/` | User and developer documentation |
 | `VERSION` | Package version |
 | `.env.example` | Template only (no secrets) |

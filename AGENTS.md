@@ -7,7 +7,7 @@ Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple 
 ```bash
 bash install.sh                         # One-line new-user install
 bash build_inventory.sh                 # Build APPLICATIONS.md from this Mac
-bash update_all.sh                      # Full update (all 6 steps)
+bash update_all.sh                      # Full update (all 7 steps)
 bash scripts/report_update_coverage.sh  # Coverage by update method category
 bash dev_sync/dev-sync-import.sh        # Restore private overlay (owners)
 bash run_tests.sh                       # Full test suite
@@ -20,13 +20,13 @@ bash -n update_all.sh                   # Syntax check
 |------|-------|---------|
 | **Orchestrator** | `claude-sonnet-4-6` | Default — daily work, planning, coordinating subagents |
 | **Advisor** | `claude-opus-4-7` | Architecture, code review, ADRs — NO implementation code |
-| **Worker** | `claude-haiku-4-6` | Fast tasks: boilerplate, refactors, log summaries |
+| **Worker** | `claude-haiku-4-5-20251001` | Fast tasks: boilerplate, refactors, log summaries |
 
 ## Reference Docs
 
 Load only when relevant to your task:
 
-- @docs/agents/scripts.md — script list, update_all.sh step order, migration_setup.sh 16 phases, dev sync commands, new Mac setup, adding internet apps
+- @docs/agents/scripts.md — script list, update_all.sh step order, migration_setup.sh phases 0a-16, dev sync commands, new Mac setup, adding internet apps
 - @docs/agents/architecture.md — Bash 3.2 constraints, session dir, Python inline heredocs, i18n, Homebrew prefix detection, cloud sync
 - @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (CVE-2025-43411), App Store two-track, version detection, update methods per app, APPLICATIONS.md structure
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
