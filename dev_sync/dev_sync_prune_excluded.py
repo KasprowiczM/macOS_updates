@@ -241,7 +241,14 @@ def write_plan(plan: dict[str, Any], plan_out: str, logger: Logger) -> Path:
     if not path.is_absolute():
         path = Path.cwd() / path
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    content = json.dumps(plan, indent=2, sort_keys=True) + "\n"
+    tmp_path = path.with_suffix(f".tmp.{os.getpid()}")
+    try:
+        tmp_path.write_text(content, encoding="utf-8")
+        os.replace(str(tmp_path), str(path))
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
     logger.log(f"Wrote cleanup plan: {path}")
     return path
 

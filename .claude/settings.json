@@ -3,7 +3,7 @@
   "env": {
     "MAX_THINKING_TOKENS": "10000",
     "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-6",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-haiku-4-5-20251001",
     "ECC_GATEGUARD": "off"
   },
   "disabledMcpServers": [
