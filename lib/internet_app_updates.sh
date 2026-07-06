@@ -873,7 +873,7 @@ iu_docker_desktop() {
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
         # Docker Desktop CLI (available from v4.37+)
-        if command -v docker >/dev/null 2>&1; then
+        if command -v docker >/dev/null 2>&1 && run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
             print_step "$L_INTERNET_DOCKER_CHECKING"
             # Check if an update is available first (non-destructive)
             if run_with_timeout 60 docker desktop update --check-only --quiet 2>/dev/null; then
@@ -890,7 +890,10 @@ iu_docker_desktop() {
                 STATUS_DOCKER="$L_INTERNET_STATUS_CURRENT"
             fi
         else
-            # No CLI — visible launch for menu-bar notification
+            # No CLI, or the CLI plugin is present but the Docker Desktop app
+            # isn't running -- "docker desktop status" fails in that case too,
+            # and --check-only's exit code must not be misread as "no update
+            # available" when it really means "couldn't check at all".
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Docker Desktop")"
             if open -a Docker 2>/dev/null; then
                 print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Docker icon w menu bar → Software updates")"
@@ -1072,8 +1075,8 @@ iu_ledger() {
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_LEDGER" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "$LEDGER_NAME" "$LATEST_LEDGER")"
-            # Parse the actual DMG filename from the YAML 'path:' field
-            LEDGER_DMG_FILE=$(echo "$LEDGER_YML" | grep "^  *- url:" | head -1 | sed 's|.*url: *||' | tr -d '[:space:]')
+            # Parse the actual DMG filename from the YAML 'files' list (skip ZIP, extract DMG only)
+            LEDGER_DMG_FILE=$(echo "$LEDGER_YML" | grep "^  *- url:.*\.dmg" | head -1 | sed 's|.*url: *||' | tr -d '[:space:]')
             if [ -z "$LEDGER_DMG_FILE" ]; then
                 LEDGER_DMG_FILE="ledger-live-desktop-${LATEST_LEDGER}-mac.dmg"
             fi

@@ -7,7 +7,7 @@ Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple 
 ```bash
 bash install.sh                       # One-line new-user install (see docs/INSTALL.md)
 bash build_inventory.sh               # Build APPLICATIONS.md from this Mac only
-bash update_all.sh                    # Full update (all 6 steps)
+bash update_all.sh                    # Full update (all 7 steps)
 bash update_all.sh --dry-run          # Preview without mutations
 bash scripts/report_update_coverage.sh # Supported vs missing apps (by category)
 bash dev_sync/dev-sync-import.sh      # Restore private overlay (owners only)
@@ -33,7 +33,7 @@ bash -n update_all.sh                 # Syntax check
 |------|-------|---------|
 | **Orchestrator** | `claude-sonnet-4-6` | Default — daily coding, planning, coordinating subagents |
 | **Advisor** | `claude-opus-4-7` | Architecture analysis, code review, ADRs — NO implementation code |
-| **Worker** | `claude-haiku-4-6` | Fast/cheap tasks: boilerplate, refactors, log summaries, test snippets |
+| **Worker** | `claude-haiku-4-5-20251001` | Fast/cheap tasks: boilerplate, refactors, log summaries, test snippets |
 
 - Switch to Advisor: `/agent:advisor` or `claude --model claude-opus-4-7`
 - Delegate to Worker: Sonnet orchestrator calls `Task()` → `worker-haiku` agent handles it
@@ -42,7 +42,7 @@ bash -n update_all.sh                 # Syntax check
 
 Load only when relevant to your task:
 
-- @docs/agents/scripts.md — script list, update_all.sh step order, migration_setup.sh 16 phases, dev sync, adding internet apps
+- @docs/agents/scripts.md — script list, update_all.sh step order, migration_setup.sh phases 0a-16, dev sync, adding internet apps
 - @docs/agents/architecture.md — Bash 3.2 constraints, session dir, Python inline heredocs, i18n, Homebrew prefix detection, cloud sync
 - @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (CVE-2025-43411), App Store two-track, version detection, update methods per app
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
