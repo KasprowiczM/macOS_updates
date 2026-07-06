@@ -6,7 +6,7 @@
 | `uninstall.sh` | Remove repo clone (optional `--purge` prefs) |
 | `build_inventory.sh` | Prescan only — build `APPLICATIONS.md` from installed apps on this Mac |
 | `setup.sh` | First-run (public users) — language, deps, paths |
-| `migration_setup.sh` | First-run (owner) — 16 phases: language, cloud, deps, paths, app scan |
+| `migration_setup.sh` | First-run (owner) — phases 0a–16: language, cloud, deps, paths, app scan |
 | `update_all.sh` | Master: prescan → system → appstore → npm-cli → brew → internet → postupdate |
 | `update_system.sh` | macOS via `softwareupdate -ia -R --verbose` |
 | `update_appstore.sh` | `sudo mas upgrade` + AppleScript GUI for iPad apps |
@@ -33,11 +33,13 @@ Step 5: update_internet_apps.sh — 40+ internet apps
 Step 6: postupdate.py       — bump versions in APPLICATIONS.md, append to UPDATES.md
 ```
 
-## migration_setup.sh — 16 Phases (New Mac First-Run)
+## migration_setup.sh — Phases 0a–16 (New Mac First-Run)
 
 Run once before `update_all.sh` when copying project to a new Mac.
 
 ```
+Phase 0a: Language selection (before localized banner)
+Phase 0b: Cloud storage provider setup
 Phase  1: Detect user, home, macOS version, arch, hostname, shell, terminal app
 Phase  2: Extract old username from CLAUDE.md path patterns
 Phase  3: Fix paths in all .md files (username, project dir, Homebrew prefix)

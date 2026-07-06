@@ -11,7 +11,7 @@ Thank you for contributing to **macOS Updates** (v1.0.19).
 ## Before you submit
 
 ```bash
-bash run_tests.sh          # bash -n, py_compile, 56 unittest, gitleaks
+bash run_tests.sh          # bash -n, py_compile, 62 unittest, gitleaks
 shellcheck --severity=warning $(find . -name '*.sh' ! -path './.git/*' -print)  # uses .shellcheckrc
 ```
 
