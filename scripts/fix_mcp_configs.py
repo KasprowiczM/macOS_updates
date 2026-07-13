@@ -4,6 +4,20 @@ import os
 import shutil
 import sys
 
+def first_existing_path(paths):
+    for path in paths:
+        if path and os.path.exists(path):
+            return path
+    return None
+
+def merge_path_parts(preferred_path, current_path):
+    path_parts = []
+    for raw_part in (preferred_path + ":" + current_path).split(":"):
+        part = raw_part.strip()
+        if part and part not in path_parts:
+            path_parts.append(part)
+    return ":".join(path_parts)
+
 def fix_mcp_config(config_path):
     if not os.path.exists(config_path):
         print(f"File not found: {config_path}")
@@ -36,8 +50,20 @@ def fix_mcp_config(config_path):
         "bin",
     )
 
-    NPX_PATH = os.environ.get("MAC_UPDATE_NPX_PATH") or shutil.which("npx") or os.path.join(n_prefix, "bin", "npx")
-    NODE_PATH = os.environ.get("MAC_UPDATE_NODE_PATH") or shutil.which("node") or os.path.join(n_prefix, "bin", "node")
+    managed_npx = os.path.join(n_prefix, "bin", "npx")
+    managed_node = os.path.join(n_prefix, "bin", "node")
+    NPX_PATH = (
+        os.environ.get("MAC_UPDATE_NPX_PATH")
+        or first_existing_path([managed_npx, os.path.join(npm_global_bin, "npx")])
+        or shutil.which("npx")
+        or managed_npx
+    )
+    NODE_PATH = (
+        os.environ.get("MAC_UPDATE_NODE_PATH")
+        or first_existing_path([managed_node])
+        or shutil.which("node")
+        or managed_node
+    )
 
     path_parts = []
     for prefix in [
@@ -72,11 +98,9 @@ def fix_mcp_config(config_path):
         env = server_config["env"]
         current_path = env.get("PATH", "")
         
-        if "/opt/homebrew/bin" not in current_path:
-            if current_path:
-                env["PATH"] = f"{GLOBAL_PATH}:{current_path}"
-            else:
-                env["PATH"] = GLOBAL_PATH
+        merged_path = merge_path_parts(GLOBAL_PATH, current_path)
+        if current_path != merged_path:
+            env["PATH"] = merged_path
             modified = True
 
     if modified:
