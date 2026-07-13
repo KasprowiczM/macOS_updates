@@ -1,17 +1,18 @@
 # Guia do utilizador (Português)
 
-**Versão:** 1.0.19 · **Apenas Apple Silicon**
+**Versão:** 1.0.20 · **Apple Silicon, macOS 13+**
 
 ## O que faz
 
-macOS Updates automatiza atualizações em **Macs Apple Silicon**:
+macOS Updates orquestra atualizações em **Macs Apple Silicon com macOS 13+**:
 
-1. Sistema macOS (`softwareupdate -ia -R`)
-2. App Store (`sudo mas upgrade` + GUI para apps iPad)
+1. Pré-análise e inventário
+2. App Store (`sudo mas upgrade` + Track 2 GUI separado)
 3. Node/Bun e CLIs npm globais
-4. Homebrew
-5. 40+ apps da Internet — **apenas se instaladas**
-6. Catálogo `APPLICATIONS.md` e histórico `UPDATES.md`
+4. Homebrew (`--greedy`)
+5. Apps instaladas: handlers diretos, CLI ou acionadores integrados
+6. Pós-atualização atómica do inventário/histórico
+7. macOS (`softwareupdate -ia -R`) por último; ignorado após erro anterior
 
 **Não instala novas aplicações.** Cada Mac constrói o seu inventário (`build_inventory.sh`).
 
@@ -26,6 +27,8 @@ macOS Updates automatiza atualizações em **Macs Apple Silicon**:
 ```bash
 bash scripts/report_update_coverage.sh
 ```
+
+Estados: **verified direct**, **triggered-unverified**, **externally managed**, **manual**, **unknown**. Um arranque silencioso não prova a atualização. Inkscape usa Homebrew; UniFi/WiFiman/Picsart Track 2; Office `msupdate`; Teams o próprio updater com fallback MAU `TEAMS21` observado e verificado. Só IPMIView e DJI Assistant 2 permanecem manuais.
 
 ## Adicionar app da Internet
 

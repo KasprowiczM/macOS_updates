@@ -4,7 +4,7 @@ Przewodnik dla operatora — codzienna i tygodniowa obsługa macOS Updates.
 
 ## Platforma
 
-**Tylko Apple Silicon (arm64).** Skrypty kończą działanie natychmiast na Macach z procesorem Intel.
+**Tylko Apple Silicon (arm64), macOS 13+.** Skrypty kończą działanie przed zmianami na nieobsługiwanych Macach.
 
 ## Tygodniowa aktualizacja
 
@@ -20,12 +20,14 @@ W razie błędu sprawdź: `logs/update_all_<timestamp>.log` (zachowywane są ost
 | Krok | Skrypt / akcja | Flaga pominięcia |
 |------|----------------|------------------|
 | 0 | prescan → `APPLICATIONS.md` | `--skip-prescan` |
-| 1 | `update_system.sh` | `--skip-system` |
-| 2 | `update_appstore.sh` | `--skip-appstore` |
-| 3 | `update_npm_cli.sh` | `--skip-npm` |
-| 4 | `update_brew.sh` | `--skip-brew` |
-| 5 | `update_internet_apps.sh` | `--skip-internet` |
-| 6 | postupdate → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
+| 1 | `update_appstore.sh` | `--skip-appstore` |
+| 2 | `update_npm_cli.sh` | `--skip-npm` |
+| 3 | `update_brew.sh` | `--skip-brew` |
+| 4 | `update_internet_apps.sh` | `--skip-internet` |
+| 5 | postupdate/historia → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
+| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+
+Krok 6 działa ostatni, ponieważ może uruchomić Maca ponownie. Po błędzie wcześniejszego wybranego kroku jest automatycznie pomijany.
 
 Podgląd bez zmian: `bash update_all.sh --dry-run -y`
 
@@ -86,4 +88,4 @@ brew outdated
 softwareupdate -l
 ```
 
-Uruchom próbnie kluczowe aplikacje (przeglądarka, VPN, IDE), jeśli krok internetowy zgłosił ostrzeżenia.
+Dla aplikacji **triggered-unverified** sprawdź ekran Informacje/wersję — samo uruchomienie aktualizatora nie potwierdza ukończenia. Ręczne pozostają tylko IPMIView i DJI Assistant 2.

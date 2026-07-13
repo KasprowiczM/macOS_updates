@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.0.19**).
+**Version:** see `VERSION` in repo root (currently **1.0.20**).
 
 ## One-line install (new Mac, Apple Silicon)
 
@@ -17,6 +17,8 @@ This will:
 5. Print `scripts/report_update_coverage.sh` — what the project can and cannot update (localized)
 
 Pre-clone checks (arm64, macOS version, git) are shown in English because i18n files are not available until after the clone.
+
+Both setup paths fail before dependency or update mutations unless the Mac is Apple Silicon (arm64) and runs macOS 13 or later.
 
 The installer **does not**:
 

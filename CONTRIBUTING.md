@@ -1,17 +1,17 @@
 # Contributing
 
-Thank you for contributing to **macOS Updates** (v1.0.19).
+Thank you for contributing to **macOS Updates** (v1.0.20).
 
 ## Requirements
 
-- **Apple Silicon (arm64) Mac** — Intel is not supported
+- **Apple Silicon (arm64) Mac running macOS 13+** — Intel and older macOS releases are not supported
 - **Bash 3.2+** — macOS default shell; no `declare -A`, `mapfile`, or `readarray` in project scripts
 - **Python 3.11+** for `dev_sync/` and inline heredocs in `update_all.sh`
 
 ## Before you submit
 
 ```bash
-bash run_tests.sh          # bash -n, py_compile, 62 unittest, gitleaks
+bash run_tests.sh          # bash -n, py_compile, unit/static tests, gitleaks
 shellcheck --severity=warning $(find . -name '*.sh' ! -path './.git/*' -print)  # uses .shellcheckrc
 ```
 

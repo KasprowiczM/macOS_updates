@@ -17,6 +17,8 @@ sudo env MAS_NO_AUTO_INDEX=1 mas upgrade
 - **Track 1:** `sudo mas upgrade` — native macOS apps
 - **Track 2:** AppleScript GUI (`osascript`) — iPad apps (UniFi, WiFiman, myCANAL, Picsart)
   - Requires Accessibility permission in System Settings
+  - This is a separate track, not a fallback for Track 1; unexpected GUI states fail honestly
+  - `mas outdated` cannot prove the state of iPad apps, so Track 2 keeps its own result
 
 ## 4. Version detection
 ```bash
@@ -30,26 +32,45 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 
 | Method | Apps |
 |--------|------|
-| Sparkle appcast + DMG | ChatGPT, Atlas |
+| Sparkle appcast + DMG | ChatGPT Atlas |
 | Mozilla product-details/download + DMG | Firefox Dev |
 | GitHub API / Official Metadata + DMG | KeePassXC, CodeEdit, Trezor Suite, Ledger Wallet / Live |
 | Google Keystone | Chrome, Google Drive |
-| msupdate CLI | Word, Excel, PowerPoint, Outlook, OneNote, Teams |
+| msupdate CLI | Word, Excel, PowerPoint, Outlook, OneNote; observed `TEAMS21` fallback when MAU offers it |
+| Vendor self-updater + MAU fallback | Microsoft Teams normally owns its cadence; MAU may recover a failed Teams updater |
 | Docker CLI | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
 | Homebrew cask --greedy | Inkscape |
-| Built-in auto-updater (silent launch) | Brave, ChatGPT, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, Codex, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian, Ascendo |
-| Manual only | IPMIView, DJI Assistant 2, Picsart, UniFi (iPad), WiFiman (iPad) |
+| Built-in auto-updater (silent launch) | Brave, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian, Ascendo |
+| Hybrid self-update + MAU fallback | Teams (`TEAMS21` is accepted only when surfaced by MAU and is verified by a final `msupdate --list`) |
+| App Store GUI Track 2 | UniFi, WiFiman, Picsart |
+| Manual only | IPMIView, DJI Assistant 2 |
+
+These methods are not equivalent proof levels:
+
+- **verified direct** — the script verifies a version/package path or a vendor CLI reports completion.
+- **triggered-unverified** — the app was launched to trigger its built-in updater; completion is not asserted.
+- **externally managed** — the App Store or vendor owns the update lifecycle outside a directly verifiable handler.
+- **manual** — the registry intentionally requires user action.
+- **unknown** — no supported registry method matches the installed app.
 
 ## 6. Downloaded installers
 - Use random temp paths under `$MAC_UPDATE_SESSION_DIR` or `mktemp`.
 - Run `hdiutil verify` before mounting downloaded DMGs.
-- Copy `.app` bundles with `ditto` (preserves code signature, xattrs, resource forks — `cp -R` does not). Quit the running app first, then `spctl --assess --type execute` **before** copy (reject unsigned downloads) and again **after** the swap (log post-install failures).
+- Mount each DMG at a unique mountpoint inside `$MAC_UPDATE_SESSION_DIR`; never discover an installer by scanning shared `/Volumes` names.
+- Copy `.app` bundles with `ditto` (preserves code signature, xattrs, resource forks — `cp -R` does not). Quit the running app first, verify the incoming bundle's identifier and signing team against the installed target, run `spctl --assess --type execute`, stage the replacement, then swap it in with a retained backup. If the copy or post-swap validation fails, restore the original app before returning non-zero.
 - Verify `.pkg` installers with `pkgutil --check-signature` before `sudo installer`.
 - Do not report success after a failed copy/install; return a non-zero exit so `update_all.sh` records a failed step.
 - **Honest status:** a GUI app that is only launched reports `LAUNCHED_UNVERIFIED` (⏳), not success; a failed launch reports `LAUNCH_FAILED` (⚠️) and fails the step. Only a confirmed version change reports `UPDATED`/`CURRENT`.
 
-## 7. APPLICATIONS.md structure
+## 7. Private state and imports
+
+- Write `APPLICATIONS.md`, `UPDATES.md`, provider config and logs through a same-directory temporary file, flush/fsync where implemented, then `os.replace()`.
+- Private config is mode `0600`; log/config directories are private to the user.
+- Cloud imports stage only allowlisted, safe relative paths. Commit the staged set transactionally and roll back already replaced targets if any later file fails.
+- Rclone listing/copy failures are fatal; never turn an incomplete remote listing into a successful empty import.
+
+## 8. APPLICATIONS.md structure
 - GRUPA 1: Apple system apps
 - GRUPA 2: App Store (mas IDs)
 - GRUPA 3: Internet apps

@@ -14,5 +14,5 @@ Prevents `exec: "npx": executable file not found in $PATH` errors.
 ```
 
 - Preferred: `~/.local/share/mac-update/node/bin/npx` (managed by `update_npm_cli.sh`)
-- Legacy Homebrew fallback: `/opt/homebrew/bin/npx` on arm64 or `/usr/local/bin/npx` on Intel
+- Homebrew fallback on the supported platform: `/opt/homebrew/bin/npx` (Apple Silicon)
 - Always include `PATH` in `env` block — Claude Code does not inherit shell PATH.
