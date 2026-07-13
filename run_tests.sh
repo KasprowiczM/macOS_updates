@@ -42,10 +42,9 @@ done
 [ "$syntax_fail" -eq 0 ] && ok "all bash scripts parse"
 
 say "2/4  python3 -m py_compile on all .py"
+# Only tracked project code belongs to the production test surface. Local
+# ignored scratch helpers must never make CI or a release check fail.
 PY_FILES="dev_sync/*.py scripts/*.py tests/*.py"
-if [ -d "scratch" ] && ls scratch/*.py >/dev/null 2>&1; then
-    PY_FILES="$PY_FILES scratch/*.py"
-fi
 if python3 -m py_compile $PY_FILES 2>&1; then
     ok "all python modules compile"
 else

@@ -11,12 +11,12 @@ Options:
       --dry-run                  Preview steps without mutating the system
       --json-summary             Emit JSON summary on exit (stdout, after run)
       --skip-prescan             Skip step 0 (APPLICATIONS.md prescan)
-      --skip-system              Skip step 1 (macOS system update)
-      --skip-appstore            Skip step 2 (App Store)
-      --skip-npm                 Skip step 3 (Native CLI + npm)
-      --skip-brew                Skip step 4 (Homebrew)
-      --skip-internet            Skip step 5 (internet apps)
-      --skip-postupdate          Skip step 6 (APPLICATIONS.md / UPDATES.md)
+      --skip-system              Skip final macOS system update
+      --skip-appstore            Skip App Store updates
+      --skip-npm                 Skip Native CLI + npm updates
+      --skip-brew                Skip Homebrew updates
+      --skip-internet            Skip internet-app updates
+      --skip-postupdate          Skip APPLICATIONS.md / UPDATES.md history
       --skip-doctor              Skip brew doctor in update_brew.sh
       --treat-appstore-ax-as-warning
                                  Treat App Store exit 2 (Accessibility) as warning

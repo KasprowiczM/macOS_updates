@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,18 +19,25 @@ sys.path.insert(0, str(DEV_SYNC_DIR))
 from dev_sync_core import (  # noqa: E402
     DevSyncConfig,
     DevSyncError,
+    Logger,
     RCloneProvider,
+    RunOptions,
+    copy_relpaths,
     path_matches_pattern,
     read_manifest,
     safe_relpath,
     should_include_candidate,
     should_keep_path,
+    write_json,
 )
 from dev_sync_prune_excluded import quarantine_from_plan  # noqa: E402
 
 
 class NullLogger:
     def log(self, message: str, always_stdout: bool = True) -> None:
+        pass
+
+    def verbose(self, message: str) -> None:
         pass
 
 
@@ -75,6 +86,58 @@ class DevSyncPathSafetyTests(unittest.TestCase):
             }
             with self.assertRaises(DevSyncError):
                 quarantine_from_plan(plan, base, base / "dev_sync_quarantine", NullLogger())
+
+    def test_transactional_copy_rolls_back_on_failed_swap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            dest = root / "dest"
+            source.mkdir()
+            dest.mkdir()
+            (source / "first.txt").write_text("new-first", encoding="utf-8")
+            (source / "second.txt").write_text("new-second", encoding="utf-8")
+            (dest / "first.txt").write_text("old-first", encoding="utf-8")
+            (dest / "second.txt").write_text("old-second", encoding="utf-8")
+
+            real_replace = os.replace
+
+            def fail_incoming_swap(src, target):
+                if Path(target) == dest / "second.txt" and "incoming" in Path(src).parts:
+                    raise OSError("simulated swap failure")
+                return real_replace(src, target)
+
+            with mock.patch("dev_sync_core.os.replace", side_effect=fail_incoming_swap):
+                with self.assertRaises(OSError):
+                    copy_relpaths(
+                        source,
+                        dest,
+                        ["first.txt", "second.txt"],
+                        NullLogger(),
+                        RunOptions(),
+                    )
+
+            self.assertEqual((dest / "first.txt").read_text(encoding="utf-8"), "old-first")
+            self.assertEqual((dest / "second.txt").read_text(encoding="utf-8"), "old-second")
+
+    def test_private_overlay_logs_use_private_permissions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            logger = Logger(root, "permission-test", RunOptions())
+            try:
+                logger.log("safe")
+                self.assertEqual(logger.log_dir.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(logger.log_path.stat().st_mode & 0o777, 0o600)
+            finally:
+                logger.close()
+
+    def test_write_json_is_atomic_and_private(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "private.json"
+            path.write_text('{"old": true}', encoding="utf-8")
+            path.chmod(0o644)
+            write_json(path, {"new": True})
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"new": True})
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
 
 class DevSyncMatchingTests(unittest.TestCase):
@@ -200,6 +263,17 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("tee -a", text)
         self.assertIn("update_all_", text)
 
+    def test_update_all_renders_multiline_step_list(self) -> None:
+        text = self.read_script("update_all.sh")
+        self.assertIn('printf "%b\\n" "$L_UPDATE_ALL_STEPS"', text)
+        self.assertIn("sed 's/^/    /'", text)
+
+    def test_update_all_dry_run_reports_every_step_as_skipped(self) -> None:
+        text = self.read_script("update_all.sh")
+        npm_step = text[text.index("# STEP 2: Native CLI & npm update"):]
+        self.assertIn('RESULT_NPMCLI="[DRY-RUN] skipped"', npm_step)
+        self.assertIn("DRY-RUN: no applications, inventory, or history files were changed.", text)
+
     def test_appstore_diag_captured_on_failure(self) -> None:
         """update_appstore.sh must persist diagnostics on TRACK 1 / TRACK 2 failure.
 
@@ -251,7 +325,156 @@ class StaticShellSafetyTests(unittest.TestCase):
 
     def test_appstore_mas_upgrade_uses_sudo(self) -> None:
         text = self.read_script("update_appstore.sh")
-        self.assertIn("sudo env MAS_NO_AUTO_INDEX=1 mas upgrade", text)
+        self.assertIn("sudo -v", text)
+        self.assertIn("sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade", text)
+
+    def test_appstore_dry_run_exits_before_mutations(self) -> None:
+        text = self.read_script("update_appstore.sh")
+        dry_run_exit = text.index('print_info "[DRY-RUN] Would run: sudo mas upgrade"')
+        install_mas = text.index("if brew install mas; then")
+        native_upgrade = text.index("sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade")
+        self.assertLess(dry_run_exit, install_mas)
+        self.assertLess(dry_run_exit, native_upgrade)
+
+    def test_appstore_skips_sudo_when_native_queue_is_empty(self) -> None:
+        text = self.read_script("update_appstore.sh")
+        self.assertIn('if [ -z "$NATIVE_OUTDATED" ]; then', text)
+        self.assertIn("sudo mas upgrade skipped", text)
+        self.assertIn("mas outdated --accurate", text)
+        self.assertIn("MAC_UPDATE_MAS_CHECK_TIMEOUT", text)
+        self.assertIn("MAC_UPDATE_MAS_UPGRADE_TIMEOUT", text)
+        self.assertIn('run_with_timeout "$MAS_UPGRADE_TIMEOUT"', text)
+
+    def test_appstore_success_header_depends_on_final_exit_status(self) -> None:
+        text = self.read_script("update_appstore.sh")
+        final_block = text[text.rindex("# ── mas snapshot AFTER update") :]
+        self.assertIn('if [ "$APPSTORE_EXIT" -eq 0 ]; then', final_block)
+        self.assertIn("FINISHED WITH ERRORS OR PENDING UPDATES", final_block)
+        self.assertIn('if [ "$APPSTORE_TOR2_BRANCH" = "no_updates" ]; then', final_block)
+
+    def test_update_all_runs_reboot_capable_system_step_last(self) -> None:
+        text = self.read_script("update_all.sh")
+        postupdate = text.index("# STEP 5: Update APPLICATIONS.md and UPDATES.md")
+        system = text.index("# FINAL MUTATING STEP: macOS system update")
+        final_summary = text.index("# Final summary", system)
+        self.assertLess(postupdate, system)
+        self.assertLess(system, final_summary)
+        self.assertIn('elif [ "$OVERALL_EXIT" -ne 0 ]; then', text[system:final_summary])
+
+    def test_update_all_skips_system_after_each_failed_update_layer(self) -> None:
+        layers = {
+            "appstore": "update_appstore.sh",
+            "npm": "update_npm_cli.sh",
+            "brew": "update_brew.sh",
+            "internet": "update_internet_apps.sh",
+        }
+        for selected, failing_script in layers.items():
+            with self.subTest(layer=selected), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                shutil.copy2(REPO_ROOT / "update_all.sh", root / "update_all.sh")
+                shutil.copy2(REPO_ROOT / "VERSION", root / "VERSION")
+                shutil.copytree(REPO_ROOT / "lib", root / "lib")
+                shutil.copytree(REPO_ROOT / "i18n", root / "i18n")
+
+                marker = root / "system-ran"
+                for script in layers.values():
+                    body = "#!/usr/bin/env bash\nexit 9\n" if script == failing_script else "#!/usr/bin/env bash\nexit 0\n"
+                    (root / script).write_text(body, encoding="utf-8")
+                (root / "update_system.sh").write_text(
+                    '#!/usr/bin/env bash\nprintf ran > "$SYSTEM_MARKER"\n',
+                    encoding="utf-8",
+                )
+
+                mock_bin = root / "mock-bin"
+                mock_bin.mkdir()
+                (mock_bin / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+                (mock_bin / "sw_vers").write_text(
+                    "#!/bin/sh\n"
+                    'case "$1" in\n'
+                    "  -productVersion) echo 26.5.2 ;;\n"
+                    "  -buildVersion) echo TESTBUILD ;;\n"
+                    "  *) echo 'ProductName: macOS' ;;\n"
+                    "esac\n",
+                    encoding="utf-8",
+                )
+                for executable in [*layers.values(), "update_system.sh"]:
+                    (root / executable).chmod(0o755)
+                (mock_bin / "uname").chmod(0o755)
+                (mock_bin / "sw_vers").chmod(0o755)
+
+                args = [
+                    "/bin/bash",
+                    str(root / "update_all.sh"),
+                    "--yes",
+                    "--skip-prescan",
+                    "--skip-postupdate",
+                ]
+                skip_flags = {
+                    "appstore": "--skip-appstore",
+                    "npm": "--skip-npm",
+                    "brew": "--skip-brew",
+                    "internet": "--skip-internet",
+                }
+                args.extend(flag for layer, flag in skip_flags.items() if layer != selected)
+                env = os.environ.copy()
+                env.update(
+                    {
+                        "PATH": f"{mock_bin}:/usr/bin:/bin",
+                        "SYSTEM_MARKER": str(marker),
+                        "MAC_LANG": "en",
+                    }
+                )
+                result = subprocess.run(
+                    args,
+                    cwd=root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                self.assertNotEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertFalse(marker.exists(), msg=f"system ran after {selected} failed")
+                self.assertIn("Skipping the final macOS update", result.stdout)
+
+    def test_inventory_only_refresh_does_not_append_update_history(self) -> None:
+        text = self.read_script("update_all.sh")
+        inventory_guard = text.index("if os.environ.get('MAC_UPDATE_INVENTORY_ONLY') == '1':")
+        history_builder = text.index("# ── Build UPDATES.md history entry", inventory_guard)
+        self.assertLess(inventory_guard, history_builder)
+        build = self.read_script("build_inventory.sh")
+        self.assertIn("MAC_UPDATE_INVENTORY_ONLY=1", build)
+        self.assertIn("UPDATES.md history intentionally unchanged", text)
+
+    def test_prescan_recognizes_formatted_inventory_cells(self) -> None:
+        text = self.read_script("update_all.sh")
+        self.assertIn(r'(?:\*\*)?(?:\s+[^|]+)?\s*\|', text)
+        self.assertIn("fields[1] == 'appstore_gui'", text)
+
+    def test_internet_dmg_handlers_use_session_mount_helper(self) -> None:
+        handlers = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("hdiutil attach", handlers)
+        self.assertNotIn("/Volumes/", handlers)
+        self.assertEqual(handlers.count('mount_verified_dmg "$TEMP_DMG"'), 6)
+        self.assertEqual(handlers.count("detach_verified_dmg"), 6)
+
+    def test_microsoft_updates_are_verified_and_teams_is_hybrid(self) -> None:
+        handlers = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('MAU_VERIFY=$(run_with_timeout 60 "$MAU_CLI" --list', handlers)
+        self.assertIn("iu_microsoft_teams()", handlers)
+        self.assertIn("MAU_TEAMS21_VERIFIED", handlers)
+        self.assertIn("TEAMS21", handlers)
+
+    def test_provider_config_is_written_atomically_with_private_mode(self) -> None:
+        text = (REPO_ROOT / "dev_sync" / "provider_setup.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("config_tmp=", text)
+        self.assertIn('chmod 600 "$config_tmp"', text)
+        self.assertIn('mv -f "$config_tmp" "$CONFIG_FILE"', text)
 
     def test_platform_requires_apple_silicon(self) -> None:
         text = (REPO_ROOT / "lib" / "platform.sh").read_text(encoding="utf-8")
@@ -259,7 +482,8 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("arm64", text)
         master = self.read_script("update_all.sh")
         self.assertIn("lib/platform.sh", master)
-        self.assertIn("mac_update_require_apple_silicon", master)
+        self.assertIn("mac_update_require_supported_platform", master)
+        self.assertIn("mac_update_require_macos_minimum 13", text)
 
     def test_internet_apps_config_has_handlers(self) -> None:
         cfg = REPO_ROOT / "config" / "internet_apps.txt"
@@ -321,13 +545,12 @@ class StaticShellSafetyTests(unittest.TestCase):
             registry[parts[0]] = parts[1]
         for app in apps:
             self.assertIn(app, registry, msg=f"missing method registry for {app!r}")
-        ms_apps = [a for a in apps if a.startswith("Microsoft ")]
-        if ms_apps:
-            self.assertEqual(
-                len(set(registry[a] for a in ms_apps)),
-                1,
-                msg="Microsoft apps should share one msupdate handler",
-            )
+        office_apps = [a for a in apps if a.startswith("Microsoft ") and a != "Microsoft Teams"]
+        self.assertTrue(office_apps)
+        self.assertTrue(all(registry[a] == "msupdate" for a in office_apps))
+        self.assertEqual(
+            registry.get("Microsoft Teams"), "mau_fallback_self_update"
+        )
 
     def test_internet_config_status_var_parity(self) -> None:
         """All 4 internet-app config sources must agree on STATUS_* variables.
@@ -485,6 +708,11 @@ class StaticShellSafetyTests(unittest.TestCase):
         early = text.find("[DRY-RUN] Would run: brew update")
         self.assertGreater(early, -1)
         self.assertLess(early, update_pos)
+
+    def test_brew_asaf_filter_keeps_internal_blank_lines_in_warning_block(self) -> None:
+        text = self.read_script("update_brew.sh")
+        self.assertIn('in_dylib_block && /^(Warning:|Error:)/', text)
+        self.assertNotIn('if ($0 == "") emit_dylib_block()', text)
 
     def test_skip_doctor_flag_consumed_by_update_brew(self) -> None:
         """--skip-doctor must be honoured in update_brew.sh, not just exported.
@@ -900,4 +1128,3 @@ class InternetLibParserTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

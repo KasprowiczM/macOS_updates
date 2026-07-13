@@ -26,7 +26,7 @@ MANIFEST_PATH="$SCRIPT_DIR/config/npm_global_clis.txt"
 BUN_VERSION_PATH="$SCRIPT_DIR/config/bun_version.txt"
 
 . "$SCRIPT_DIR/lib/platform.sh"
-mac_update_require_apple_silicon || exit 1
+mac_update_require_supported_platform || exit 1
 
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
@@ -41,8 +41,6 @@ cleanup_npm_cli() {
     rm -rf "${TMPDIR:-/tmp}"/mac_update_node.* 2>/dev/null || true
     rm -rf "$TOOLCHAIN_HOME"/node.staging.* 2>/dev/null || true
 }
-trap cleanup_npm_cli EXIT
-trap 'cleanup_npm_cli; exit 130' INT TERM
 BUN_HOME="${BUN_INSTALL:-$HOME/.bun}"
 BUN_BIN="$BUN_HOME/bin"
 NPMRC_PATH="$HOME/.npmrc"
@@ -53,6 +51,54 @@ print_ok()   { echo -e "  ${GREEN}✅ $1${NC}"; }
 print_info() { echo -e "  ${CYAN}ℹ️  $1${NC}"; }
 print_warn() { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
 print_error(){ echo -e "  ${RED}❌ $1${NC}"; }
+
+sanitize_npm_stderr() {
+    awk '
+        {
+            lower = tolower($0)
+            if (lower ~ /(_authtoken|_auth[[:space:]]*[:=]|authorization[[:space:]]*[:=]|npm_token[[:space:]]*[:=]|password[[:space:]]*[:=]|token[[:space:]]*[:=])/) {
+                print "[REDACTED sensitive diagnostic line]"
+                next
+            }
+            if ($0 ~ /https?:\/\/[^[:space:]\/@]+@/) {
+                print "[REDACTED URL credentials]"
+                next
+            }
+            print substr($0, 1, 500)
+        }
+    '
+}
+
+run_quiet_with_error_log() {
+    local label="$1"
+    shift
+    local log_root="${TMPDIR:-/tmp}"
+    local stderr_file
+    local command_exit
+
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        log_root="$MAC_UPDATE_SESSION_DIR"
+    fi
+    stderr_file="$(mktemp "$log_root/npm_cli_stderr.XXXXXX")" || return 1
+
+    "$@" </dev/null >/dev/null 2>"$stderr_file"
+    command_exit=$?
+    if [ "$command_exit" -ne 0 ]; then
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+            {
+                printf '=== %s (exit=%s) ===\n' "$label" "$command_exit"
+                # Keep diagnostics useful but bounded: npm can emit thousands of lines.
+                tail -n 30 "$stderr_file" | sanitize_npm_stderr
+                echo ""
+            } >> "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" 2>/dev/null || true
+        else
+            printf '  Diagnostic (%s):\n' "$label" >&2
+            tail -n 12 "$stderr_file" | sanitize_npm_stderr >&2
+        fi
+    fi
+    rm -f "$stderr_file" 2>/dev/null || true
+    return "$command_exit"
+}
 
 find_shell_profile() {
     local default_shell
@@ -69,7 +115,7 @@ find_shell_profile() {
 ensure_line_in_file() {
     local file_path="$1"
     local line="$2"
-    touch "$file_path"
+    touch "$file_path" || return 1
     if ! grep -Fqx "$line" "$file_path" 2>/dev/null; then
         printf '%s\n' "$line" >> "$file_path"
     fi
@@ -80,7 +126,11 @@ remove_line_from_file() {
     [ -f "$file_path" ] || return 0
     local tmpfile
     tmpfile="$(mktemp "${TMPDIR:-/tmp}/mac_update_profile.XXXXXX")" || return 1
-    grep -Fvx "$line" "$file_path" > "$tmpfile" && mv "$tmpfile" "$file_path" || rm -f "$tmpfile"
+    grep -Fvx "$line" "$file_path" > "$tmpfile" 2>/dev/null || true
+    if ! mv "$tmpfile" "$file_path"; then
+        rm -f "$tmpfile"
+        return 1
+    fi
 }
 
 remove_npmrc_prefix() {
@@ -100,8 +150,8 @@ remove_npmrc_prefix() {
 ensure_toolchain_paths() {
     local profile
 
-    mkdir -p "$TOOLCHAIN_HOME" "$N_PREFIX" "$NPM_GLOBAL_PREFIX" "$NPM_GLOBAL_BIN" "$BUN_HOME" "$LOCAL_BIN"
-    remove_npmrc_prefix
+    mkdir -p "$TOOLCHAIN_HOME" "$N_PREFIX" "$NPM_GLOBAL_PREFIX" "$NPM_GLOBAL_BIN" "$BUN_HOME" "$LOCAL_BIN" || return 1
+    remove_npmrc_prefix || return 1
 
     export N_PREFIX
     export BUN_INSTALL="$BUN_HOME"
@@ -109,31 +159,52 @@ ensure_toolchain_paths() {
     hash -r 2>/dev/null || true
 
     profile="$(find_shell_profile)"
-    remove_line_from_file "$profile" "# Managed by macOS Updates — native CLI toolchain"
-    remove_line_from_file "$profile" "export N_PREFIX=\"$N_PREFIX\""
-    remove_line_from_file "$profile" "export PATH=\"$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\$PATH\""
-    remove_line_from_file "$profile" "export PATH=\"$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\$PATH\""
-    remove_line_from_file "$profile" "# Managed by macOS Updates — Bun only (nvm owns Node/npm)"
-    remove_line_from_file "$profile" "export BUN_INSTALL=\"$BUN_HOME\""
-    remove_line_from_file "$profile" "export PATH=\"$BUN_BIN:\$PATH\""
-    remove_line_from_file "$profile" "export PATH=\"$LOCAL_BIN:$BUN_BIN:\$PATH\""
-    remove_line_from_file "$profile" "[ -n \"\$NVM_BIN\" ] && export PATH=\"\$NVM_BIN:\$PATH\""
-    ensure_line_in_file "$profile" ""
+    remove_line_from_file "$profile" "# Managed by macOS Updates — native CLI toolchain" || return 1
+    remove_line_from_file "$profile" "export N_PREFIX=\"$N_PREFIX\"" || return 1
+    remove_line_from_file "$profile" "export PATH=\"$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\$PATH\"" || return 1
+    remove_line_from_file "$profile" "export PATH=\"$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\$PATH\"" || return 1
+    remove_line_from_file "$profile" "# Managed by macOS Updates — Bun only (nvm owns Node/npm)" || return 1
+    remove_line_from_file "$profile" "export BUN_INSTALL=\"$BUN_HOME\"" || return 1
+    remove_line_from_file "$profile" "export PATH=\"$BUN_BIN:\$PATH\"" || return 1
+    remove_line_from_file "$profile" "export PATH=\"$LOCAL_BIN:$BUN_BIN:\$PATH\"" || return 1
+    remove_line_from_file "$profile" "[ -n \"\$NVM_BIN\" ] && export PATH=\"\$NVM_BIN:\$PATH\"" || return 1
+    ensure_line_in_file "$profile" "" || return 1
     if [ -s "$HOME/.nvm/nvm.sh" ]; then
-        ensure_line_in_file "$profile" "# Managed by macOS Updates — Bun only (nvm owns Node/npm)"
-        ensure_line_in_file "$profile" "export BUN_INSTALL=\"$BUN_HOME\""
-        ensure_line_in_file "$profile" "export PATH=\"$LOCAL_BIN:$BUN_BIN:\$PATH\""
-        [ -n "$NVM_BIN" ] && ensure_line_in_file "$profile" "[ -n \"\$NVM_BIN\" ] && export PATH=\"\$NVM_BIN:\$PATH\""
+        ensure_line_in_file "$profile" "# Managed by macOS Updates — Bun only (nvm owns Node/npm)" || return 1
+        ensure_line_in_file "$profile" "export BUN_INSTALL=\"$BUN_HOME\"" || return 1
+        ensure_line_in_file "$profile" "export PATH=\"$LOCAL_BIN:$BUN_BIN:\$PATH\"" || return 1
+        if [ -n "$NVM_BIN" ]; then
+            ensure_line_in_file "$profile" "[ -n \"\$NVM_BIN\" ] && export PATH=\"\$NVM_BIN:\$PATH\"" || return 1
+        fi
         return 0
     fi
-    ensure_line_in_file "$profile" "# Managed by macOS Updates — native CLI toolchain"
-    ensure_line_in_file "$profile" "export N_PREFIX=\"$N_PREFIX\""
-    ensure_line_in_file "$profile" "export BUN_INSTALL=\"$BUN_HOME\""
-    ensure_line_in_file "$profile" "export PATH=\"$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\$PATH\""
+    ensure_line_in_file "$profile" "# Managed by macOS Updates — native CLI toolchain" || return 1
+    ensure_line_in_file "$profile" "export N_PREFIX=\"$N_PREFIX\"" || return 1
+    ensure_line_in_file "$profile" "export BUN_INSTALL=\"$BUN_HOME\"" || return 1
+    ensure_line_in_file "$profile" "export PATH=\"$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\$PATH\"" || return 1
 }
 
 normalize_semver() {
     printf '%s' "$1" | sed 's/^v//; s/ .*//'
+}
+
+semver_is_newer() {
+    awk -v lhs="$(normalize_semver "$1")" -v rhs="$(normalize_semver "$2")" '
+        BEGIN {
+            sub(/[-+].*$/, "", lhs)
+            sub(/[-+].*$/, "", rhs)
+            lhs_n = split(lhs, lhs_parts, ".")
+            rhs_n = split(rhs, rhs_parts, ".")
+            max_n = lhs_n > rhs_n ? lhs_n : rhs_n
+            for (i = 1; i <= max_n; i++) {
+                left = lhs_parts[i] + 0
+                right = rhs_parts[i] + 0
+                if (left > right) exit 0
+                if (left < right) exit 1
+            }
+            exit 1
+        }
+    '
 }
 
 detect_command_version() {
@@ -203,19 +274,42 @@ resolve_command_path() {
 
 run_with_timeout() {
     local seconds="$1"
+    local command_pid command_exit elapsed grace
     shift
     if command -v timeout >/dev/null 2>&1; then
         timeout "$seconds" "$@"
     elif command -v gtimeout >/dev/null 2>&1; then
         gtimeout "$seconds" "$@"
     else
-        "$@"
+        # Stock macOS has neither GNU timeout nor gtimeout. Run the command in
+        # the background and supervise it with a Bash 3.2 polling watchdog.
+        "$@" &
+        command_pid=$!
+        elapsed=0
+        while kill -0 "$command_pid" 2>/dev/null; do
+            if [ "$elapsed" -ge "$seconds" ]; then
+                kill -TERM "$command_pid" 2>/dev/null || true
+                grace=0
+                while kill -0 "$command_pid" 2>/dev/null && [ "$grace" -lt 5 ]; do
+                    sleep 1
+                    grace=$((grace + 1))
+                done
+                kill -KILL "$command_pid" 2>/dev/null || true
+                wait "$command_pid" 2>/dev/null || true
+                return 124
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+        wait "$command_pid"
+        command_exit=$?
+        return "$command_exit"
     fi
 }
 
 write_cli_snapshot() {
     local outfile="$1"
-    : > "$outfile"
+    : > "$outfile" || return 1
 
     while IFS='|' read -r display_name package_name method _brew_formula command_name; do
         local command_path
@@ -227,14 +321,17 @@ write_cli_snapshot() {
 
         if command_path="$(resolve_command_path "$command_name")"; then
             version="$(detect_command_version "$display_name" "$command_path")"
-            printf '%s|%s|%s|%s|%s\n' \
+            if ! printf '%s|%s|%s|%s|%s\n' \
                 "$display_name" \
                 "$package_name" \
                 "${version:-?}" \
                 "$command_name" \
-                "$command_path" >> "$outfile"
+                "$command_path" >> "$outfile"; then
+                return 1
+            fi
         fi
     done < "$MANIFEST_PATH"
+    return 0
 }
 
 detect_latest_node_version() {
@@ -345,7 +442,9 @@ ensure_n_helper() {
         return 1
     fi
 
-    "$npm_bin" install -g --prefix "$NPM_GLOBAL_PREFIX" n@latest >/dev/null 2>&1
+    run_quiet_with_error_log \
+        "npm install n@latest" \
+        "$npm_bin" install -g --prefix "$NPM_GLOBAL_PREFIX" n@latest
 }
 
 ensure_latest_node() {
@@ -399,7 +498,7 @@ read_bun_version() {
 install_bun_tarball() {
     local bun_version="$1"
     local archive_arch archive_name tag archive_url shasums_url tmpdir
-    local bun_binary staging_bin backup_bin
+    local bun_binary staging_bin backup_bin installed_version
 
     case "$(uname -m)" in
         arm64)  archive_arch="aarch64" ;;
@@ -438,7 +537,7 @@ install_bun_tarball() {
         rm -rf "$tmpdir"
         return 1
     fi
-    bun_binary="$tmpdir/bun"
+    bun_binary="$tmpdir/bun-darwin-${archive_arch}/bun"
     if [ ! -f "$bun_binary" ]; then
         rm -rf "$tmpdir"
         return 1
@@ -457,9 +556,21 @@ install_bun_tarball() {
     chmod +x "$staging_bin"
     backup_bin="$BUN_BIN/bun.backup.$(date +%Y%m%d%H%M%S).$$"
     if [ -f "$BUN_BIN/bun" ]; then
-        mv "$BUN_BIN/bun" "$backup_bin" 2>/dev/null || true
+        if ! mv "$BUN_BIN/bun" "$backup_bin" 2>/dev/null; then
+            rm -rf "$tmpdir"
+            rm -f "$staging_bin" 2>/dev/null || true
+            return 1
+        fi
     fi
     if ! mv "$staging_bin" "$BUN_BIN/bun"; then
+        [ -f "$backup_bin" ] && mv "$backup_bin" "$BUN_BIN/bun" 2>/dev/null || true
+        rm -rf "$tmpdir"
+        return 1
+    fi
+    installed_version="$(normalize_semver "$("$BUN_BIN/bun" --version 2>/dev/null || echo '?')")"
+    if [ "$installed_version" != "$(normalize_semver "$bun_version")" ]; then
+        print_error "Weryfikacja wersji Bun nie powiodła się: oczekiwano $bun_version, wykryto $installed_version"
+        rm -f "$BUN_BIN/bun" 2>/dev/null || true
         [ -f "$backup_bin" ] && mv "$backup_bin" "$BUN_BIN/bun" 2>/dev/null || true
         rm -rf "$tmpdir"
         return 1
@@ -470,25 +581,32 @@ install_bun_tarball() {
 }
 
 ensure_latest_bun() {
+    local pinned
+    local current
+
     export BUN_INSTALL="$BUN_HOME"
-    mkdir -p "$BUN_HOME" "$BUN_BIN"
+    mkdir -p "$BUN_HOME" "$BUN_BIN" || return 1
 
     if [ -x "$BUN_BIN/bun" ]; then
+        current="$(normalize_semver "$("$BUN_BIN/bun" --version 2>/dev/null || echo '?')")"
         print_info "Aktualizuję Bun natywnie przez bun upgrade..."
-        if "$BUN_BIN/bun" upgrade >/dev/null 2>&1; then
+        if run_quiet_with_error_log "bun upgrade" "$BUN_BIN/bun" upgrade; then
             print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
         else
             print_warn "bun upgrade zakończony ostrzeżeniem — próbuję instalacji z archiwum..."
-            local pinned
             if pinned="$(read_bun_version)"; then
-                install_bun_tarball "$pinned" || return 1
-                print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
+                if semver_is_newer "$pinned" "$current"; then
+                    install_bun_tarball "$pinned" || return 1
+                    print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
+                else
+                    print_ok "Bun $current nie jest starszy niż zweryfikowany fallback $pinned — bez downgrade"
+                fi
             else
-                print_warn "Brak config/bun_version.txt — pozostawiam obecną wersję Bun"
+                print_error "Brak config/bun_version.txt — nie mogę zweryfikować fallbacku Bun"
+                return 1
             fi
         fi
     else
-        local pinned
         pinned="$(read_bun_version)" || pinned=""
         if [ -z "$pinned" ]; then
             print_error "Brak config/bun_version.txt — nie mogę zainstalować Bun bez weryfikacji SHA256"
@@ -515,6 +633,7 @@ install_latest_npm_packages() {
     local command_name
     local command_path
     local package_spec
+    local failures=0
 
     if [ ! -x "$active_npm" ]; then
         active_npm="$(bootstrap_npm)"
@@ -533,19 +652,25 @@ install_latest_npm_packages() {
         if [ "$method" = "npm" ]; then
             package_spec="${package_name}@latest"
             print_info "Aktualizuję ${display_name} przez npm (${package_spec})..."
-            if "$active_npm" install -g --prefix "$NPM_GLOBAL_PREFIX" "$package_spec" </dev/null >/dev/null 2>&1; then
+            if run_quiet_with_error_log \
+                "npm install ${package_spec}" \
+                "$active_npm" install -g --prefix "$NPM_GLOBAL_PREFIX" "$package_spec"; then
                 print_ok "${display_name}: $(detect_command_version "$display_name" "$NPM_GLOBAL_BIN/$command_name")"
             else
                 print_warn "Aktualizacja ${display_name} nie powiodła się"
+                failures=$((failures + 1))
             fi
         elif [ "$method" = "self-update" ]; then
             if command_path="$(resolve_command_path "$command_name")"; then
                 print_info "Aktualizuję ${display_name} przez własny updater (${command_name} update)..."
-                if run_with_timeout 300 "$command_path" update </dev/null >/dev/null 2>&1; then
+                if run_quiet_with_error_log \
+                    "${command_name} update" \
+                    run_with_timeout 300 "$command_path" update; then
                     command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
                 else
                     print_warn "Aktualizacja ${display_name} nie powiodła się"
+                    failures=$((failures + 1))
                 fi
             else
                 print_info "${display_name} nie jest zainstalowany — pomijam"
@@ -555,6 +680,15 @@ install_latest_npm_packages() {
 
     export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:$PATH"
     hash -r 2>/dev/null || true
+
+    if [ "$failures" -ne 0 ]; then
+        print_error "$failures aktualizacji npm/self-update zakończyło się błędem"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
+            print_info "Diagnostyka: $MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"
+        fi
+        return 1
+    fi
+    return 0
 }
 
 remove_legacy_brew_formulas() {
@@ -594,10 +728,6 @@ remove_legacy_brew_formulas() {
     done
 }
 
-if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
-    print_warn "DRY-RUN mode — npm/CLI mutations will be skipped where possible"
-fi
-
 print_header "🧰 Native CLI & npm"
 
 if [ ! -f "$MANIFEST_PATH" ]; then
@@ -605,27 +735,64 @@ if [ ! -f "$MANIFEST_PATH" ]; then
     exit 1
 fi
 
-ensure_toolchain_paths
-
-if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-    print_info "Zapisuję snapshot CLI przed aktualizacją..."
-    write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_before.txt"
-fi
-
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+    print_warn "DRY-RUN mode — no npm/CLI files or shell profiles will be modified"
     print_info "[DRY-RUN] Would run: Node bootstrap, npm global upgrades, Bun install/upgrade"
     print_header "✅ Native CLI & npm — dry-run complete"
     exit 0
 fi
 
-ensure_latest_node || exit 1
-install_latest_npm_packages || exit 1
-ensure_latest_bun || exit 1
+trap cleanup_npm_cli EXIT
+trap 'cleanup_npm_cli; exit 130' INT TERM
+if ! ensure_toolchain_paths; then
+    print_error "Nie udało się bezpiecznie skonfigurować ścieżek natywnego toolchainu"
+    exit 1
+fi
+
+NPM_CLI_EXIT=0
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    if ! : > "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"; then
+        print_error "Nie udało się utworzyć logu diagnostycznego npm"
+        NPM_CLI_EXIT=1
+    fi
+fi
+
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    print_info "Zapisuję snapshot CLI przed aktualizacją..."
+    if ! write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_before.txt"; then
+        print_error "Nie udało się zapisać snapshotu CLI przed aktualizacją"
+        NPM_CLI_EXIT=1
+    fi
+fi
+
+NODE_READY=1
+if ! ensure_latest_node; then
+    NPM_CLI_EXIT=1
+    NODE_READY=0
+fi
+if [ "$NODE_READY" -eq 1 ]; then
+    install_latest_npm_packages || NPM_CLI_EXIT=1
+else
+    print_error "Pomijam pakiety npm, ponieważ aktualizacja Node.js nie powiodła się"
+fi
+ensure_latest_bun || NPM_CLI_EXIT=1
 remove_legacy_brew_formulas
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "Zapisuję snapshot CLI po aktualizacji..."
-    write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_after.txt"
+    if ! write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_after.txt"; then
+        print_error "Nie udało się zapisać snapshotu CLI po aktualizacji"
+        NPM_CLI_EXIT=1
+    fi
+fi
+
+if [ "$NPM_CLI_EXIT" -ne 0 ]; then
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -s "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
+        print_warn "Ostatnia diagnostyka npm/self-update (sanityzowana):"
+        tail -n 20 "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" | sed 's/^/    /'
+    fi
+    print_header "❌ Native CLI & npm — zakończono z błędami"
+    exit "$NPM_CLI_EXIT"
 fi
 
 print_header "✅ Native CLI & npm — gotowe"

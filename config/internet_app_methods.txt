@@ -1,11 +1,11 @@
 # Canonical update method per internet app (config/internet_apps.txt order)
 # Format: AppName|method|STATUS_VAR
-# Methods: keystone | github_dmg | silent_launch | msupdate | docker_cli | manual
+# Methods: keystone | github_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual
 Google Chrome|keystone|STATUS_CHROME
 Firefox Developer Edition|github_dmg|STATUS_FIREFOX
 Brave Browser|silent_launch|STATUS_BRAVE
 ChatGPT Atlas|github_dmg|STATUS_ATLAS
-ChatGPT|silent_launch|STATUS_CHATGPT
+ChatGPT / Codex|silent_launch|STATUS_CHATGPT
 Claude|silent_launch|STATUS_CLAUDE_APP
 Comet|silent_launch|STATUS_COMET
 Gemini|silent_launch|STATUS_GEMINI
@@ -13,7 +13,6 @@ Perplexity|silent_launch|STATUS_PERPLEXITY
 Antigravity|silent_launch|STATUS_ANTIGRAVITY
 Antigravity IDE|silent_launch|STATUS_ANTIGRAVITY_IDE
 LM Studio|silent_launch|STATUS_LMSTUDIO
-Codex|silent_launch|STATUS_CODEX
 OpenCode|silent_launch|STATUS_OPENCODE
 Cursor|silent_launch|STATUS_CURSOR
 Ascendo|silent_launch|STATUS_ASCENDO
@@ -30,7 +29,7 @@ Microsoft Word|msupdate|STATUS_MICROSOFT
 Microsoft Outlook|msupdate|STATUS_MICROSOFT
 Microsoft PowerPoint|msupdate|STATUS_MICROSOFT
 Microsoft OneNote|msupdate|STATUS_MICROSOFT
-Microsoft Teams|msupdate|STATUS_MICROSOFT
+Microsoft Teams|mau_fallback_self_update|STATUS_TEAMS
 Visual Studio Code|github_dmg|STATUS_VSCODE
 Warp|silent_launch|STATUS_WARP
 CodeEdit|github_dmg|STATUS_CODEEDIT
@@ -39,12 +38,11 @@ AppCleaner|silent_launch|STATUS_APPCLEANER
 Spotify|silent_launch|STATUS_SPOTIFY
 CapCut|silent_launch|STATUS_CAPCUT
 Ledger Live|github_dmg|STATUS_LEDGER
-Ledger Wallet|github_dmg|STATUS_LEDGER
 Trezor Suite|github_dmg|STATUS_TREZOR
 Remote Desktop Manager|silent_launch|STATUS_RDMANAGER
 IPMIView|manual|STATUS_IPMIVIEW
-Inkscape|manual|STATUS_INKSCAPE
+Inkscape|brew_cask|STATUS_INKSCAPE
 DJI Assistant 2|manual|STATUS_DJI
-UniFi|manual|STATUS_UNIFI
-WiFiman|manual|STATUS_WIFIMAN
-Picsart|manual|STATUS_PICSART
+UniFi|appstore_gui|STATUS_UNIFI
+WiFiman|appstore_gui|STATUS_WIFIMAN
+Picsart|appstore_gui|STATUS_PICSART

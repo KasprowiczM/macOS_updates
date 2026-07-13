@@ -24,7 +24,7 @@ NC='\033[0m' # Brak koloru
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 . "$SCRIPT_DIR/lib/platform.sh"
-mac_update_require_apple_silicon || exit 1
+mac_update_require_supported_platform || exit 1
 
 # ── i18n: load language strings ──────────────────────────────
 . "$SCRIPT_DIR/lib/cli.sh"
@@ -78,8 +78,14 @@ echo ""
 # ============================================================
 print_header "$L_SYSTEM_UPDATES_CHECK"
 
-UPDATES=$(softwareupdate -l 2>&1)
+UPDATES_EXIT=0
+UPDATES=$(softwareupdate -l 2>&1) || UPDATES_EXIT=$?
 echo "$UPDATES"
+
+if [ "$UPDATES_EXIT" -ne 0 ]; then
+    print_error "softwareupdate -l failed (exit $UPDATES_EXIT)"
+    exit 1
+fi
 
 if echo "$UPDATES" | grep -q "No new software available"; then
     print_ok "$L_SYSTEM_UPDATES_NONE"
@@ -128,9 +134,10 @@ echo ""
 # BŁĄD: "sudo reboot" to surowy restart jądra — omija mechanizm
 # aktualizacji macOS i dlatego aktualizacje nie są stosowane przy restarcie.
 
-# Sprawdź czy któraś aktualizacja wymaga restartu (przed instalacją)
+# Sprawdź czy któraś aktualizacja wymaga restartu (użyj już pobranego wyniku,
+# zamiast ponownie odpytywać softwareupdate).
 NEEDS_RESTART=false
-if softwareupdate -l 2>&1 | grep -qi "restart"; then
+if echo "$UPDATES" | grep -qi "restart"; then
     NEEDS_RESTART=true
 fi
 
@@ -138,8 +145,12 @@ if [ "$NEEDS_RESTART" = true ]; then
     echo ""
     print_warn "$L_SYSTEM_RESTART_REQUIRED"
     print_info "$L_SYSTEM_RESTART_AFTER_INFO"
-    read -r -p "  $L_SYSTEM_CONFIRM_RESTART " AUTO_RESTART
-    AUTO_RESTART="${AUTO_RESTART:-T}"
+    if [ "${MAC_UPDATE_YES:-0}" = "1" ]; then
+        AUTO_RESTART="T"
+    else
+        read -r -p "  $L_SYSTEM_CONFIRM_RESTART " AUTO_RESTART
+        AUTO_RESTART="${AUTO_RESTART:-T}"
+    fi
     if [[ "$AUTO_RESTART" =~ ^[Nn] ]]; then
         print_error "Restart-required macOS updates will not be installed without softwareupdate -R."
         print_info "$L_SYSTEM_RESTART_MECHANISM"

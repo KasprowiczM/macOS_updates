@@ -10,7 +10,6 @@ iu_antigravity_ide
 iu_gemini
 iu_lm_studio
 iu_perplexity_desktop
-iu_codex_desktop
 iu_opencode_desktop
 iu_protonvpn
 iu_keepassxc
@@ -20,6 +19,7 @@ iu_google_drive
 iu_megasync
 iu_proton_drive
 iu_microsoft_365
+iu_microsoft_teams
 iu_visual_studio_code
 iu_codeedit
 iu_docker_desktop
@@ -34,8 +34,4 @@ iu_ledger
 iu_trezor_suite
 iu_remote_desktop_manager
 iu_ipmiview
-iu_inkscape
 iu_dji_assistant
-iu_unifi
-iu_wifiman
-iu_picsart

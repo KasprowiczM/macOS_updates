@@ -4,7 +4,7 @@ Google Chrome
 Firefox Developer Edition
 Brave Browser
 ChatGPT Atlas
-ChatGPT
+ChatGPT / Codex
 Claude
 Comet
 Gemini
@@ -12,7 +12,6 @@ Perplexity
 Antigravity
 Antigravity IDE
 LM Studio
-Codex
 OpenCode
 Cursor
 Ascendo
@@ -38,7 +37,6 @@ AppCleaner
 Spotify
 CapCut
 Ledger Live
-Ledger Wallet
 Trezor Suite
 Remote Desktop Manager
 IPMIView

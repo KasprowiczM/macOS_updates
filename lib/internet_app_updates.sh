@@ -2,6 +2,63 @@
 # lib/internet_app_updates.sh — per-app update handlers (sourced by update_internet_apps.sh)
 # Requires: helpers from update_internet_apps.sh (print_*, app_version, silent_launch_app, etc.)
 
+# Print "newer" only when the remote version is provably greater than the
+# installed version. "current" includes equality and a local version ahead of
+# the feed; "unknown" prevents replacement when either version is unparseable.
+internet_version_relation() {
+    python3 - "$1" "$2" <<'PYEOF'
+import re
+import sys
+
+
+def version_key(value):
+    match = re.search(r"\d+(?:\.\d+)*", value or "")
+    if not match:
+        return None
+    numbers = [int(part) for part in match.group(0).split(".")]
+    numbers = (numbers + [0] * 12)[:12]
+    suffix = (value[match.end():] or "").lower().split("+", 1)[0]
+    prerelease = suffix.lstrip("-._")
+    prerelease_rank = 4
+    for marker, rank in (("dev", 0), ("alpha", 1), ("a", 1), ("beta", 2), ("b", 2), ("rc", 3)):
+        if prerelease.startswith(marker):
+            prerelease_rank = rank
+            break
+    suffix_numbers = [int(part) for part in re.findall(r"\d+", suffix)]
+    suffix_numbers = (suffix_numbers + [0] * 4)[:4]
+    return tuple(numbers + [prerelease_rank] + suffix_numbers)
+
+
+remote = version_key(sys.argv[1])
+local = version_key(sys.argv[2])
+if remote is None or local is None:
+    print("unknown")
+elif remote > local:
+    print("newer")
+else:
+    print("current")
+PYEOF
+}
+
+GOOGLE_KEYSTONE_RAN=0
+GOOGLE_KEYSTONE_EXIT=1
+MAU_TEAMS21_VERIFIED=0
+google_keystone_check() {
+    local agent="$1"
+    local output=""
+    if [ "$GOOGLE_KEYSTONE_RAN" -eq 1 ]; then
+        return "$GOOGLE_KEYSTONE_EXIT"
+    fi
+    GOOGLE_KEYSTONE_RAN=1
+    output=$(run_with_timeout 180 "$agent" --runMode ondemand 2>&1)
+    GOOGLE_KEYSTONE_EXIT=$?
+    if [ "$GOOGLE_KEYSTONE_EXIT" -ne 0 ]; then
+        internet_diag_log "ERROR: Google Keystone check failed (exit=$GOOGLE_KEYSTONE_EXIT)"
+        [ -n "$output" ] && printf '%s\n' "$output" | tail -n 20
+    fi
+    return "$GOOGLE_KEYSTONE_EXIT"
+}
+
 iu_google_chrome() {
     print_header "🟡 Google Chrome"
     if [ -d "/Applications/Google Chrome.app" ]; then
@@ -11,10 +68,13 @@ iu_google_chrome() {
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
         if [ -f "$KEYSTONE_AGENT" ]; then
             print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
-            "$KEYSTONE_AGENT" --runMode ondemand 2>/dev/null &
-            sleep 3
-            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
-            STATUS_CHROME="$L_INTERNET_STATUS_CHECKED_CLI"
+            if google_keystone_check "$KEYSTONE_AGENT"; then
+                print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
+                STATUS_CHROME="$L_INTERNET_STATUS_CHECKED_CLI"
+            else
+                print_warn "Google Keystone failed to check for Chrome updates"
+                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         else
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Chrome")"
             if silent_launch_app "Google Chrome"; then
@@ -47,6 +107,7 @@ iu_firefox_developer_edition() {
         # a Mozilla API zwraca pełną wersję z sufiksem (np. "150.0b5").
         # Porównujemy wersje bazowe, żeby uniknąć ciągłego pobierania tej samej wersji.
         LATEST_FF_BASE=$(echo "$LATEST_FF" | sed 's/b[0-9]*$//')
+        FF_RELATION="$(internet_version_relation "$LATEST_FF_BASE" "$VER")"
 
         if [ "$LATEST_FF" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "Mozilla API")"
@@ -56,13 +117,11 @@ iu_firefox_developer_edition() {
             else
                 STATUS_FIREFOX="$L_INTERNET_STATUS_LAUNCH_FAILED"
             fi
-        elif [ "$LATEST_FF" = "$VER" ] || [ "$LATEST_FF_BASE" = "$VER" ]; then
-            # Exact match — already current
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$VER")"
-            STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
-        elif [ "$(printf '%s\n%s\n' "$LATEST_FF_BASE" "$VER" | sort -V | tail -1)" = "$VER" ]; then
-            # Local version is newer or equal to remote base (e.g. local=150.0.1, remote=150.0b5)
-            # DevEdition = beta channel — local may legitimately be ahead
+        elif [ "$FF_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Firefox Developer Edition version")"
+            STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$FF_RELATION" = "current" ]; then
+            # Equal or local ahead (e.g. local=150.0.1, remote=150.0b5).
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$VER (remote: $LATEST_FF)")"
             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
         else
@@ -70,19 +129,27 @@ iu_firefox_developer_edition() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_APPLE_SILICON" "Firefox Developer Edition" "$LATEST_FF")"
             FF_URL="https://download.mozilla.org/?product=firefox-devedition-latest&os=osx&lang=pl"
             TEMP_DMG="$(make_temp_dmg Firefox_DevEd)"
-            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL" 2>/dev/null \
-                && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
-                    sleep 1
-                    if copy_verified_app "/Volumes/Firefox Developer Edition/Firefox Developer Edition.app" "Firefox Developer Edition.app"; then
-                        NEW_VER=$(firefox_dev_version)
-                        print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$NEW_VER")"
-                        STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL" 2>/dev/null; then
+                FF_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$FF_MOUNT" ]; then
+                    if [ -d "$FF_MOUNT/Firefox Developer Edition.app" ]; then
+                        FF_SOURCE_VER=$(app_version "$FF_MOUNT/Firefox Developer Edition.app")
+                        if [ "$(internet_version_relation "$FF_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer Firefox payload: $FF_SOURCE_VER (installed: $VER)"
+                            STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$FF_MOUNT/Firefox Developer Edition.app" "Firefox Developer Edition.app"; then
+                            NEW_VER=$(firefox_dev_version)
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$NEW_VER")"
+                            STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                        else
+                            print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
+                            STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        fi
                     else
-                        print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
+                        print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "Firefox Developer Edition")"
                         STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
                     fi
-                    hdiutil detach "/Volumes/Firefox Developer Edition" -quiet 2>/dev/null || true
+                    detach_verified_dmg "$FF_MOUNT" || true
                 else
                     print_warn "$L_INTERNET_MOUNT_DMG_MANUAL"
                     STATUS_FIREFOX="$L_INTERNET_STATUS_MOUNT_ERROR"
@@ -144,47 +211,49 @@ iu_chatgpt_atlas() {
             sort -V | tail -1)
         ATLAS_DMG_URL=$(echo "$ATLAS_XML" | grep -m1 'enclosure url=".*\.dmg"' | \
             sed 's|.*enclosure url="\([^"]*\.dmg\)".*|\1|')
+        ATLAS_RELATION="$(internet_version_relation "$ATLAS_LATEST" "$VER")"
 
         if [ -z "$ATLAS_LATEST" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "OpenAI server")"
             STATUS_ATLAS="$L_INTERNET_STATUS_OFFLINE"
-        elif [ "$ATLAS_LATEST" = "$VER" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "ChatGPT Atlas" "$VER")"
+        elif [ "$ATLAS_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "ChatGPT Atlas version")"
+            STATUS_ATLAS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$ATLAS_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "ChatGPT Atlas" "$VER (remote: $ATLAS_LATEST)")"
             STATUS_ATLAS="$L_INTERNET_STATUS_CURRENT"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$ATLAS_LATEST" "$VER")"
             if [ -n "$ATLAS_DMG_URL" ]; then
                 print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_SIZE" "ChatGPT Atlas" "$ATLAS_LATEST" "~250 MB")"
                 TEMP_DMG="$(make_temp_dmg ChatGPT_Atlas)"
-                if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$ATLAS_DMG_URL" 2>/dev/null \
-                    && verify_dmg "$TEMP_DMG"; then
-                    if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
-                        sleep 1
-                        ATLAS_VOL=$(find /Volumes -maxdepth 1 -type d \
-                            \( -iname "*atlas*" -o -iname "*chatgpt*" \) 2>/dev/null | head -1)
-                        if [ -n "$ATLAS_VOL" ]; then
-                            SRC_APP=$(find "$ATLAS_VOL" -maxdepth 1 -name "*.app" 2>/dev/null | head -1)
-                            if [ -n "$SRC_APP" ]; then
-                                APP_BASE=$(basename "$SRC_APP")
-                                if copy_verified_app "$SRC_APP" "$APP_BASE"; then
-                                    print_ok "$(internet_msg "$L_INTERNET_APP_COPIED" "$APP_BASE")"
-                                    NEW_VER=$(app_version "$ATLAS_APP")
-                                    print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "ChatGPT Atlas" "$NEW_VER")"
-                                    STATUS_ATLAS="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
-                                else
-                                    print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$APP_BASE")"
-                                    STATUS_ATLAS="$L_INTERNET_STATUS_INSTALL_ERROR"
-                                fi
-                                hdiutil detach "$ATLAS_VOL" -quiet 2>/dev/null || true
+                if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$ATLAS_DMG_URL" 2>/dev/null; then
+                    ATLAS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                    if [ -n "$ATLAS_MOUNT" ]; then
+                        ATLAS_SRC=""
+                        for ATLAS_CANDIDATE in "$ATLAS_MOUNT/ChatGPT Atlas.app" "$ATLAS_MOUNT/Atlas.app"; do
+                            [ -d "$ATLAS_CANDIDATE" ] && ATLAS_SRC="$ATLAS_CANDIDATE" && break
+                        done
+                        if [ -n "$ATLAS_SRC" ]; then
+                            ATLAS_DEST="$(basename "$ATLAS_APP")"
+                            ATLAS_SOURCE_VER=$(app_version "$ATLAS_SRC")
+                            if [ "$(internet_version_relation "$ATLAS_SOURCE_VER" "$VER")" != "newer" ]; then
+                                print_warn "Refusing non-newer Atlas payload: $ATLAS_SOURCE_VER (installed: $VER)"
+                                STATUS_ATLAS="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            elif copy_verified_app "$ATLAS_SRC" "$ATLAS_DEST"; then
+                                print_ok "$(internet_msg "$L_INTERNET_APP_COPIED" "$ATLAS_DEST")"
+                                NEW_VER=$(app_version "$ATLAS_APP")
+                                print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "ChatGPT Atlas" "$NEW_VER")"
+                                STATUS_ATLAS="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                             else
-                                hdiutil detach "$ATLAS_VOL" -quiet 2>/dev/null || true
-                                print_warn "$L_INTERNET_APP_NOT_ON_VOLUME"
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$ATLAS_DEST")"
                                 STATUS_ATLAS="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         else
-                            print_warn "$L_INTERNET_VOLUME_NOT_FOUND"
-                            STATUS_ATLAS="$L_INTERNET_STATUS_MOUNT_ERROR"
+                            print_warn "$L_INTERNET_APP_NOT_ON_VOLUME"
+                            STATUS_ATLAS="$L_INTERNET_STATUS_INSTALL_ERROR"
                         fi
+                        detach_verified_dmg "$ATLAS_MOUNT" || true
                     else
                         print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
                         STATUS_ATLAS="$L_INTERNET_STATUS_MOUNT_ERROR"
@@ -215,19 +284,20 @@ iu_chatgpt_atlas() {
 }
 
 iu_chatgpt() {
-    print_header "🤖 ChatGPT"
-    if [ -d "/Applications/ChatGPT.app" ]; then
-        VER=$(app_version "/Applications/ChatGPT.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "ChatGPT")"
-        if silent_launch_app "ChatGPT"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ChatGPT → Check for updates")"
+    print_header "🤖 ChatGPT / Codex (OpenAI)"
+    OPENAI_APP="$(internet_app_path "ChatGPT / Codex" 2>/dev/null || true)"
+    if [ -n "$OPENAI_APP" ] && [ -d "$OPENAI_APP" ]; then
+        VER=$(app_version "$OPENAI_APP")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "bundle: com.openai.codex")"
+        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "ChatGPT / Codex")"
+        if silent_launch_app "$OPENAI_APP"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ChatGPT / Codex → Check for updates")"
             STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
         else
             STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT")"
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT / Codex (com.openai.codex)")"
     fi
 
     # ── 6. CLAUDE (aplikacja desktopowa) ──────────────────────────
@@ -375,29 +445,6 @@ iu_perplexity_desktop() {
         print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://www.perplexity.ai/platforms (lub przez App Store)")"
     fi
 
-    # ── 11. CODEX DESKTOP (OpenAI) ────────────────────────────────
-}
-
-iu_codex_desktop() {
-    print_header "⚡ Codex Desktop (OpenAI)"
-    # OpenAI Codex — agent kodowania AI, pobierany z chatgpt.com/codex
-    # Obsługuje auto-aktualizacje przez wbudowany updater (Electron Squirrel)
-    if [ -d "/Applications/Codex.app" ]; then
-        VER=$(app_version "/Applications/Codex.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Codex")"
-        if silent_launch_app "Codex"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Codex → About Codex → Check for updates")"
-            print_info "Strona pobierania: https://chatgpt.com/codex"
-            STATUS_CODEX="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_CODEX="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Codex Desktop")"
-        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://chatgpt.com/codex (tylko Apple Silicon)")"
-    fi
-
     # ── 11b. OPENCODE DESKTOP (SST/opencode) ──────────────────────
 }
 
@@ -467,6 +514,7 @@ iu_keepassxc() {
 
         LATEST_KPX_TAG=$(github_latest_tag "keepassxreboot/keepassxc")
         LATEST_KPX=$(echo "$LATEST_KPX_TAG" | sed 's/^v//')
+        KPX_RELATION="$(internet_version_relation "$LATEST_KPX" "$VER")"
         # Arch detection for DMG URL
         KPX_ARCH=$([ "$(uname -m)" = "arm64" ] && echo "arm64" || echo "x86_64")
 
@@ -478,21 +526,26 @@ iu_keepassxc() {
             else
                 STATUS_KEEPASSXC="$L_INTERNET_STATUS_LAUNCH_FAILED"
             fi
-        elif [ "$LATEST_KPX" = "$VER" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "KeePassXC" "$VER")"
+        elif [ "$KPX_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "KeePassXC version")"
+            STATUS_KEEPASSXC="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$KPX_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "KeePassXC" "$VER (remote: $LATEST_KPX)")"
             STATUS_KEEPASSXC="$L_INTERNET_STATUS_CURRENT"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_KPX" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$LATEST_KPX ($KPX_ARCH)")"
             KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/KeePassXC-${LATEST_KPX}-${KPX_ARCH}.dmg"
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
-            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" 2>/dev/null \
-                && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
-                    sleep 1
-                    VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*keepass*" 2>/dev/null | head -1)
-                    if [ -n "$VOLUME_PATH" ] && [ -d "$VOLUME_PATH/KeePassXC.app" ]; then
-                        if copy_verified_app "$VOLUME_PATH/KeePassXC.app" "KeePassXC.app"; then
+            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" 2>/dev/null; then
+                KPX_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$KPX_MOUNT" ]; then
+                    if [ -d "$KPX_MOUNT/KeePassXC.app" ]; then
+                        KPX_SOURCE_VER=$(app_version "$KPX_MOUNT/KeePassXC.app")
+                        if [ "$(internet_version_relation "$KPX_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer KeePassXC payload: $KPX_SOURCE_VER (installed: $VER)"
+                            STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$KPX_MOUNT/KeePassXC.app" "KeePassXC.app"; then
                             print_ok "$(internet_msg "$L_INTERNET_APP_COPIED" "KeePassXC")"
                             NEW_VER=$(app_version "/Applications/KeePassXC.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "KeePassXC" "$NEW_VER")"
@@ -501,12 +554,11 @@ iu_keepassxc() {
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "KeePassXC")"
                             STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
                         fi
-                        hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                     else
-                        [ -n "$VOLUME_PATH" ] && hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                         print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "KeePassXC")"
                         STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
                     fi
+                    detach_verified_dmg "$KPX_MOUNT" || true
                 else
                     print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
                     STATUS_KEEPASSXC="$L_INTERNET_STATUS_MOUNT_ERROR"
@@ -536,26 +588,15 @@ iu_proton_mail() {
         VER=$(app_version "/Applications/Proton Mail.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        LATEST_PROTON_TAG=$(github_latest_tag "ProtonMail/proton-mail-desktop")
-        LATEST_PROTON=$(echo "$LATEST_PROTON_TAG" | sed 's/^v//')
-
-        if [ "$LATEST_PROTON" = "?" ]; then
-            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
-        elif [ "$LATEST_PROTON" = "$VER" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Proton Mail" "$VER")"
-            STATUS_PROTONMAIL="$L_INTERNET_STATUS_CURRENT"
+        # Proton does not publish a stable public desktop-release endpoint.
+        # Trigger its built-in updater and report the result honestly instead
+        # of turning the chronic GitHub 404 into a false offline failure.
+        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Proton Mail")"
+        if silent_launch_app "/Applications/Proton Mail.app"; then
+            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Mail")"
+            STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
         else
-            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_MAYBE" "$LATEST_PROTON" "$VER")"
-        fi
-        # If not already marked current, launch for self-update
-        if [ "${STATUS_PROTONMAIL:-}" != "$L_INTERNET_STATUS_CURRENT" ]; then
-            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Proton Mail")"
-            if silent_launch_app "Proton Mail"; then
-                print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Mail")"
-                STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-            else
-                STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+            STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Proton Mail")"
@@ -602,10 +643,13 @@ iu_google_drive() {
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
         if [ -f "$KEYSTONE_AGENT" ]; then
             print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
-            "$KEYSTONE_AGENT" --runMode ondemand 2>/dev/null &
-            sleep 2
-            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
-            STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_CHECKED_CLI"
+            if google_keystone_check "$KEYSTONE_AGENT"; then
+                print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
+                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_CHECKED_CLI"
+            else
+                print_warn "Google Keystone failed to check for Google Drive updates"
+                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
         else
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Google Drive")"
             if silent_launch_app "Google Drive"; then
@@ -668,11 +712,12 @@ iu_microsoft_365() {
 
     MAU_CLI="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate"
     MAU_APP="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app"
+    MAU_TEAMS21_OFFERED=0
 
     # Sprawdź czy zainstalowana jest jakakolwiek aplikacja Microsoft
     MS_INSTALLED=0
     for ms_app in "Microsoft Word" "Microsoft Excel" "Microsoft PowerPoint" \
-                   "Microsoft Outlook" "Microsoft OneNote" "Microsoft Teams"; do
+                   "Microsoft Outlook" "Microsoft OneNote"; do
         if [ -d "/Applications/${ms_app}.app" ]; then
             VER=$(app_version "/Applications/${ms_app}.app")
             print_info "${ms_app}: $VER"
@@ -684,49 +729,83 @@ iu_microsoft_365() {
         if [ -f "$MAU_CLI" ]; then
             # Krok 1: sprawdź dostępne aktualizacje z limitem czasu 30s
             print_step "$L_INTERNET_MS_CHECKING"
-            MAU_LIST=$(run_with_timeout 60 "$MAU_CLI" --list 2>/dev/null || true)
+            MAU_LIST_EXIT=0
+            MAU_LIST=$(run_with_timeout 60 "$MAU_CLI" --list 2>&1) || MAU_LIST_EXIT=$?
 
             # Filtruj linie zawierające rzeczywiste wpisy aktualizacji
             # msupdate --list wypisuje nazwy pakietów lub pusty wynik gdy brak aktualizacji
-            MAU_UPDATES=$(echo "$MAU_LIST" | grep -v "^[[:space:]]*$" | grep -v "No updates" || true)
-            MAU_COUNT=$(echo "$MAU_UPDATES" | grep -c "." 2>/dev/null || echo "0")
-
-            if [ -n "$MAU_UPDATES" ] && [ "$MAU_COUNT" -gt 0 ]; then
-                print_info "$(internet_msg "$L_INTERNET_MS_UPDATES_AVAILABLE" "$MAU_COUNT")"
-                echo "$MAU_UPDATES" | while read -r line; do
-                    [ -n "$line" ] && print_info "  → $line"
-                done
-                # Krok 2: instaluj tylko jeśli są aktualizacje; limit 300s (5 min)
-                print_step "$L_INTERNET_MS_INSTALLING"
-                if run_with_timeout 300 "$MAU_CLI" --install 2>/dev/null; then
-                    print_ok "$L_INTERNET_MS_UPDATED"
-                    STATUS_MICROSOFT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "Microsoft 365")"
-                else
-                    EXIT_CODE=$?
-                    if [ "$EXIT_CODE" = "124" ]; then
-                        print_warn "$L_INTERNET_MS_TIMEOUT"
-                    else
-                        print_warn "$(internet_msg "$L_INTERNET_MS_INSTALL_ERROR" "$EXIT_CODE")"
-                    fi
-                    if [ -d "$MAU_APP" ]; then
-                        open -a "$MAU_APP" 2>/dev/null || true
-                        print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
-                    fi
-                    STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
-                fi
+            if [ "$MAU_LIST_EXIT" -ne 0 ]; then
+                print_warn "Microsoft AutoUpdate check failed (exit $MAU_LIST_EXIT)"
+                [ -n "$MAU_LIST" ] && printf '%s\n' "$MAU_LIST" | tail -n 20
+                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
             else
-                print_ok "$L_INTERNET_MS_CURRENT"
-                STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+                if printf '%s\n' "$MAU_LIST" | grep -q "TEAMS21"; then
+                    MAU_TEAMS21_OFFERED=1
+                fi
+                MAU_UPDATES=$(echo "$MAU_LIST" | grep -v "^[[:space:]]*$" | grep -v "No updates" || true)
+                MAU_COUNT=$(echo "$MAU_UPDATES" | grep -c "." 2>/dev/null || echo "0")
+
+                if [ -n "$MAU_UPDATES" ] && [ "$MAU_COUNT" -gt 0 ]; then
+                    print_info "$(internet_msg "$L_INTERNET_MS_UPDATES_AVAILABLE" "$MAU_COUNT")"
+                    echo "$MAU_UPDATES" | while read -r line; do
+                        [ -n "$line" ] && print_info "  → $line"
+                    done
+                    # Krok 2: instaluj tylko jeśli są aktualizacje; limit 300s (5 min)
+                    print_step "$L_INTERNET_MS_INSTALLING"
+                    MAU_INSTALL_EXIT=0
+                    MAU_INSTALL_OUT=$(run_with_timeout 300 "$MAU_CLI" --install 2>&1) || MAU_INSTALL_EXIT=$?
+                    if [ "$MAU_INSTALL_EXIT" -eq 0 ]; then
+                        [ -n "$MAU_INSTALL_OUT" ] && printf '%s\n' "$MAU_INSTALL_OUT"
+                        MAU_VERIFY_EXIT=0
+                        MAU_VERIFY=$(run_with_timeout 60 "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
+                        MAU_REMAINING=$(printf '%s\n' "$MAU_VERIFY" \
+                            | grep -v "^[[:space:]]*$" | grep -v "No updates" || true)
+                        if [ "$MAU_VERIFY_EXIT" -eq 0 ] && [ -z "$MAU_REMAINING" ]; then
+                            print_ok "$L_INTERNET_MS_UPDATED"
+                            STATUS_MICROSOFT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "Microsoft apps")"
+                            if [ "$MAU_TEAMS21_OFFERED" -eq 1 ]; then
+                                MAU_TEAMS21_VERIFIED=1
+                            fi
+                        else
+                            print_warn "Microsoft AutoUpdate did not pass the final update check."
+                            [ -n "$MAU_VERIFY" ] && printf '%s\n' "$MAU_VERIFY" | tail -n 20
+                            internet_diag_log "ERROR: Microsoft AutoUpdate final verification failed (exit=$MAU_VERIFY_EXIT)"
+                            STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                        fi
+                    else
+                        if [ "$MAU_INSTALL_EXIT" = "124" ] || [ "$MAU_INSTALL_EXIT" = "137" ] || [ "$MAU_INSTALL_EXIT" = "143" ]; then
+                            print_warn "$L_INTERNET_MS_TIMEOUT"
+                        else
+                            print_warn "$(internet_msg "$L_INTERNET_MS_INSTALL_ERROR" "$MAU_INSTALL_EXIT")"
+                        fi
+                        [ -n "$MAU_INSTALL_OUT" ] && printf '%s\n' "$MAU_INSTALL_OUT" | tail -n 20
+                        if [ -d "$MAU_APP" ]; then
+                            if open -a "$MAU_APP" 2>/dev/null; then
+                                print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                            else
+                                print_warn "Could not launch Microsoft AutoUpdate after the CLI failure."
+                            fi
+                        fi
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                    fi
+                else
+                    print_ok "$L_INTERNET_MS_CURRENT"
+                    STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+                fi
             fi
         elif [ -d "$MAU_APP" ]; then
-        print_step "$L_INTERNET_MS_OPENING_GUI"
-        open -a "$MAU_APP" 2>/dev/null || true
-        print_info "$L_INTERNET_MS_ACCEPT_GUI"
-        STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_OPENED"
-    else
-        print_warn "Microsoft AutoUpdate is not installed"
-        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://learn.microsoft.com/en-us/microsoft-365-apps/mac/update-office-for-mac-using-msupdate")"
-        STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_MISSING"
+            print_step "$L_INTERNET_MS_OPENING_GUI"
+            if open -a "$MAU_APP" 2>/dev/null; then
+                print_info "$L_INTERNET_MS_ACCEPT_GUI"
+                STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_OPENED"
+            else
+                print_warn "Could not launch Microsoft AutoUpdate"
+                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+            fi
+        else
+            print_warn "Microsoft AutoUpdate is not installed"
+            print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://learn.microsoft.com/en-us/microsoft-365-apps/mac/update-office-for-mac-using-msupdate")"
+            STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_MISSING"
         fi
     else
         print_info "$L_INTERNET_MS_NONE_INSTALLED"
@@ -735,6 +814,33 @@ iu_microsoft_365() {
     # ============================================================
     # ██ SEKCJA 7: NARZĘDZIA DEWELOPERSKIE
     # ============================================================
+
+    # ── 18b. MICROSOFT TEAMS ─────────────────────────────────────
+    # Teams owns its normal update cadence. Microsoft documents TEAMS21 as an
+    # MAU fallback that may be offered when the Teams updater fails; the shared
+    # MAU handler above can therefore verify a fallback update in this run.
+}
+
+iu_microsoft_teams() {
+    print_header "💬 Microsoft Teams"
+    if [ -d "/Applications/Microsoft Teams.app" ]; then
+        VER=$(app_version "/Applications/Microsoft Teams.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        if [ "$MAU_TEAMS21_VERIFIED" -eq 1 ]; then
+            print_ok "Microsoft Teams fallback update verified by MAU (TEAMS21): $VER"
+            STATUS_TEAMS="✅ MAU fallback verified ($VER)"
+        else
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Microsoft Teams")"
+            if silent_launch_app "/Applications/Microsoft Teams.app"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Microsoft Teams → Check for updates")"
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Microsoft Teams")"
+    fi
 
     # ── 19. VISUAL STUDIO CODE ────────────────────────────────────
 }
@@ -746,6 +852,7 @@ iu_visual_studio_code() {
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
         LATEST_VSCODE=$(github_latest_tag "microsoft/vscode" | sed 's/^v//')
+        VSCODE_RELATION="$(internet_version_relation "$LATEST_VSCODE" "$VER")"
 
         if [ "$LATEST_VSCODE" = "?" ]; then
             # Offline or GitHub unreachable — launch app for built-in updater
@@ -757,8 +864,11 @@ iu_visual_studio_code() {
             else
                 STATUS_VSCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
             fi
-        elif [ "$VER" = "$LATEST_VSCODE" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER")"
+        elif [ "$VSCODE_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Visual Studio Code version")"
+            STATUS_VSCODE="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$VSCODE_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER (remote: $LATEST_VSCODE)")"
             STATUS_VSCODE="$L_INTERNET_STATUS_CURRENT"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
@@ -773,7 +883,11 @@ iu_visual_studio_code() {
                 print_step "$(internet_msg "$L_INTERNET_EXTRACTING" "Visual Studio Code")"
                 if unzip -q "$TEMP_ZIP" -d "$TEMP_DIR" 2>/dev/null; then
                     if [ -d "$TEMP_DIR/Visual Studio Code.app" ]; then
-                        if copy_verified_app "$TEMP_DIR/Visual Studio Code.app" "Visual Studio Code.app"; then
+                        VSCODE_SOURCE_VER=$(app_version "$TEMP_DIR/Visual Studio Code.app")
+                        if [ "$(internet_version_relation "$VSCODE_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer VS Code payload: $VSCODE_SOURCE_VER (installed: $VER)"
+                            STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$TEMP_DIR/Visual Studio Code.app" "Visual Studio Code.app"; then
                             NEW_VER=$(app_version "/Applications/Visual Studio Code.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Visual Studio Code" "$NEW_VER")"
                             STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
@@ -811,6 +925,7 @@ iu_codeedit() {
 
         LATEST_CE_TAG=$(github_latest_tag "CodeEditApp/CodeEdit")
         LATEST_CE=$(echo "$LATEST_CE_TAG" | sed 's/^v//')
+        CE_RELATION="$(internet_version_relation "$LATEST_CE" "$VER")"
 
         if [ "$LATEST_CE" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
@@ -819,21 +934,26 @@ iu_codeedit() {
             else
                 STATUS_CODEEDIT="$L_INTERNET_STATUS_LAUNCH_FAILED"
             fi
-        elif [ "$LATEST_CE" = "$VER" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "CodeEdit" "$VER")"
+        elif [ "$CE_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "CodeEdit version")"
+            STATUS_CODEEDIT="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$CE_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "CodeEdit" "$VER (remote: $LATEST_CE)")"
             STATUS_CODEEDIT="$L_INTERNET_STATUS_CURRENT"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_CE" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "CodeEdit" "$LATEST_CE")"
             CE_URL="https://github.com/CodeEditApp/CodeEdit/releases/download/${LATEST_CE_TAG}/CodeEdit.dmg"
             TEMP_DMG="$(make_temp_dmg CodeEdit)"
-            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL" 2>/dev/null \
-                && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
-                    sleep 1
-                    VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*codeedit*" 2>/dev/null | head -1)
-                    if [ -n "$VOLUME_PATH" ] && [ -d "$VOLUME_PATH/CodeEdit.app" ]; then
-                        if copy_verified_app "$VOLUME_PATH/CodeEdit.app" "CodeEdit.app"; then
+            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL" 2>/dev/null; then
+                CE_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$CE_MOUNT" ]; then
+                    if [ -d "$CE_MOUNT/CodeEdit.app" ]; then
+                        CE_SOURCE_VER=$(app_version "$CE_MOUNT/CodeEdit.app")
+                        if [ "$(internet_version_relation "$CE_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer CodeEdit payload: $CE_SOURCE_VER (installed: $VER)"
+                            STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$CE_MOUNT/CodeEdit.app" "CodeEdit.app"; then
                             NEW_VER=$(app_version "/Applications/CodeEdit.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "CodeEdit" "$NEW_VER")"
                             STATUS_CODEEDIT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
@@ -841,12 +961,11 @@ iu_codeedit() {
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "CodeEdit")"
                             STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
                         fi
-                        hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                     else
-                        [ -n "$VOLUME_PATH" ] && hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                         print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "CodeEdit")"
                         STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
                     fi
+                    detach_verified_dmg "$CE_MOUNT" || true
                 else
                     print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
                     STATUS_CODEEDIT="$L_INTERNET_STATUS_MOUNT_ERROR"
@@ -1065,12 +1184,16 @@ iu_ledger() {
 
         LEDGER_YML=$(curl -s --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml" 2>/dev/null)
         LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
+        LEDGER_RELATION="$(internet_version_relation "$LATEST_LEDGER" "$VER")"
 
         if [ -z "$LATEST_LEDGER" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             STATUS_LEDGER="$L_INTERNET_STATUS_OFFLINE"
-        elif [ "$LATEST_LEDGER" = "$VER" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "$LEDGER_NAME" "$VER")"
+        elif [ "$LEDGER_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Ledger version")"
+            STATUS_LEDGER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$LEDGER_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "$LEDGER_NAME" "$VER (remote: $LATEST_LEDGER)")"
             STATUS_LEDGER="$L_INTERNET_STATUS_CURRENT"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_LEDGER" "$VER")"
@@ -1082,20 +1205,22 @@ iu_ledger() {
             fi
             LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
-            if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL" 2>/dev/null \
-                && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
-                    sleep 1
-                    VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*ledger*" 2>/dev/null | head -1)
-                    if [ -n "$VOLUME_PATH" ] && { [ -d "$VOLUME_PATH/Ledger Live.app" ] || [ -d "$VOLUME_PATH/Ledger Wallet.app" ]; }; then
+            if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL" 2>/dev/null; then
+                LEDGER_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$LEDGER_MOUNT" ]; then
+                    if [ -d "$LEDGER_MOUNT/Ledger Live.app" ] || [ -d "$LEDGER_MOUNT/Ledger Wallet.app" ]; then
                         SRC_APP=""
-                        if [ -d "$VOLUME_PATH/Ledger Wallet.app" ]; then
+                        if [ -d "$LEDGER_MOUNT/Ledger Wallet.app" ]; then
                             SRC_APP="Ledger Wallet.app"
                         else
                             SRC_APP="Ledger Live.app"
                         fi
 
-                        if copy_verified_app "$VOLUME_PATH/$SRC_APP" "$LEDGER_NAME.app"; then
+                        LEDGER_SOURCE_VER=$(app_version "$LEDGER_MOUNT/$SRC_APP")
+                        if [ "$(internet_version_relation "$LEDGER_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer Ledger payload: $LEDGER_SOURCE_VER (installed: $VER)"
+                            STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$LEDGER_MOUNT/$SRC_APP" "$LEDGER_NAME.app"; then
                             NEW_VER=$(app_version "/Applications/$LEDGER_NAME.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "$LEDGER_NAME" "$NEW_VER")"
                             STATUS_LEDGER="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
@@ -1103,12 +1228,11 @@ iu_ledger() {
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$SRC_APP")"
                             STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
                         fi
-                        hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                     else
-                        [ -n "$VOLUME_PATH" ] && hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                         print_warn "$L_INTERNET_APP_NOT_ON_VOLUME"
                         STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
                     fi
+                    detach_verified_dmg "$LEDGER_MOUNT" || true
                 else
                     print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
                     STATUS_LEDGER="$L_INTERNET_STATUS_MOUNT_ERROR"
@@ -1152,25 +1276,31 @@ try:
 except Exception:
     print("?")' 2>/dev/null)
         LATEST_TS=$(echo "$LATEST_TS_TAG" | sed 's/^v//')
+        TS_RELATION="$(internet_version_relation "$LATEST_TS" "$VER")"
 
         if [ "$LATEST_TS" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             STATUS_TREZOR="$L_INTERNET_STATUS_OFFLINE"
-        elif [ "$LATEST_TS" = "$VER" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Trezor Suite" "$VER")"
+        elif [ "$TS_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Trezor Suite version")"
+            STATUS_TREZOR="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$TS_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Trezor Suite" "$VER (remote: $LATEST_TS)")"
             STATUS_TREZOR="$L_INTERNET_STATUS_CURRENT"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_TS" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_ARM" "Trezor Suite" "$LATEST_TS")"
             TS_URL="https://github.com/trezor/trezor-suite/releases/download/${LATEST_TS_TAG}/Trezor-Suite-${LATEST_TS}-mac-arm64.dmg"
             TEMP_DMG="$(make_temp_dmg TrezorSuite)"
-            if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL" 2>/dev/null \
-                && verify_dmg "$TEMP_DMG"; then
-                if hdiutil attach "$TEMP_DMG" -quiet -nobrowse 2>/dev/null; then
-                    sleep 1
-                    VOLUME_PATH=$(find /Volumes -maxdepth 1 -type d -iname "*trezor*" 2>/dev/null | head -1)
-                    if [ -n "$VOLUME_PATH" ] && [ -d "$VOLUME_PATH/Trezor Suite.app" ]; then
-                        if copy_verified_app "$VOLUME_PATH/Trezor Suite.app" "Trezor Suite.app"; then
+            if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL" 2>/dev/null; then
+                TS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$TS_MOUNT" ]; then
+                    if [ -d "$TS_MOUNT/Trezor Suite.app" ]; then
+                        TS_SOURCE_VER=$(app_version "$TS_MOUNT/Trezor Suite.app")
+                        if [ "$(internet_version_relation "$TS_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer Trezor Suite payload: $TS_SOURCE_VER (installed: $VER)"
+                            STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$TS_MOUNT/Trezor Suite.app" "Trezor Suite.app"; then
                             NEW_VER=$(app_version "/Applications/Trezor Suite.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Trezor Suite" "$NEW_VER")"
                             STATUS_TREZOR="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
@@ -1178,13 +1308,12 @@ except Exception:
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Trezor Suite.app")"
                             STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
                         fi
-                        hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                     else
-                        [ -n "$VOLUME_PATH" ] && hdiutil detach "$VOLUME_PATH" -quiet 2>/dev/null || true
                         print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "Trezor Suite")"
                         print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://trezor.io/trezor-suite")"
                         STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
                     fi
+                    detach_verified_dmg "$TS_MOUNT" || true
                 else
                     print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
                     STATUS_TREZOR="$L_INTERNET_STATUS_MOUNT_ERROR"
@@ -1244,32 +1373,13 @@ iu_ipmiview() {
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "IPMIView")"
     fi
 
-    # ── 35. INKSCAPE (Vector Graphics) ───────────────────────────
-}
-
-iu_inkscape() {
-    print_header "🎨 Inkscape"
-    if [ -d "/Applications/Inkscape.app" ]; then
-        VER=$(app_version "/Applications/Inkscape.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "Inkscape")"
-        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://inkscape.org/release/")"
-        STATUS_INKSCAPE="$L_INTERNET_STATUS_MANUAL_UPDATE"
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Inkscape")"
-    fi
-
+    # ── 35. DJI ASSISTANT (manual) ───────────────────────────────
 }
 
 iu_dji_assistant() {
     print_header "🚁 DJI Assistant 2"
-    # Note: The app name has parentheses in the bundle name
-    DJI_PATH=""
-    for dpath in "/Applications/DJI Assistant 2(Consumer Drones Series).app" \
-                 "/Applications/DJI Assistant 2.app"; do
-        [ -d "$dpath" ] && DJI_PATH="$dpath" && break
-    done
-    if [ -n "$DJI_PATH" ]; then
+    DJI_PATH="$(internet_app_path "DJI Assistant 2")"
+    if [ -d "$DJI_PATH" ]; then
         VER=$(app_version "$DJI_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "DJI Assistant 2")"
@@ -1277,44 +1387,5 @@ iu_dji_assistant() {
         STATUS_DJI="$L_INTERNET_STATUS_MANUAL_UPDATE"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "DJI Assistant 2")"
-    fi
-}
-
-iu_unifi() {
-    print_header "📡 UniFi"
-    if [ -d "/Applications/UniFi.app" ]; then
-        VER=$(app_version "/Applications/UniFi.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "UniFi (iPad/iOS app)")"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Account → Updates")"
-        STATUS_UNIFI="$L_INTERNET_STATUS_MANUAL_UPDATE"
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "UniFi")"
-    fi
-}
-
-iu_wifiman() {
-    print_header "📶 WiFiman"
-    if [ -d "/Applications/WiFiman.app" ]; then
-        VER=$(app_version "/Applications/WiFiman.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "WiFiman (iPad/iOS app)")"
-        print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "App Store → Account → Updates")"
-        STATUS_WIFIMAN="$L_INTERNET_STATUS_MANUAL_UPDATE"
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "WiFiman")"
-    fi
-}
-
-iu_picsart() {
-    print_header "🎨 Picsart"
-    if [ -d "/Applications/Picsart.app" ]; then
-        VER=$(app_version "/Applications/Picsart.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "Picsart")"
-        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://picsart.com/apps")"
-        STATUS_PICSART="$L_INTERNET_STATUS_MANUAL_UPDATE"
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Picsart")"
     fi
 }
