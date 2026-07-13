@@ -1,6 +1,6 @@
 # Quick Start (English)
 
-**Apple Silicon Mac required** · macOS 13+ · **v1.0.19**
+**Apple Silicon Mac required** · macOS 13+ · **v1.0.20**
 
 ## One-line install (recommended)
 
@@ -48,7 +48,7 @@ bash update_all.sh
 
 | Command | Purpose |
 |---------|---------|
-| `bash scripts/report_update_coverage.sh` | What can / cannot be auto-updated |
+| `bash scripts/report_update_coverage.sh` | Verified, triggered, external, manual and unknown coverage |
 | `bash build_inventory.sh` | Refresh `APPLICATIONS.md` from this Mac |
 | `bash update_all.sh --dry-run -y` | Preview all steps |
 | `bash run_tests.sh` | Verify installation |

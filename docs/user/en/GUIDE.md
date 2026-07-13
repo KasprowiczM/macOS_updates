@@ -2,14 +2,15 @@
 
 ## What this toolkit does
 
-macOS Updates automates updates across six layers on **Apple Silicon Macs**:
+macOS Updates orchestrates updates across six layers on **Apple Silicon Macs running macOS 13+**. The full pipeline runs in this order:
 
-1. macOS system updates (`softwareupdate -ia -R`)
-2. App Store apps (`sudo mas upgrade` + GUI fallback for iPad apps)
+1. Prescan and per-Mac inventory
+2. App Store (`sudo mas upgrade` plus a separate GUI Track 2 for iPad apps)
 3. Native Node/Bun and npm global CLIs
-4. Homebrew formulae and casks
-5. 40+ internet-downloaded apps — **only if already installed**
-6. Personal catalog (`APPLICATIONS.md`) and history (`UPDATES.md`)
+4. Homebrew formulae and casks (`--greedy`)
+5. Installed internet apps through direct handlers, vendor CLIs or in-app update triggers
+6. Atomic inventory/history postupdate
+7. macOS (`softwareupdate -ia -R`) last; skipped if an earlier step failed
 
 It **never installs new applications** for you. Each Mac builds its own inventory first (`build_inventory.sh` or prescan in `update_all.sh`).
 
@@ -32,11 +33,13 @@ After install or when adding apps:
 bash scripts/report_update_coverage.sh
 ```
 
-Shows:
+Shows five evidence-based states:
 
-- Installed apps the project can update (by method category)
-- Supported apps **not** installed (skipped — install yourself if wanted)
-- Installed apps **not** in the registry (add handlers with an AI agent)
+- **verified direct** — a package/version path or vendor CLI result was confirmed
+- **triggered-unverified** — the app launched its built-in updater, but completion is not asserted
+- **externally managed** — App Store or vendor lifecycle owns the update
+- **manual** — user action is intentionally required
+- **unknown** — the installed app has no registered method
 
 ### Update method categories
 
@@ -44,10 +47,13 @@ Shows:
 |--------|----------|---------------|
 | `keystone` | Chrome, Google Drive | Keystone handler in `lib/internet_app_updates.sh` |
 | `github_dmg` | Firefox Dev, KeePassXC | `scripts/scaffold_internet_app.sh "App" github_dmg` |
-| `silent_launch` | Claude, Cursor, Warp | `scripts/scaffold_internet_app.sh "App" silent_launch` |
-| `msupdate` | Microsoft 365 suite | Shared `msupdate` handler |
+| `silent_launch` | Claude, Cursor, Warp | Triggered-unverified; verify the About/version screen |
+| `msupdate` | Microsoft Office | Shared Office `msupdate` handler |
+| `mau_fallback_self_update` | Microsoft Teams | Teams self-updater plus an observed, verified `TEAMS21` MAU fallback when offered |
 | `docker_cli` | Docker Desktop | `docker desktop update` |
-| `manual` | IPMIView, Inkscape | Notification only |
+| `brew_cask` | Inkscape | Homebrew cask with `--greedy` |
+| `appstore_gui` | UniFi, WiFiman, Picsart | App Store GUI Track 2 |
+| `manual` | IPMIView, DJI Assistant 2 | Notification only |
 
 ## Adding an internet app
 
@@ -60,7 +66,7 @@ Shows:
 
 | Problem | Fix |
 |---------|-----|
-| Intel Mac | Not supported — Apple Silicon only |
+| Intel Mac / macOS 12 or older | Not supported — Apple Silicon and macOS 13+ only |
 | Wrong app catalog | `bash build_inventory.sh` — do not use another user's `APPLICATIONS.md` |
 | App not updating | `bash scripts/report_update_coverage.sh` |
 | `mas` fails | Sign in to App Store; use `sudo mas upgrade` |

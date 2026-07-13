@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.19** — Production-ready one-command updater for **Apple Silicon Macs**. Keeps macOS, App Store, Homebrew, and 40+ internet-downloaded apps up to date — **only software you already have installed**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.0.20** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13+**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -29,14 +29,16 @@ See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 | Step | Action |
 |------|--------|
 | 0 | **Prescan** — discover installed apps → update `APPLICATIONS.md` |
-| 1 | **System** — `softwareupdate -ia -R` |
-| 2 | **App Store** — `sudo mas upgrade` + AppleScript fallback |
-| 3 | **Native CLI + npm** — Node, Bun, global npm CLIs |
-| 4 | **Homebrew** — `brew upgrade` + cleanup |
-| 5 | **Internet apps** — only if installed (Chrome, VS Code, Microsoft 365, …) |
-| 6 | **Postupdate** — bump versions in `APPLICATIONS.md`, append `UPDATES.md` |
+| 1 | **App Store** — Track 1: `sudo mas upgrade`; Track 2: AppleScript GUI for iPad apps |
+| 2 | **Native CLI + npm** — Node, Bun, global npm CLIs |
+| 3 | **Homebrew** — formulae and casks (`--greedy`) + cleanup and health check |
+| 4 | **Internet apps** — verified direct handlers, vendor CLIs and honest update triggers |
+| 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
+| 6 | **macOS (final)** — `softwareupdate -ia -R`; skipped when any earlier step failed |
 
-**Important:** Updates only touch software already installed on your Mac. Supported-but-missing apps are reported, not installed. Unknown installed apps are listed so you (or an AI agent) can add handlers.
+**Important:** Updates only touch software already installed on your Mac. Supported-but-missing apps are reported, not installed. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Unknown installed apps are listed so you (or an AI agent) can add handlers.
+
+Coverage is deliberately explicit: **verified direct** means the updater confirmed the package/version path; **triggered-unverified** means an app was launched to let its vendor updater run but completion cannot be proven; **externally managed** means the vendor or App Store owns the update lifecycle; **manual** requires user action; **unknown** has no registered method. Today Inkscape is a Homebrew cask, UniFi/WiFiman/Picsart use App Store Track 2, Microsoft Office uses `msupdate`, and Teams uses its self-updater with an observed, verified `TEAMS21` MAU fallback when Microsoft offers it. Only IPMIView and DJI Assistant 2 remain manual.
 
 ```bash
 bash scripts/report_update_coverage.sh   # coverage report
@@ -91,7 +93,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Package version (1.0.19)
+├── VERSION                     # Package version (1.0.20)
 ├── install.sh                  # One-line installer entrypoint
 ├── uninstall.sh                # Remove clone (keeps Homebrew/apps)
 ├── setup.sh                    # First-run setup (no cloud)
@@ -136,7 +138,7 @@ macOS_updates/
 | `install.sh` | Clone + setup + inventory for new users |
 | `setup.sh` | Dependencies and permissions (no cloud) |
 | `migration_setup.sh` | Full migration + cloud + app scan |
-| `build_inventory.sh` | Prescan only → `APPLICATIONS.md` |
+| `build_inventory.sh` | Read-only system scan → atomically refresh `APPLICATIONS.md` without update history |
 | `update_all.sh` | All update steps + logging |
 | `update_system.sh` … `update_brew.sh` | Single-layer updates |
 | `uninstall.sh` | Remove toolkit directory |
@@ -155,7 +157,7 @@ bash scripts/scaffold_internet_app.sh "App Name" silent_launch
 bash run_tests.sh
 ```
 
-Categories (from `config/internet_app_methods.txt`): `keystone`, `github_dmg`, `silent_launch`, `msupdate`, `docker_cli`, `manual`.
+Coverage methods are mapped to the user-facing states above. Examples: `github_dmg` and a confirmed vendor CLI are **verified direct**; `silent_launch` is **triggered-unverified**; App Store/vendor-owned flows can be **externally managed**; `manual` and missing registry entries remain explicit.
 
 ---
 
@@ -190,6 +192,8 @@ bash update_all.sh --dry-run -y
 - **`softwareupdate` must use `-R`** — otherwise updates download but never apply.
 - **`mas upgrade` must use `sudo`** on macOS 26.x (CVE-2025-43411).
 - **Bash 3.2+** throughout — no `declare -A`, `mapfile`, `readarray`.
+- Downloaded app bundles are verified, installed through a rollback-safe staged swap, and mounted at unique per-session DMG mountpoints.
+- Private inventory/history writes and cloud imports use atomic replacement; imports stage accepted private files before committing them.
 
 ---
 

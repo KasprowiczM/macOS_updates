@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.19** — Outil de mise à jour en une seule commande, prêt pour la production, destiné aux **Macs Apple Silicon**. Maintient à jour macOS, l'App Store, Homebrew et plus de 40 applications téléchargées sur Internet — **uniquement les logiciels que vous avez déjà installés**. **Multilingue** (7 langues). Couche privée optionnelle dans le cloud via [`dev_sync/`](dev_sync/README.md).
+> **v1.0.20** — Orchestrateur de mise à jour en une commande pour **Mac Apple Silicon sous macOS 13+**. Il coordonne les mises à jour vérifiées et signale honnêtement les déclenchements intégrés — **uniquement pour les logiciels déjà installés**. **Multilingue** (7 langues). Couche privée optionnelle via [`dev_sync/`](dev_sync/README.md).
 
 **Dépôt public :** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publication : [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -29,14 +29,16 @@ Voir [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md
 | Étape | Action |
 |------|--------|
 | 0 | **Pré-analyse** — détecte les applications installées → met à jour `APPLICATIONS.md` |
-| 1 | **Système** — `softwareupdate -ia -R` |
-| 2 | **App Store** — `sudo mas upgrade` + solution de secours via AppleScript |
-| 3 | **CLI natifs + npm** — Node, Bun, outils globaux npm |
-| 4 | **Homebrew** — `brew upgrade` + nettoyage |
-| 5 | **Applications Internet** — uniquement si elles sont installées (Chrome, VS Code, Microsoft 365, …) |
-| 6 | **Post-mise à jour** — met à jour les versions dans `APPLICATIONS.md`, ajoute à `UPDATES.md` |
+| 1 | **App Store** — Track 1 : `sudo mas upgrade` ; Track 2 : interface AppleScript pour apps iPad |
+| 2 | **CLI natifs + npm** — Node, Bun, outils globaux npm |
+| 3 | **Homebrew** — formules et casks (`--greedy`) + nettoyage |
+| 4 | **Applications Internet** — handlers vérifiés, CLI éditeurs et déclencheurs honnêtes |
+| 5 | **Post-mise à jour/historique** — inventaire et historique atomiques |
+| 6 | **macOS (en dernier)** — `softwareupdate -ia -R` ; ignoré si une étape précédente échoue |
 
 **Important :** Les mises à jour ne modifient que les logiciels déjà installés sur votre Mac. Les applications prises en charge mais absentes sont signalées, non installées.
+
+La couverture distingue **verified direct**, **triggered-unverified**, **externally managed**, **manual** et **unknown** ; lancer une app ne prouve pas sa mise à jour. Inkscape passe par Homebrew Cask ; UniFi, WiFiman et Picsart par App Store Track 2 ; Office par `msupdate` ; Teams par son propre programme avec un repli MAU `TEAMS21` observé et vérifié lorsque Microsoft le propose. Seuls IPMIView et DJI Assistant 2 restent manuels.
 
 ```bash
 bash scripts/report_update_coverage.sh   # rapport de couverture

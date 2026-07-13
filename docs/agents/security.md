@@ -39,7 +39,10 @@ Private files are `.gitignore`d and managed by `dev_sync`:
 - All scripts must use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"` — no hardcoded `/Users/<name>/`
 - Use `mktemp` for executable temp files and downloads; do not use predictable `/tmp/name_$$` paths.
 - Downloaded DMGs must pass `hdiutil verify`; copied `.app` bundles must pass Gatekeeper assessment; PKGs must pass `pkgutil --check-signature`.
+- Mount DMGs at unique paths inside the private session directory. Validate incoming bundle identifier and signing team, retain the installed app during the staged swap, and roll back on any copy or post-install validation failure.
 - `dev_sync` manifest and cleanup-plan relpaths must pass safe relative-path validation. Reject absolute paths, `..`, empty paths, newlines, NUL/control characters, and resolved paths outside the intended root.
+- Private files/configs must use atomic same-directory replacement and restrictive permissions. Cloud imports must stage an allowlisted file set and roll back the transaction after any partial commit failure.
+- Enforce the platform boundary (Apple Silicon arm64 and macOS 13+) before setup or update mutations.
 - Avoid commands that dump gigantic logs without redirect; pipe to file and read selectively
 - Output limits: ~200 lines per tool call; redirect long builds to file
 

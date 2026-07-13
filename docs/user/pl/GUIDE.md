@@ -1,17 +1,18 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.0.19 · **Tylko Apple Silicon**
+**Wersja:** 1.0.20 · **Apple Silicon, macOS 13+**
 
 ## Co robi ten zestaw
 
-macOS Updates automatyzuje aktualizacje na **Macach Apple Silicon**:
+macOS Updates koordynuje aktualizacje na **Macach Apple Silicon z macOS 13+** w kolejności:
 
-1. System macOS (`softwareupdate -ia -R`)
-2. App Store (`sudo mas upgrade` + GUI dla aplikacji iPad)
+1. Prescan i inwentarz tego Maca
+2. App Store (`sudo mas upgrade` + osobny GUI Track 2 dla aplikacji iPad)
 3. Node/Bun i globalne CLI npm
-4. Homebrew (formuły i caski)
-5. 40+ aplikacji z internetu — **tylko jeśli są zainstalowane**
-6. Katalog `APPLICATIONS.md` i historia `UPDATES.md`
+4. Homebrew (formuły i caski `--greedy`)
+5. Zainstalowane aplikacje internetowe: bezpośrednie handlery, CLI lub wyzwalanie aktualizatora
+6. Atomowy postupdate inwentarza i historii
+7. macOS (`softwareupdate -ia -R`) na końcu; pomijany po wcześniejszym błędzie
 
 **Nie instaluje nowych aplikacji.** Każdy Mac buduje własny katalog (`build_inventory.sh` lub prescan w `update_all.sh`).
 
@@ -27,7 +28,7 @@ macOS Updates automatyzuje aktualizacje na **Macach Apple Silicon**:
 bash scripts/report_update_coverage.sh
 ```
 
-Pokazuje: zainstalowane i obsługiwane, obsługiwane ale niezainstalowane, zainstalowane bez handlera (do dodania przez agenta AI).
+Pokazuje stany: **verified direct**, **triggered-unverified**, **externally managed**, **manual** i **unknown**. Ciche uruchomienie nie jest dowodem zakończonej aktualizacji. Inkscape obsługuje Homebrew; UniFi/WiFiman/Picsart — App Store Track 2; Office — `msupdate`; Teams — własny updater z obserwowanym, weryfikowanym fallbackiem MAU `TEAMS21`. Ręczne są tylko IPMIView i DJI Assistant 2.
 
 ## Dodawanie aplikacji z internetu
 

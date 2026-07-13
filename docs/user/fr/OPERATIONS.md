@@ -4,7 +4,7 @@ Guide pour l'opérateur — maintenance quotidienne et hebdomadaire du macOS Upd
 
 ## Plateforme
 
-**Apple Silicon (arm64) uniquement.** Les scripts s'arrêtent immédiatement sur les Mac Intel.
+**Apple Silicon (arm64), macOS 13+ uniquement.** Les scripts s'arrêtent avant toute modification sur un Mac non pris en charge.
 
 ## Mise à jour hebdomadaire
 
@@ -20,12 +20,14 @@ En cas d'échec, consulter : `logs/update_all_<timestamp>.log` (30 dernières ex
 | Étape | Script / action | Flag d'ignorer |
 |-------|-----------------|----------------|
 | 0 | prescan → `APPLICATIONS.md` | `--skip-prescan` |
-| 1 | `update_system.sh` | `--skip-system` |
-| 2 | `update_appstore.sh` | `--skip-appstore` |
-| 3 | `update_npm_cli.sh` | `--skip-npm` |
-| 4 | `update_brew.sh` | `--skip-brew` |
-| 5 | `update_internet_apps.sh` | `--skip-internet` |
-| 6 | postupdate → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
+| 1 | `update_appstore.sh` | `--skip-appstore` |
+| 2 | `update_npm_cli.sh` | `--skip-npm` |
+| 3 | `update_brew.sh` | `--skip-brew` |
+| 4 | `update_internet_apps.sh` | `--skip-internet` |
+| 5 | postupdate/historique → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
+| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+
+L'étape 6 s'exécute en dernier à cause du redémarrage possible et est automatiquement ignorée après un échec antérieur.
 
 Aperçu sans modifications : `bash update_all.sh --dry-run -y`
 

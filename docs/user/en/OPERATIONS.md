@@ -4,7 +4,7 @@ Human operator guide for daily and weekly macOS Updates maintenance.
 
 ## Platform
 
-**Apple Silicon (arm64) only.** Scripts exit immediately on Intel Macs.
+**Apple Silicon (arm64), macOS 13+ only.** Scripts exit before mutations on unsupported Macs.
 
 ## Weekly update
 
@@ -20,12 +20,14 @@ Review on failure: `logs/update_all_<timestamp>.log` (last 30 runs kept).
 | Step | Script / action | Skip flag |
 |------|-----------------|-----------|
 | 0 | prescan → `APPLICATIONS.md` | `--skip-prescan` |
-| 1 | `update_system.sh` | `--skip-system` |
-| 2 | `update_appstore.sh` | `--skip-appstore` |
-| 3 | `update_npm_cli.sh` | `--skip-npm` |
-| 4 | `update_brew.sh` | `--skip-brew` |
-| 5 | `update_internet_apps.sh` | `--skip-internet` |
-| 6 | postupdate → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
+| 1 | `update_appstore.sh` | `--skip-appstore` |
+| 2 | `update_npm_cli.sh` | `--skip-npm` |
+| 3 | `update_brew.sh` | `--skip-brew` |
+| 4 | `update_internet_apps.sh` | `--skip-internet` |
+| 5 | postupdate/history → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
+| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+
+Step 6 runs last because it may restart the Mac. It is automatically skipped when an earlier selected step fails.
 
 Preview without mutations: `bash update_all.sh --dry-run -y`
 
@@ -90,4 +92,4 @@ brew outdated
 softwareupdate -l
 ```
 
-Sample-launch critical apps (browser, VPN, IDE) if internet step reported warnings.
+For **triggered-unverified** apps, verify the About/version screen: launching the vendor updater does not prove completion. Manual coverage remains limited to IPMIView and DJI Assistant 2.

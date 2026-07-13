@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.19** — Gotowy do produkcji jednokomendowy aktualizator dla **Maców z procesorem Apple Silicon**. Utrzymuje w aktualności system macOS, App Store, Homebrew oraz ponad 40 aplikacji pobieranych z internetu — **tylko to oprogramowanie, które masz już zainstalowane**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka w chmurze przez [`dev_sync/`](dev_sync/README.md).
+> **v1.0.20** — Gotowy do produkcji jednokomendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13+**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwie raportowane wyzwalanie aktualizatorów aplikacji — **wyłącznie dla oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka w chmurze przez [`dev_sync/`](dev_sync/README.md).
 
 **Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -29,14 +29,16 @@ Zobacz [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.
 | Krok | Akcja |
 |------|--------|
 | 0 | **Skan wstępny** — wykrywa zainstalowane aplikacje → aktualizuje `APPLICATIONS.md` |
-| 1 | **System** — `softwareupdate -ia -R` |
-| 2 | **App Store** — `sudo mas upgrade` + AppleScript (awaryjnie) |
-| 3 | **Narzędzia CLI (Native + npm)** — Node, Bun, globalne narzędzia npm |
-| 4 | **Homebrew** — `brew upgrade` + czyszczenie |
-| 5 | **Aplikacje internetowe** — tylko jeśli są zainstalowane (Chrome, VS Code, Microsoft 365, …) |
-| 6 | **Po aktualizacji** — podnosi wersje w `APPLICATIONS.md`, dodaje historię do `UPDATES.md` |
+| 1 | **App Store** — Track 1: `sudo mas upgrade`; Track 2: AppleScript GUI dla aplikacji iPad |
+| 2 | **Narzędzia CLI (Native + npm)** — Node, Bun, globalne narzędzia npm |
+| 3 | **Homebrew** — formuły i caski (`--greedy`) + czyszczenie i kontrola stanu |
+| 4 | **Aplikacje internetowe** — zweryfikowane handlery, CLI producentów i uczciwe wyzwalanie aktualizatorów |
+| 5 | **Postupdate/historia** — odświeża `APPLICATIONS.md`, atomowo dopisuje `UPDATES.md` |
+| 6 | **macOS (na końcu)** — `softwareupdate -ia -R`; pomijany, gdy wcześniejszy krok zawiódł |
 
-**Ważne:** Aktualizacje dotyczą wyłącznie oprogramowania już zainstalowanego na Twoim Macu. Zgłaszane są braki obsługiwanych aplikacji, ale nie są one instalowane. Wykryte, ale nieobsługiwane aplikacje są wyświetlane na liście, abyś mógł (Ty lub AI agent) dodać dla nich obsługę.
+**Ważne:** Aktualizacje dotyczą wyłącznie oprogramowania już zainstalowanego na Twoim Macu. Końcowy krok macOS może uruchomić komputer ponownie, dlatego działa ostatni i zawsze zachowuje wymagane `-R`. Zgłaszane są braki obsługiwanych aplikacji, ale nie są one instalowane.
+
+Raport pokrycia rozróżnia: **verified direct** — skrypt potwierdził ścieżkę pakietu/wersji; **triggered-unverified** — uruchomił aplikację, lecz nie może potwierdzić zakończenia aktualizacji producenta; **externally managed** — cyklem zarządza producent lub App Store; **manual** — potrzebna jest akcja użytkownika; **unknown** — brak zarejestrowanej metody. Inkscape jest obsługiwany jako cask Homebrew, UniFi/WiFiman/Picsart przez App Store Track 2, Office przez `msupdate`, a Teams przez własny updater z obserwowanym, weryfikowanym fallbackiem MAU `TEAMS21`, gdy Microsoft go oferuje. Ręczne pozostają tylko IPMIView i DJI Assistant 2.
 
 ```bash
 bash scripts/report_update_coverage.sh   # raport pokrycia aplikacji
@@ -91,7 +93,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Wersja pakietu (1.0.19)
+├── VERSION                     # Wersja pakietu (1.0.20)
 ├── install.sh                  # Jednolinijkowy instalator
 ├── uninstall.sh                # Usuwa sklonowane pliki (zachowuje Homebrew/aplikacje)
 ├── setup.sh                    # Konfiguracja pierwszego uruchomienia (bez chmury)
@@ -155,7 +157,7 @@ bash scripts/scaffold_internet_app.sh "Nazwa Aplikacji" silent_launch
 bash run_tests.sh
 ```
 
-Kategorie (z `config/internet_app_methods.txt`): `keystone`, `github_dmg`, `silent_launch`, `msupdate`, `docker_cli`, `manual`.
+Metody z rejestru są mapowane na powyższe stany pokrycia. Przykładowo `github_dmg` i potwierdzone CLI producenta są **verified direct**, a `silent_launch` jest **triggered-unverified** — samo uruchomienie nie oznacza potwierdzonej aktualizacji.
 
 ---
 
@@ -188,6 +190,8 @@ bash update_all.sh --dry-run -y
 - **`softwareupdate` musi używać `-R`** — inaczej aktualizacje pobierają się, ale nigdy nie są stosowane.
 - **`mas upgrade` musi używać `sudo`** w systemie macOS 26.x (CVE-2025-43411).
 - **Całość oparta o Bash 3.2+** — żadnych `declare -A`, `mapfile`, `readarray`.
+- Pobrane aplikacje przechodzą weryfikację tożsamości/podpisu i rollback-safe staged swap; każdy DMG dostaje unikalny mountpoint sesji.
+- Prywatny inwentarz, historia oraz import chmurowy używają zapisu atomowego i stagingu zaakceptowanych plików.
 
 ---
 

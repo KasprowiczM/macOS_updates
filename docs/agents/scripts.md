@@ -4,13 +4,13 @@
 |--------|---------|
 | `install.sh` | One-line new-user install: clone, `setup.sh`, `build_inventory.sh`, coverage report |
 | `uninstall.sh` | Remove repo clone (optional `--purge` prefs) |
-| `build_inventory.sh` | Prescan only — build `APPLICATIONS.md` from installed apps on this Mac |
+| `build_inventory.sh` | Read-only scan — atomically refresh `APPLICATIONS.md` (apps, Homebrew and native CLI versions) without adding update history |
 | `setup.sh` | First-run (public users) — language, deps, paths |
 | `migration_setup.sh` | First-run (owner) — phases 0a–16: language, cloud, deps, paths, app scan |
-| `update_all.sh` | Master: prescan → system → appstore → npm-cli → brew → internet → postupdate |
+| `update_all.sh` | Master: prescan → App Store → npm CLI → Homebrew → internet apps → postupdate/history → macOS final |
 | `update_system.sh` | macOS via `softwareupdate -ia -R --verbose` |
 | `update_appstore.sh` | `sudo mas upgrade` + AppleScript GUI for iPad apps |
-| `update_internet_apps.sh` | 40+ apps (see `config/internet_apps.txt`): GitHub API, Keystone, msupdate, Docker CLI, Sparkle, auto-updaters |
+| `update_internet_apps.sh` | Installed internet apps (see `config/internet_apps.txt`): verified direct handlers, vendor CLIs and honestly reported in-app updater triggers |
 | `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `codex`, `opencode`) + self-updating `agy` |
 | `update_brew.sh` | `brew upgrade` + cleanup + doctor |
 | `dev_sync/*.sh` | Export/import/verify private files to/from cloud storage |
@@ -24,23 +24,25 @@
 ## update_all.sh Step Order
 
 ```
-Step 0: prescan.py          — scan /Applications + brew + mas → update APPLICATIONS.md
-Step 1: update_system.sh    — macOS update (may restart)
-Step 2: update_appstore.sh  — App Store (mas + AppleScript snapshots)
-Step 3: update_npm_cli.sh   — native Node/Bun + npm global CLI migration/update + `agy update`
-Step 4: update_brew.sh      — Homebrew upgrade + cleanup + doctor
-Step 5: update_internet_apps.sh — 40+ internet apps
-Step 6: postupdate.py       — bump versions in APPLICATIONS.md, append to UPDATES.md
+Step 0: prescan.py          — scan /Applications + ~/Applications + brew + mas → atomically update APPLICATIONS.md
+Step 1: update_appstore.sh  — Track 1: sudo mas; Track 2: AppleScript GUI for iPad apps
+Step 2: update_npm_cli.sh   — native Node/Bun + npm global CLI migration/update + `agy update`
+Step 3: update_brew.sh      — Homebrew formulae/casks (--greedy) + cleanup + doctor
+Step 4: update_internet_apps.sh — installed internet apps; direct updates and honest triggers
+Step 5: postupdate.py       — atomically refresh APPLICATIONS.md and append UPDATES.md
+Step 6: update_system.sh    — macOS via softwareupdate -ia -R; last because it may restart
 ```
+
+If any step before step 6 fails, the macOS step is skipped and the overall run exits non-zero. This preserves diagnostics and avoids rebooting into a partially failed update session. If `softwareupdate` applies a restart-required update, `-R` remains mandatory and the process may not return; the history entry therefore remains explicitly pending until the next verified run.
 
 ## migration_setup.sh — Phases 0a–16 (New Mac First-Run)
 
 Run once before `update_all.sh` when copying project to a new Mac.
 
 ```
-Phase 0a: Language selection (before localized banner)
-Phase 0b: Cloud storage provider setup
-Phase  1: Detect user, home, macOS version, arch, hostname, shell, terminal app
+Phase 0a/16: Language selection (before localized banner)
+Phase 0b/16: Cloud storage provider setup
+Phase  1: Validate Apple Silicon (arm64) and macOS 13+, then detect user, home, version, hostname, shell, terminal app
 Phase  2: Extract old username from CLAUDE.md path patterns
 Phase  3: Fix paths in all .md files (username, project dir, Homebrew prefix)
 Phase  4: Update macOS version + arch strings in all AI context files
@@ -53,12 +55,12 @@ Phase 10: Check optional tools: msupdate, Docker CLI ≥4.37, Google Keystone
 Phase 11: chmod +x all *.sh scripts
 Phase 12: Verify App Store login via mas list
 Phase 13: Test Accessibility for terminal; open System Settings if missing
-Phase 14: Inline Python scans /Applications + brew + mas → updates APPLICATIONS.md
+Phase 14: Inline Python scans /Applications + ~/Applications + brew + mas → atomically updates APPLICATIONS.md
 Phase 15: Fix MCP configs for Gemini/Windsurf
 Phase 16: Append migration entry to UPDATES.md; print ✅/⚠️/❌ summary
 ```
 
-migration_setup.sh is **idempotent** — safe to re-run.
+`migration_setup.sh` is **idempotent** — safe to re-run. Its readiness checks are fail-closed: unmet required dependencies produce a non-zero exit instead of a success-looking summary.
 
 ## Dev Sync Commands
 

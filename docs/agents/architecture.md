@@ -3,17 +3,17 @@
 ## Shell
 - **Bash 3.2+ only** — no `declare -A`, no `mapfile`, no `readarray`, no bash 4+ features
 - **No hardcoded paths** — always `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`
-- **Apple Silicon only** — `lib/platform.sh` exits on non-arm64
+- **Apple Silicon + macOS 13+ only** — `lib/platform.sh` exits on non-arm64 or an older system before setup/update mutations
 - **Homebrew prefix:** `/opt/homebrew` (arm64)
 - **Native CLI toolchain:** keep npm global binaries outside Homebrew, under user-space paths managed by `update_npm_cli.sh`
-- **Internet-app bundle replacement:** `copy_verified_app` quits the running app, copies with `ditto` (not `cp -R`) to a staging path, swaps in atomically with `mv`, and `spctl`-verifies before and after. Status reporting is honest — `LAUNCHED_UNVERIFIED` / `LAUNCH_FAILED` / `CURRENT` / `UPDATED`, never an unconditional "checked".
+- **Internet-app bundle replacement:** `copy_verified_app` validates bundle ID/signing team, uses a unique session mountpoint, quits the running app, copies with `ditto` to staging, retains the original during the swap, and restores it if post-swap validation fails. Status reporting is honest — `LAUNCHED_UNVERIFIED` / `LAUNCH_FAILED` / `CURRENT` / `UPDATED`, never an unconditional "checked".
 - **Version detection:** `app_version()` reads `CFBundleShortVersionString`, then `CFBundleVersion`, then falls back to `mdls -name kMDItemVersion` (covers iOS/iPadOS apps on Apple Silicon that have no `Contents/Info` plist).
 
 ## Python
 - Update pipeline Python is inline via heredocs written to session dir.
 - Existing standalone Python is limited to the `dev_sync/` backend and `scripts/fix_mcp_configs.py`.
 - Used for `APPLICATIONS.md` / `UPDATES.md` processing, cloud sync, and MCP config repair.
-- **Atomic config writes:** JSON writes (`dev_sync/`, `scripts/fix_mcp_configs.py`) use a temp file + `os.replace()`; user-owned configs (`~/.claude.json`, MCP) are copied to `.bak` first.
+- **Atomic private writes:** JSON, inventory and history writes use a same-directory temp file + `os.replace()`; user-owned MCP configs are copied to `.bak` first. Private provider config and logs use restrictive permissions.
 
 ## Session Dir
 - Path: `mktemp -d "${TMPDIR:-/tmp}/mac_update.XXXXXX"` stored in `$MAC_UPDATE_SESSION_DIR`
@@ -29,6 +29,7 @@
 - GitHub = code + AI context. Cloud = private files.
 - Config via `dev_sync/provider_setup.sh`
 - Local filesystem exports write `.dev_sync_manifest.json` in the provider mirror; import prefers it to avoid restoring stale provider files.
+- Imports are transactional: allowlisted files are copied into a private staging directory, then committed with retained backups and rollback. Rclone imports list and stage individual accepted paths instead of copying the remote tree over the repository.
 - Exclude rebuildable/dependency/external-skill folders from Proton (`node_modules/`, caches, build output, `.agent/skills/`, `.claude/skills/`, `.gemini/skills/`).
 - `migration_setup.sh` is idempotent — single source of truth for first-run.
 
