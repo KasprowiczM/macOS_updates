@@ -4,7 +4,7 @@ set -o pipefail
 # setup.sh — macOS Updates: Quick Setup for New Users
 # ============================================================
 # Data: 2026-04-14
-# Kompatybilność: bash 3.2+ (macOS domyślny shell, Apple Silicon + Intel)
+# Kompatybilność: bash 3.2+ (macOS domyślny shell, Apple Silicon only)
 #
 # URUCHOM JAKO PIERWSZY po sklonowaniu repozytorium:
 #
@@ -19,7 +19,7 @@ set -o pipefail
 #   3.  Aktualizuje ścieżki w plikach dokumentacji (.md)
 #   4.  Aktualizuje wersję macOS i arch w CLAUDE.md, AGENTS.md, GEMINI.md, CODEX.md
 #   5.  Sprawdza i instaluje Xcode Command Line Tools
-#   6.  Sprawdza i instaluje Homebrew (z właściwą ścieżką arm64/Intel)
+#   6.  Sprawdza i instaluje Homebrew w /opt/homebrew (arm64)
 #   7.  Sprawdza i instaluje mas (App Store CLI)
 #   8.  Sprawdza dostępność Python 3
 #   9.  Sprawdza inne narzędzia: curl, git
@@ -85,7 +85,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MAC_UPDATE_NONINTERACTIVE="${MAC_UPDATE_NONINTERACTIVE:-0}"
 
 . "$SCRIPT_DIR/lib/platform.sh"
-mac_update_require_apple_silicon || exit 1
+mac_update_require_supported_platform || exit 1
+
+SETUP_EXIT=0
 
 # ── i18n: load language strings (English default until picker runs) ──
 . "$SCRIPT_DIR/i18n/loader.sh"
@@ -179,6 +181,24 @@ else
     SHELL_PROFILE="$NEW_HOME/.zshrc"
 fi
 print_info "$L_INFO_SHELL_PROFILE $SHELL_PROFILE"
+
+SHELL_PROFILE_OK=1
+if [ ! -e "$SHELL_PROFILE" ]; then
+    if : > "$SHELL_PROFILE"; then
+        print_fixed "Created shell profile: $SHELL_PROFILE"
+        add_fix "Created shell profile: $SHELL_PROFILE"
+    else
+        print_error "Could not create shell profile: $SHELL_PROFILE"
+        add_action "Create a writable shell profile: $SHELL_PROFILE"
+        SHELL_PROFILE_OK=0
+        SETUP_EXIT=1
+    fi
+elif [ ! -f "$SHELL_PROFILE" ]; then
+    print_error "Shell profile is not a regular file: $SHELL_PROFILE"
+    add_action "Replace $SHELL_PROFILE with a writable shell profile file"
+    SHELL_PROFILE_OK=0
+    SETUP_EXIT=1
+fi
 
 TERM_APP_NAME="Terminal.app"
 case "${TERM_PROGRAM:-}" in
@@ -377,17 +397,23 @@ if [ $BREW_OK -eq 1 ]; then
     print_ok "Homebrew installed: $BREW_VER"
     print_ok "Location: $BREW_PATH"
 
-    if [ -f "$SHELL_PROFILE" ]; then
+    if [ "$SHELL_PROFILE_OK" -eq 1 ]; then
         if grep -q "brew shellenv" "$SHELL_PROFILE" 2>/dev/null; then
             print_ok "Homebrew shellenv in $SHELL_PROFILE — PATH configured"
         else
             print_warn "Homebrew shellenv NOT in $SHELL_PROFILE"
             print_step "Adding Homebrew shellenv to $SHELL_PROFILE..."
-            echo "" >> "$SHELL_PROFILE"
-            echo "# Homebrew (added by setup.sh)" >> "$SHELL_PROFILE"
-            echo "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"
-            print_fixed "Added Homebrew shellenv to $SHELL_PROFILE"
-            add_fix "Homebrew PATH added to $SHELL_PROFILE — run: source $SHELL_PROFILE"
+            if printf '\n%s\n%s\n' \
+                '# Homebrew (added by setup.sh)' \
+                "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"; then
+                print_fixed "Added Homebrew shellenv to $SHELL_PROFILE"
+                add_fix "Homebrew PATH added to $SHELL_PROFILE — run: source $SHELL_PROFILE"
+            else
+                print_error "Could not update shell profile: $SHELL_PROFILE"
+                add_action "Add Homebrew shellenv to writable profile: $SHELL_PROFILE"
+                SHELL_PROFILE_OK=0
+                SETUP_EXIT=1
+            fi
         fi
     fi
 else
@@ -409,11 +435,17 @@ else
         if [ $BREW_OK -eq 1 ]; then
             print_ok "Homebrew installed successfully!"
             add_fix "Installed Homebrew"
-            if [ -f "$SHELL_PROFILE" ] && ! grep -q "brew shellenv" "$SHELL_PROFILE" 2>/dev/null; then
-                echo "" >> "$SHELL_PROFILE"
-                echo "# Homebrew" >> "$SHELL_PROFILE"
-                echo "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"
-                add_fix "Homebrew shellenv added to $SHELL_PROFILE"
+            if [ "$SHELL_PROFILE_OK" -eq 1 ] && ! grep -q "brew shellenv" "$SHELL_PROFILE" 2>/dev/null; then
+                if printf '\n%s\n%s\n' \
+                    '# Homebrew (added by setup.sh)' \
+                    "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"; then
+                    add_fix "Homebrew shellenv added to $SHELL_PROFILE"
+                else
+                    print_error "Could not update shell profile: $SHELL_PROFILE"
+                    add_action "Add Homebrew shellenv to writable profile: $SHELL_PROFILE"
+                    SHELL_PROFILE_OK=0
+                    SETUP_EXIT=1
+                fi
             fi
         else
             print_error "Homebrew installation failed. Install manually: https://brew.sh"
@@ -725,28 +757,62 @@ fi
 echo -e "  ${BOLD}🏁 READINESS CHECKLIST:${NC}"
 echo ""
 
+if xcode-select -p &>/dev/null 2>&1; then
+    echo -e "  ${GREEN}✅ Xcode Command Line Tools — OK${NC}"
+else
+    echo -e "  ${RED}❌ Xcode Command Line Tools — installation required${NC}"
+    SETUP_EXIT=1
+fi
+
 if command -v brew &>/dev/null; then
     echo -e "  ${GREEN}✅ Homebrew — OK${NC}"
 else
     echo -e "  ${RED}❌ Homebrew — installation required${NC}"
+    SETUP_EXIT=1
 fi
 
+MAS_READY=0
 if command -v mas &>/dev/null; then
-    echo -e "  ${GREEN}✅ mas (App Store CLI) — OK${NC}"
+    MAS_READY_VERSION="$(mas version 2>/dev/null | head -1)"
+    MAS_READY_MAJOR="${MAS_READY_VERSION%%.*}"
+    case "$MAS_READY_MAJOR" in
+        ''|*[!0-9]*) ;;
+        *) [ "$MAS_READY_MAJOR" -ge 4 ] && MAS_READY=1 ;;
+    esac
+fi
+if [ "$MAS_READY" -eq 1 ]; then
+    echo -e "  ${GREEN}✅ mas (App Store CLI) — OK ($MAS_READY_VERSION)${NC}"
 else
-    echo -e "  ${YELLOW}⚠️  mas — missing (brew install mas)${NC}"
+    echo -e "  ${RED}❌ mas 4+ — missing or outdated (brew upgrade mas)${NC}"
+    SETUP_EXIT=1
 fi
 
 if [ $PYTHON3_OK -eq 1 ]; then
     echo -e "  ${GREEN}✅ Python 3 — OK${NC}"
 else
-    echo -e "  ${YELLOW}⚠️  Python 3 — missing (brew install python@3.11)${NC}"
+    echo -e "  ${RED}❌ Python 3 — missing (brew install python@3.11)${NC}"
+    SETUP_EXIT=1
 fi
 
 if command -v curl &>/dev/null; then
     echo -e "  ${GREEN}✅ curl — OK${NC}"
 else
     echo -e "  ${RED}❌ curl — missing${NC}"
+    SETUP_EXIT=1
+fi
+
+if command -v git &>/dev/null; then
+    echo -e "  ${GREEN}✅ git — OK${NC}"
+else
+    echo -e "  ${RED}❌ git — missing${NC}"
+    SETUP_EXIT=1
+fi
+
+if [ "$SHELL_PROFILE_OK" -eq 1 ]; then
+    echo -e "  ${GREEN}✅ Shell profile — OK${NC}"
+else
+    echo -e "  ${RED}❌ Shell profile — unavailable${NC}"
+    SETUP_EXIT=1
 fi
 
 SCRIPTS_OK=1
@@ -756,7 +822,8 @@ done
 if [ $SCRIPTS_OK -eq 1 ]; then
     echo -e "  ${GREEN}✅ Scripts (chmod +x) — OK${NC}"
 else
-    echo -e "  ${YELLOW}⚠️  Scripts — run: chmod +x $SCRIPT_DIR/*.sh${NC}"
+    echo -e "  ${RED}❌ Scripts — run: chmod +x $SCRIPT_DIR/*.sh${NC}"
+    SETUP_EXIT=1
 fi
 
 if command -v mas &>/dev/null && mas list &>/dev/null 2>&1; then
@@ -773,9 +840,19 @@ fi
 
 echo ""
 echo -e "  ${BOLD}🚀 NEXT STEPS:${NC}"
-echo -e "     ${GREEN}cd $SCRIPT_DIR && bash update_all.sh${NC}"
+if [ "$SETUP_EXIT" -eq 0 ]; then
+    echo -e "     ${GREEN}cd $SCRIPT_DIR && bash update_all.sh${NC}"
+else
+    echo -e "     ${YELLOW}Resolve the critical items above, then re-run: bash setup.sh${NC}"
+fi
 echo ""
 echo -e "${BLUE}${BOLD}══════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}  ✅  SETUP COMPLETE — macOS Updates ready!          ${NC}"
+if [ "$SETUP_EXIT" -eq 0 ]; then
+    echo -e "${GREEN}${BOLD}  ✅  SETUP COMPLETE — macOS Updates ready!          ${NC}"
+else
+    echo -e "${RED}${BOLD}  ❌  SETUP INCOMPLETE — resolve critical items.     ${NC}"
+fi
 echo -e "${BLUE}${BOLD}══════════════════════════════════════════════════════════════${NC}"
 echo ""
+
+exit "$SETUP_EXIT"

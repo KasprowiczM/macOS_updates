@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2153  # L_* variables are loaded dynamically by i18n/loader.sh.
 # ============================================================
 # SKRYPT 2: Aktualizacja aplikacji z Mac App Store
 # ============================================================
@@ -26,6 +27,8 @@ set -o pipefail
 #
 # Zmienne środowiskowe:
 #   MAS_NO_AUTO_INDEX=1  — wyłącza auto-indeksowanie Spotlight przez mas
+#   MAC_UPDATE_MAS_CHECK_TIMEOUT=120 — limit zapytania mas outdated (sekundy)
+#   MAC_UPDATE_MAS_UPGRADE_TIMEOUT=1800 — limit sudo mas upgrade (sekundy)
 #     (domyślnie włączone tu, eliminuje ściany ostrzeżeń o niewindeksowanych
 #      aplikacjach App Store przy każdym wywołaniu mas list/upgrade/outdated)
 # ============================================================
@@ -42,7 +45,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 . "$SCRIPT_DIR/lib/platform.sh"
-mac_update_require_apple_silicon || exit 1
+mac_update_require_supported_platform || exit 1
 
 # ── i18n: load language strings ──────────────────────────────
 . "$SCRIPT_DIR/lib/cli.sh"
@@ -56,15 +59,69 @@ print_warn()  { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
 print_error() { echo -e "  ${RED}❌ $1${NC}"; }
 print_step()  { echo -e "  ${BOLD}▶  $1${NC}"; }
 
+run_with_timeout() {
+    local seconds="$1"
+    local command_pid command_exit elapsed grace
+    shift
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$seconds" "$@"
+    elif command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$seconds" "$@"
+    else
+        "$@" &
+        command_pid=$!
+        elapsed=0
+        while kill -0 "$command_pid" 2>/dev/null; do
+            if [ "$elapsed" -ge "$seconds" ]; then
+                kill -TERM "$command_pid" 2>/dev/null || true
+                grace=0
+                while kill -0 "$command_pid" 2>/dev/null && [ "$grace" -lt 5 ]; do
+                    sleep 1
+                    grace=$((grace + 1))
+                done
+                kill -KILL "$command_pid" 2>/dev/null || true
+                wait "$command_pid" 2>/dev/null || true
+                return 124
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+        wait "$command_pid"
+        command_exit=$?
+        return "$command_exit"
+    fi
+}
+
 # Suppress mas Spotlight auto-indexing warnings
 # (apps not yet indexed in Spotlight trigger noisy warnings on every mas call)
 export MAS_NO_AUTO_INDEX=1
 APPSTORE_EXIT=0
+MAS_CHECK_TIMEOUT="${MAC_UPDATE_MAS_CHECK_TIMEOUT:-120}"
+MAS_UPGRADE_TIMEOUT="${MAC_UPDATE_MAS_UPGRADE_TIMEOUT:-1800}"
+case "$MAS_CHECK_TIMEOUT:$MAS_UPGRADE_TIMEOUT" in
+    *[!0-9:]*|:*|*:) print_error "Invalid mas timeout configuration."; exit 1 ;;
+esac
+if [ "$MAS_CHECK_TIMEOUT" -le 0 ] || [ "$MAS_UPGRADE_TIMEOUT" -le 0 ]; then
+    print_error "mas timeouts must be positive integers."
+    exit 1
+fi
 
 # ============================================================
 print_header "$L_SCRIPT_TITLE_APPSTORE"
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
-    print_warn "DRY-RUN mode — App Store updates will not run"
+    print_warn "DRY-RUN mode — App Store updates will not run and no tools will be installed"
+    if command -v mas >/dev/null 2>&1; then
+        print_info "mas version: $(mas version 2>/dev/null || echo '?')"
+        print_info "Installed App Store apps (read-only):"
+        mas list 2>/dev/null || print_warn "mas list failed"
+        print_info "Pending native updates (read-only, fast mode):"
+        mas outdated 2>/dev/null || print_warn "mas outdated failed"
+    else
+        print_warn "mas is not installed; a live run would install it through Homebrew"
+    fi
+    print_info "[DRY-RUN] Would run: sudo mas upgrade"
+    print_info "[DRY-RUN] Would run: App Store GUI automation (AppleScript)"
+    exit 0
 fi
 
 # ============================================================
@@ -80,8 +137,12 @@ fi
 
 if ! command -v mas &> /dev/null; then
     print_warn "$L_MAS_INSTALLING"
-    brew install mas
-    print_ok "$L_MAS_INSTALLED"
+    if brew install mas; then
+        print_ok "$L_MAS_INSTALLED"
+    else
+        print_error "Homebrew could not install mas."
+        exit 1
+    fi
 fi
 
 # Check version — only update if < 4.0 (avoid slow brew update)
@@ -89,10 +150,32 @@ MAS_VER=$(mas version 2>/dev/null || echo "0.0.0")
 MAS_MAJOR=$(echo "$MAS_VER" | cut -d'.' -f1)
 print_ok "$L_MAS_VERSION $MAS_VER"
 
-if [ "${MAS_MAJOR:-0}" -lt 4 ] 2>/dev/null; then
+case "$MAS_MAJOR" in
+    ''|*[!0-9]*)
+        print_error "Could not parse the installed mas version: $MAS_VER"
+        exit 1
+        ;;
+esac
+
+if [ "$MAS_MAJOR" -lt 4 ]; then
     print_warn "$L_MAS_VERSION_OLD"
-    HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade mas 2>/dev/null || brew upgrade mas
+    if ! HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade mas 2>/dev/null \
+        && ! brew upgrade mas; then
+        print_error "Homebrew could not upgrade mas."
+        exit 1
+    fi
     MAS_VER=$(mas version 2>/dev/null || echo "?")
+    MAS_MAJOR=$(echo "$MAS_VER" | cut -d'.' -f1)
+    case "$MAS_MAJOR" in
+        ''|*[!0-9]*)
+            print_error "Could not parse the upgraded mas version: $MAS_VER"
+            exit 1
+            ;;
+    esac
+    if [ "$MAS_MAJOR" -lt 4 ]; then
+        print_error "mas 4.0 or newer is required; detected: $MAS_VER"
+        exit 1
+    fi
     print_ok "$L_MAS_VERSION_UPDATED $MAS_VER"
 fi
 
@@ -102,9 +185,8 @@ fi
 print_header "$L_APPSTORE_CHECK"
 
 # mas account is unstable on macOS 26.x — use mas list as test
-ACCOUNT=$(mas account 2>/dev/null || echo "")
-if [ -n "$ACCOUNT" ]; then
-    print_ok "$L_APPSTORE_LOGIN_CHECK $ACCOUNT"
+if mas account >/dev/null 2>&1; then
+    print_ok "App Store account detected (identifier not displayed)"
 else
     print_warn "$L_APPSTORE_LOGIN_UNSTABLE"
     print_info "$L_APPSTORE_VERIFY_ACCESS"
@@ -127,6 +209,32 @@ echo ""
 mas list
 echo ""
 
+# Read the native update queue before asking for sudo. `--accurate` disables
+# the optimistic fast path when supported by mas 4.x. A failed query is not
+# equivalent to an empty queue and must stop the native track.
+MAS_OUTDATED_MODE="default"
+if mas outdated --help 2>&1 | grep -q -- '--accurate'; then
+    MAS_OUTDATED_MODE="accurate"
+fi
+if [ "$MAS_OUTDATED_MODE" = "accurate" ]; then
+    NATIVE_OUTDATED=$(run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated --accurate 2>&1)
+    MAS_OUTDATED_EXIT=$?
+else
+    NATIVE_OUTDATED=$(run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated 2>&1)
+    MAS_OUTDATED_EXIT=$?
+fi
+if [ "$MAS_OUTDATED_EXIT" -ne 0 ]; then
+    print_error "mas outdated ($MAS_OUTDATED_MODE) failed; native App Store state is unknown."
+    [ -n "$NATIVE_OUTDATED" ] && printf '%s\n' "$NATIVE_OUTDATED"
+    exit 1
+fi
+if [ -z "$NATIVE_OUTDATED" ]; then
+    print_ok "$L_APPSTORE_NO_UPDATES"
+else
+    print_info "Pending native App Store updates:"
+    printf '%s\n' "$NATIVE_OUTDATED"
+fi
+
 # ============================================================
 # STEP 3: CONFIRMATION
 # ============================================================
@@ -134,7 +242,7 @@ echo -e "${YELLOW}  $L_RUN_TWO_TRACKS${NC}"
 echo "    $L_TOR_1_HEADER"
 echo "    $L_TOR_2_HEADER"
 echo ""
-print_warn "$L_TOR_1_SUDO_MSG"
+[ -n "$NATIVE_OUTDATED" ] && print_warn "$L_TOR_1_SUDO_MSG"
 print_warn "$L_AX_PERMISSION_CHECK"
 echo ""
 if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
@@ -146,41 +254,54 @@ if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
     fi
 fi
 
-if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
-    print_info "[DRY-RUN] Would run: sudo mas upgrade"
-    print_info "[DRY-RUN] Would run: App Store GUI automation (AppleScript)"
-    exit 0
-fi
-
 # ============================================================
 # TRACK 1: sudo mas upgrade (native macOS apps)
 # ============================================================
 print_header "$L_TOR_1_HEADER"
-print_info "$L_TOR_1_SUDO_MSG"
+[ -n "$NATIVE_OUTDATED" ] && print_info "$L_TOR_1_SUDO_MSG"
 echo ""
 
 # ── mas snapshot BEFORE update ───────────────────────────────
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_SNAPSHOT_BEFORE"
-    mas list 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/mas_before.txt" || true
+    if ! mas list 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/mas_before.txt"; then
+        print_warn "Could not save the pre-update App Store snapshot."
+        APPSTORE_EXIT=1
+    fi
 fi
 
-MAS_TOR1_OUT=$(sudo env MAS_NO_AUTO_INDEX=1 mas upgrade 2>&1)
-MAS_TOR1_EXIT=$?
-if [ "$MAS_TOR1_EXIT" -eq 0 ]; then
-    printf '%s\n' "$MAS_TOR1_OUT"
-    print_ok "$L_TOR_1_COMPLETE"
+if [ -z "$NATIVE_OUTDATED" ]; then
+    print_ok "$L_APPSTORE_NO_UPDATES — sudo mas upgrade skipped"
 else
-    printf '%s\n' "$MAS_TOR1_OUT"
-    print_warn "$L_TOR_1_ERROR"
-    APPSTORE_EXIT=1
-    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
-        {
-            echo "=== TRACK 1 (sudo mas upgrade) FAILED ==="
-            echo "exit=$MAS_TOR1_EXIT"
-            echo "--- output ---"
-            printf '%s\n' "$MAS_TOR1_OUT"
-        } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
+    # Authenticate in the foreground so a normal Terminal can display the
+    # password prompt. The timed command then uses the cached ticket with -n;
+    # this also fails quickly instead of hanging in a non-interactive session.
+    if sudo -v; then
+        MAS_TOR1_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
+            sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade 2>&1)
+        MAS_TOR1_EXIT=$?
+    else
+        MAS_TOR1_OUT="sudo authentication failed; native App Store updates were not started"
+        MAS_TOR1_EXIT=1
+    fi
+    if [ "$MAS_TOR1_EXIT" -eq 0 ]; then
+        printf '%s\n' "$MAS_TOR1_OUT"
+        print_ok "mas upgrade command completed; the final queue check will verify installation."
+    else
+        printf '%s\n' "$MAS_TOR1_OUT"
+        if [ "$MAS_TOR1_EXIT" -eq 124 ]; then
+            print_warn "sudo mas upgrade exceeded ${MAS_UPGRADE_TIMEOUT}s and was stopped."
+        fi
+        print_warn "$L_TOR_1_ERROR"
+        APPSTORE_EXIT=1
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+            {
+                echo "=== TRACK 1 (sudo mas upgrade) FAILED ==="
+                echo "exit=$MAS_TOR1_EXIT"
+                echo "--- output ---"
+                printf '%s\n' "$MAS_TOR1_OUT"
+            } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
+        fi
     fi
 fi
 
@@ -311,14 +432,17 @@ APPLESCRIPT
 # ── Interpret result ──
 echo ""
 APPSTORE_TOR2_BRANCH="unexpected"
+APPSTORE_TOR2_BACKGROUND=0
 if echo "$AS_RESULT" | grep -q "not allowed\|assistive\|Accessibility"; then
     APPSTORE_TOR2_BRANCH="ax_revoked"
     print_warn "$L_APPSTORE_AX_REVOKED"
     print_info "$L_APPSTORE_CHECK_PREFS"
     open "macappstores://showUpdatesPage"
+    APPSTORE_EXIT=1
 
 elif echo "$AS_RESULT" | grep -q "^UPDATE_ALL_CLICKED\|^UPDATE_ALL_DEEP"; then
     APPSTORE_TOR2_BRANCH="update_all"
+    APPSTORE_TOR2_BACKGROUND=1
     print_ok "$L_APPSTORE_UPDATE_ALL_CLICKED"
     print_info "$L_APPSTORE_BG_INSTALL"
     print_warn "$L_APPSTORE_WAIT_PROMPT"
@@ -328,6 +452,7 @@ elif echo "$AS_RESULT" | grep -q "^UPDATE_ALL_CLICKED\|^UPDATE_ALL_DEEP"; then
 
 elif echo "$AS_RESULT" | grep -q "^INDIVIDUAL_UPDATES:"; then
     APPSTORE_TOR2_BRANCH="individual"
+    APPSTORE_TOR2_BACKGROUND=1
     COUNT="${AS_RESULT#INDIVIDUAL_UPDATES:}"
     print_ok "$L_APPSTORE_INDIVIDUAL_UPDATES ($COUNT)"
     print_info "$L_APPSTORE_INSTALLING_BG"
@@ -344,6 +469,7 @@ else
     print_warn "$L_APPSTORE_UNEXPECTED $AS_RESULT"
     print_info "$L_APPSTORE_MANUAL_UPDATE"
     open "macappstores://showUpdatesPage"
+    APPSTORE_EXIT=1
 fi
 
 # Persist TRACK 2 diagnostic when AppleScript hit a non-success branch
@@ -363,10 +489,32 @@ fi
 # FINAL VERIFICATION
 # ============================================================
 print_header "$L_FINAL_CHECK"
-STILL_OUTDATED=$(mas outdated 2>/dev/null || echo "")
-if [ -z "$STILL_OUTDATED" ]; then
-    print_ok "$L_APPSTORE_NO_UPDATES"
+if [ "$MAS_OUTDATED_MODE" = "accurate" ]; then
+    if ! STILL_OUTDATED=$(run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated --accurate 2>&1); then
+        print_error "mas outdated --accurate failed; native App Store state is unknown."
+        [ -n "$STILL_OUTDATED" ] && printf '%s\n' "$STILL_OUTDATED"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+            printf 'FINAL native verification failed (mode=accurate):\n%s\n' "$STILL_OUTDATED" \
+                >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
+        fi
+        APPSTORE_EXIT=1
+        STILL_OUTDATED=""
+    fi
 else
+    if ! STILL_OUTDATED=$(run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated 2>&1); then
+        print_error "mas outdated failed; native App Store state is unknown."
+        [ -n "$STILL_OUTDATED" ] && printf '%s\n' "$STILL_OUTDATED"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+            printf 'FINAL native verification failed (mode=default):\n%s\n' "$STILL_OUTDATED" \
+                >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
+        fi
+        APPSTORE_EXIT=1
+        STILL_OUTDATED=""
+    fi
+fi
+if [ -z "$STILL_OUTDATED" ] && [ "$APPSTORE_EXIT" -eq 0 ]; then
+    print_ok "$L_APPSTORE_NO_UPDATES"
+elif [ -n "$STILL_OUTDATED" ]; then
     print_warn "$L_STILL_OUTDATED"
     echo "$STILL_OUTDATED"
     APPSTORE_EXIT=1
@@ -379,17 +527,46 @@ else
     fi
 fi
 
+if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
+    print_warn "Track 2 is still installing in the background; its completion is not verified by mas ($MAS_OUTDATED_MODE checks native apps only)."
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        {
+            echo ""
+            echo "=== TRACK 2 BACKGROUND_UNVERIFIED ==="
+            echo "branch=$APPSTORE_TOR2_BRANCH"
+            echo "Native verification mode=$MAS_OUTDATED_MODE"
+        } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
+    fi
+fi
+
 # ── mas snapshot AFTER update ────────────────────────────────
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_SNAPSHOT_AFTER"
     sleep 3
-    mas list 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/mas_after.txt" || true
-    print_ok "$L_SNAPSHOTS_SAVED $MAC_UPDATE_SESSION_DIR"
+    if mas list 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/mas_after.txt"; then
+        print_ok "$L_SNAPSHOTS_SAVED $MAC_UPDATE_SESSION_DIR"
+    else
+        print_warn "Could not save the post-update App Store snapshot."
+        APPSTORE_EXIT=1
+    fi
 fi
 
-print_header "$L_SCRIPT_2_COMPLETE"
-print_info "$L_SCRIPT_2_SUMMARY_TOR1"
-print_info "$L_SCRIPT_2_SUMMARY_TOR2"
-print_warn "$L_SCRIPT_2_CHECK_WINDOW"
+if [ "$APPSTORE_EXIT" -eq 0 ]; then
+    print_header "$L_SCRIPT_2_COMPLETE"
+    if [ -z "$NATIVE_OUTDATED" ]; then
+        print_info "Track 1 (mas): no pending native updates; sudo was not requested."
+    else
+        print_info "$L_SCRIPT_2_SUMMARY_TOR1"
+    fi
+    if [ "$APPSTORE_TOR2_BRANCH" = "no_updates" ]; then
+        print_info "Track 2 (App Store UI): no pending GUI updates were found."
+    else
+        print_info "$L_SCRIPT_2_SUMMARY_TOR2"
+        print_warn "$L_SCRIPT_2_CHECK_WINDOW"
+    fi
+else
+    print_header "❌ SCRIPT 2 FINISHED WITH ERRORS OR PENDING UPDATES"
+    print_error "App Store did not pass every final verification; review the diagnostics above."
+fi
 echo ""
 exit "$APPSTORE_EXIT"

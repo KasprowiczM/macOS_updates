@@ -9,6 +9,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Sequence
@@ -203,9 +204,11 @@ class Logger:
         self.options = options
         self.log_dir = repo_root / LOG_DIRNAME
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.log_dir.chmod(0o700)
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.log_path = self.log_dir / f"{stamp}-{command_name}.log"
-        self._fh = self.log_path.open("w", encoding="utf-8")
+        fd = os.open(self.log_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        self._fh = os.fdopen(fd, "w", encoding="utf-8")
 
     def close(self) -> None:
         self._fh.close()
@@ -350,11 +353,30 @@ def read_json(path: Path) -> dict:
 
 def write_json(path: Path, payload: dict) -> None:
     content = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    tmp_path = path.with_suffix(f".tmp.{os.getpid()}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, raw_tmp_path = tempfile.mkstemp(prefix=f".{path.name}.tmp-", dir=path.parent, text=True)
+    tmp_path = Path(raw_tmp_path)
     try:
-        tmp_path.write_text(content, encoding="utf-8")
-        os.replace(str(tmp_path), str(path))
+        try:
+            os.fchmod(fd, 0o600)
+        except OSError:
+            # Some cloud/FUSE and removable-volume providers do not expose
+            # POSIX modes. Their container ACL remains the enforcement layer.
+            pass
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
     except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
         tmp_path.unlink(missing_ok=True)
         raise
 
@@ -838,23 +860,48 @@ class RCloneProvider(CloudProvider):
             )
         return files, "rclone"
 
-    def sync_from(self, dest_root: Path, dry_run: bool = False) -> tuple[list[str], str]:
+    def list_remote_files(self, cwd: Path) -> list[str]:
         remote_root = self._remote_root()
-        if not dry_run:
-            run_command(["rclone", "copy", remote_root, str(dest_root), "--checksum"], cwd=dest_root)
-        # rclone copy does not return a file list, so list the remote explicitly
-        # to report what was imported. Best-effort: a listing failure must not
-        # break an otherwise-successful import.
+        listing = run_command(
+            ["rclone", "lsf", "--files-only", "-R", remote_root],
+            cwd=cwd,
+        )
+        return sorted({safe_relpath(line.strip()) for line in listing.stdout.splitlines() if line.strip()})
+
+    def sync_from(
+        self,
+        dest_root: Path,
+        dry_run: bool = False,
+        files: Iterable[str] | None = None,
+    ) -> tuple[list[str], str]:
+        remote_root = self._remote_root()
+        requested = self.list_remote_files(dest_root) if files is None else files
+        selected = sorted({safe_relpath(path) for path in requested})
+        if dry_run or not selected:
+            return selected, "rclone"
+
+        options = RunOptions(dry_run=False, verbose=False)
+        logger = Logger(dest_root, "rclone-stage", options)
         try:
-            listing = run_command(
-                ["rclone", "lsf", "--files-only", "-R", remote_root],
-                cwd=dest_root,
-                check=False,
-            )
-            files = sorted(line.strip() for line in listing.stdout.splitlines() if line.strip())
-        except Exception:
-            files = []
-        return files, "rclone"
+            with tempfile.TemporaryDirectory(prefix="dev-sync-rclone-") as temp_dir:
+                staging_root = Path(temp_dir)
+                for relpath in selected:
+                    staged = staging_root / relpath
+                    staged.parent.mkdir(parents=True, exist_ok=True)
+                    run_command(
+                        [
+                            "rclone",
+                            "copyto",
+                            f"{remote_root}/{relpath}",
+                            str(staged),
+                            "--checksum",
+                        ],
+                        cwd=dest_root,
+                    )
+                sync_relpaths(staging_root, dest_root, selected, logger, options, transactional=True)
+        finally:
+            logger.close()
+        return selected, "rclone-staged"
 
 
 def create_provider(config: DevSyncConfig) -> CloudProvider:
@@ -939,23 +986,84 @@ def copy_relpaths(
     logger: Logger,
     options: RunOptions,
 ) -> None:
-    for rel in sorted({safe_relpath(relpath) for relpath in relpaths}):
-        source = source_base / rel
-        dest = dest_base / rel
-        logger.verbose(f"copy {source} -> {dest}")
-        if options.dry_run:
-            continue
-        validate_no_symlink_dest_ancestors(dest_base, [rel])
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        remove_path(dest, dry_run=False)
-        if source.is_symlink():
-            os.symlink(os.readlink(source), dest)
-        elif source.is_file():
-            shutil.copy2(source, dest)
-        elif source.is_dir():
-            shutil.copytree(source, dest, dirs_exist_ok=True, symlinks=True)
-        else:
-            raise DevSyncError(f"Source path vanished during copy: {source}")
+    paths = sorted({safe_relpath(relpath) for relpath in relpaths})
+    for rel in paths:
+        logger.verbose(f"copy {source_base / rel} -> {dest_base / rel}")
+    if options.dry_run or not paths:
+        return
+
+    # A manifest must contain independent roots. Overlapping entries would make
+    # rollback order ambiguous (for example both `folder` and `folder/file`).
+    path_set = set(paths)
+    for rel in paths:
+        parent = PurePosixPath(rel).parent
+        while str(parent) not in ("", "."):
+            if str(parent) in path_set:
+                raise DevSyncError(f"Overlapping overlay paths are not allowed: {parent} and {rel}")
+            parent = parent.parent
+
+    dest_base.mkdir(parents=True, exist_ok=True)
+    validate_no_symlink_dest_ancestors(dest_base, paths)
+    transaction_root = Path(tempfile.mkdtemp(prefix=".dev-sync-txn-", dir=dest_base))
+    incoming_root = transaction_root / "incoming"
+    backup_root = transaction_root / "backup"
+    swapped: list[tuple[str, bool]] = []
+
+    try:
+        # Stage the complete overlay first. No destination is touched until
+        # every source has been copied successfully.
+        for rel in paths:
+            source = source_base / rel
+            staging = incoming_root / rel
+            staging.parent.mkdir(parents=True, exist_ok=True)
+            if source.is_symlink():
+                os.symlink(os.readlink(source), staging)
+            elif source.is_file():
+                shutil.copy2(source, staging)
+            elif source.is_dir():
+                shutil.copytree(source, staging, symlinks=True)
+            else:
+                raise DevSyncError(f"Source path vanished during copy: {source}")
+
+        # Swap all staged roots. Previous destinations remain under backup_root
+        # until the complete batch has succeeded.
+        for rel in paths:
+            staging = incoming_root / rel
+            dest = dest_base / rel
+            backup = backup_root / rel
+            had_dest = lexists(dest)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if had_dest:
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(dest, backup)
+            try:
+                os.replace(staging, dest)
+            except Exception:
+                if had_dest and lexists(backup) and not lexists(dest):
+                    os.replace(backup, dest)
+                raise
+            swapped.append((rel, had_dest))
+    except Exception as error:
+        rollback_errors: list[str] = []
+        for rel, had_dest in reversed(swapped):
+            dest = dest_base / rel
+            backup = backup_root / rel
+            try:
+                remove_path(dest, dry_run=False)
+                if had_dest and lexists(backup):
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(backup, dest)
+            except Exception as rollback_error:  # pragma: no cover - catastrophic filesystem failure
+                rollback_errors.append(f"{rel}: {rollback_error}")
+        if rollback_errors:
+            raise DevSyncError(
+                "Overlay import failed and rollback was incomplete. "
+                f"Recovery data remains at {transaction_root}: {'; '.join(rollback_errors)}"
+            ) from error
+        shutil.rmtree(transaction_root, ignore_errors=True)
+        raise
+    else:
+        shutil.rmtree(transaction_root)
 
 
 def sync_relpaths(
@@ -964,6 +1072,7 @@ def sync_relpaths(
     relpaths: Iterable[str],
     logger: Logger,
     options: RunOptions,
+    transactional: bool = False,
 ) -> str:
     paths = sorted({safe_relpath(relpath) for relpath in relpaths})
     if not paths:
@@ -974,11 +1083,11 @@ def sync_relpaths(
             logger.verbose(path)
         return "dry-run"
     validate_no_symlink_dest_ancestors(dest_base, paths)
-    if rsync_available():
+    if rsync_available() and not transactional:
         rsync_transfer(source_base, dest_base, paths, logger, options)
         return "rsync"
     copy_relpaths(source_base, dest_base, paths, logger, options)
-    return "python"
+    return "python-transactional" if transactional else "python"
 
 
 def manifest_path(base: Path) -> Path:
@@ -1094,12 +1203,27 @@ def import_overlay(
                 for relpath in skipped_tracked:
                     logger.log(f"  - {relpath}")
             logger.log(f"Importing {len(files_to_copy)} private overlay file(s) from {source}")
-            transport = sync_relpaths(source, repo_root, files_to_copy, logger, options)
+            transport = sync_relpaths(source, repo_root, files_to_copy, logger, options, transactional=True)
         else:
             source = Path(f"{config.rclone_remote}:{config.rclone_remote_path}/{config.project_name}")
-            files_to_copy, transport = provider.sync_from(repo_root, dry_run=dry_run)
-            skipped_tracked = []
-            logger.log("Manifest support is unavailable for rclone imports.", always_stdout=False)
+            assert isinstance(provider, RCloneProvider)
+            provider_files = {
+                rel for rel in provider.list_remote_files(repo_root) if should_include_candidate(rel, config)
+            }
+            tracked = tracked_files(repo_root)
+            skipped_tracked = sorted(provider_files & tracked)
+            files_to_copy = sorted(provider_files - tracked)
+            if skipped_tracked:
+                logger.log(f"Skipping {len(skipped_tracked)} tracked Git file(s) from rclone overlay")
+                for relpath in skipped_tracked:
+                    logger.log(f"  - {relpath}")
+            logger.log(f"Importing {len(files_to_copy)} validated private overlay file(s) from {source}")
+            files_to_copy, transport = provider.sync_from(
+                repo_root,
+                dry_run=dry_run,
+                files=files_to_copy,
+            )
+            logger.log("rclone import used validated staging without a provider manifest.", always_stdout=False)
 
         logger.log(f"project_root={repo_root}", always_stdout=False)
         logger.log(f"provider={config.provider}", always_stdout=False)

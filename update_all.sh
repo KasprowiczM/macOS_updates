@@ -11,13 +11,13 @@ set -o pipefail
 
 # Data:  2026-04-18 (zaktualizowano)
 # Opis:  Uruchamia wszystkie skrypty aktualizacji po kolei:
-#        0. Skanowanie nowych aplikacji → aktualizacja APPLICATIONS.md
-#        1. System macOS
-#        2. App Store
-#        3. Native CLI + npm
-#        4. Homebrew
-#        5. Aplikacje z Internetu
-#        6. Aktualizacja APPLICATIONS.md i UPDATES.md z wynikami
+#        0. Skanowanie i inwentarz wstępny
+#        1. App Store
+#        2. Native CLI + npm
+#        3. Homebrew
+#        4. Aplikacje z Internetu
+#        5. Aktualizacja APPLICATIONS.md i UPDATES.md z wynikami
+#        6. System macOS na końcu (restart-safe, zawsze z -R)
 # Kompatybilność: bash 3.2+ (macOS domyślny shell)
 # ============================================================
 
@@ -43,7 +43,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export UI_START_EPOCH=$(date +%s)
 mac_update_parse_cli "$@"
 
-mac_update_require_apple_silicon || exit 1
+mac_update_require_supported_platform || exit 1
 
 # ── i18n: load language strings ──────────────────────────────
 . "$SCRIPT_DIR/i18n/loader.sh"
@@ -120,7 +120,7 @@ if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
 fi
 
 echo -e "  ${BOLD}$L_UPDATE_ALL_INTRO${NC}"
-printf "    %s\n" "$L_UPDATE_ALL_STEPS"
+printf "%b\n" "$L_UPDATE_ALL_STEPS" | sed 's/^/    /'
 echo ""
 echo -e "  ${YELLOW}$L_UPDATE_ALL_DURATION${NC}"
 echo ""
@@ -157,6 +157,28 @@ chmod 700 "$LOGS_DIR" 2>/dev/null || true
 LOG_TS="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="$LOGS_DIR/update_all_${LOG_TS}.log"
 MAX_LOGS="${MAC_UPDATE_MAX_LOGS:-30}"
+case "$MAX_LOGS" in
+    ''|*[!0-9]*|0)
+        print_error "MAC_UPDATE_MAX_LOGS must be a positive integer (received: $MAX_LOGS)"
+        rm -rf "$SESSION_DIR" 2>/dev/null || true
+        exit 2
+        ;;
+esac
+
+# Create the diagnostic log with private permissions before tee opens it.
+# The directory is already mode 700, but an explicit 600 file mode also
+# protects copied logs and non-standard umask configurations.
+: > "$LOG_FILE" || {
+    print_error "Cannot create run log: $LOG_FILE"
+    rm -rf "$SESSION_DIR" 2>/dev/null || true
+    exit 1
+}
+chmod 600 "$LOG_FILE" 2>/dev/null || {
+    print_error "Cannot protect run log: $LOG_FILE"
+    rm -f "$LOG_FILE" 2>/dev/null || true
+    rm -rf "$SESSION_DIR" 2>/dev/null || true
+    exit 1
+}
 
 # Rotate: prune oldest beyond MAX_LOGS
 if [ -d "$LOGS_DIR" ]; then
@@ -232,12 +254,14 @@ RESULT_INTERNET="$L_ALL_RESULT_SKIPPED"
 RESULT_NPMCLI="$L_ALL_RESULT_SKIPPED"
 RESULT_BREW="$L_ALL_RESULT_SKIPPED"
 RESULT_MD="$L_ALL_RESULT_SKIPPED"
+SYSTEM_HISTORY_PENDING="⏳ pending final step"
+SYSTEM_DEFERRED=0
 OVERALL_EXIT=0
 
 # ============================================================
 # STEP 0: Scan new applications
 # ============================================================
-ui_master_progress 0 7
+ui_master_progress 0 6
 if [ "${MAC_UPDATE_SKIP_PRESCAN:-0}" = "1" ]; then
     print_info "Skipped step 0 (--skip-prescan)"
     RESULT_SCAN="$L_ALL_RESULT_SKIPPED"
@@ -252,11 +276,34 @@ import os
 import re
 import sys
 import subprocess
+import tempfile
 
 script_dir = sys.argv[1]
 session_dir = sys.argv[2]
 
 programy_md_path = os.path.join(script_dir, 'APPLICATIONS.md')
+
+def atomic_write_text(path, text, mode=0o600):
+    directory = os.path.dirname(path) or '.'
+    fd, tmp_path = tempfile.mkstemp(prefix='.mac-update.', dir=directory, text=True)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+        os.chmod(path, mode)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 def read_md():
     if not os.path.exists(programy_md_path):
@@ -300,8 +347,7 @@ def read_md():
             "> **Uwaga:** Casks zarządzane przez Homebrew.\n\n"
             f"## Podsumowanie\n\n*Zaktualizowano: {_t}*\n"
         )
-        with open(programy_md_path, 'w') as _f:
-            _f.write(_minimal)
+        atomic_write_text(programy_md_path, _minimal)
         print("  ℹ️  APPLICATIONS.md nie istnieje — utworzono minimalny szablon")
     with open(programy_md_path, 'r') as f:
         return f.read()
@@ -314,7 +360,9 @@ APP_ALIASES = {
     'Ledger Live': ['Ledger Live', 'Ledger Wallet'],
     'Docker': ['Docker', 'Docker Desktop'],
     'Docker Desktop': ['Docker', 'Docker Desktop'],
-    'Codex': ['Codex', 'Codex Desktop (OpenAI)'],
+    'ChatGPT / Codex': ['ChatGPT / Codex', 'ChatGPT', 'Codex', 'Codex Desktop (OpenAI)'],
+    'ChatGPT': ['ChatGPT', 'ChatGPT / Codex', 'Codex', 'Codex Desktop (OpenAI)'],
+    'Codex': ['Codex', 'ChatGPT', 'ChatGPT / Codex', 'Codex Desktop (OpenAI)'],
     'Comet': ['Comet', 'Comet (Perplexity Browser)'],
     'Perplexity': ['Perplexity', 'Perplexity Desktop'],
     'zoom.us': ['zoom.us', 'Zoom'],
@@ -326,11 +374,31 @@ APP_ALIASES = {
     'Pages Creator Studio': ['Pages Creator Studio', 'Pages'],
 }
 
-SKIP_DISCOVERY_APPS = set(['WiFiman', 'Picsart', 'Utilities'])
+SKIP_DISCOVERY_APPS = set(['Utilities'])
+# Apps explicitly delegated to App Store GUI Track 2 are already covered by
+# the registry even though iPad-on-Mac inventory entries are not normal mas
+# rows. Do not report them as new internet downloads on every prescan.
+methods_path = os.path.join(script_dir, 'config', 'internet_app_methods.txt')
+try:
+    with open(methods_path, encoding='utf-8') as methods_handle:
+        for raw in methods_handle:
+            raw = raw.split('#', 1)[0].strip()
+            if not raw:
+                continue
+            fields = raw.split('|')
+            if len(fields) >= 2 and fields[1] == 'appstore_gui':
+                SKIP_DISCOVERY_APPS.add(fields[0])
+except OSError:
+    pass
 
 def row_exists(table_content, name):
     for candidate in APP_ALIASES.get(name, [name]):
-        pattern = r'^\| ' + re.escape(candidate) + r' \|'
+        # Inventory cells may bold iPad apps or append a marker such as 🆕.
+        # Match the exact start of the first cell while allowing that formatting.
+        pattern = (
+            r'^\|\s*(?:\*\*)?' + re.escape(candidate)
+            + r'(?:\*\*)?(?:\s+[^|]+)?\s*\|'
+        )
         if re.search(pattern, table_content, re.MULTILINE) is not None:
             return True
     return False
@@ -338,8 +406,9 @@ def row_exists(table_content, name):
 def app_exists(name):
     candidates = APP_ALIASES.get(name, [name])
     for candidate in candidates:
-        if os.path.exists(os.path.join('/Applications', candidate + '.app')):
-            return True
+        for applications_dir in ('/Applications', os.path.expanduser('~/Applications')):
+            if os.path.exists(os.path.join(applications_dir, candidate + '.app')):
+                return True
     return False
 
 print("  Skanowanie /Applications...")
@@ -351,19 +420,56 @@ print("  Skanowanie /Applications...")
 grupo_1_3_match = re.search(r'^(.*?)(?=^## GRUPA 4)', content, re.DOTALL | re.MULTILINE)
 grupo_1_3_content = grupo_1_3_match.group(1) if grupo_1_3_match else content
 
-try:
-    all_items = os.listdir('/Applications')
-except Exception:
-    all_items = []
+installed_app_paths = {}
+for applications_dir in ('/Applications', os.path.expanduser('~/Applications')):
+    try:
+        for item in os.listdir(applications_dir):
+            if item.endswith('.app'):
+                installed_app_paths.setdefault(item[:-4], os.path.join(applications_dir, item))
+    except Exception:
+        pass
 
-installed_apps = sorted([item[:-4] for item in all_items if item.endswith('.app')])
+installed_apps = sorted(
+    name for name in installed_app_paths
+    if '|' not in name and not any(ord(char) < 32 or ord(char) == 127 for char in name)
+)
 new_apps = []
+
+def installed_app_version(app_path):
+    for key in ('CFBundleShortVersionString', 'CFBundleVersion'):
+        try:
+            result = subprocess.run(
+                ['defaults', 'read', os.path.join(app_path, 'Contents', 'Info'), key],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except Exception:
+            pass
+    try:
+        result = subprocess.run(
+            ['mdls', '-name', 'kMDItemVersion', '-raw', app_path],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip() not in ('', '(null)'):
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return '?'
+
+# Always persist a current installed-app snapshot for the post-scan inventory
+# refresh. The session directory is private and removed by the orchestrator.
+with open(os.path.join(session_dir, 'installed_apps_after.txt'), 'w', encoding='utf-8') as handle:
+    for app in installed_apps:
+        if '|' in app or '\n' in app or '\r' in app:
+            continue
+        handle.write(f"{app}|{installed_app_version(installed_app_paths[app])}\n")
 
 # Aplikacje systemowe Apple — zawsze obecne w GRUPIE 1, pomiń fałszywe wpisy
 SYSTEM_APP_FRAGMENTS = [
     'Installer', 'Uninstaller', 'Helper', 'Agent', 'Updater',
     'Shim', 'Launcher', 'Framework', 'Plugin', 'Extension',
-    'Service', 'Daemon', 'XPC', 'Feedback',
+    'Service', 'Daemon', 'XPC', 'Feedback', 'Handler',
 ]
 
 for app in installed_apps:
@@ -657,31 +763,25 @@ if os.path.exists(new_apps_file):
 today = datetime.now().strftime('%Y-%m-%d')
 content = re.sub(r'(\*\*Data analizy:\*\* )\d{4}-\d{2}-\d{2}', r'\g<1>' + today, content)
 
-# Mark removed apps in APPLICATIONS.md (apps in GRUPA 3 but no longer installed)
+# Remove uninstalled apps from APPLICATIONS.md (confirmed policy: inventory
+# describes the current Mac and never reinstalls removed applications).
 removed_apps_file = os.path.join(session_dir, 'removed_apps.txt')
 if os.path.exists(removed_apps_file):
     with open(removed_apps_file) as f:
         removed = [l.strip() for l in f if l.strip()]
     removed_count = 0
     for app in removed:
-        # Replace last column in this app's row with 🗑️ marker (only if not already marked)
-        pattern = r'^(\| ' + re.escape(app) + r' \| [^|]+ \| )([^|]+?)( \|)\s*$'
-        def mark_removed(m, _app=app):
-            if '🗑️' in m.group(0) or 'ODINSTALOWANA' in m.group(0):
-                return m.group(0)
-            return m.group(1) + '🗑️ ODINSTALOWANA — usuń ten wiersz' + m.group(3)
-        new_content = re.sub(pattern, mark_removed, content, flags=re.MULTILINE)
+        pattern = r'^\| ' + re.escape(app) + r' \|[^\n]*\|\s*\n?'
+        new_content = re.sub(pattern, '', content, count=1, flags=re.MULTILINE)
         if new_content != content:
             content = new_content
             removed_count += 1
     if removed_count > 0:
         changes_made = True
-        print(f"  🗑️  Oznaczono {removed_count} usuniętych aplikacji w APPLICATIONS.md")
-        print(f"     Przejrzyj APPLICATIONS.md i usuń wiersze oznaczone 🗑️")
+        print(f"  🗑️  Usunięto {removed_count} odinstalowanych aplikacji z APPLICATIONS.md")
 
 if changes_made:
-    with open(programy_md_path, 'w') as f:
-        f.write(content)
+    atomic_write_text(programy_md_path, content)
     print(f"\n  📝 APPLICATIONS.md zaktualizowany o nowe aplikacje")
 else:
     print(f"\n  ℹ️  APPLICATIONS.md — nowe wpisy zostały zgłoszone ale nie wymagały edycji tabel")
@@ -690,6 +790,97 @@ PYEOF
 
 if python3 "$SESSION_DIR/prescan.py" "$SCRIPT_DIR" "$SESSION_DIR"; then
     RESULT_SCAN="$L_STATUS_OK"
+    if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
+        print_info "Capturing current versions for the inventory refresh..."
+        if ! internet_capture_versions "$SESSION_DIR/internet_before.txt"; then
+            print_error "Could not capture installed internet-app versions"
+            RESULT_SCAN="$L_ALL_RESULT_WARN"
+            OVERALL_EXIT=1
+        else
+            cp "$SESSION_DIR/internet_before.txt" "$SESSION_DIR/internet_after.txt"
+        fi
+        if command -v brew >/dev/null 2>&1; then
+            if brew list --formula --versions > "$SESSION_DIR/brew_formulae_after.txt" 2>/dev/null \
+                && brew list --cask --versions > "$SESSION_DIR/brew_casks_after.txt" 2>/dev/null; then
+                cp "$SESSION_DIR/brew_formulae_after.txt" "$SESSION_DIR/brew_formulae_before.txt"
+                cp "$SESSION_DIR/brew_casks_after.txt" "$SESSION_DIR/brew_casks_before.txt"
+            else
+                print_error "Could not capture Homebrew versions for inventory"
+                RESULT_SCAN="$L_ALL_RESULT_WARN"
+                OVERALL_EXIT=1
+            fi
+        fi
+        python3 - "$SCRIPT_DIR/config/npm_global_clis.txt" "$SESSION_DIR/npm_cli_after.txt" <<'PYEOF'
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+manifest, output = sys.argv[1:3]
+home = os.path.expanduser('~')
+
+def candidate_path(command):
+    if not re.fullmatch(r'[A-Za-z0-9._+-]+', command):
+        return None
+    roots = [
+        os.path.join(home, '.local', 'share', 'mac-update', 'npm-global', 'bin'),
+        os.path.join(home, '.local', 'share', 'mac-update', 'node', 'bin'),
+        os.path.join(home, '.local', 'bin'),
+        os.path.join(home, '.bun', 'bin'),
+    ]
+    for root in roots:
+        path = os.path.join(root, command)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return shutil.which(command)
+
+rows = []
+with open(manifest, encoding='utf-8') as handle:
+    for raw in handle:
+        raw = raw.split('#', 1)[0].strip()
+        if not raw:
+            continue
+        fields = raw.split('|')
+        if len(fields) != 5:
+            continue
+        display, package, _method, _brew_formula, command = fields
+        path = candidate_path(command)
+        if not path:
+            continue
+        args = [path, '-v' if display in ('node', 'claude-code') else '--version']
+        try:
+            result = subprocess.run(args, capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if result.returncode != 0:
+            continue
+        first = (result.stdout or result.stderr).strip().splitlines()
+        if not first:
+            continue
+        version = first[0].strip()
+        if display == 'claude-code':
+            version = version.split()[0]
+        elif display == 'codex-cli':
+            version = version.split()[-1]
+        elif display != 'node':
+            version = version.split()[0]
+        if version.startswith('v'):
+            version = version[1:]
+        rows.append(f'{display}|{package}|{version}|{command}|{path}')
+
+with open(output, 'w', encoding='utf-8') as handle:
+    handle.write('\n'.join(rows) + ('\n' if rows else ''))
+PYEOF
+        CLI_SNAPSHOT_EXIT=$?
+        if [ "$CLI_SNAPSHOT_EXIT" -eq 0 ]; then
+            cp "$SESSION_DIR/npm_cli_after.txt" "$SESSION_DIR/npm_cli_before.txt"
+        else
+            print_error "Could not capture native CLI versions for inventory"
+            RESULT_SCAN="$L_ALL_RESULT_WARN"
+            OVERALL_EXIT=1
+        fi
+    fi
 else
     RESULT_SCAN="$L_ALL_RESULT_WARN"
     OVERALL_EXIT=1
@@ -697,34 +888,30 @@ fi
 fi
 
 # ============================================================
-# STEP 1: System update
+# Prepare the final system update. It is deliberately not presented as an
+# early step: a framework-managed reboot must not interrupt application work.
 # ============================================================
-ui_master_progress 1 7
 if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" = "1" ]; then
-    print_info "Skipped step 1 (--skip-system)"
+    print_info "Skipped final macOS step (--skip-system)"
     RESULT_SYSTEM="$L_ALL_RESULT_SKIPPED"
-elif mac_update_run_child "update_system.sh" "update_system.sh"; then
-    RESULT_SYSTEM="$L_STATUS_OK completed"
 else
-    RESULT_SYSTEM="$L_STATUS_ERROR"
-    OVERALL_EXIT=1
+    SYSTEM_DEFERRED=1
+    if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+        RESULT_SYSTEM="[DRY-RUN] pending final step"
+    else
+        RESULT_SYSTEM="$SYSTEM_HISTORY_PENDING"
+    fi
 fi
 
 # ============================================================
-# STEP 2: App Store update
+# STEP 1: App Store update
 # ============================================================
-ui_master_progress 2 7
+ui_master_progress 1 6
 if [ "${MAC_UPDATE_SKIP_APPSTORE:-0}" = "1" ]; then
-    print_info "Skipped step 2 (--skip-appstore)"
+    print_info "Skipped step 1 (--skip-appstore)"
     RESULT_APPSTORE="$L_ALL_RESULT_SKIPPED"
 else
-ui_step_header 2 6 "$L_SCRIPT_TITLE_APPSTORE"
-
-# Snapshot MAS before update
-if command -v mas &> /dev/null; then
-    print_info "$L_SNAPSHOT_BEFORE"
-    mas list 2>/dev/null > "$SESSION_DIR/mas_before.txt" || true
-fi
+ui_step_header 1 6 "$L_SCRIPT_TITLE_APPSTORE"
 
 if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
     chmod +x "$SCRIPT_DIR/update_appstore.sh"
@@ -748,45 +935,36 @@ else
     RESULT_APPSTORE="$L_STATUS_ERROR missing file"
     OVERALL_EXIT=1
 fi
-
-# Snapshot MAS after update
-if command -v mas &> /dev/null; then
-    print_info "$L_SNAPSHOT_AFTER"
-    sleep 3
-    mas list 2>/dev/null > "$SESSION_DIR/mas_after.txt" || true
-fi
 fi
 
 # ============================================================
-# STEP 3: Native CLI & npm update
+# STEP 2: Native CLI & npm update
 # ============================================================
-ui_master_progress 3 7
+ui_master_progress 2 6
 if [ "${MAC_UPDATE_SKIP_NPM:-0}" = "1" ]; then
-    print_info "Skipped step 3 (--skip-npm)"
+    print_info "Skipped step 2 (--skip-npm)"
     RESULT_NPMCLI="$L_ALL_RESULT_SKIPPED"
+else
+ui_step_header 2 6 "Native CLI + npm"
+if mac_update_dry_run_msg "update_npm_cli.sh"; then
+    RESULT_NPMCLI="[DRY-RUN] skipped"
 elif mac_update_run_child "update_npm_cli.sh" "update_npm_cli.sh"; then
     RESULT_NPMCLI="$L_STATUS_OK completed"
 else
     RESULT_NPMCLI="$L_STATUS_ERROR"
     OVERALL_EXIT=1
 fi
+fi
 
 # ============================================================
-# STEP 4: Homebrew update
+# STEP 3: Homebrew update
 # ============================================================
-ui_master_progress 4 7
+ui_master_progress 3 6
 if [ "${MAC_UPDATE_SKIP_BREW:-0}" = "1" ]; then
-    print_info "Skipped step 4 (--skip-brew)"
+    print_info "Skipped step 3 (--skip-brew)"
     RESULT_BREW="$L_ALL_RESULT_SKIPPED"
 else
-ui_step_header 4 6 "$L_SCRIPT_TITLE_BREW"
-
-# Snapshot brew before update
-if command -v brew &> /dev/null; then
-    print_info "$L_SNAPSHOT_BEFORE"
-    brew list --formula --versions 2>/dev/null > "$SESSION_DIR/brew_formulae_before.txt" || true
-    brew list --cask --versions 2>/dev/null > "$SESSION_DIR/brew_casks_before.txt" || true
-fi
+ui_step_header 3 6 "$L_SCRIPT_TITLE_BREW"
 
 if mac_update_dry_run_msg "update_brew.sh"; then
     RESULT_BREW="[DRY-RUN] skipped"
@@ -803,28 +981,17 @@ else
     RESULT_BREW="$L_STATUS_ERROR missing file"
     OVERALL_EXIT=1
 fi
-
-# Snapshot brew after update
-if command -v brew &> /dev/null; then
-    print_info "$L_SNAPSHOT_AFTER"
-    brew list --formula --versions 2>/dev/null > "$SESSION_DIR/brew_formulae_after.txt" || true
-    brew list --cask --versions 2>/dev/null > "$SESSION_DIR/brew_casks_after.txt" || true
-fi
 fi
 
 # ============================================================
-# STEP 5: Internet-downloaded apps update
+# STEP 4: Internet-downloaded apps update
 # ============================================================
-ui_master_progress 5 7
+ui_master_progress 4 6
 if [ "${MAC_UPDATE_SKIP_INTERNET:-0}" = "1" ]; then
-    print_info "Skipped step 5 (--skip-internet)"
+    print_info "Skipped step 4 (--skip-internet)"
     RESULT_INTERNET="$L_ALL_RESULT_SKIPPED"
 else
-ui_step_header 5 6 "$L_SCRIPT_TITLE_INTERNET"
-
-# Snapshot before update
-print_info "$L_SNAPSHOT_INTERNET_BEFORE"
-internet_capture_versions "$SESSION_DIR/internet_before.txt"
+ui_step_header 4 6 "$L_SCRIPT_TITLE_INTERNET"
 
 if mac_update_dry_run_msg "update_internet_apps.sh"; then
     RESULT_INTERNET="[DRY-RUN] skipped"
@@ -841,32 +1008,27 @@ else
     RESULT_INTERNET="$L_STATUS_ERROR missing file"
     OVERALL_EXIT=1
 fi
-
-# Snapshot after update — child owns after-snapshot (includes 15s wait for plist)
-if [ ! -f "$SESSION_DIR/internet_after.txt" ]; then
-    print_info "$L_SNAPSHOT_INTERNET_AFTER"
-    sleep 15
-    internet_capture_versions "$SESSION_DIR/internet_after.txt"
-fi
 fi
 
 # ============================================================
-# STEP 6: Update APPLICATIONS.md and UPDATES.md
+# STEP 5: Update APPLICATIONS.md and UPDATES.md
 # ============================================================
-ui_master_progress 6 7
+ui_master_progress 5 6
 if [ "${MAC_UPDATE_SKIP_POSTUPDATE:-0}" = "1" ]; then
-    print_info "Skipped step 6 (--skip-postupdate)"
+    print_info "Skipped step 5 (--skip-postupdate)"
     RESULT_MD="$L_ALL_RESULT_SKIPPED"
-elif mac_update_dry_run_msg "postupdate.py (APPLICATIONS.md / UPDATES.md)"; then
+else
+ui_step_header 5 6 "$L_ALL_STEP5_DESC"
+if mac_update_dry_run_msg "postupdate.py (APPLICATIONS.md / UPDATES.md)"; then
     RESULT_MD="[DRY-RUN] skipped"
 else
-ui_step_header 6 6 "$L_ALL_STEP5_DESC"
 
 # Write the post-update Python script
 cat > "$SESSION_DIR/postupdate.py" << 'PYEOF'
 import os
 import re
 import sys
+import tempfile
 from datetime import datetime
 
 script_dir  = sys.argv[1]
@@ -879,6 +1041,28 @@ result_brew      = sys.argv[7]
 
 programy_md_path    = os.path.join(script_dir, 'APPLICATIONS.md')
 aktualizacje_md_path = os.path.join(script_dir, 'UPDATES.md')
+
+def atomic_write_text(path, text, mode=0o600):
+    directory = os.path.dirname(path) or '.'
+    fd, tmp_path = tempfile.mkstemp(prefix='.mac-update.', dir=directory, text=True)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+        os.chmod(path, mode)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 # ── Helper: read versions file → dict {name: version} ────────
 def read_versions(filepath):
@@ -955,6 +1139,7 @@ def read_internet_versions(filepath):
 
 internet_before = read_internet_versions(os.path.join(session_dir, 'internet_before.txt'))
 internet_after  = read_internet_versions(os.path.join(session_dir, 'internet_after.txt'))
+installed_apps_after = read_internet_versions(os.path.join(session_dir, 'installed_apps_after.txt'))
 
 internet_upgrades = {}
 for name, new_ver in internet_after.items():
@@ -973,7 +1158,7 @@ INTERNET_SNAPSHOT_ALIASES = {
     'Ledger Wallet': ['Ledger Live', 'Ledger Wallet', 'Ledger Live/Wallet'],
     'Docker Desktop': ['Docker Desktop', 'Docker'],
     'OpenCode': ['OpenCode', 'OpenCode Desktop', 'opencode'],
-    'Codex': ['Codex', 'Codex Desktop', 'Codex Desktop (OpenAI)'],
+    'ChatGPT / Codex': ['ChatGPT / Codex', 'ChatGPT', 'Codex', 'Codex Desktop', 'Codex Desktop (OpenAI)'],
     'Comet': ['Comet', 'Comet (Perplexity Browser)'],
 }
 
@@ -1047,6 +1232,9 @@ except FileNotFoundError:
 all_new_versions = {}
 all_new_versions.update(brew_formula_after)
 all_new_versions.update(brew_cask_after)
+# The all-app snapshot also refreshes system and arbitrary GUI bundles during
+# inventory-only runs. Canonical internet snapshots below take precedence.
+all_new_versions.update(installed_apps_after)
 # Add internet app versions (snapshot keys + APPLICATIONS.md aliases)
 all_new_versions.update(expand_internet_versions(internet_after))
 all_new_versions.update(npm_cli_after)
@@ -1070,6 +1258,24 @@ for line in lines:
 
 content = '\n'.join(new_lines)
 
+# GRUPA 1 uses a two-column table, unlike the three-column internet/Homebrew
+# sections. Restrict replacement to that section so App Store IDs in GRUPA 2
+# can never be mistaken for version numbers.
+group1_match = re.search(r'(^## GRUPA 1.*?)(?=^## GRUPA 2)', content, re.DOTALL | re.MULTILINE)
+if group1_match:
+    group1 = group1_match.group(1)
+    refreshed = []
+    for line in group1.split('\n'):
+        match = re.match(r'^(\| )([^|]+?)( \| )([^|]+?)( \|)\s*$', line)
+        if match:
+            name = match.group(2).strip()
+            new_ver = installed_apps_after.get(name)
+            if new_ver not in (None, '', '?') and match.group(4).strip() != new_ver:
+                line = f"{match.group(1)}{name}{match.group(3)}{new_ver}{match.group(5)}"
+                updated_count += 1
+        refreshed.append(line)
+    content = content[:group1_match.start(1)] + '\n'.join(refreshed) + content[group1_match.end(1):]
+
 # Update the dates in APPLICATIONS.md
 today = datetime.now().strftime('%Y-%m-%d')
 content = re.sub(r'(\*\*Data analizy:\*\* )\d{4}-\d{2}-\d{2}', r'\g<1>' + today, content)
@@ -1090,8 +1296,9 @@ try:
         _codename = _codenames.get(_major, '')
         _os_label = f'macOS {_pv}' + (f' {_codename}' if _codename else '')
         content = re.sub(
-            r'(# 📱 ZAINSTALOWANE APLIKACJE — MacBook ' + re.escape(_mac_user) + r' \(macOS )[\d.]+(?: [A-Za-z]+)?\)',
-            r'\g<1>' + _pv + (_codename and f' {_codename}' or '') + ')', content)
+            r'^# 📱 ZAINSTALOWANE APLIKACJE — MacBook .*$',
+            f'# 📱 ZAINSTALOWANE APLIKACJE — MacBook {_mac_user} ({_os_label})',
+            content, count=1, flags=re.MULTILINE)
         content = re.sub(
             r'(\*\*System:\*\* macOS )[\d.]+(?: [A-Za-z]+)? \(Build [A-Z0-9]+\)',
             r'\g<1>' + _os_label + f' (Build {_bv})', content)
@@ -1149,10 +1356,13 @@ if npm_cli_new:
             content = content[:insert_pos] + new_rows + content[insert_pos:]
             print(f"  ✅ Dodano nowych CLI do APPLICATIONS.md (sekcja 4d)")
 
-with open(programy_md_path, 'w') as f:
-    f.write(content)
+atomic_write_text(programy_md_path, content)
 
 print(f"  ✅ APPLICATIONS.md zaktualizowany (zmieniono {updated_count} wersji)")
+
+if os.environ.get('MAC_UPDATE_INVENTORY_ONLY') == '1':
+    print("  ✅ Tryb inwentarza: pominięto wpis do UPDATES.md")
+    sys.exit(0)
 
 # ── Build UPDATES.md history entry ──────────────────────
 print("\n  Aktualizuję historię sesji w UPDATES.md...")
@@ -1231,7 +1441,7 @@ if os.path.exists(removed_apps_file):
     if removed_apps:
         history_lines.append("**🗑️ Aplikacje do usunięcia z listy (odinstalowane):**")
         for app in removed_apps:
-            history_lines.append(f"- {app} *(oznaczone w APPLICATIONS.md — usuń wiersz ręcznie)*")
+            history_lines.append(f"- {app} *(usunięto automatycznie z APPLICATIONS.md)*")
         history_lines.append("")
 
 if total_upgrades == 0 and not formula_new and not cask_new and not npm_cli_new:
@@ -1262,15 +1472,21 @@ ak_content = re.sub(r'(\*\*Data:\*\* )\d{4}-\d{2}-\d{2}', r'\g<1>' + today, ak_c
 ak_content = re.sub(r'(\*Zaktualizowano: )\d{4}-\d{2}-\d{2}', r'\g<1>' + today, ak_content)
 # Auto-update macOS version strings in UPDATES.md
 if '_pv' in vars() and _pv:
+    try:
+        _major_updates = int(_pv.split('.', 1)[0])
+    except (ValueError, IndexError):
+        _major_updates = 0
+    _updates_codename = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe'}.get(_major_updates, '')
     ak_content = re.sub(
-        r'(\*\*System:\*\* macOS )[\d.]+( Tahoe)',
-        lambda m: m.group(1) + _pv + m.group(2), ak_content)
+        r'(\*\*System:\*\* macOS )[\d.]+(?: Ventura| Sonoma| Sequoia| Tahoe)?',
+        lambda m: m.group(1) + _pv + (f' {_updates_codename}' if _updates_codename else ''),
+        ak_content)
     ak_content = re.sub(
-        r'(\| macOS )[\d.]+( Tahoe arm64)',
-        lambda m: m.group(1) + _pv + m.group(2), ak_content)
+        r'(\| macOS )[\d.]+(?: Ventura| Sonoma| Sequoia| Tahoe)?( arm64)',
+        lambda m: m.group(1) + _pv + (f' {_updates_codename}' if _updates_codename else '') + m.group(2),
+        ak_content)
 
-with open(aktualizacje_md_path, 'w') as f:
-    f.write(ak_content)
+atomic_write_text(aktualizacje_md_path, ak_content)
 
 print(f"  ✅ UPDATES.md zaktualizowany")
 print(f"")
@@ -1298,8 +1514,65 @@ else
     OVERALL_EXIT=1
 fi
 fi
+fi
 
-ui_master_progress 7 7
+# ============================================================
+# FINAL MUTATING STEP: macOS system update
+# ============================================================
+if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
+    ui_master_progress 6 6
+    ui_step_header 6 6 "$L_SYSTEM_UPDATE_TITLE"
+    if mac_update_dry_run_msg "update_system.sh (final step)"; then
+        RESULT_SYSTEM="[DRY-RUN] skipped"
+    elif [ "$OVERALL_EXIT" -ne 0 ]; then
+        RESULT_SYSTEM="⏭️ skipped because an earlier update step failed"
+        print_warn "Skipping the final macOS update because an earlier step failed; fix it and rerun."
+    elif mac_update_run_child "update_system.sh" "update_system.sh (final step)"; then
+        RESULT_SYSTEM="$L_STATUS_OK completed"
+    else
+        RESULT_SYSTEM="$L_STATUS_ERROR"
+        OVERALL_EXIT=1
+    fi
+
+    # Postupdate runs before the reboot-capable system step. If softwareupdate
+    # returns normally, replace the pending marker in the newest history entry.
+    if [ -f "$SCRIPT_DIR/UPDATES.md" ] && [ "$RESULT_MD" = "$L_STATUS_OK completed" ]; then
+        if ! python3 - "$SCRIPT_DIR/UPDATES.md" "$SYSTEM_HISTORY_PENDING" "$RESULT_SYSTEM" <<'PYEOF'
+import os
+import sys
+import tempfile
+
+path, pending, result = sys.argv[1:4]
+with open(path, encoding='utf-8') as handle:
+    content = handle.read()
+old = f"| 🍎 System macOS | {pending} |"
+new = f"| 🍎 System macOS | {result} |"
+if old in content:
+    content = content.replace(old, new, 1)
+    fd, temp_path = tempfile.mkstemp(prefix='.mac-update.', dir=os.path.dirname(path), text=True)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        os.chmod(path, 0o600)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+PYEOF
+        then
+            print_error "Could not finalize the macOS result in UPDATES.md."
+            OVERALL_EXIT=1
+        fi
+    fi
+fi
+
+ui_master_progress 6 6
 
 # ============================================================
 # Final summary
@@ -1317,12 +1590,12 @@ _summary_msg="$L_UPDATE_ALL_SUCCESS"
 ui_print_box "$_summary_msg"
 echo ""
 echo -e "  0. Scan new apps:           $RESULT_SCAN"
-echo -e "  1. macOS System:            $RESULT_SYSTEM"
-echo -e "  2. App Store:               $RESULT_APPSTORE"
-echo -e "  3. Native CLI + npm:        $RESULT_NPMCLI"
-echo -e "  4. Homebrew:                $RESULT_BREW"
-echo -e "  5. Internet apps:           $RESULT_INTERNET"
-echo -e "  6. $L_ALL_UPDATE_APPS_LABEL $RESULT_MD"
+echo -e "  1. App Store:               $RESULT_APPSTORE"
+echo -e "  2. Native CLI + npm:        $RESULT_NPMCLI"
+echo -e "  3. Homebrew:                $RESULT_BREW"
+echo -e "  4. Internet apps:           $RESULT_INTERNET"
+echo -e "  5. $L_ALL_UPDATE_APPS_LABEL $RESULT_MD"
+echo -e "  6. macOS System:            $RESULT_SYSTEM"
 echo ""
 echo -e "  Duration: ${MINUTES} min ${DURATION_SECS} sek"
 echo ""
@@ -1331,8 +1604,16 @@ if [ "$OVERALL_EXIT" -eq 0 ]; then
 else
     print_error "One or more update steps failed. Review the step summary above and session logs before rerunning."
 fi
-print_info "$L_ALL_FILES_UPDATED_MSG"
-print_info "$L_ALL_RESTART_CHECK_MSG"
+if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+    print_info "DRY-RUN: no applications, inventory, or history files were changed."
+elif [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
+    print_info "Inventory refreshed: APPLICATIONS.md (UPDATES.md history intentionally unchanged)."
+else
+    print_info "$L_ALL_FILES_UPDATED_MSG"
+fi
+if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" != "1" ]; then
+    print_info "$L_ALL_RESTART_CHECK_MSG"
+fi
 echo ""
 
 export MAC_UPDATE_OVERALL_EXIT="$OVERALL_EXIT"
@@ -1348,12 +1629,12 @@ export MAC_UPDATE_LOG_FILE="$LOG_FILE"
 
 _ui_summary=$(cat <<EOS
 0. Scan:      $RESULT_SCAN
-1. System:    $RESULT_SYSTEM
-2. App Store: $RESULT_APPSTORE
-3. npm/CLI:   $RESULT_NPMCLI
-4. Homebrew:  $RESULT_BREW
-5. Internet:  $RESULT_INTERNET
-6. Docs:      $RESULT_MD
+1. App Store: $RESULT_APPSTORE
+2. npm/CLI:   $RESULT_NPMCLI
+3. Homebrew:  $RESULT_BREW
+4. Internet:  $RESULT_INTERNET
+5. Inventory: $RESULT_MD
+6. System:    $RESULT_SYSTEM
 Duration:     ${MINUTES}m ${DURATION_SECS}s
 EOS
 )

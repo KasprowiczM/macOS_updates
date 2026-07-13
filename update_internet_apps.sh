@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2329  # Helpers are invoked by the sourced dispatch module and traps.
 # ============================================================
 # SCRIPT 5: Update internet-downloaded applications
 # ============================================================
@@ -14,7 +15,8 @@ set -o pipefail
 #   VPN/BEZP.:        ProtonVPN, KeePassXC
 #   POCZTA/KOMUN.:    Proton Mail, Zoom
 #   CHMURA:           Google Drive, MEGAsync, Proton Drive
-#   MICROSOFT 365:    Word, Excel, PowerPoint, Outlook, OneNote, Teams (via msupdate)
+#   MICROSOFT 365:    Word, Excel, PowerPoint, Outlook, OneNote (via msupdate)
+#   TEAMS:            built-in updater + observed MAU fallback (TEAMS21)
 #   DEV TOOLS:        VS Code, CodeEdit, Docker Desktop, Warp, Cursor, Ascendo
 #   PRODUKTYWNOŚĆ:    AppCleaner, Obsidian
 #   MULTIMEDIA:       Spotify
@@ -54,7 +56,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/internet_i18n.sh"
 . "$SCRIPT_DIR/lib/platform.sh"
 
-mac_update_require_apple_silicon || exit 1
+mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/lib/ui.sh"
 
 # ── i18n: load language strings ──────────────────────────────
@@ -76,9 +78,36 @@ if [ -z "$INTERNET_TEMP_ROOT" ]; then
     INTERNET_TEMP_OWNED=1
 fi
 chmod 700 "$INTERNET_TEMP_ROOT" 2>/dev/null || true
+INTERNET_MOUNT_TRACK_FILE="$(mktemp "$INTERNET_TEMP_ROOT/mounted_dmgs.XXXXXX")" || {
+    print_error "Cannot create DMG mount tracking file in $INTERNET_TEMP_ROOT"
+    if [ "$INTERNET_TEMP_OWNED" -eq 1 ]; then
+        rm -rf "$INTERNET_TEMP_ROOT" 2>/dev/null || true
+    fi
+    exit 1
+}
 
 cleanup_internet_temp() {
-    if [ "$INTERNET_TEMP_OWNED" -eq 1 ]; then
+    local mount_cleanup_failed=0
+    if [ -f "${INTERNET_MOUNT_TRACK_FILE:-}" ]; then
+        while IFS= read -r mount_point; do
+            [ -n "$mount_point" ] || continue
+            case "$mount_point" in
+                "$INTERNET_TEMP_ROOT"/dmg_mount.*)
+                    if hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 \
+                        || ! mount | grep -Fq " on $mount_point ("; then
+                        rm -rf "$mount_point" 2>/dev/null || true
+                    else
+                        mount_cleanup_failed=1
+                        internet_diag_log "WARN: mount still active after cleanup: $mount_point"
+                    fi
+                    ;;
+            esac
+        done < "$INTERNET_MOUNT_TRACK_FILE"
+        if [ "$mount_cleanup_failed" -eq 0 ]; then
+            rm -f "$INTERNET_MOUNT_TRACK_FILE" 2>/dev/null || true
+        fi
+    fi
+    if [ "$INTERNET_TEMP_OWNED" -eq 1 ] && [ "$mount_cleanup_failed" -eq 0 ]; then
         case "$INTERNET_TEMP_ROOT" in
             "${TMPDIR:-/tmp}"/mac_update_internet.*|/tmp/mac_update_internet.*)
                 rm -rf "$INTERNET_TEMP_ROOT" 2>/dev/null || true
@@ -97,9 +126,93 @@ verify_dmg() {
     hdiutil verify "$dmg_path" -quiet >/dev/null 2>&1
 }
 
+# Mount a verified DMG read-only at a unique path controlled by this session.
+# Handlers can capture the printed path and pass it to detach_verified_dmg.
+mount_verified_dmg() {
+    local dmg_path="$1"
+    local mount_point
+
+    if ! verify_dmg "$dmg_path"; then
+        internet_diag_log "ERROR: hdiutil verify failed for $dmg_path"
+        return 1
+    fi
+    mount_point="$(mktemp -d "$INTERNET_TEMP_ROOT/dmg_mount.XXXXXX")" || return 1
+    if ! hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$mount_point" -quiet >/dev/null 2>&1; then
+        internet_diag_log "ERROR: hdiutil attach failed for $dmg_path at $mount_point"
+        rm -rf "$mount_point" 2>/dev/null || true
+        return 1
+    fi
+    if ! printf '%s\n' "$mount_point" >> "$INTERNET_MOUNT_TRACK_FILE"; then
+        hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true
+        rm -rf "$mount_point" 2>/dev/null || true
+        return 1
+    fi
+    printf '%s\n' "$mount_point"
+}
+
+detach_verified_dmg() {
+    local mount_point="$1"
+    [ -n "$mount_point" ] || return 1
+    case "$mount_point" in
+        "$INTERNET_TEMP_ROOT"/dmg_mount.*) ;;
+        *)
+            internet_diag_log "ERROR: refused to detach unmanaged mount point: $mount_point"
+            return 1
+            ;;
+    esac
+    if ! hdiutil detach "$mount_point" -quiet >/dev/null 2>&1; then
+        internet_diag_log "WARN: hdiutil detach failed for $mount_point"
+        return 1
+    fi
+    rm -rf "$mount_point" 2>/dev/null || true
+    return 0
+}
+
 verify_app_signature() {
     local app_path="$1"
     spctl --assess --type execute "$app_path" >/dev/null 2>&1
+}
+
+app_bundle_identifier() {
+    local app_path="$1"
+    local identifier
+    identifier="$(codesign -dv --verbose=4 "$app_path" 2>&1 \
+        | sed -n 's/^Identifier=//p' | head -1)"
+    if [ -z "$identifier" ]; then
+        identifier="$(defaults read "$app_path/Contents/Info" CFBundleIdentifier 2>/dev/null || true)"
+    fi
+    printf '%s\n' "$identifier"
+}
+
+app_team_identifier() {
+    local app_path="$1"
+    codesign -dv --verbose=4 "$app_path" 2>&1 \
+        | sed -n 's/^TeamIdentifier=//p' | head -1
+}
+
+verify_replacement_identity() {
+    local new_app="$1"
+    local installed_app="$2"
+    local app_label="$3"
+    local new_bundle old_bundle new_team old_team
+
+    new_bundle="$(app_bundle_identifier "$new_app")"
+    old_bundle="$(app_bundle_identifier "$installed_app")"
+    new_team="$(app_team_identifier "$new_app")"
+    old_team="$(app_team_identifier "$installed_app")"
+
+    if [ -z "$new_bundle" ] || [ -z "$old_bundle" ] \
+        || [ -z "$new_team" ] || [ -z "$old_team" ]; then
+        print_warn "Cannot verify bundle/team identity for $app_label; refusing replacement"
+        internet_diag_log "ERROR: missing signing identity for $app_label (old bundle=$old_bundle team=$old_team; new bundle=$new_bundle team=$new_team)"
+        return 1
+    fi
+    if [ "$new_bundle" != "$old_bundle" ] || [ "$new_team" != "$old_team" ]; then
+        print_warn "Signing identity mismatch for $app_label; refusing replacement"
+        internet_diag_log "ERROR: identity mismatch for $app_label (old bundle=$old_bundle team=$old_team; new bundle=$new_bundle team=$new_team)"
+        return 1
+    fi
+    return 0
 }
 
 copy_verified_app() {
@@ -109,50 +222,117 @@ copy_verified_app() {
     fi
     local app_path="$1"
     local app_label="$2"
+    local dest="/Applications/$app_label"
+    local app_name
+    local staging_root staging backup_root backup rejected
+    local had_existing=0
+
     if ! verify_app_signature "$app_path"; then
         print_warn "$(internet_msg "$L_INTERNET_GATEKEEPER_REJECTED" "$app_label")"
         return 1
     fi
-    local dest="/Applications/$app_label"
-    # Quit the running app before replacing its bundle (ignore errors if not running)
-    local app_name
-    app_name="$(echo "$app_label" | sed 's/\.app$//')"
+
+    # mktemp prevents collisions with concurrent/stale runs. The staging and
+    # backup roots live beside the destination so every mv stays on one volume.
+    staging_root="$(mktemp -d "/Applications/.macupd_staging.XXXXXX")" || return 1
+    backup_root="$(mktemp -d "/Applications/.macupd_backup.XXXXXX")" || {
+        rm -rf "$staging_root" 2>/dev/null || true
+        return 1
+    }
+    staging="$staging_root/$app_label"
+    backup="$backup_root/$app_label"
+    if ! ditto "$app_path" "$staging" 2>/dev/null; then
+        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
+        return 1
+    fi
+    if ! verify_app_signature "$staging"; then
+        print_warn "Staged signature check failed for $app_label"
+        internet_diag_log "ERROR: staged spctl failed for $staging"
+        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
+        return 1
+    fi
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+        if ! verify_replacement_identity "$staging" "$dest" "$app_label"; then
+            rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
+            return 1
+        fi
+        had_existing=1
+    fi
+
+    # Quit the running app before replacing its bundle (ignore errors if not running).
+    app_name="${app_label%.app}"
     osascript -e "tell application \"$app_name\" to quit" 2>/dev/null || true
     sleep 1
-    # Copy to a staging path on the same volume FIRST, so a failed or partial
-    # copy never destroys the currently-installed app. Swap into place only
-    # after a complete copy (mv = atomic rename on the same volume).
-    # ditto preserves code signatures, xattrs, and resource forks — cp -R does not.
-    local staging="${dest}.macupd_new.$$"
-    rm -rf "$staging" 2>/dev/null || true
-    if ! ditto "$app_path" "$staging" 2>/dev/null; then
-        rm -rf "$staging" 2>/dev/null || true
+
+    if [ "$had_existing" -eq 1 ] && ! mv "$dest" "$backup" 2>/dev/null; then
+        internet_diag_log "ERROR: could not move existing $dest to rollback backup $backup"
+        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
         return 1
-    fi
-    if [ -d "$dest" ]; then
-        rm -rf "$dest" || true
     fi
     if ! mv "$staging" "$dest" 2>/dev/null; then
-        rm -rf "$staging" 2>/dev/null || true
+        if [ "$had_existing" -eq 1 ] && ! mv "$backup" "$dest" 2>/dev/null; then
+            internet_diag_log "CRITICAL: install failed and rollback is at $backup"
+            rm -rf "$staging_root" 2>/dev/null || true
+            return 1
+        fi
+        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
         return 1
     fi
-    # Post-install signature verification (log failures but don't block)
+
+    # A post-swap Gatekeeper failure restores the known previous bundle.
     if ! verify_app_signature "$dest"; then
         print_warn "Post-install signature check failed for $app_label"
-        internet_diag_log "WARN: post-install spctl failed for $dest"
+        internet_diag_log "ERROR: post-install spctl failed for $dest; rolling back"
+        rejected="$staging_root/$app_label.rejected"
+        if ! mv "$dest" "$rejected" 2>/dev/null; then
+            internet_diag_log "WARN: could not preserve rejected app; removing it before rollback"
+            if ! rm -rf "$dest" 2>/dev/null; then
+                internet_diag_log "CRITICAL: could not remove rejected app; rollback remains at $backup"
+                return 1
+            fi
+        fi
+        if [ "$had_existing" -eq 1 ] && ! mv "$backup" "$dest" 2>/dev/null; then
+            internet_diag_log "CRITICAL: rejected app is at $rejected; rollback remains at $backup"
+            return 1
+        fi
+        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
+        return 1
     fi
+
+    rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
     return 0
 }
 
 run_with_timeout() {
     local seconds="$1"
+    local command_pid command_exit elapsed grace
     shift
     if command -v timeout >/dev/null 2>&1; then
         timeout "$seconds" "$@"
     elif command -v gtimeout >/dev/null 2>&1; then
         gtimeout "$seconds" "$@"
     else
-        "$@"
+        "$@" &
+        command_pid=$!
+        elapsed=0
+        while kill -0 "$command_pid" 2>/dev/null; do
+            if [ "$elapsed" -ge "$seconds" ]; then
+                kill -TERM "$command_pid" 2>/dev/null || true
+                grace=0
+                while kill -0 "$command_pid" 2>/dev/null && [ "$grace" -lt 5 ]; do
+                    sleep 1
+                    grace=$((grace + 1))
+                done
+                kill -KILL "$command_pid" 2>/dev/null || true
+                wait "$command_pid" 2>/dev/null || true
+                return 124
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+        wait "$command_pid"
+        command_exit=$?
+        return "$command_exit"
     fi
 }
 
@@ -249,7 +429,6 @@ STATUS_PERPLEXITY="$L_INTERNET_STATUS_SKIPPED"
 STATUS_ANTIGRAVITY="$L_INTERNET_STATUS_SKIPPED"
 STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_SKIPPED"
 STATUS_LMSTUDIO="$L_INTERNET_STATUS_SKIPPED"
-STATUS_CODEX="$L_INTERNET_STATUS_SKIPPED"
 STATUS_PROTONVPN="$L_INTERNET_STATUS_SKIPPED"
 STATUS_KEEPASSXC="$L_INTERNET_STATUS_SKIPPED"
 STATUS_PROTONMAIL="$L_INTERNET_STATUS_SKIPPED"
@@ -258,6 +437,7 @@ STATUS_ZOOM="$L_INTERNET_STATUS_SKIPPED"
 STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_SKIPPED"
 STATUS_MEGASYNC="$L_INTERNET_STATUS_SKIPPED"
 STATUS_MICROSOFT="$L_INTERNET_STATUS_SKIPPED"
+STATUS_TEAMS="$L_INTERNET_STATUS_SKIPPED"
 STATUS_VSCODE="$L_INTERNET_STATUS_SKIPPED"
 STATUS_CODEEDIT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_DOCKER="$L_INTERNET_STATUS_SKIPPED"
@@ -273,11 +453,11 @@ STATUS_TREZOR="$L_INTERNET_STATUS_SKIPPED"
 STATUS_IPMIVIEW="$L_INTERNET_STATUS_SKIPPED"
 STATUS_RDMANAGER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_OPENCODE="$L_INTERNET_STATUS_SKIPPED"
-STATUS_INKSCAPE="$L_INTERNET_STATUS_SKIPPED"
+STATUS_INKSCAPE="→ managed by Homebrew (update_brew.sh)"
 STATUS_DJI="$L_INTERNET_STATUS_SKIPPED"
-STATUS_UNIFI="$L_INTERNET_STATUS_SKIPPED"
-STATUS_WIFIMAN="$L_INTERNET_STATUS_SKIPPED"
-STATUS_PICSART="$L_INTERNET_STATUS_SKIPPED"
+STATUS_UNIFI="→ managed by App Store (update_appstore.sh)"
+STATUS_WIFIMAN="→ managed by App Store (update_appstore.sh)"
+STATUS_PICSART="→ managed by App Store (update_appstore.sh)"
 
 # ============================================================
 # App handlers — config/internet_dispatch_order.txt
@@ -306,7 +486,7 @@ printf "  %-32s %s\n" "ChatGPT Atlas:"            "$STATUS_ATLAS"
 echo ""
 
 echo -e "  ${BOLD}$L_INTERNET_SECTION_AI${NC}"
-printf "  %-32s %s\n" "ChatGPT:"                  "$STATUS_CHATGPT"
+printf "  %-32s %s\n" "ChatGPT / Codex:"          "$STATUS_CHATGPT"
 printf "  %-32s %s\n" "Claude Desktop:"           "$STATUS_CLAUDE_APP"
 printf "  %-32s %s\n" "Gemini Desktop:"           "$STATUS_GEMINI"
 printf "  %-32s %s\n" "Comet (Perplexity Browser):" "$STATUS_COMET"
@@ -314,7 +494,6 @@ printf "  %-32s %s\n" "Perplexity Desktop:"       "$STATUS_PERPLEXITY"
 printf "  %-32s %s\n" "Antigravity:"              "$STATUS_ANTIGRAVITY"
 printf "  %-32s %s\n" "Antigravity IDE:"          "$STATUS_ANTIGRAVITY_IDE"
 printf "  %-32s %s\n" "LM Studio:"                "$STATUS_LMSTUDIO"
-printf "  %-32s %s\n" "Codex Desktop:"            "$STATUS_CODEX"
 printf "  %-32s %s\n" "OpenCode Desktop:"         "$STATUS_OPENCODE"
 echo ""
 
@@ -335,7 +514,8 @@ printf "  %-32s %s\n" "Proton Drive:"             "$STATUS_PROTONDRIVE"
 echo ""
 
 echo -e "  ${BOLD}$L_INTERNET_SECTION_MICROSOFT${NC}"
-printf "  %-32s %s\n" "Microsoft 365 (msupdate):" "$STATUS_MICROSOFT"
+printf "  %-32s %s\n" "Microsoft AutoUpdate:" "$STATUS_MICROSOFT"
+printf "  %-32s %s\n" "Microsoft Teams (hybrid):" "$STATUS_TEAMS"
 echo ""
 
 echo -e "  ${BOLD}$L_INTERNET_SECTION_DEV${NC}"
@@ -382,9 +562,9 @@ print_info "$L_INTERNET_INSTRUCTIONS"
 for status in \
     "$STATUS_CHROME" "$STATUS_FIREFOX" "$STATUS_BRAVE" "$STATUS_ATLAS" \
     "$STATUS_CHATGPT" "$STATUS_CLAUDE_APP" "$STATUS_GEMINI" "$STATUS_COMET" "$STATUS_PERPLEXITY" \
-    "$STATUS_ANTIGRAVITY" "$STATUS_ANTIGRAVITY_IDE" "$STATUS_LMSTUDIO" "$STATUS_CODEX" "$STATUS_OPENCODE" \
+    "$STATUS_ANTIGRAVITY" "$STATUS_ANTIGRAVITY_IDE" "$STATUS_LMSTUDIO" "$STATUS_OPENCODE" \
     "$STATUS_PROTONVPN" "$STATUS_KEEPASSXC" "$STATUS_PROTONMAIL" "$STATUS_ZOOM" \
-    "$STATUS_GOOGLEDRIVE" "$STATUS_MEGASYNC" "$STATUS_PROTONDRIVE" "$STATUS_MICROSOFT" \
+    "$STATUS_GOOGLEDRIVE" "$STATUS_MEGASYNC" "$STATUS_PROTONDRIVE" "$STATUS_MICROSOFT" "$STATUS_TEAMS" \
     "$STATUS_VSCODE" "$STATUS_CODEEDIT" "$STATUS_DOCKER" "$STATUS_WARP" "$STATUS_CURSOR" "$STATUS_ASCENDO" \
     "$STATUS_APPCLEANER" "$STATUS_OBSIDIAN" "$STATUS_SPOTIFY" "$STATUS_CAPCUT" \
     "$STATUS_LEDGER" "$STATUS_TREZOR" \

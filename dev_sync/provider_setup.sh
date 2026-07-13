@@ -5,6 +5,7 @@
 #
 
 set -e
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/.dev_sync_config.json"
@@ -98,6 +99,9 @@ create_config_json() {
     local rclone_remote="$3"
     local rclone_remote_path="$4"
     local project_folder="$5"
+    local config_dir
+    local config_tmp
+    local backup_tmp=""
     # Sanitize user-provided values for safe JSON embedding (strip backslashes and double-quotes)
     provider="$(echo "$provider" | tr -d '\\"')"
     provider_path="$(echo "$provider_path" | tr -d '\\"')"
@@ -105,7 +109,10 @@ create_config_json() {
     rclone_remote_path="$(echo "$rclone_remote_path" | tr -d '\\"')"
     project_folder="$(echo "$project_folder" | tr -d '\\"')"
 
-    cat > "$CONFIG_FILE" <<EOF
+    config_dir="$(dirname "$CONFIG_FILE")"
+    config_tmp="$(mktemp "$config_dir/.dev_sync_config.json.tmp.XXXXXX")" || return 1
+
+    if ! cat > "$config_tmp" <<EOF
 {
   "project_name": "$project_folder",
   "provider": "$provider",
@@ -182,6 +189,36 @@ create_config_json() {
   ]
 }
 EOF
+    then
+        rm -f "$config_tmp"
+        return 1
+    fi
+
+    if ! chmod 600 "$config_tmp"; then
+        rm -f "$config_tmp"
+        return 1
+    fi
+
+    if [ -e "$CONFIG_FILE" ]; then
+        backup_tmp="$(mktemp "$config_dir/.dev_sync_config.json.bak.tmp.XXXXXX")" || {
+            rm -f "$config_tmp"
+            return 1
+        }
+        if ! cp -p "$CONFIG_FILE" "$backup_tmp" || ! chmod 600 "$backup_tmp"; then
+            rm -f "$config_tmp" "$backup_tmp"
+            return 1
+        fi
+        if ! mv -f "$backup_tmp" "${CONFIG_FILE}.bak"; then
+            rm -f "$config_tmp" "$backup_tmp"
+            return 1
+        fi
+    fi
+
+    if ! mv -f "$config_tmp" "$CONFIG_FILE"; then
+        rm -f "$config_tmp"
+        return 1
+    fi
+    chmod 600 "$CONFIG_FILE"
 }
 
 main() {
@@ -202,8 +239,7 @@ main() {
     provider_count=1
 
     if [ -n "$icloud_path" ]; then
-        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} iCloud Drive       ${COLOR_GREEN}✓${COLOR_RESET} found at:"
-        echo "     $icloud_path"
+        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} iCloud Drive       ${COLOR_GREEN}✓${COLOR_RESET} found"
         provider_count=$((provider_count + 1))
     else
         echo "  ${COLOR_RED}1)${COLOR_RESET} iCloud Drive       ${COLOR_RED}✗${COLOR_RESET} not found"
@@ -211,32 +247,28 @@ main() {
     fi
 
     if [ -n "$gdrive_path" ]; then
-        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} Google Drive      ${COLOR_GREEN}✓${COLOR_RESET} found at:"
-        echo "     $gdrive_path"
+        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} Google Drive      ${COLOR_GREEN}✓${COLOR_RESET} found"
     else
         echo "  ${COLOR_RED}${provider_count})${COLOR_RESET} Google Drive      ${COLOR_RED}✗${COLOR_RESET} not found"
     fi
     provider_count=$((provider_count + 1))
 
     if [ -n "$onedrive_path" ]; then
-        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} OneDrive          ${COLOR_GREEN}✓${COLOR_RESET} found at:"
-        echo "     $onedrive_path"
+        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} OneDrive          ${COLOR_GREEN}✓${COLOR_RESET} found"
     else
         echo "  ${COLOR_RED}${provider_count})${COLOR_RESET} OneDrive          ${COLOR_RED}✗${COLOR_RESET} not found"
     fi
     provider_count=$((provider_count + 1))
 
     if [ -n "$proton_path" ]; then
-        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} Proton Drive      ${COLOR_GREEN}✓${COLOR_RESET} found at:"
-        echo "     $proton_path"
+        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} Proton Drive      ${COLOR_GREEN}✓${COLOR_RESET} found"
     else
         echo "  ${COLOR_RED}${provider_count})${COLOR_RESET} Proton Drive      ${COLOR_RED}✗${COLOR_RESET} not found"
     fi
     provider_count=$((provider_count + 1))
 
     if [ -n "$mega_path" ]; then
-        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} Mega.nz           ${COLOR_GREEN}✓${COLOR_RESET} found at:"
-        echo "     $mega_path"
+        echo "  ${COLOR_GREEN}${provider_count})${COLOR_RESET} Mega.nz           ${COLOR_GREEN}✓${COLOR_RESET} found"
     else
         echo "  ${COLOR_RED}${provider_count})${COLOR_RESET} Mega.nz           ${COLOR_RED}✗${COLOR_RESET} not found"
     fi
@@ -363,7 +395,7 @@ main() {
             print_error "Path does not exist: $selected_path"
             return 1
         fi
-        print_success "Path confirmed: $selected_path"
+        print_success "Path confirmed (stored privately)."
     fi
 
     echo ""
@@ -376,13 +408,13 @@ main() {
     print_header "Configuration Summary"
     echo "  Provider:           $selected_provider"
     if [ -n "$selected_path" ]; then
-        echo "  Provider path:      $selected_path"
+        echo "  Provider path:      [stored privately]"
     fi
     if [ -n "$selected_rclone" ]; then
-        echo "  Rclone remote:      $selected_rclone"
-        echo "  Rclone path:        $selected_rclone_path"
+        echo "  Rclone remote:      [stored privately]"
+        echo "  Rclone path:        [stored privately]"
     fi
-    echo "  Project folder:     $project_folder"
+    echo "  Project folder:     [stored privately]"
     echo ""
 
     read -p "Save configuration? [y/n]: " confirm
@@ -395,7 +427,7 @@ main() {
     print_success "Configuration saved to: $CONFIG_FILE"
     echo ""
     echo "Next steps:"
-    echo "  1. Review the configuration: cat $CONFIG_FILE"
+    echo "  1. Review the private configuration in your editor (do not paste it into logs)."
     echo "  2. Test export: bash dev-sync-export.sh --dry-run"
     echo "  3. If config is correct, run: bash dev-sync-export.sh"
 }

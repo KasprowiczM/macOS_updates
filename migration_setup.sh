@@ -13,7 +13,7 @@ set -o pipefail
 #   2.  Wykrywa stary username z plików .md i naprawia ścieżki
 #   3.  Aktualizuje wersję macOS i arch w CLAUDE.md, AGENTS.md, GEMINI.md
 #   4.  Sprawdza i instaluje Xcode Command Line Tools
-#   5.  Sprawdza i instaluje Homebrew (z właściwą ścieżką arm64/Intel)
+#   5.  Sprawdza i instaluje Homebrew w /opt/homebrew (arm64)
 #   6.  Sprawdza i instaluje mas (App Store CLI)
 #   7.  Sprawdza dostępność Python 3
 #   8.  Sprawdza inne narzędzia: curl, git, jq
@@ -84,7 +84,7 @@ add_warning() { WARNINGS="${WARNINGS}${1}\n"; }
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 . "$SCRIPT_DIR/lib/platform.sh"
-mac_update_require_apple_silicon || exit 1
+mac_update_require_supported_platform || exit 1
 
 # ── i18n: load language strings ──────────────────────────────
 . "$SCRIPT_DIR/i18n/loader.sh"
@@ -140,10 +140,19 @@ if [ ! -f "$SCRIPT_DIR/.dev_sync_config.json" ]; then
     print_info "$L_CLOUD_BACKUP_HINT"
     echo ""
     if [ -f "$SCRIPT_DIR/dev_sync/provider_setup.sh" ]; then
-        bash "$SCRIPT_DIR/dev_sync/provider_setup.sh" "$SCRIPT_DIR"
+        if ! bash "$SCRIPT_DIR/dev_sync/provider_setup.sh" "$SCRIPT_DIR"; then
+            print_error "$L_CLOUD_NOT_CONFIGURED"
+            add_action "$L_CLOUD_CONFIGURE_LATER"
+            MIGRATION_EXIT=1
+        elif [ ! -f "$SCRIPT_DIR/.dev_sync_config.json" ]; then
+            print_error "$L_CLOUD_NOT_CONFIGURED"
+            add_action "$L_CLOUD_CONFIGURE_LATER"
+            MIGRATION_EXIT=1
+        fi
     else
         print_warn "$L_CLOUD_PROVIDER_MISSING: $SCRIPT_DIR/dev_sync/"
         print_info "$L_CLOUD_CONFIGURE_LATER"
+        MIGRATION_EXIT=1
     fi
 else
     print_ok "$L_CLOUD_ALREADY_CONFIGURED"
@@ -195,6 +204,24 @@ else
     SHELL_PROFILE="$NEW_HOME/.zshrc"
 fi
 print_info "$L_INFO_SHELL_PROFILE $SHELL_PROFILE"
+
+SHELL_PROFILE_OK=1
+if [ ! -e "$SHELL_PROFILE" ]; then
+    if : > "$SHELL_PROFILE"; then
+        print_fixed "Created shell profile: $SHELL_PROFILE"
+        add_fix "Created shell profile: $SHELL_PROFILE"
+    else
+        print_error "Could not create shell profile: $SHELL_PROFILE"
+        add_action "Create a writable shell profile: $SHELL_PROFILE"
+        SHELL_PROFILE_OK=0
+        MIGRATION_EXIT=1
+    fi
+elif [ ! -f "$SHELL_PROFILE" ]; then
+    print_error "Shell profile is not a regular file: $SHELL_PROFILE"
+    add_action "Replace $SHELL_PROFILE with a writable shell profile file"
+    SHELL_PROFILE_OK=0
+    MIGRATION_EXIT=1
+fi
 
 # Wykryj terminal (dla Accessibility)
 TERM_APP_NAME="Terminal.app"
@@ -418,17 +445,23 @@ if [ $BREW_OK -eq 1 ]; then
     print_ok "$(printf "$L_MSG_BREW_OK" "$BREW_VER")"
     print_ok "$(printf "$L_MSG_BREW_LOC" "$BREW_PATH")"
 
-    if [ -f "$SHELL_PROFILE" ]; then
+    if [ "$SHELL_PROFILE_OK" -eq 1 ]; then
         if grep -q "brew shellenv" "$SHELL_PROFILE" 2>/dev/null; then
             print_ok "$(printf "$L_MSG_BREW_SHELLENV_OK" "$SHELL_PROFILE")"
         else
             print_warn "$(printf "$L_MSG_BREW_SHELLENV_MISSING" "$SHELL_PROFILE")"
             print_step "$(printf "$L_MSG_BREW_SHELLENV_ADD" "$SHELL_PROFILE")"
-            echo "" >> "$SHELL_PROFILE"
-            echo "# Homebrew (added by setup.sh)" >> "$SHELL_PROFILE"
-            echo "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"
-            print_fixed "$(printf "$L_MSG_BREW_SHELLENV_FIXED" "$SHELL_PROFILE")"
-            add_fix "$(printf "$L_MSG_BREW_SHELLENV_FIX" "$SHELL_PROFILE" "$SHELL_PROFILE")"
+            if printf '\n%s\n%s\n' \
+                '# Homebrew (added by migration_setup.sh)' \
+                "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"; then
+                print_fixed "$(printf "$L_MSG_BREW_SHELLENV_FIXED" "$SHELL_PROFILE")"
+                add_fix "$(printf "$L_MSG_BREW_SHELLENV_FIX" "$SHELL_PROFILE" "$SHELL_PROFILE")"
+            else
+                print_error "Could not update shell profile: $SHELL_PROFILE"
+                add_action "Add Homebrew shellenv to writable profile: $SHELL_PROFILE"
+                SHELL_PROFILE_OK=0
+                MIGRATION_EXIT=1
+            fi
         fi
     fi
 else
@@ -450,11 +483,17 @@ else
         if [ $BREW_OK -eq 1 ]; then
             print_ok "$L_MSG_BREW_OK2"
             add_fix "$L_MSG_BREW_FIX"
-            if [ -f "$SHELL_PROFILE" ] && ! grep -q "brew shellenv" "$SHELL_PROFILE" 2>/dev/null; then
-                echo "" >> "$SHELL_PROFILE"
-                echo "# Homebrew" >> "$SHELL_PROFILE"
-                echo "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"
-                add_fix "$(printf "$L_MSG_BREW_SHELLENV_FIX2" "$SHELL_PROFILE")"
+            if [ "$SHELL_PROFILE_OK" -eq 1 ] && ! grep -q "brew shellenv" "$SHELL_PROFILE" 2>/dev/null; then
+                if printf '\n%s\n%s\n' \
+                    '# Homebrew (added by migration_setup.sh)' \
+                    "eval \"\$($BREW_PREFIX/bin/brew shellenv)\"" >> "$SHELL_PROFILE"; then
+                    add_fix "$(printf "$L_MSG_BREW_SHELLENV_FIX2" "$SHELL_PROFILE")"
+                else
+                    print_error "Could not update shell profile: $SHELL_PROFILE"
+                    add_action "Add Homebrew shellenv to writable profile: $SHELL_PROFILE"
+                    SHELL_PROFILE_OK=0
+                    MIGRATION_EXIT=1
+                fi
             fi
         else
             print_error "$L_MSG_BREW_FAIL"
@@ -760,7 +799,7 @@ if [ $PYTHON3_OK -eq 1 ]; then
 
     # Uruchom Python inline do aktualizacji APPLICATIONS.md
     env MAC_LANG="$MAC_LANG" python3 - "$SCRIPT_DIR" "$SCAN_SESSION_DIR" "$TODAY" "$MAC_LANG" << 'PYEOF'
-import os, re, sys, subprocess
+import os, re, sys, subprocess, tempfile
 from datetime import datetime
 
 script_dir  = sys.argv[1]
@@ -809,6 +848,28 @@ def S(key, *args):
 
 programy_path = os.path.join(script_dir, 'APPLICATIONS.md')
 
+def atomic_write_text(path, text, mode=0o600):
+    directory = os.path.dirname(path) or '.'
+    fd, temp_path = tempfile.mkstemp(prefix='.mac-update.', dir=directory, text=True)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        os.chmod(path, mode)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+
 def read_file(path):
     try:
         with open(path, 'r') as f:
@@ -821,7 +882,9 @@ APP_ALIASES = {
     'Ledger Live': ['Ledger Live', 'Ledger Wallet'],
     'Docker': ['Docker', 'Docker Desktop'],
     'Docker Desktop': ['Docker', 'Docker Desktop'],
-    'Codex': ['Codex', 'Codex Desktop (OpenAI)'],
+    'ChatGPT / Codex': ['ChatGPT / Codex', 'ChatGPT', 'Codex', 'Codex Desktop (OpenAI)'],
+    'ChatGPT': ['ChatGPT', 'ChatGPT / Codex', 'Codex', 'Codex Desktop (OpenAI)'],
+    'Codex': ['Codex', 'ChatGPT', 'ChatGPT / Codex', 'Codex Desktop (OpenAI)'],
     'Comet': ['Comet', 'Comet (Perplexity Browser)'],
     'Perplexity': ['Perplexity', 'Perplexity Desktop'],
     'Keynote Creator Studio': ['Keynote Creator Studio', 'Keynote'],
@@ -841,8 +904,12 @@ def app_version(app_name):
     candidates = APP_ALIASES.get(app_name, [app_name])
     app_root = None
     for candidate in candidates:
-        if os.path.exists(f'/Applications/{candidate}.app'):
-            app_root = f'/Applications/{candidate}.app'
+        for applications_dir in ('/Applications', os.path.expanduser('~/Applications')):
+            candidate_path = os.path.join(applications_dir, candidate + '.app')
+            if os.path.exists(candidate_path):
+                app_root = candidate_path
+                break
+        if app_root is not None:
             break
     if app_root is None:
         return None
@@ -859,7 +926,11 @@ def app_version(app_name):
                             capture_output=True, text=True, timeout=5)
         if r2.returncode == 0 and r2.stdout.strip():
             return r2.stdout.strip()
-    except:
+        r3 = subprocess.run(['mdls', '-name', 'kMDItemVersion', '-raw', app_root],
+                            capture_output=True, text=True, timeout=5)
+        if r3.returncode == 0 and r3.stdout.strip() not in ('', '(null)'):
+            return r3.stdout.strip()
+    except Exception:
         pass
     return '?'
 
@@ -915,13 +986,15 @@ all_versions.update(internet_versions)
 # ── Scan /Applications for NEW apps not in APPLICATIONS.md ────────
 print(S('check_new'))
 content = read_file(programy_path)
-try:
-    installed_all = sorted([
-        item[:-4] for item in os.listdir('/Applications')
-        if item.endswith('.app')
-    ])
-except:
-    installed_all = []
+installed_all = []
+for applications_dir in ('/Applications', os.path.expanduser('~/Applications')):
+    try:
+        installed_all.extend(
+            item[:-4] for item in os.listdir(applications_dir) if item.endswith('.app')
+        )
+    except OSError:
+        pass
+installed_all = sorted(set(installed_all))
 
 new_apps_unknown = []
 # POPRAWKA: szukaj tylko w GRUPACH 1-3, nie w sekcji Homebrew (GRUPA 4)
@@ -933,9 +1006,9 @@ grupo_1_3_content = grupo_1_3_match.group(1) if grupo_1_3_match else content
 SYSTEM_SKIP_FRAGMENTS = [
     'Installer', 'Uninstaller', 'Helper', 'Agent', 'Updater',
     'Shim', 'Launcher', 'Framework', 'Plugin', 'Extension',
-    'Service', 'Daemon', 'XPC', 'Feedback',
+    'Service', 'Daemon', 'XPC', 'Feedback', 'Handler',
 ]
-SKIP_DISCOVERY_APPS = set(['WiFiman', 'Picsart', 'Utilities'])
+SKIP_DISCOVERY_APPS = set(['Utilities'])
 for app in installed_all:
     if any(frag.lower() in app.lower() for frag in SYSTEM_SKIP_FRAGMENTS):
         continue
@@ -999,8 +1072,7 @@ content = re.sub(
 )
 
 # ── Write back ────────────────────────────────────────────────
-with open(programy_path, 'w') as f:
-    f.write(content)
+atomic_write_text(programy_path, content)
 
 print(S('done'))
 print(S('ver', updated_count))
@@ -1017,8 +1089,9 @@ PYEOF
         print_ok "$L_MIG_SCAN_OK"
         add_fix "$L_MIG_SCAN_FIX"
     else
-        print_warn "$L_MIG_SCAN_WARN"
-        add_warning "$L_MIG_SCAN_WARN2"
+        print_error "$L_MIG_SCAN_WARN"
+        add_action "$L_MIG_SCAN_WARN2"
+        MIGRATION_EXIT=1
     fi
     case "$SCAN_SESSION_DIR" in
         "${TMPDIR:-/tmp}"/mac_update_scan.*|/tmp/mac_update_scan.*)
@@ -1058,7 +1131,7 @@ if [ $PYTHON3_OK -eq 1 ]; then
     env MAC_LANG="$MAC_LANG" python3 - "$SCRIPT_DIR" "$NOW" "$TODAY" \
         "$NEW_USER" "$NEW_HOME" "$MACOS_VERSION" "$ARCH_LABEL" \
         "$HOSTNAME_NEW" "$SCRIPT_DIR" << 'PYEOF'
-import sys, re, os
+import sys, re, os, tempfile
 
 script_dir   = sys.argv[1]
 now          = sys.argv[2]
@@ -1140,6 +1213,28 @@ t = MIG.get(lang, MIG['en'])
 
 ak_path = os.path.join(script_dir, 'UPDATES.md')
 
+def atomic_write_text(path, text, mode=0o600):
+    directory = os.path.dirname(path) or '.'
+    fd, temp_path = tempfile.mkstemp(prefix='.mac-update.', dir=directory, text=True)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+        os.chmod(path, mode)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+
 try:
     with open(ak_path, 'r') as f:
         ak_content = f.read()
@@ -1174,11 +1269,17 @@ else:
 ak_content = re.sub(r'(\*\*Data:\*\* )\d{4}-\d{2}-\d{2}', r'\g<1>' + today, ak_content)
 ak_content = re.sub(r'(\*Zaktualizowano: )\d{4}-\d{2}-\d{2}', r'\g<1>' + today, ak_content)
 
-with open(ak_path, 'w') as f:
-    f.write(ak_content)
+atomic_write_text(ak_path, ak_content)
 
 print("  ✅ " + {"en":"Migration registered in UPDATES.md","pl":"Migracja zarejestrowana w UPDATES.md","de":"Migration in UPDATES.md registriert","fr":"Migration enregistrée dans UPDATES.md","es":"Migración registrada en UPDATES.md","it":"Migrazione registrata in UPDATES.md","pt":"Migração registada em UPDATES.md"}.get(lang, "Migration registered in UPDATES.md"))
 PYEOF
+
+    MIG_REGISTER_EXIT=$?
+    if [ "$MIG_REGISTER_EXIT" -ne 0 ]; then
+        print_error "Could not register the migration history atomically."
+        add_action "Re-run migration_setup.sh after fixing the UPDATES.md write failure"
+        MIGRATION_EXIT=1
+    fi
 
 else
     print_skip "$L_MIG_UPDATES_SKIP"
@@ -1228,24 +1329,43 @@ echo -e "  ${BOLD}🏁 $L_MIG_CHECKLIST${NC}"
 echo ""
 
 # Homebrew
+if xcode-select -p &>/dev/null 2>&1; then
+    echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "Xcode Command Line Tools")${NC}"
+else
+    echo -e "  ${RED}❌ Xcode Command Line Tools${NC}"
+    MIGRATION_EXIT=1
+fi
+
 if command -v brew &>/dev/null; then
     echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "Homebrew")${NC}"
 else
     echo -e "  ${RED}❌ $L_MIG_CHECK_BREW_FAIL${NC}"
+    MIGRATION_EXIT=1
 fi
 
 # mas
+MAS_READY=0
 if command -v mas &>/dev/null; then
-    echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "mas (App Store CLI)")${NC}"
+    MAS_READY_VERSION="$(mas version 2>/dev/null | head -1)"
+    MAS_READY_MAJOR="${MAS_READY_VERSION%%.*}"
+    case "$MAS_READY_MAJOR" in
+        ''|*[!0-9]*) ;;
+        *) [ "$MAS_READY_MAJOR" -ge 4 ] && MAS_READY=1 ;;
+    esac
+fi
+if [ "$MAS_READY" -eq 1 ]; then
+    echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "mas $MAS_READY_VERSION (App Store CLI)")${NC}"
 else
-    echo -e "  ${YELLOW}⚠️  $L_MIG_CHECK_MAS_WARN${NC}"
+    echo -e "  ${RED}❌ $L_MIG_CHECK_MAS_WARN${NC}"
+    MIGRATION_EXIT=1
 fi
 
 # Python 3
 if [ $PYTHON3_OK -eq 1 ]; then
     echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "Python 3")${NC}"
 else
-    echo -e "  ${YELLOW}⚠️  $L_MIG_CHECK_PY_WARN${NC}"
+    echo -e "  ${RED}❌ $L_MIG_CHECK_PY_WARN${NC}"
+    MIGRATION_EXIT=1
 fi
 
 # curl
@@ -1253,6 +1373,21 @@ if command -v curl &>/dev/null; then
     echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "curl")${NC}"
 else
     echo -e "  ${RED}❌ $L_MIG_CHECK_CURL_FAIL${NC}"
+    MIGRATION_EXIT=1
+fi
+
+if command -v git &>/dev/null; then
+    echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "git")${NC}"
+else
+    echo -e "  ${RED}❌ git${NC}"
+    MIGRATION_EXIT=1
+fi
+
+if [ "$SHELL_PROFILE_OK" -eq 1 ]; then
+    echo -e "  ${GREEN}✅ $(printf "$L_MIG_CHECK_OK" "Shell profile")${NC}"
+else
+    echo -e "  ${RED}❌ Shell profile${NC}"
+    MIGRATION_EXIT=1
 fi
 
 # Skrypty .sh
@@ -1263,7 +1398,8 @@ done
 if [ $SCRIPTS_OK -eq 1 ]; then
     echo -e "  ${GREEN}✅ $L_MIG_CHECK_SCRIPTS_OK${NC}"
 else
-    echo -e "  ${YELLOW}⚠️  $(printf "$L_MIG_CHECK_SCRIPTS_WARN" "$SCRIPT_DIR")${NC}"
+    echo -e "  ${RED}❌ $(printf "$L_MIG_CHECK_SCRIPTS_WARN" "$SCRIPT_DIR")${NC}"
+    MIGRATION_EXIT=1
 fi
 
 # App Store
@@ -1310,12 +1446,18 @@ else
     echo -e "     ${GREEN}cd $SCRIPT_DIR && bash update_all.sh${NC}"
 fi
 echo ""
-echo -e "${BLUE}${BOLD}══════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}  ✅  $L_MIG_COMPLETE_BANNER  ${NC}"
-echo -e "${BLUE}${BOLD}══════════════════════════════════════════════════════════════${NC}"
-echo ""
 
 if [ ! -f "$SCRIPT_DIR/APPLICATIONS.md" ] || [ ! -f "$SCRIPT_DIR/UPDATES.md" ]; then
     MIGRATION_EXIT=1
 fi
+
+echo -e "${BLUE}${BOLD}══════════════════════════════════════════════════════════════${NC}"
+if [ "$MIGRATION_EXIT" -eq 0 ]; then
+    echo -e "${GREEN}${BOLD}  ✅  $L_MIG_COMPLETE_BANNER  ${NC}"
+else
+    echo -e "${RED}${BOLD}  ❌  $L_MIG_SUMMARY_ACTIONS  ${NC}"
+fi
+echo -e "${BLUE}${BOLD}══════════════════════════════════════════════════════════════${NC}"
+echo ""
+
 exit "$MIGRATION_EXIT"

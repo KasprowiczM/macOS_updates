@@ -23,14 +23,49 @@ internet_apps_load_config() {
 }
 
 internet_app_path() {
-    local app_name="$1"
+    local app_name="$1" candidate bundle_id
     case "$app_name" in
+        "ChatGPT / Codex")
+            # OpenAI renamed the Codex desktop bundle to ChatGPT.app while
+            # retaining com.openai.codex.  Match the bundle ID so the legacy
+            # com.openai.chat (ChatGPT Classic) is never treated as this target.
+            for candidate in \
+                "/Applications/ChatGPT.app" \
+                "${HOME}/Applications/ChatGPT.app" \
+                "/Applications/Codex.app" \
+                "${HOME}/Applications/Codex.app"
+            do
+                [ -d "$candidate" ] || continue
+                bundle_id=$(defaults read "$candidate/Contents/Info" CFBundleIdentifier 2>/dev/null \
+                    || mdls -raw -name kMDItemCFBundleIdentifier "$candidate" 2>/dev/null \
+                    || true)
+                if [ "$bundle_id" = "com.openai.codex" ]; then
+                    echo "$candidate"
+                    return 0
+                fi
+            done
+            return 1
+            ;;
+        "ChatGPT Atlas")
+            for candidate in \
+                "/Applications/ChatGPT Atlas.app" \
+                "${HOME}/Applications/ChatGPT Atlas.app" \
+                "/Applications/Atlas.app" \
+                "${HOME}/Applications/Atlas.app"
+            do
+                [ -d "$candidate" ] && echo "$candidate" && return 0
+            done
+            ;;
         "OpenCode")
             for candidate in \
                 "/Applications/OpenCode.app" \
+                "${HOME}/Applications/OpenCode.app" \
                 "/Applications/opencode.app" \
+                "${HOME}/Applications/opencode.app" \
                 "/Applications/Opencode.app" \
-                "/Applications/opencode Desktop.app"
+                "${HOME}/Applications/Opencode.app" \
+                "/Applications/opencode Desktop.app" \
+                "${HOME}/Applications/opencode Desktop.app"
             do
                 [ -d "$candidate" ] && echo "$candidate" && return 0
             done
@@ -38,12 +73,42 @@ internet_app_path() {
         "Ledger Live")
             [ -d "/Applications/Ledger Live.app" ] && echo "/Applications/Ledger Live.app" && return 0
             [ -d "/Applications/Ledger Wallet.app" ] && echo "/Applications/Ledger Wallet.app" && return 0
+            [ -d "${HOME}/Applications/Ledger Live.app" ] && echo "${HOME}/Applications/Ledger Live.app" && return 0
+            [ -d "${HOME}/Applications/Ledger Wallet.app" ] && echo "${HOME}/Applications/Ledger Wallet.app" && return 0
             ;;
         "Docker Desktop")
             [ -d "/Applications/Docker.app" ] && echo "/Applications/Docker.app" && return 0
+            [ -d "${HOME}/Applications/Docker.app" ] && echo "${HOME}/Applications/Docker.app" && return 0
+            ;;
+        "DJI Assistant 2")
+            for candidate in \
+                "/Applications/DJI Assistant 2(Consumer Drones Series).app" \
+                "${HOME}/Applications/DJI Assistant 2(Consumer Drones Series).app" \
+                "/Applications/DJI Assistant 2.app" \
+                "${HOME}/Applications/DJI Assistant 2.app"
+            do
+                [ -d "$candidate" ] && echo "$candidate" && return 0
+            done
             ;;
     esac
+    for candidate in "/Applications/${app_name}.app" "${HOME}/Applications/${app_name}.app"; do
+        [ -d "$candidate" ] && echo "$candidate" && return 0
+    done
     echo "/Applications/${app_name}.app"
+}
+
+internet_app_snapshot_version() {
+    local app_path="$1" ver
+    ver=$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
+        || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null \
+        || true)
+    if [ -z "$ver" ]; then
+        # iOS/iPadOS apps on Apple Silicon can be wrapped without a
+        # Contents/Info plist. Spotlight still exposes their version.
+        ver=$(mdls -raw -name kMDItemVersion "$app_path" 2>/dev/null || true)
+        [ "$ver" = "(null)" ] && ver=""
+    fi
+    [ -n "$ver" ] && echo "$ver" || echo "?"
 }
 
 internet_firefox_snapshot_version() {
@@ -51,9 +116,7 @@ internet_firefox_snapshot_version() {
     if [ -f "$ini" ]; then
         grep "^Version=" "$ini" 2>/dev/null | head -1 | cut -d= -f2
     else
-        defaults read "/Applications/Firefox Developer Edition.app/Contents/Info" CFBundleShortVersionString 2>/dev/null \
-            || defaults read "/Applications/Firefox Developer Edition.app/Contents/Info" CFBundleVersion 2>/dev/null \
-            || echo "?"
+        internet_app_snapshot_version "/Applications/Firefox Developer Edition.app"
     fi
 }
 
@@ -68,9 +131,7 @@ internet_capture_versions() {
             if [ "$app_name" = "Firefox Developer Edition" ]; then
                 ver="$(internet_firefox_snapshot_version)"
             else
-                ver=$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
-                    || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null \
-                    || echo "?")
+                ver="$(internet_app_snapshot_version "$app_path")"
             fi
             echo "${app_name}|${ver}" >> "$outfile"
         fi
