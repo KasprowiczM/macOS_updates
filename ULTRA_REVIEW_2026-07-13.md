@@ -81,7 +81,7 @@ Microsoft Teams normalnie korzysta z własnego cyklu aktualizacji. Oficjalna dok
 - [x] Pełny udany przebieg kończy się kontrolą `mas outdated`, `brew outdated --cask --greedy`, `softwareupdate -l`, przebudową inwentarza i ponownym raportem pokrycia.
 - [x] Raport nie zawiera duplikatów aliasów, aplikacji systemowych ani ogólnych pozycji już zarządzanych przez Homebrew/App Store.
 - [x] Prywatne `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json` i `logs/` są ignorowane i nie trafiają do commita ani logu publicznego.
-- [ ] Commit wersji 1.0.20 i push są zweryfikowane względem zdalnego `main`.
+- [x] Commit wersji 1.0.20 i push są zweryfikowane względem zdalnego `main`.
 
 ## Oficjalne źródła
 
