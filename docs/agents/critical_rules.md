@@ -75,3 +75,12 @@ These methods are not equivalent proof levels:
 - GRUPA 2: App Store (mas IDs)
 - GRUPA 3: Internet apps
 - GRUPA 4: Tooling (4a key ⭐, 4b deps, 4c casks, 4d native CLI + npm)
+
+## 9. Microsoft AutoUpdate version regressions
+
+- Treat `Installer succeeded with no version change`, PackageKit `Skipping component`, or delta `postinstall` code 112 as a package-version investigation, not proof that MAU itself is broken.
+- Compare both `CFBundleShortVersionString` and `CFBundleVersion` for the installed Office app and offered package. PackageKit can reject a package with a newer build number when its short version is lower.
+- Never bypass that protection by editing a signed Office bundle, deleting it, or forcing a lower short-version component into place.
+- If Microsoft has published a malformed `Recommended` Preview update, use its documented per-app `OptionalUpdatesDeferrals` mechanism as a temporary quarantine. Preserve existing nested deferrals; critical updates must remain eligible.
+- Deferral-day preferences persist across releases. Remove only the incident-specific app IDs after Microsoft corrects the feed, then require a clean `msupdate --list`.
+- The evidence and reversible commands for the 2026-07-14 Preview incident are in `docs/agents/troubleshooting.md`.

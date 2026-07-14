@@ -22,6 +22,7 @@ Wersja 1.0.19 nie spełniała jeszcze rygoru produkcyjnego: kończyła się „n
 - Homebrew zaktualizował `stripe` 1.43.7 → 1.43.8 i `tbb` 2023.0.0 → 2023.1.0. Końcowe `brew outdated --formula` oraz `brew outdated --cask --greedy` były puste. Jedynym surowym ostrzeżeniem `brew doctor` pozostał dokładnie `/usr/local/lib/libASAF.dylib`, filtrowany wyłącznie w tym wąskim przypadku.
 - Natywna warstwa CLI zaktualizowała npm 12.0.0 → 12.0.1, pnpm 11.12.0 → 11.13.0 i OpenCode CLI 1.17.18 → 1.17.20. Node 26.5.0, Bun 1.3.14, Claude Code 2.1.207 i Codex CLI 0.144.3 przeszły kontrolę.
 - Microsoft AutoUpdate zaoferował fallback `TEAMS21`, zainstalował go i zakończył czystym `msupdate --list`; Teams zmienił wersję na 26163.407.4839.8659.
+- Późniejsza oferta Office Preview `16.111.26071325` ujawniła błąd publikacji po stronie Microsoftu: zainstalowane, prawidłowo podpisane aplikacje miały wersję `16.111.5 (26071215)`, a nowy pakiet deklarował komponent `16.111` (`16.111.0` w porównaniu PackageKit). macOS pominął niższy komponent, delta zakończyła się `PKInstallErrorDomain Code=112`, a pełny fallback zgłosił brak zmiany wersji. MAU `4.83.26040910` był aktualny i poprawnie podpisany; siedmiodniowa, per-app kwarantanna `OptionalUpdatesDeferrals` przywróciła czyste `msupdate --list` bez wymuszania downgrade'u.
 - Końcowy raport obejmuje 66 unikalnych aplikacji: 15 `verified direct`, 24 `triggered-unverified`, 25 `externally managed`, 2 `manual`, 0 `unknown`. Znane pokrycie wynosi 100%, a konserwatywne pokrycie automatyczne 60,6%.
 - ChatGPT Classic (`com.openai.chat`) został usunięty z `/Applications` do Kosza z zachowaniem danych. Aktywny ChatGPT/Codex ma bundle `com.openai.codex` i jest jedynym celem OpenAI o tej nazwie.
 
@@ -63,6 +64,8 @@ Wersja 1.0.19 nie spełniała jeszcze rygoru produkcyjnego: kończyła się „n
 
 Microsoft Teams normalnie korzysta z własnego cyklu aktualizacji. Oficjalna dokumentacja Microsoft wymienia jednak `TEAMS21` i wyjaśnia, że MAU może być fallbackiem, gdy updater Teams zawiedzie. Live-run 2026-07-14 wykrył, zainstalował i końcowym `msupdate --list` zweryfikował właśnie taki fallback (wersja Teams zmieniła się z 26072.608.4595.8484 na 26163.407.4839.8659). Registry pozostaje konserwatywne: bez zaoferowanego `TEAMS21` Teams nadal ma status `triggered-unverified`.
 
+Incydent Office Preview z tego samego dnia potwierdził również, że `msupdate` jest dowodem tylko wtedy, gdy końcowa kontrola jest czysta. Numer builda `26071325` był wyższy, lecz top-level `CFBundleShortVersionString` pakietu spadł z `16.111.5` do `16.111`. PackageKit poprawnie zastosował semantykę wersji komponentu i odmówił podmiany. Ręczna instalacja tego samego pakietu nie mogła pomóc; bezpieczna remediacja polegała na zachowaniu podpisanych aplikacji, odroczeniu wyłącznie pięciu rekomendowanych produktów Office i ponownej kontroli CLI. Deferral jest trwałą preferencją i musi zostać usunięty po publikacji poprawionego pakietu; aktualizacje krytyczne nie podlegają odroczeniu.
+
 ## Ograniczenia, których nie należy ukrywać
 
 - AppleScript GUI zależy od wersji interfejsu App Store, uprawnienia Accessibility i aktywnej sesji użytkownika. Dla aplikacji iPad nie istnieje równoważna, w pełni obserwowalna ścieżka `mas`.
@@ -88,6 +91,9 @@ Microsoft Teams normalnie korzysta z własnego cyklu aktualizacji. Oficjalna dok
 - [Homebrew Manpage — `outdated`, `upgrade`, `--greedy`](https://docs.brew.sh/Manpage)
 - [mas README — `outdated`, `upgrade`/`update` i ograniczenia App Store](https://github.com/mas-cli/mas)
 - [Microsoft Learn — Update Office for Mac by using msupdate](https://learn.microsoft.com/en-us/microsoft-365-apps/mac/update-office-for-mac-using-msupdate)
+- [Microsoft Learn — Release history for Microsoft AutoUpdate](https://learn.microsoft.com/en-us/officeupdates/release-history-microsoft-autoupdate)
+- [Microsoft Learn — Microsoft AutoUpdate and Deferred Updates](https://learn.microsoft.com/en-us/microsoft-365-apps/mac/mau-deferred-updates)
+- [Microsoft Learn — Update history for Office for Mac](https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac)
 - [mas issue #128 — non-interactive update can hang](https://github.com/mas-cli/mas/issues/128)
 - [Docker Docs — Docker Desktop CLI, w tym `docker desktop update`](https://docs.docker.com/desktop/features/desktop-cli/)
 - [Apple Platform Deployment — Manage macOS software updates](https://support.apple.com/guide/deployment/manage-macos-updates-depafd2fad80/web)
