@@ -463,10 +463,19 @@ class StaticShellSafetyTests(unittest.TestCase):
         handlers = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn('MAU_VERIFY=$(run_with_timeout 60 "$MAU_CLI" --list', handlers)
+        self.assertIn('MAU_VERIFY=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list', handlers)
         self.assertIn("iu_microsoft_teams()", handlers)
         self.assertIn("MAU_TEAMS21_VERIFIED", handlers)
         self.assertIn("TEAMS21", handlers)
+
+    def test_mau_deferral_preflight_and_cleanup_helpers(self) -> None:
+        handlers = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("mau_deferral_entries()", handlers)
+        self.assertIn("mau_deferral_health_warnings()", handlers)
+        self.assertIn("mau_clean_stale_deferrals()", handlers)
+        self.assertIn("mau_deferral_preflight()", handlers)
 
     def test_provider_config_is_written_atomically_with_private_mode(self) -> None:
         text = (REPO_ROOT / "dev_sync" / "provider_setup.sh").read_text(
