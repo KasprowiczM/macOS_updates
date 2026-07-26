@@ -359,82 +359,167 @@ class StaticShellSafetyTests(unittest.TestCase):
         final_summary = text.index("# Final summary", system)
         self.assertLess(postupdate, system)
         self.assertLess(system, final_summary)
-        self.assertIn('elif [ "$OVERALL_EXIT" -ne 0 ]; then', text[system:final_summary])
+        # The final macOS step is gated on BLOCKING_EXIT, never on OVERALL_EXIT:
+        # a soft/unverified app-updater result must not suppress security updates.
+        self.assertIn('elif [ "$BLOCKING_EXIT" -ne 0 ]; then', text[system:final_summary])
+        self.assertNotIn('elif [ "$OVERALL_EXIT" -ne 0 ]; then', text[system:final_summary])
+
+    UPDATE_LAYERS = {
+        "appstore": "update_appstore.sh",
+        "npm": "update_npm_cli.sh",
+        "brew": "update_brew.sh",
+        "internet": "update_internet_apps.sh",
+    }
+
+    def run_update_all_with_layer_exit(self, selected: str, exit_code: int):
+        """Run update_all.sh with one layer stubbed to `exit_code`, others skipped.
+
+        Returns (CompletedProcess, marker_exists) where the marker is written by
+        the stubbed update_system.sh, i.e. it proves whether step 6 actually ran.
+        """
+        layers = self.UPDATE_LAYERS
+        failing_script = layers[selected]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            shutil.copy2(REPO_ROOT / "update_all.sh", root / "update_all.sh")
+            shutil.copy2(REPO_ROOT / "VERSION", root / "VERSION")
+            shutil.copytree(REPO_ROOT / "lib", root / "lib")
+            shutil.copytree(REPO_ROOT / "i18n", root / "i18n")
+
+            marker = root / "system-ran"
+            for script in layers.values():
+                body = (
+                    f"#!/usr/bin/env bash\nexit {exit_code}\n"
+                    if script == failing_script
+                    else "#!/usr/bin/env bash\nexit 0\n"
+                )
+                (root / script).write_text(body, encoding="utf-8")
+            (root / "update_system.sh").write_text(
+                '#!/usr/bin/env bash\nprintf ran > "$SYSTEM_MARKER"\n',
+                encoding="utf-8",
+            )
+
+            mock_bin = root / "mock-bin"
+            mock_bin.mkdir()
+            (mock_bin / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+            (mock_bin / "sw_vers").write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                "  -productVersion) echo 26.5.2 ;;\n"
+                "  -buildVersion) echo TESTBUILD ;;\n"
+                "  *) echo 'ProductName: macOS' ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            for executable in [*layers.values(), "update_system.sh"]:
+                (root / executable).chmod(0o755)
+            (mock_bin / "uname").chmod(0o755)
+            (mock_bin / "sw_vers").chmod(0o755)
+
+            args = [
+                "/bin/bash",
+                str(root / "update_all.sh"),
+                "--yes",
+                "--skip-prescan",
+                "--skip-postupdate",
+            ]
+            skip_flags = {
+                "appstore": "--skip-appstore",
+                "npm": "--skip-npm",
+                "brew": "--skip-brew",
+                "internet": "--skip-internet",
+            }
+            args.extend(flag for layer, flag in skip_flags.items() if layer != selected)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{mock_bin}:/usr/bin:/bin",
+                    "SYSTEM_MARKER": str(marker),
+                    "MAC_LANG": "en",
+                }
+            )
+            result = subprocess.run(
+                args,
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            return result, marker.exists()
 
     def test_update_all_skips_system_after_each_failed_update_layer(self) -> None:
-        layers = {
-            "appstore": "update_appstore.sh",
-            "npm": "update_npm_cli.sh",
-            "brew": "update_brew.sh",
-            "internet": "update_internet_apps.sh",
-        }
-        for selected, failing_script in layers.items():
-            with self.subTest(layer=selected), tempfile.TemporaryDirectory() as tmp:
-                root = Path(tmp)
-                shutil.copy2(REPO_ROOT / "update_all.sh", root / "update_all.sh")
-                shutil.copy2(REPO_ROOT / "VERSION", root / "VERSION")
-                shutil.copytree(REPO_ROOT / "lib", root / "lib")
-                shutil.copytree(REPO_ROOT / "i18n", root / "i18n")
-
-                marker = root / "system-ran"
-                for script in layers.values():
-                    body = "#!/usr/bin/env bash\nexit 9\n" if script == failing_script else "#!/usr/bin/env bash\nexit 0\n"
-                    (root / script).write_text(body, encoding="utf-8")
-                (root / "update_system.sh").write_text(
-                    '#!/usr/bin/env bash\nprintf ran > "$SYSTEM_MARKER"\n',
-                    encoding="utf-8",
+        # exit 9 is neither clean (0) nor soft/degraded (10), so every layer must
+        # still be classified as a hard, blocking failure.
+        for selected in self.UPDATE_LAYERS:
+            with self.subTest(layer=selected):
+                result, system_ran = self.run_update_all_with_layer_exit(selected, 9)
+                self.assertNotEqual(
+                    result.returncode, 0, msg=result.stdout + result.stderr
                 )
-
-                mock_bin = root / "mock-bin"
-                mock_bin.mkdir()
-                (mock_bin / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
-                (mock_bin / "sw_vers").write_text(
-                    "#!/bin/sh\n"
-                    'case "$1" in\n'
-                    "  -productVersion) echo 26.5.2 ;;\n"
-                    "  -buildVersion) echo TESTBUILD ;;\n"
-                    "  *) echo 'ProductName: macOS' ;;\n"
-                    "esac\n",
-                    encoding="utf-8",
-                )
-                for executable in [*layers.values(), "update_system.sh"]:
-                    (root / executable).chmod(0o755)
-                (mock_bin / "uname").chmod(0o755)
-                (mock_bin / "sw_vers").chmod(0o755)
-
-                args = [
-                    "/bin/bash",
-                    str(root / "update_all.sh"),
-                    "--yes",
-                    "--skip-prescan",
-                    "--skip-postupdate",
-                ]
-                skip_flags = {
-                    "appstore": "--skip-appstore",
-                    "npm": "--skip-npm",
-                    "brew": "--skip-brew",
-                    "internet": "--skip-internet",
-                }
-                args.extend(flag for layer, flag in skip_flags.items() if layer != selected)
-                env = os.environ.copy()
-                env.update(
-                    {
-                        "PATH": f"{mock_bin}:/usr/bin:/bin",
-                        "SYSTEM_MARKER": str(marker),
-                        "MAC_LANG": "en",
-                    }
-                )
-                result = subprocess.run(
-                    args,
-                    cwd=root,
-                    env=env,
-                    capture_output=True,
-                    text=True,
-                    timeout=20,
-                )
-                self.assertNotEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-                self.assertFalse(marker.exists(), msg=f"system ran after {selected} failed")
+                self.assertFalse(system_ran, msg=f"system ran after {selected} failed")
                 self.assertIn("Skipping the final macOS update", result.stdout)
+
+    def test_soft_internet_failure_still_runs_macos_system_step(self) -> None:
+        """Regression test for the 2026-07-26 incident.
+
+        A misdetected Microsoft AutoUpdate check made update_internet_apps.sh
+        exit non-zero, which suppressed `softwareupdate -ia -R` entirely. A soft
+        (exit 10) app-updater result must now surface a warning, keep the process
+        exit status clean, and still let the macOS system update run.
+        """
+        result, system_ran = self.run_update_all_with_layer_exit("internet", 10)
+        self.assertTrue(
+            system_ran,
+            msg="macOS system step was suppressed by a soft internet-app warning:\n"
+            + result.stdout
+            + result.stderr,
+        )
+        self.assertNotIn("Skipping the final macOS update", result.stdout)
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        # The warning must stay visible — soft results are surfaced, not hidden.
+        self.assertIn("UPDATE COMPLETED WITH WARNINGS", result.stdout)
+        self.assertIn("macOS step not blocked", result.stdout)
+
+    def test_soft_failure_in_every_layer_never_blocks_macos_system_step(self) -> None:
+        for selected in self.UPDATE_LAYERS:
+            with self.subTest(layer=selected):
+                result, system_ran = self.run_update_all_with_layer_exit(selected, 10)
+                self.assertTrue(
+                    system_ran,
+                    msg=f"system step blocked by soft {selected} result:\n"
+                    + result.stdout
+                    + result.stderr,
+                )
+                self.assertEqual(
+                    result.returncode, 0, msg=result.stdout + result.stderr
+                )
+
+    def test_internet_apps_split_soft_and_hard_severities(self) -> None:
+        text = self.read_script("update_internet_apps.sh")
+        self.assertIn("INTERNET_SOFT_EXIT=10", text)
+        # Hard: a download/install actually broke.
+        for key in (
+            "L_INTERNET_STATUS_INSTALL_ERROR",
+            "L_INTERNET_STATUS_MOUNT_ERROR",
+            "L_INTERNET_STATUS_DOWNLOAD_ERROR",
+            "L_INTERNET_STATUS_EXTRACT_ERROR",
+        ):
+            self.assertIn(f'"${key}"', text)
+        self.assertIn("INTERNET_HARD_FAIL=1", text)
+        self.assertIn("INTERNET_SOFT_FAIL=1", text)
+        # Unverifiable / environmental statuses must not be hard failures.
+        hard_block = text[
+            text.index("# HARD (exit 1)") : text.index("# SOFT (exit 10)")
+        ]
+        for key in (
+            "L_INTERNET_STATUS_CHECK_MAU",
+            "L_INTERNET_STATUS_MAU_MISSING",
+            "L_INTERNET_STATUS_OFFLINE",
+            "L_INTERNET_STATUS_LAUNCH_FAILED",
+            "L_INTERNET_STATUS_NO_URL",
+        ):
+            self.assertNotIn(f'"${key}"', hard_block)
 
     def test_inventory_only_refresh_does_not_append_update_history(self) -> None:
         text = self.read_script("update_all.sh")
