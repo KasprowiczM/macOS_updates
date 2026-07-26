@@ -707,12 +707,364 @@ iu_proton_drive() {
 
 }
 
+# ── Microsoft AutoUpdate (msupdate) helpers ───────────────────
+# msupdate draws a carriage-return progress spinner with ANSI erase-line
+# codes, so its raw output is NOT line-oriented. Captured verbatim on this
+# Mac (cat -v) — three physical lines, the last one without a newline:
+#   ^M
+#   ^M^[[2K^MChecking for updates...^M^[[2K^MUpdate Assistant: Idle^M...^M^[[2K^MNo updates available^M
+#   ^M^[[2K^MUpdate Assistant: Idle
+# The old parser only dropped blank lines and lines containing "No updates",
+# so that trailing "Update Assistant: Idle" fragment was counted as one
+# pending update. That triggered a pointless msupdate --install which hung
+# until the timeout and failed the whole internet-apps step.
+
+# Microsoft product IDs documented for msupdate --apps. Used as a fast path so
+# that IDs without a digit (WDAVSHIM) are still recognised; every other ID
+# falls through to the generic shape check in mau_classify_output.
+MAU_KNOWN_PRODUCT_IDS="MSau04 MSWD2019 XCEL2019 PPT32019 OPIM2019 ONMC2019 TEAMS21 WDAVSHIM OLIC02"
+# The five Office DeferralDays entries left behind by the 2026-07-14 Office
+# Preview package-regression quarantine.
+MAU_OFFICE_DEFERRAL_IDS="MSWD2019 XCEL2019 PPT32019 OPIM2019 ONMC2019"
+# DeferralVersions pins the MAXIMUM version MAU will ever offer, so a pin at
+# the installed build blocks all future updates for that product.
+MAU_STALE_DEFERRAL_VERSION_IDS="TEAMS21"
+
+# Turn raw msupdate output into clean logical lines: drop ANSI escape
+# sequences, translate carriage returns into newlines so the spinner's
+# overwritten segments become separate lines, trim each line, drop empties.
+mau_sanitize_output() {
+    local esc
+    esc="$(printf '\033')"
+    printf '%s\n' "$1" \
+        | tr '\r' '\n' \
+        | sed "s/${esc}\\[[0-9;?]*[0-9A-Za-z]//g" \
+        | tr -d '\001-\010\013\014\016-\037\177' \
+        | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d'
+}
+
+# Classify every sanitized line as "NOISE", "ID<tab><product-id>" or
+# "UNKNOWN<tab><line>". Requiring a positively identified product ID is the
+# whole point: the previous "anything that is not blank" filter is what caused
+# the false positive. A line we cannot identify is reported for diagnostics,
+# never counted as a pending update.
+mau_classify_output() {
+    mau_sanitize_output "$1" | awk -v known=" $MAU_KNOWN_PRODUCT_IDS " '
+        function is_product_id(tok) {
+            if (tok == "") return 0
+            if (index(known, " " tok " ") > 0) return 1
+            if (length(tok) < 5 || length(tok) > 8) return 0
+            if (tok !~ /^[A-Z]/) return 0
+            if (tok !~ /[0-9]/) return 0
+            if (tok ~ /^[A-Z][A-Z0-9]*$/) return 1
+            if (tok ~ /^[A-Z][A-Za-z]+[0-9]+$/) return 1
+            return 0
+        }
+        {
+            if ($0 ~ /^[Uu]pdate [Aa]ssistant:/ \
+                || $0 ~ /^Checking for updates/ \
+                || $0 ~ /^Detecting and downloading/ \
+                || $0 ~ /^Found the following/ \
+                || $0 ~ /[Nn]o updates available/) {
+                print "NOISE\t" $0
+                next
+            }
+            # Real entries carry the ID in parentheses, e.g. "Word (MSWD2019)".
+            rest = $0
+            while (match(rest, /\([A-Za-z0-9]+\)/)) {
+                tok = substr(rest, RSTART + 1, RLENGTH - 2)
+                if (is_product_id(tok)) { print "ID\t" tok; next }
+                rest = substr(rest, RSTART + RLENGTH)
+            }
+            n = split($0, parts, /[^A-Za-z0-9]+/)
+            for (i = 1; i <= n; i++) {
+                if (is_product_id(parts[i])) { print "ID\t" parts[i]; next }
+            }
+            print "UNKNOWN\t" $0
+        }
+    '
+}
+
+# "No updates available" is authoritative: when MAU prints it there are zero
+# pending updates no matter what spinner fragments trail behind it.
+mau_has_no_updates_sentinel() {
+    mau_sanitize_output "$1" | grep -qi '^no updates available$'
+}
+
+# Genuine pending product IDs only, de-duplicated, one per line.
+mau_parse_pending() {
+    if mau_has_no_updates_sentinel "$1"; then
+        return 0
+    fi
+    mau_classify_output "$1" | awk -F'\t' '$1 == "ID" && !seen[$2]++ { print $2 }'
+}
+
+# Lines that survived the noise filter but carry no product ID — diagnostics
+# only, so an unexpected MAU message can be investigated without ever being
+# mistaken for a pending update.
+mau_parse_unrecognized() {
+    mau_classify_output "$1" | awk -F'\t' '$1 == "UNKNOWN" { print $2 }'
+}
+
+# Space-separated product IDs that may be passed to msupdate --install --apps.
+# TEAMS21 is excluded on purpose: Microsoft documents that Teams updates cannot
+# be managed through msupdate, so a TEAMS21 offer is informational only and
+# Teams keeps its own updater path (see iu_microsoft_teams).
+mau_installable_ids() {
+    printf '%s\n' "$1" \
+        | grep -v '^TEAMS21$' \
+        | grep -v '^[[:space:]]*$' \
+        | tr '\n' ' ' \
+        | sed 's/[[:space:]]*$//' || true
+}
+
+# One scoped msupdate --install pass over a space-separated ID list. Sets
+# MAU_INSTALL_CLEAN for the caller and returns msupdate's exit status.
+mau_run_scoped_install() {
+    local ids="$1" out="" install_exit=0
+    print_step "$(internet_msg "$L_INTERNET_MS_INSTALLING_SCOPED_FMT" "$ids")"
+    # shellcheck disable=SC2086  # deliberate word splitting: one argv per product ID
+    out=$(run_with_timeout "$MAU_INSTALL_TIMEOUT" "$MAU_CLI" \
+        --install --wait "$MAU_INSTALL_WAIT" --apps $ids 2>&1) || install_exit=$?
+    MAU_INSTALL_CLEAN="$(mau_sanitize_output "$out")"
+    [ -n "$MAU_INSTALL_CLEAN" ] && printf '%s\n' "$MAU_INSTALL_CLEAN" | tail -n 20
+    internet_diag_log "msupdate --install --apps $ids (exit=$install_exit, sanitized):"
+    [ -n "$MAU_INSTALL_CLEAN" ] && internet_diag_log "$MAU_INSTALL_CLEAN"
+    return "$install_exit"
+}
+
+# Strictly numeric count of non-blank lines, so the caller's -gt comparison
+# can never see whitespace or a multiline value.
+mau_count_lines() {
+    local value="$1" count=""
+    if [ -z "$value" ]; then
+        echo 0
+        return 0
+    fi
+    count="$(printf '%s\n' "$value" | grep -c '[^[:space:]]' 2>/dev/null || true)"
+    count="$(printf '%s' "$count" | tr -cd '0-9')"
+    [ -n "$count" ] || count=0
+    echo "$count"
+}
+
+# Positive-integer timeout or the documented default (same contract as
+# MAC_UPDATE_MAS_CHECK_TIMEOUT / MAC_UPDATE_MAS_UPGRADE_TIMEOUT).
+mau_timeout_value() {
+    local raw="$1" fallback="$2"
+    case "$raw" in
+        ''|*[!0-9]*) echo "$fallback"; return 0 ;;
+    esac
+    if [ "$raw" -gt 0 ]; then
+        echo "$raw"
+    else
+        echo "$fallback"
+    fi
+}
+
+# ── MAU deferral preferences ──────────────────────────────────
+# Every read and every mutation happens on an exported copy, so a partial
+# failure can never corrupt the live com.microsoft.autoupdate2 domain.
+mau_prefs_export() {
+    defaults export com.microsoft.autoupdate2 "$1" >/dev/null 2>&1
+}
+
+mau_plist_keys() {
+    plutil -extract "$2" xml1 -o - "$1" 2>/dev/null \
+        | sed -n 's|.*<key>\(.*\)</key>.*|\1|p'
+}
+
+mau_deferral_value() {
+    plutil -extract "OptionalUpdatesDeferrals.$2.$3" raw -o - "$1" 2>/dev/null
+}
+
+# "ID=value" for every entry of one deferral container.
+mau_deferral_entries() {
+    local plist="$1" container="$2" id value
+    for id in $(mau_plist_keys "$plist" "OptionalUpdatesDeferrals.$container"); do
+        value="$(mau_deferral_value "$plist" "$container" "$id")"
+        printf '%s=%s\n' "$id" "$value"
+    done
+}
+
+# "Container.ID=value" for the whole OptionalUpdatesDeferrals subtree.
+mau_deferral_state() {
+    local plist="$1" container entry
+    for container in DeferralDays DeferralVersions; do
+        mau_deferral_entries "$plist" "$container" | while IFS= read -r entry; do
+            [ -n "$entry" ] && printf '%s.%s\n' "$container" "$entry"
+        done
+    done
+}
+
+# Permanent health check, not a one-off cleanup. Microsoft documents
+# DeferralDays as an integer in 1-28 and DeferralVersions as Major.Minor only;
+# anything else has undefined behaviour and silently blocks updates.
+mau_deferral_health_warnings() {
+    local plist="$1" entry id value
+    mau_deferral_entries "$plist" DeferralDays | while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        id="${entry%%=*}"
+        value="${entry#*=}"
+        case "$value" in
+            ''|*[!0-9]*)
+                echo "DeferralDays.$id=$value is not an integer"
+                continue
+                ;;
+        esac
+        if [ "$value" -lt 1 ] || [ "$value" -gt 28 ]; then
+            echo "DeferralDays.$id=$value is outside Microsoft's documented 1-28 range"
+        fi
+    done
+    mau_deferral_entries "$plist" DeferralVersions | while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        id="${entry%%=*}"
+        value="${entry#*=}"
+        if ! printf '%s' "$value" | grep -q '^[0-9][0-9]*\.[0-9][0-9]*$'; then
+            echo "DeferralVersions.$id=$value is not the documented Major.Minor form"
+        fi
+    done
+}
+
+# Remove only the targeted stale entries from an exported copy and echo what
+# was removed. Every untargeted key is preserved; containers emptied by the
+# removals are dropped instead of being left behind as {}.
+mau_clean_stale_deferrals() {
+    local plist="$1" id container removed=""
+    for id in $MAU_OFFICE_DEFERRAL_IDS; do
+        if [ -n "$(mau_deferral_value "$plist" DeferralDays "$id")" ] \
+            && plutil -remove "OptionalUpdatesDeferrals.DeferralDays.$id" "$plist" >/dev/null 2>&1; then
+            removed="$removed DeferralDays.$id"
+        fi
+    done
+    for id in $MAU_STALE_DEFERRAL_VERSION_IDS; do
+        if [ -n "$(mau_deferral_value "$plist" DeferralVersions "$id")" ] \
+            && plutil -remove "OptionalUpdatesDeferrals.DeferralVersions.$id" "$plist" >/dev/null 2>&1; then
+            removed="$removed DeferralVersions.$id"
+        fi
+    done
+    for container in DeferralDays DeferralVersions; do
+        if [ -z "$(mau_plist_keys "$plist" "OptionalUpdatesDeferrals.$container")" ]; then
+            plutil -remove "OptionalUpdatesDeferrals.$container" "$plist" >/dev/null 2>&1 || true
+        fi
+    done
+    if [ -z "$(mau_plist_keys "$plist" OptionalUpdatesDeferrals)" ]; then
+        plutil -remove OptionalUpdatesDeferrals "$plist" >/dev/null 2>&1 || true
+    fi
+    printf '%s\n' "${removed# }"
+}
+
+# Preflight run before msupdate --list: report the deferral state, warn about
+# malformed entries, and clear the known-stale ones so Office and Teams stop
+# being silently held back. The msupdate --list that follows in the caller is
+# the post-cleanup re-verification.
+mau_deferral_preflight() {
+    local plist verify backup before after warnings removed
+    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
+    # defaults import replaces the whole domain, so stop MAU first — otherwise
+    # its daemon can race the rewrite and win.
+    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    if ! mau_prefs_export "$plist"; then
+        rm -f "$plist" 2>/dev/null || true
+        internet_diag_log "WARN: could not export com.microsoft.autoupdate2 preferences"
+        return 1
+    fi
+
+    before="$(mau_deferral_state "$plist")"
+    if [ -z "$before" ]; then
+        internet_diag_log "MAU: no OptionalUpdatesDeferrals entries"
+        rm -f "$plist" 2>/dev/null || true
+        return 0
+    fi
+
+    print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_FOUND_FMT" "$(printf '%s\n' "$before" | tr '\n' ' ')")"
+    internet_diag_log "MAU deferrals before cleanup: $(printf '%s\n' "$before" | tr '\n' ' ')"
+    warnings="$(mau_deferral_health_warnings "$plist")"
+    if [ -n "$warnings" ]; then
+        printf '%s\n' "$warnings" | while IFS= read -r line; do
+            [ -n "$line" ] && print_warn "$line"
+        done
+        internet_diag_log "MAU deferral health: $(printf '%s\n' "$warnings" | tr '\n' ';')"
+    fi
+
+    if [ "${MAC_UPDATE_MAU_KEEP_DEFERRALS:-0}" = "1" ]; then
+        print_info "$L_INTERNET_MS_DEFERRALS_KEPT"
+        rm -f "$plist" 2>/dev/null || true
+        return 0
+    fi
+    if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+        print_info "[DRY-RUN] Would remove stale Microsoft AutoUpdate deferrals"
+        rm -f "$plist" 2>/dev/null || true
+        return 0
+    fi
+
+    # Back up the untouched export before mutating anything.
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        backup="$MAC_UPDATE_SESSION_DIR/mau_prefs_backup.plist"
+    else
+        backup="$(mktemp "${TMPDIR:-/tmp}/mau-prefs-backup.XXXXXX")" || backup=""
+    fi
+    if [ -z "$backup" ] || ! cp "$plist" "$backup" 2>/dev/null; then
+        print_warn "Could not back up Microsoft AutoUpdate preferences — leaving deferrals untouched"
+        internet_diag_log "ERROR: MAU preference backup failed; skipped deferral cleanup"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+    print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_BACKUP_FMT" "$backup")"
+
+    removed="$(mau_clean_stale_deferrals "$plist")"
+    if [ -z "$removed" ]; then
+        internet_diag_log "MAU: no stale deferral entries to remove"
+        rm -f "$plist" 2>/dev/null || true
+        return 0
+    fi
+
+    # Validate the mutated copy before it is allowed to replace live prefs.
+    if ! plutil -lint "$plist" >/dev/null 2>&1; then
+        print_warn "Rewritten Microsoft AutoUpdate preferences failed plutil -lint — not imported"
+        internet_diag_log "ERROR: MAU preference rewrite failed lint; backup at $backup"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+    if ! defaults import com.microsoft.autoupdate2 "$plist" >/dev/null 2>&1; then
+        print_warn "Could not import cleaned Microsoft AutoUpdate preferences"
+        print_info "Restore with: defaults import com.microsoft.autoupdate2 $backup"
+        internet_diag_log "ERROR: defaults import failed; backup at $backup"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+    rm -f "$plist" 2>/dev/null || true
+    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    killall cfprefsd 2>/dev/null || true
+
+    print_ok "$(internet_msg "$L_INTERNET_MS_DEFERRALS_CLEARED_FMT" "$removed")"
+    verify="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 0
+    if mau_prefs_export "$verify"; then
+        after="$(mau_deferral_state "$verify")"
+        if [ -n "$after" ]; then
+            print_info "Remaining Microsoft AutoUpdate deferrals: $(printf '%s\n' "$after" | tr '\n' ' ')"
+        else
+            print_info "No Microsoft AutoUpdate deferrals remain"
+        fi
+        internet_diag_log "MAU deferrals after cleanup: $(printf '%s\n' "$after" | tr '\n' ' ')"
+    fi
+    rm -f "$verify" 2>/dev/null || true
+    return 0
+}
+
 iu_microsoft_365() {
     print_header "💼 Microsoft 365 (via Microsoft AutoUpdate)"
 
     MAU_CLI="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate"
     MAU_APP="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app"
     MAU_TEAMS21_OFFERED=0
+    MAU_CHECK_TIMEOUT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT:-120}" 120)"
+    # msupdate's own --wait returns the current install state instead of
+    # hanging, so it is the primary bound. run_with_timeout stays strictly
+    # above it as a hard backstop — a killed msupdate (124) tells us nothing,
+    # a --wait return is readable. Office full installers are multi-GB, hence
+    # the 1800s default rather than the old 300s.
+    MAU_INSTALL_WAIT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_INSTALL_TIMEOUT:-1800}" 1800)"
+    MAU_INSTALL_TIMEOUT=$((MAU_INSTALL_WAIT + 60))
 
     # Sprawdź czy zainstalowana jest jakakolwiek aplikacja Microsoft
     MS_INSTALLED=0
@@ -727,10 +1079,11 @@ iu_microsoft_365() {
 
     if [ "$MS_INSTALLED" = "1" ]; then
         if [ -f "$MAU_CLI" ]; then
-            # Krok 1: sprawdź dostępne aktualizacje z limitem czasu 30s
+            mau_deferral_preflight || true
+            # Krok 1: sprawdź dostępne aktualizacje z limitem czasu MAU_CHECK_TIMEOUT
             print_step "$L_INTERNET_MS_CHECKING"
             MAU_LIST_EXIT=0
-            MAU_LIST=$(run_with_timeout 60 "$MAU_CLI" --list 2>&1) || MAU_LIST_EXIT=$?
+            MAU_LIST=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_LIST_EXIT=$?
 
             # Filtruj linie zawierające rzeczywiste wpisy aktualizacji
             # msupdate --list wypisuje nazwy pakietów lub pusty wynik gdy brak aktualizacji
@@ -750,14 +1103,14 @@ iu_microsoft_365() {
                     echo "$MAU_UPDATES" | while read -r line; do
                         [ -n "$line" ] && print_info "  → $line"
                     done
-                    # Krok 2: instaluj tylko jeśli są aktualizacje; limit 300s (5 min)
+                    # Krok 2: instaluj tylko jeśli są aktualizacje
                     print_step "$L_INTERNET_MS_INSTALLING"
                     MAU_INSTALL_EXIT=0
-                    MAU_INSTALL_OUT=$(run_with_timeout 300 "$MAU_CLI" --install 2>&1) || MAU_INSTALL_EXIT=$?
+                    MAU_INSTALL_OUT=$(run_with_timeout "$MAU_INSTALL_TIMEOUT" "$MAU_CLI" --install --wait "$MAU_INSTALL_WAIT" 2>&1) || MAU_INSTALL_EXIT=$?
                     if [ "$MAU_INSTALL_EXIT" -eq 0 ]; then
                         [ -n "$MAU_INSTALL_OUT" ] && printf '%s\n' "$MAU_INSTALL_OUT"
                         MAU_VERIFY_EXIT=0
-                        MAU_VERIFY=$(run_with_timeout 60 "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
+                        MAU_VERIFY=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
                         MAU_REMAINING=$(printf '%s\n' "$MAU_VERIFY" \
                             | grep -v "^[[:space:]]*$" | grep -v "No updates" || true)
                         if [ "$MAU_VERIFY_EXIT" -eq 0 ] && [ -z "$MAU_REMAINING" ]; then
