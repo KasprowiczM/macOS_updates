@@ -70,7 +70,17 @@ print_warn()  { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
 print_error() { echo -e "  ${RED}❌ $1${NC}"; }
 print_step()  { echo -e "  ${MAGENTA}▶  $1${NC}"; }
 
+# ── Severity contract with update_all.sh (see its comment block) ──
+#   0  = clean
+#   10 = soft/degraded — nothing is known to be broken, something could not be
+#        verified (offline, vendor updater unreachable, launch refused). MUST
+#        NOT defer the final macOS system update.
+#   1  = hard failure — a download/install actually broke and may have left an
+#        application bundle mid-replacement.
+INTERNET_SOFT_EXIT=10
 INTERNET_EXIT=0
+INTERNET_HARD_FAIL=0
+INTERNET_SOFT_FAIL=0
 INTERNET_TEMP_ROOT="${MAC_UPDATE_SESSION_DIR:-}"
 INTERNET_TEMP_OWNED=0
 if [ -z "$INTERNET_TEMP_ROOT" ]; then
@@ -575,24 +585,41 @@ do
     # constant — do not scan for the ⚠️ glyph, which would silently break if a
     # translation used a different warning symbol. Every failure status below is
     # a static string (no %s substitution), so an exact match is safe and
-    # locale-independent.
+    # locale-independent. Keep them static: adding a %s to any of these keys
+    # would break the exact match and silently reclassify the status.
+    #
+    # HARD (exit 1): a download or install actually broke. The bundle swap in
+    # copy_verified_app can leave staging/rollback state behind, so the machine
+    # may be mid-mutation and a reboot could make it worse.
     case "$status" in
-        "$L_INTERNET_STATUS_OFFLINE"|\
         "$L_INTERNET_STATUS_INSTALL_ERROR"|\
         "$L_INTERNET_STATUS_MOUNT_ERROR"|\
         "$L_INTERNET_STATUS_DOWNLOAD_ERROR"|\
-        "$L_INTERNET_STATUS_EXTRACT_ERROR"|\
+        "$L_INTERNET_STATUS_EXTRACT_ERROR")
+            INTERNET_HARD_FAIL=1
+            ;;
+    esac
+    # SOFT (exit 10): could not verify, or environmental. Nothing was mutated,
+    # so these must stay visible without deferring the macOS system update.
+    case "$status" in
+        "$L_INTERNET_STATUS_OFFLINE"|\
         "$L_INTERNET_STATUS_NO_URL"|\
         "$L_INTERNET_STATUS_CHECK_MAU"|\
         "$L_INTERNET_STATUS_MAU_MISSING"|\
         "$L_INTERNET_STATUS_LAUNCH_FAILED")
-            INTERNET_EXIT=1
+            INTERNET_SOFT_FAIL=1
             ;;
     esac
 done
 
-if [ "$INTERNET_EXIT" -ne 0 ]; then
+if [ "$INTERNET_HARD_FAIL" -ne 0 ]; then
+    INTERNET_EXIT=1
+    print_error "$L_INTERNET_HARD_FAILURE"
+    [ "$INTERNET_SOFT_FAIL" -ne 0 ] && print_warn "$L_INTERNET_PARTIAL_FAILURE"
+elif [ "$INTERNET_SOFT_FAIL" -ne 0 ]; then
+    INTERNET_EXIT="$INTERNET_SOFT_EXIT"
     print_warn "$L_INTERNET_PARTIAL_FAILURE"
+    print_info "$L_INTERNET_SOFT_NOTE"
 fi
 print_header "$L_INTERNET_SCRIPT_DONE"
 exit "$INTERNET_EXIT"
