@@ -84,3 +84,12 @@ These methods are not equivalent proof levels:
 - If Microsoft has published a malformed `Recommended` Preview update, use its documented per-app `OptionalUpdatesDeferrals` mechanism as a temporary quarantine. Preserve existing nested deferrals; critical updates must remain eligible.
 - Deferral-day preferences persist across releases. Remove only the incident-specific app IDs after Microsoft corrects the feed, then require a clean `msupdate --list`.
 - The evidence and reversible commands for the 2026-07-14 Preview incident are in `docs/agents/troubleshooting.md`.
+
+## 10. Step Severity Contract and Non-blocking Update Gating
+
+- Child `update_*.sh` scripts return exit codes adhering to the severity contract:
+  - `0`: Clean execution without issues.
+  - `10`: Soft / degraded result (e.g. offline check, unverified launch, missing remote feed). Surfaces as warnings in banners, logs, and `UPDATES.md`.
+  - `1` / `127`: Hard failure (e.g. broken installation, corrupt download, failed bundle swap).
+- `update_all.sh` tracks `BLOCKING_EXIT` separately from `OVERALL_EXIT`. Only hard failures defer the final `softwareupdate -ia -R` step. Soft warnings never suppress macOS system updates.
+

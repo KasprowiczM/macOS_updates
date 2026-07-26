@@ -19,7 +19,7 @@
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 
-`update_all.sh` supports `--dry-run`, `--yes`, and selective `--skip-*` flags (see `lib/cli.sh`). It now treats any failed child step as a failed overall run. Child scripts must exit non-zero for failed critical update operations; warnings that require manual follow-up should not be reported as successful updates.
+`update_all.sh` supports `--dry-run`, `--yes`, and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
 
 ## update_all.sh Step Order
 
@@ -33,7 +33,7 @@ Step 5: postupdate.py       — atomically refresh APPLICATIONS.md and append UP
 Step 6: update_system.sh    — macOS via softwareupdate -ia -R; last because it may restart
 ```
 
-If any step before step 6 fails, the macOS step is skipped and the overall run exits non-zero. This preserves diagnostics and avoids rebooting into a partially failed update session. If `softwareupdate` applies a restart-required update, `-R` remains mandatory and the process may not return; the history entry therefore remains explicitly pending until the next verified run.
+If any step before step 6 encounters a hard failure (`BLOCKING_EXIT`), step 6 (`softwareupdate`) is deferred to avoid rebooting into a broken state. Soft warnings (`exit 10`) surface warnings in reporting while allowing system updates to proceed.
 
 ## migration_setup.sh — Phases 0a–16 (New Mac First-Run)
 
