@@ -642,3 +642,13 @@ L_MIG_NEXT_UPDATE="3. Ejecute la actualización completa:"
 L_MIG_COMPLETE_BANNER="¡MIGRACIÓN COMPLETA — macOS Updates listo!"
 L_MIG_SYSTEM_LINE="Sistema: macOS %s — %s"
 L_SETUP_SUMMARY_TITLE="RESUMEN DE CONFIGURACIÓN"
+
+# ── Gravedad de los pasos: leve/degradado vs grave (ver update_all.sh) ─
+
+L_ALL_SUMMARY_WARN="ACTUALIZACIÓN COMPLETADA CON ADVERTENCIAS"
+L_ALL_SUMMARY_ERROR="ACTUALIZACIÓN COMPLETADA CON ERRORES"
+L_ALL_RESULT_DEGRADED="completado con advertencias (sin verificar)"
+L_ALL_WARN_NOT_BLOCKING="Algunas actualizaciones no se pudieron verificar. Esto no bloqueó la actualización del sistema macOS."
+L_ALL_SYSTEM_DEFERRED="⏭️ omitido porque falló un paso de actualización bloqueante"
+L_INTERNET_HARD_FAILURE="Al menos una aplicación de Internet no se pudo descargar o instalar."
+L_INTERNET_SOFT_NOTE="Los actualizadores de apps sin verificar no bloquean la actualización del sistema macOS."

@@ -477,6 +477,16 @@ L_COVERAGE_INSTALLED_COUNT="Installed and auto-updatable by this project: %s"
 L_COVERAGE_AI_HINT="AI hint:"
 L_INSTALLER_GIT_INSTALLING="git not found — installing Xcode Command Line Tools (may open a dialog)..."
 
+# ── Step severity: soft/degraded vs hard failure (see update_all.sh) ─
+
+L_ALL_SUMMARY_WARN="UPDATE COMPLETED WITH WARNINGS"
+L_ALL_SUMMARY_ERROR="UPDATE COMPLETED WITH ERRORS"
+L_ALL_RESULT_DEGRADED="completed with warnings (unverified)"
+L_ALL_WARN_NOT_BLOCKING="Some updates could not be verified. This did not block the macOS system update."
+L_ALL_SYSTEM_DEFERRED="⏭️ skipped because a blocking update step failed"
+L_INTERNET_HARD_FAILURE="At least one internet application failed to download or install."
+L_INTERNET_SOFT_NOTE="Unverified app updaters do not block the macOS system update."
+
 # ── setup/migration shared messages ─
 
 L_UI_REQUIRED_ACTION="REQUIRED ACTION:"

@@ -617,3 +617,13 @@ L_MIG_NEXT_UPDATE="3. Vollständiges Update ausführen:"
 L_MIG_COMPLETE_BANNER="MIGRATION ABGESCHLOSSEN — macOS Updates bereit!"
 L_MIG_SYSTEM_LINE="System: macOS %s — %s"
 L_SETUP_SUMMARY_TITLE="EINRICHTUNGSZUSAMMENFASSUNG"
+
+# ── Schritt-Schweregrad: weich/eingeschränkt vs hart (siehe update_all.sh) ─
+
+L_ALL_SUMMARY_WARN="UPDATE MIT WARNUNGEN ABGESCHLOSSEN"
+L_ALL_SUMMARY_ERROR="UPDATE MIT FEHLERN ABGESCHLOSSEN"
+L_ALL_RESULT_DEGRADED="mit Warnungen abgeschlossen (unbestätigt)"
+L_ALL_WARN_NOT_BLOCKING="Einige Updates konnten nicht überprüft werden. Das macOS-Systemupdate wurde dadurch nicht blockiert."
+L_ALL_SYSTEM_DEFERRED="⏭️ übersprungen, weil ein blockierender Update-Schritt fehlgeschlagen ist"
+L_INTERNET_HARD_FAILURE="Mindestens eine Internet-Anwendung konnte nicht heruntergeladen oder installiert werden."
+L_INTERNET_SOFT_NOTE="Unbestätigte App-Updater blockieren das macOS-Systemupdate nicht."

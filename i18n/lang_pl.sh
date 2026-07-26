@@ -639,3 +639,13 @@ L_MIG_NEXT_UPDATE="3. Uruchom pełną aktualizację:"
 L_MIG_COMPLETE_BANNER="MIGRACJA ZAKOŃCZONA — macOS Updates gotowy!"
 L_MIG_SYSTEM_LINE="System: macOS %s — %s"
 L_SETUP_SUMMARY_TITLE="PODSUMOWANIE KONFIGURACJI"
+
+# ── Waga błędu kroku: miękki/ograniczony vs twardy (patrz update_all.sh) ─
+
+L_ALL_SUMMARY_WARN="AKTUALIZACJA ZAKOŃCZONA Z OSTRZEŻENIAMI"
+L_ALL_SUMMARY_ERROR="AKTUALIZACJA ZAKOŃCZONA Z BŁĘDAMI"
+L_ALL_RESULT_DEGRADED="zakończono z ostrzeżeniami (niezweryfikowane)"
+L_ALL_WARN_NOT_BLOCKING="Części aktualizacji nie udało się zweryfikować. Nie zablokowało to aktualizacji systemu macOS."
+L_ALL_SYSTEM_DEFERRED="⏭️ pominięto, ponieważ blokujący krok aktualizacji zakończył się błędem"
+L_INTERNET_HARD_FAILURE="Co najmniej jednej aplikacji internetowej nie udało się pobrać ani zainstalować."
+L_INTERNET_SOFT_NOTE="Niezweryfikowane aktualizatory aplikacji nie blokują aktualizacji systemu macOS."
