@@ -617,3 +617,13 @@ L_MIG_NEXT_UPDATE="3. Lancez la mise à jour complète :"
 L_MIG_COMPLETE_BANNER="MIGRATION TERMINÉE — macOS Updates prêt !"
 L_MIG_SYSTEM_LINE="Système : macOS %s — %s"
 L_SETUP_SUMMARY_TITLE="RÉSUMÉ DE CONFIGURATION"
+
+# ── Gravité des étapes : légère/dégradée vs bloquante (voir update_all.sh) ─
+
+L_ALL_SUMMARY_WARN="MISE À JOUR TERMINÉE AVEC DES AVERTISSEMENTS"
+L_ALL_SUMMARY_ERROR="MISE À JOUR TERMINÉE AVEC DES ERREURS"
+L_ALL_RESULT_DEGRADED="terminé avec des avertissements (non vérifié)"
+L_ALL_WARN_NOT_BLOCKING="Certaines mises à jour n'ont pas pu être vérifiées. Cela n'a pas bloqué la mise à jour du système macOS."
+L_ALL_SYSTEM_DEFERRED="⏭️ ignoré car une étape bloquante de mise à jour a échoué"
+L_INTERNET_HARD_FAILURE="Au moins une application Internet n'a pas pu être téléchargée ou installée."
+L_INTERNET_SOFT_NOTE="Les updaters d'applications non vérifiés ne bloquent pas la mise à jour du système macOS."

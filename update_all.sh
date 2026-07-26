@@ -203,6 +203,10 @@ cleanup_session_dir() {
 import json, os
 print(json.dumps({
     "exit_code": int(os.environ.get("MAC_UPDATE_OVERALL_EXIT", "0")),
+    # blocked_system is true only when a hard failure deferred the macOS step;
+    # degraded is true when a soft warning was surfaced without blocking it.
+    "blocked_system": os.environ.get("MAC_UPDATE_BLOCKING_EXIT", "0") != "0",
+    "degraded": os.environ.get("MAC_UPDATE_DEGRADED", "0") != "0",
     "duration_sec": int(os.environ.get("MAC_UPDATE_DURATION_SEC", "0")),
     "dry_run": os.environ.get("MAC_UPDATE_DRY_RUN", "0") == "1",
     "results": {
@@ -218,8 +222,11 @@ print(json.dumps({
 }, indent=2))
 PYJSON
     fi
-    # If we failed, dump session dir snapshots into the run log before wipe.
-    if [ -d "${SESSION_DIR:-/nonexistent}" ] && [ "${OVERALL_EXIT:-0}" -ne 0 ]; then
+    # If we failed or finished degraded, dump session dir snapshots into the run
+    # log before wipe. Soft warnings need diagnostics too: they are exactly the
+    # cases where a vendor updater could not be verified.
+    if [ -d "${SESSION_DIR:-/nonexistent}" ] \
+        && { [ "${OVERALL_EXIT:-0}" -ne 0 ] || [ "${DEGRADED:-0}" -ne 0 ]; }; then
         {
             echo ""
             echo "=========================================="
@@ -256,7 +263,51 @@ RESULT_BREW="$L_ALL_RESULT_SKIPPED"
 RESULT_MD="$L_ALL_RESULT_SKIPPED"
 SYSTEM_HISTORY_PENDING="⏳ pending final step"
 SYSTEM_DEFERRED=0
+
+# ============================================================
+# STEP SEVERITY CONTRACT (child exit code → orchestrator meaning)
+# ============================================================
+# Child update_*.sh scripts report severity through their exit status:
+#
+#   0   clean          — everything the step manages is verified up to date.
+#   10  soft/degraded  — the step ran, mutated nothing dangerous, but could not
+#                        VERIFY something (offline, a vendor updater did not
+#                        answer, an app refused to launch). This is the normal
+#                        healthy state for Sparkle/Electron self-updaters.
+#   1   hard failure   — a real operational failure: a download or install
+#                        actually broke, or a package manager / inventory write
+#                        may have been left mid-transaction.
+#   127 missing script — treated as a hard failure.
+#
+# Three orchestrator-level flags, deliberately kept separate:
+#
+#   OVERALL_EXIT  process exit status + "COMPLETED WITH ERRORS" banner. Only
+#                 hard failures set it. Soft/degraded results do NOT, because a
+#                 run where 24 self-updating apps are merely "launched
+#                 (unverified)" is this project's normal healthy outcome and
+#                 must not look like a failed run to cron/CI/dev_sync.
+#   DEGRADED      at least one soft warning. Drives the third reporting state
+#                 ("COMPLETED WITH WARNINGS") so warnings are never hidden.
+#   BLOCKING_EXIT the ONLY flag allowed to defer the final macOS step (6).
+#
+# Blocking matrix — which hard failures may defer macOS system updates:
+#   step 0 prescan     NOT blocking  — read-only scan, mutates nothing.
+#   step 1 App Store   blocking      — sudo mas upgrade can stop mid-install.
+#   step 2 CLI + npm   blocking      — can leave npm/bun mid-transaction.
+#   step 3 Homebrew    blocking      — can leave a keg/cask mid-transaction.
+#   step 4 internet    blocking ONLY on hard failure (bundle swap can be left
+#                      mid-replacement). A SOFT result NEVER blocks — this is
+#                      the 2026-07-26 regression: a misdetected Microsoft
+#                      AutoUpdate check suppressed macOS security updates.
+#   step 5 inventory   blocking      — results were not recorded.
+#   step 6 system      n/a           — nothing runs after it.
+#
+# Rationale: only a failure that can leave the machine mid-mutation, or that a
+# reboot could make worse, earns the right to postpone macOS security updates.
+MAC_UPDATE_SOFT_EXIT=10
 OVERALL_EXIT=0
+BLOCKING_EXIT=0
+DEGRADED=0
 
 # ============================================================
 # STEP 0: Scan new applications
@@ -882,6 +933,8 @@ PYEOF
         fi
     fi
 else
+    # Step 0 is a read-only scan: a hard failure here is reported but never
+    # blocking, because nothing on the machine was mutated.
     RESULT_SCAN="$L_ALL_RESULT_WARN"
     OVERALL_EXIT=1
 fi
@@ -924,16 +977,23 @@ if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
         APPSTORE_EXIT=$?
         if [ "$APPSTORE_EXIT" -eq 2 ] && [ "${MAC_UPDATE_TREAT_APPSTORE_AX_AS_WARNING:-0}" = "1" ]; then
             RESULT_APPSTORE="$L_STATUS_WARN Accessibility required"
+            DEGRADED=1
             print_warn "App Store exit 2 (Accessibility) treated as warning"
+        elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
+            RESULT_APPSTORE="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            DEGRADED=1
+            print_warn "App Store reported unverified updates (soft) — macOS step not blocked"
         else
             RESULT_APPSTORE="$L_STATUS_ERROR"
             OVERALL_EXIT=1
+            BLOCKING_EXIT=1
         fi
     fi
 else
     print_error "File not found: update_appstore.sh"
     RESULT_APPSTORE="$L_STATUS_ERROR missing file"
     OVERALL_EXIT=1
+    BLOCKING_EXIT=1
 fi
 fi
 
@@ -951,8 +1011,18 @@ if mac_update_dry_run_msg "update_npm_cli.sh"; then
 elif mac_update_run_child "update_npm_cli.sh" "update_npm_cli.sh"; then
     RESULT_NPMCLI="$L_STATUS_OK completed"
 else
-    RESULT_NPMCLI="$L_STATUS_ERROR"
-    OVERALL_EXIT=1
+    # mac_update_run_child ends with `bash <child>`, so the child's exit status
+    # reaches us unchanged and 10 stays distinguishable from 1 / 127.
+    NPMCLI_EXIT=$?
+    if [ "$NPMCLI_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
+        RESULT_NPMCLI="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+        DEGRADED=1
+        print_warn "Native CLI + npm reported unverified updates (soft) — macOS step not blocked"
+    else
+        RESULT_NPMCLI="$L_STATUS_ERROR"
+        OVERALL_EXIT=1
+        BLOCKING_EXIT=1
+    fi
 fi
 fi
 
@@ -973,13 +1043,22 @@ elif [ -f "$SCRIPT_DIR/update_brew.sh" ]; then
     if bash "$SCRIPT_DIR/update_brew.sh"; then
         RESULT_BREW="$L_STATUS_OK completed"
     else
-        RESULT_BREW="$L_STATUS_ERROR"
-        OVERALL_EXIT=1
+        BREW_EXIT=$?
+        if [ "$BREW_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
+            RESULT_BREW="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            DEGRADED=1
+            print_warn "Homebrew reported unverified updates (soft) — macOS step not blocked"
+        else
+            RESULT_BREW="$L_STATUS_ERROR"
+            OVERALL_EXIT=1
+            BLOCKING_EXIT=1
+        fi
     fi
 else
     print_error "File not found: update_brew.sh"
     RESULT_BREW="$L_STATUS_ERROR missing file"
     OVERALL_EXIT=1
+    BLOCKING_EXIT=1
 fi
 fi
 
@@ -1000,13 +1079,25 @@ elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
     if bash "$SCRIPT_DIR/update_internet_apps.sh"; then
         RESULT_INTERNET="$L_STATUS_OK completed"
     else
-        RESULT_INTERNET="$L_STATUS_ERROR"
-        OVERALL_EXIT=1
+        INTERNET_EXIT=$?
+        # A soft result means "could not verify" — offline, a vendor updater did
+        # not answer, an app refused to launch. Nothing is mid-mutation, so it
+        # must never postpone macOS security updates (2026-07-26 regression).
+        if [ "$INTERNET_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
+            RESULT_INTERNET="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            DEGRADED=1
+            print_warn "Internet apps reported unverified updates (soft) — macOS step not blocked"
+        else
+            RESULT_INTERNET="$L_STATUS_ERROR"
+            OVERALL_EXIT=1
+            BLOCKING_EXIT=1
+        fi
     fi
 else
     print_error "File not found: update_internet_apps.sh"
     RESULT_INTERNET="$L_STATUS_ERROR missing file"
     OVERALL_EXIT=1
+    BLOCKING_EXIT=1
 fi
 fi
 
@@ -1510,8 +1601,11 @@ if python3 "$SESSION_DIR/postupdate.py" \
     "$RESULT_BREW"; then
     RESULT_MD="$L_STATUS_OK completed"
 else
+    # Step 5 is how a run records what happened: if it fails, the results were
+    # never written, so it is blocking.
     RESULT_MD="$L_STATUS_ERROR"
     OVERALL_EXIT=1
+    BLOCKING_EXIT=1
 fi
 fi
 fi
@@ -1524,9 +1618,11 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
     ui_step_header 6 6 "$L_SYSTEM_UPDATE_TITLE"
     if mac_update_dry_run_msg "update_system.sh (final step)"; then
         RESULT_SYSTEM="[DRY-RUN] skipped"
-    elif [ "$OVERALL_EXIT" -ne 0 ]; then
-        RESULT_SYSTEM="⏭️ skipped because an earlier update step failed"
-        print_warn "Skipping the final macOS update because an earlier step failed; fix it and rerun."
+    elif [ "$BLOCKING_EXIT" -ne 0 ]; then
+        # Only a blocking hard failure may defer macOS updates. Soft/degraded
+        # results (exit 10) never reach this branch — see the severity contract.
+        RESULT_SYSTEM="${L_ALL_SYSTEM_DEFERRED:-⏭️ skipped because a blocking update step failed}"
+        print_warn "Skipping the final macOS update because a blocking step failed (the machine may be mid-transaction); fix it and rerun."
     elif mac_update_run_child "update_system.sh" "update_system.sh (final step)"; then
         RESULT_SYSTEM="$L_STATUS_OK completed"
     else
@@ -1566,6 +1662,7 @@ if old in content:
         raise
 PYEOF
         then
+            # Non-blocking by construction: nothing runs after the system step.
             print_error "Could not finalize the macOS result in UPDATES.md."
             OVERALL_EXIT=1
         fi
@@ -1585,8 +1682,13 @@ MINUTES=$((DURATION / 60))
 DURATION_SECS=$((DURATION % 60))
 
 echo ""
+# Three honest reporting states: clean / completed-with-warnings / failed.
 _summary_msg="$L_UPDATE_ALL_SUCCESS"
-[ "$OVERALL_EXIT" -ne 0 ] && _summary_msg="UPDATE COMPLETED WITH ERRORS"
+if [ "$OVERALL_EXIT" -ne 0 ]; then
+    _summary_msg="${L_ALL_SUMMARY_ERROR:-UPDATE COMPLETED WITH ERRORS}"
+elif [ "$DEGRADED" -ne 0 ]; then
+    _summary_msg="${L_ALL_SUMMARY_WARN:-UPDATE COMPLETED WITH WARNINGS}"
+fi
 ui_print_box "$_summary_msg"
 echo ""
 echo -e "  0. Scan new apps:           $RESULT_SCAN"
@@ -1599,10 +1701,12 @@ echo -e "  6. macOS System:            $RESULT_SYSTEM"
 echo ""
 echo -e "  Duration: ${MINUTES} min ${DURATION_SECS} sek"
 echo ""
-if [ "$OVERALL_EXIT" -eq 0 ]; then
-    print_ok "$L_UPDATE_ALL_SUCCESS"
-else
+if [ "$OVERALL_EXIT" -ne 0 ]; then
     print_error "One or more update steps failed. Review the step summary above and session logs before rerunning."
+elif [ "$DEGRADED" -ne 0 ]; then
+    print_warn "${L_ALL_WARN_NOT_BLOCKING:-Some updates could not be verified. This did not block the macOS system update.}"
+else
+    print_ok "$L_UPDATE_ALL_SUCCESS"
 fi
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
     print_info "DRY-RUN: no applications, inventory, or history files were changed."
@@ -1617,6 +1721,10 @@ fi
 echo ""
 
 export MAC_UPDATE_OVERALL_EXIT="$OVERALL_EXIT"
+# Severity detail for callers and the JSON summary: BLOCKING_EXIT says whether
+# the macOS step was deferred, DEGRADED says a soft warning was surfaced.
+export MAC_UPDATE_BLOCKING_EXIT="$BLOCKING_EXIT"
+export MAC_UPDATE_DEGRADED="$DEGRADED"
 export MAC_UPDATE_DURATION_SEC="$DURATION"
 export MAC_UPDATE_RESULT_SCAN="$RESULT_SCAN"
 export MAC_UPDATE_RESULT_SYSTEM="$RESULT_SYSTEM"
