@@ -928,9 +928,12 @@ mau_deferral_health_warnings() {
 # Remove only the targeted stale entries from an exported copy and echo what
 # was removed. Every untargeted key is preserved; containers emptied by the
 # removals are dropped instead of being left behind as {}.
+# $2 is the explicit DeferralDays ID list to release — the caller decides which
+# products have earned their release, because a deferral is only stale once the
+# feed stops offering a downgrade for that product.
 mau_clean_stale_deferrals() {
-    local plist="$1" id container removed=""
-    for id in $MAU_OFFICE_DEFERRAL_IDS; do
+    local plist="$1" day_ids="$2" id container removed=""
+    for id in $day_ids; do
         if [ -n "$(mau_deferral_value "$plist" DeferralDays "$id")" ] \
             && plutil -remove "OptionalUpdatesDeferrals.DeferralDays.$id" "$plist" >/dev/null 2>&1; then
             removed="$removed DeferralDays.$id"
@@ -953,10 +956,135 @@ mau_clean_stale_deferrals() {
     printf '%s\n' "${removed# }"
 }
 
+# Create the OptionalUpdatesDeferrals.DeferralDays container when it is absent.
+# plutil -extract with xml1 succeeds for dictionaries, unlike raw, so it is the
+# existence probe here as well as in mau_plist_keys.
+mau_plist_ensure_deferral_days() {
+    local plist="$1"
+    plutil -extract OptionalUpdatesDeferrals xml1 -o - "$plist" >/dev/null 2>&1 \
+        || plutil -insert OptionalUpdatesDeferrals -json '{}' "$plist" >/dev/null 2>&1 \
+        || return 1
+    plutil -extract OptionalUpdatesDeferrals.DeferralDays xml1 -o - "$plist" >/dev/null 2>&1 \
+        || plutil -insert OptionalUpdatesDeferrals.DeferralDays -json '{}' "$plist" >/dev/null 2>&1 \
+        || return 1
+    return 0
+}
+
+# Arm (or refresh) the documented per-app quarantine on an exported copy and
+# echo the IDs it set. Microsoft documents DeferralDays as an integer of 1-28
+# and states that critical updates bypass deferrals, so this never withholds a
+# security release — it only stops MAU's daemon from re-downloading a package
+# that provably cannot install.
+mau_arm_deferrals() {
+    local plist="$1" ids="$2" days="$3" id key armed=""
+    for id in $ids; do
+        [ -n "$id" ] || continue
+        [ "$(mau_deferral_value "$plist" DeferralDays "$id")" = "$days" ] && continue
+        mau_plist_ensure_deferral_days "$plist" || continue
+        key="OptionalUpdatesDeferrals.DeferralDays.$id"
+        if plutil -extract "$key" raw -o - "$plist" >/dev/null 2>&1; then
+            plutil -replace "$key" -integer "$days" "$plist" >/dev/null 2>&1 \
+                && armed="$armed $id"
+        else
+            plutil -insert "$key" -integer "$days" "$plist" >/dev/null 2>&1 \
+                && armed="$armed $id"
+        fi
+    done
+    printf '%s\n' "${armed# }"
+}
+
+# ── Office package-regression guard ───────────────────────────
+# Microsoft product ID → the installed bundle that product updates.
+# Bash 3.2 has no associative arrays, so this stays a case lookup.
+mau_app_path_for_id() {
+    case "$1" in
+        MSWD2019) echo "/Applications/Microsoft Word.app" ;;
+        XCEL2019) echo "/Applications/Microsoft Excel.app" ;;
+        PPT32019) echo "/Applications/Microsoft PowerPoint.app" ;;
+        OPIM2019) echo "/Applications/Microsoft Outlook.app" ;;
+        ONMC2019) echo "/Applications/Microsoft OneNote.app" ;;
+    esac
+}
+
+# Short version the feed offers for one product ID, e.g. "16.111.1" out of
+# "MSWD2019  Microsoft Word Update 16.111.1 (26071913)". The parenthesised
+# trailing token is the build number on a different numbering scale, so only
+# dotted numeric tokens qualify and the scan runs right to left.
+mau_offered_version() {
+    mau_sanitize_output "$1" | awk -v id="$2" '
+        index($0, id) == 0 { next }
+        {
+            for (i = NF; i >= 1; i--) {
+                tok = $i
+                gsub(/[()]/, "", tok)
+                if (tok ~ /^[0-9]+(\.[0-9]+)+$/) { print tok; exit }
+            }
+        }'
+}
+
+# Installed short version read the way PackageKit reads it. app_version()
+# deliberately falls back to CFBundleVersion and mdls, which for Office are a
+# different numbering scale (16.111.26071215 vs 16.111.5), so mixing them here
+# would invert the comparison.
+mau_installed_short_version() {
+    defaults read "$1/Contents/Info" CFBundleShortVersionString 2>/dev/null
+}
+
+# "ID offered installed" for every pending product whose offered package
+# declares a short version that is NOT newer than the installed app.
+# PackageKit refuses such a component ("Skipping component ... because the
+# version ... is already installed") and the delta package then fails its
+# postinstall with PKInstallErrorDomain Code=112. Those installs cannot
+# succeed, so they are quarantined rather than re-downloaded every run.
+# See docs/agents/critical_rules.md section 9.
+mau_regressed_entries() {
+    local list="$1" ids="$2" id app offered installed
+    for id in $ids; do
+        [ -n "$id" ] || continue
+        app="$(mau_app_path_for_id "$id")"
+        [ -n "$app" ] && [ -d "$app" ] || continue
+        offered="$(mau_offered_version "$list" "$id")"
+        [ -n "$offered" ] || continue
+        installed="$(mau_installed_short_version "$app")"
+        [ -n "$installed" ] || continue
+        # Strictly older only. Arguments are reversed on purpose:
+        # internet_version_relation folds "equal" into "current", and an equal
+        # short version with a newer build is a legitimate build-only update
+        # that PackageKit accepts. Quarantining that would block real updates.
+        if [ "$(internet_version_relation "$installed" "$offered")" = "newer" ]; then
+            printf '%s %s %s\n' "$id" "$offered" "$installed"
+        fi
+    done
+}
+
+# Drop the given space-separated IDs from a newline-separated ID list on stdin.
+mau_filter_out_ids() {
+    awk -v drop=" $1 " 'NF && index(drop, " " $0 " ") == 0'
+}
+
+# Office product IDs that currently carry a DeferralDays quarantine. Used to
+# explain an empty update list honestly instead of reporting "up to date".
+mau_active_office_deferrals() {
+    local plist ids="" id
+    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 0
+    if mau_prefs_export "$plist"; then
+        for id in $MAU_OFFICE_DEFERRAL_IDS; do
+            [ -n "$(mau_deferral_value "$plist" DeferralDays "$id")" ] && ids="$ids $id"
+        done
+    fi
+    rm -f "$plist" 2>/dev/null || true
+    printf '%s\n' "${ids# }"
+}
+
 # Preflight run before msupdate --list: report the deferral state, warn about
-# malformed entries, and clear the known-stale ones so Office and Teams stop
-# being silently held back. The msupdate --list that follows in the caller is
-# the post-cleanup re-verification.
+# malformed entries, and clear stale DeferralVersions pins, which cap the
+# maximum version MAU will ever offer and therefore block a product forever.
+#
+# It deliberately does NOT touch the Office DeferralDays quarantine. Whether a
+# deferral is stale or still protective depends on what the feed is currently
+# offering, which is only known after msupdate --list, so that decision belongs
+# to mau_reconcile_deferrals. Clearing it here unconditionally is what made
+# every run re-download a package that provably could not install.
 mau_deferral_preflight() {
     local plist verify backup before after warnings removed
     plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
@@ -1011,7 +1139,7 @@ mau_deferral_preflight() {
     fi
     print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_BACKUP_FMT" "$backup")"
 
-    removed="$(mau_clean_stale_deferrals "$plist")"
+    removed="$(mau_clean_stale_deferrals "$plist" "")"
     if [ -z "$removed" ]; then
         internet_diag_log "MAU: no stale deferral entries to remove"
         rm -f "$plist" 2>/dev/null || true
@@ -1051,6 +1179,102 @@ mau_deferral_preflight() {
     return 0
 }
 
+# Quarantine window in days, clamped to Microsoft's documented 1-28 range.
+# The documented maximum is the safe default because the quarantine is
+# re-evaluated on every run: a corrected offer releases it on the next run
+# instead of waiting the window out.
+mau_deferral_days_value() {
+    local raw="${MAC_UPDATE_MAU_DEFERRAL_DAYS:-28}"
+    case "$raw" in
+        ''|*[!0-9]*) echo 28; return 0 ;;
+    esac
+    if [ "$raw" -lt 1 ] || [ "$raw" -gt 28 ]; then
+        echo 28
+    else
+        echo "$raw"
+    fi
+}
+
+# Reconcile the Office quarantine with what the feed is actually offering:
+# arm the documented per-app deferral for every product stuck in a downgrade
+# loop, and release it for every product whose offer has since been corrected.
+# Runs after msupdate --list, because only the offer tells the two apart.
+mau_reconcile_deferrals() {
+    local regressed="$1" plist backup release id armed removed days
+    release=""
+    for id in $MAU_OFFICE_DEFERRAL_IDS; do
+        case " $regressed " in
+            *" $id "*) ;;
+            *) release="$release $id" ;;
+        esac
+    done
+    release="${release# }"
+
+    if [ "${MAC_UPDATE_MAU_KEEP_DEFERRALS:-0}" = "1" ]; then
+        print_info "$L_INTERNET_MS_DEFERRALS_KEPT"
+        return 0
+    fi
+    if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+        [ -n "$regressed" ] && print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_DRYRUN_FMT" "$regressed")"
+        return 0
+    fi
+
+    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
+    # defaults import replaces the whole domain, so stop MAU first — otherwise
+    # its daemon can race the rewrite and win.
+    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    if ! mau_prefs_export "$plist"; then
+        rm -f "$plist" 2>/dev/null || true
+        internet_diag_log "WARN: could not export com.microsoft.autoupdate2 for reconcile"
+        return 1
+    fi
+
+    # Back up the untouched export before mutating anything.
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        backup="$MAC_UPDATE_SESSION_DIR/mau_prefs_reconcile_backup.plist"
+    else
+        backup="$(mktemp "${TMPDIR:-/tmp}/mau-prefs-backup.XXXXXX")" || backup=""
+    fi
+    if [ -z "$backup" ] || ! cp "$plist" "$backup" 2>/dev/null; then
+        print_warn "Could not back up Microsoft AutoUpdate preferences — leaving deferrals untouched"
+        internet_diag_log "ERROR: MAU preference backup failed; skipped deferral reconcile"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+
+    days="$(mau_deferral_days_value)"
+    armed="$(mau_arm_deferrals "$plist" "$regressed" "$days")"
+    removed="$(mau_clean_stale_deferrals "$plist" "$release")"
+    if [ -z "$armed" ] && [ -z "$removed" ]; then
+        rm -f "$plist" 2>/dev/null || true
+        internet_diag_log "MAU deferrals already reconciled (armed: none, released: none)"
+        return 0
+    fi
+
+    # Validate the mutated copy before it is allowed to replace live prefs.
+    if ! plutil -lint "$plist" >/dev/null 2>&1; then
+        print_warn "Rewritten Microsoft AutoUpdate preferences failed plutil -lint — not imported"
+        internet_diag_log "ERROR: MAU reconcile rewrite failed lint; backup at $backup"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+    if ! defaults import com.microsoft.autoupdate2 "$plist" >/dev/null 2>&1; then
+        print_warn "Could not import reconciled Microsoft AutoUpdate preferences"
+        print_info "Restore with: defaults import com.microsoft.autoupdate2 $backup"
+        internet_diag_log "ERROR: defaults import failed during reconcile; backup at $backup"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+    rm -f "$plist" 2>/dev/null || true
+    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    killall cfprefsd 2>/dev/null || true
+
+    [ -n "$armed" ] && print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_ARMED_FMT" "$armed" "$days")"
+    [ -n "$removed" ] && print_ok "$(internet_msg "$L_INTERNET_MS_DEFERRALS_CLEARED_FMT" "$removed")"
+    internet_diag_log "MAU deferrals reconciled (armed: ${armed:-none}, released: ${removed:-none}, days=$days)"
+    return 0
+}
+
 iu_microsoft_365() {
     print_header "💼 Microsoft 365 (via Microsoft AutoUpdate)"
 
@@ -1079,71 +1303,129 @@ iu_microsoft_365() {
 
     if [ "$MS_INSTALLED" = "1" ]; then
         if [ -f "$MAU_CLI" ]; then
+            # Report the deferral state and clear version pins. The DeferralDays
+            # quarantine is reconciled after the list, once the offer is known.
             mau_deferral_preflight || true
             # Krok 1: sprawdź dostępne aktualizacje z limitem czasu MAU_CHECK_TIMEOUT
             print_step "$L_INTERNET_MS_CHECKING"
             MAU_LIST_EXIT=0
             MAU_LIST=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_LIST_EXIT=$?
 
-            # Filtruj linie zawierające rzeczywiste wpisy aktualizacji
-            # msupdate --list wypisuje nazwy pakietów lub pusty wynik gdy brak aktualizacji
             if [ "$MAU_LIST_EXIT" -ne 0 ]; then
-                print_warn "Microsoft AutoUpdate check failed (exit $MAU_LIST_EXIT)"
-                [ -n "$MAU_LIST" ] && printf '%s\n' "$MAU_LIST" | tail -n 20
+                print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_LIST_EXIT")"
+                MAU_LIST_CLEAN="$(mau_sanitize_output "$MAU_LIST")"
+                [ -n "$MAU_LIST_CLEAN" ] && printf '%s\n' "$MAU_LIST_CLEAN" | tail -n 20
+                internet_diag_log "ERROR: msupdate --list failed (exit=$MAU_LIST_EXIT)"
                 STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
             else
-                if printf '%s\n' "$MAU_LIST" | grep -q "TEAMS21"; then
+                # Only positively identified product IDs count as pending. The
+                # old "every non-blank line" filter counted spinner fragments.
+                MAU_PENDING="$(mau_parse_pending "$MAU_LIST")"
+                MAU_UNRECOGNIZED="$(mau_parse_unrecognized "$MAU_LIST")"
+                [ -n "$MAU_UNRECOGNIZED" ] && internet_diag_log \
+                    "msupdate --list unrecognized lines: $(printf '%s\n' "$MAU_UNRECOGNIZED" | tr '\n' ';')"
+                if printf '%s\n' "$MAU_PENDING" | grep -q '^TEAMS21$'; then
                     MAU_TEAMS21_OFFERED=1
                 fi
-                MAU_UPDATES=$(echo "$MAU_LIST" | grep -v "^[[:space:]]*$" | grep -v "No updates" || true)
-                MAU_COUNT=$(echo "$MAU_UPDATES" | grep -c "." 2>/dev/null || echo "0")
+                MAU_COUNT="$(mau_count_lines "$MAU_PENDING")"
 
-                if [ -n "$MAU_UPDATES" ] && [ "$MAU_COUNT" -gt 0 ]; then
+                if [ "$MAU_COUNT" -gt 0 ]; then
                     print_info "$(internet_msg "$L_INTERNET_MS_UPDATES_AVAILABLE" "$MAU_COUNT")"
-                    echo "$MAU_UPDATES" | while read -r line; do
+                    printf '%s\n' "$MAU_PENDING" | while IFS= read -r line; do
                         [ -n "$line" ] && print_info "  → $line"
                     done
-                    # Krok 2: instaluj tylko jeśli są aktualizacje
-                    print_step "$L_INTERNET_MS_INSTALLING"
-                    MAU_INSTALL_EXIT=0
-                    MAU_INSTALL_OUT=$(run_with_timeout "$MAU_INSTALL_TIMEOUT" "$MAU_CLI" --install --wait "$MAU_INSTALL_WAIT" 2>&1) || MAU_INSTALL_EXIT=$?
-                    if [ "$MAU_INSTALL_EXIT" -eq 0 ]; then
-                        [ -n "$MAU_INSTALL_OUT" ] && printf '%s\n' "$MAU_INSTALL_OUT"
-                        MAU_VERIFY_EXIT=0
-                        MAU_VERIFY=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
-                        MAU_REMAINING=$(printf '%s\n' "$MAU_VERIFY" \
-                            | grep -v "^[[:space:]]*$" | grep -v "No updates" || true)
-                        if [ "$MAU_VERIFY_EXIT" -eq 0 ] && [ -z "$MAU_REMAINING" ]; then
-                            print_ok "$L_INTERNET_MS_UPDATED"
-                            STATUS_MICROSOFT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "Microsoft apps")"
-                            if [ "$MAU_TEAMS21_OFFERED" -eq 1 ]; then
-                                MAU_TEAMS21_VERIFIED=1
-                            fi
+
+                    # A package whose short version is not newer than the
+                    # installed app can never install: PackageKit skips the
+                    # component and the delta postinstall fails with 112.
+                    # Quarantine those instead of downloading them again.
+                    MAU_PENDING_IDS="$(printf '%s\n' "$MAU_PENDING" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                    MAU_REGRESSED="$(mau_regressed_entries "$MAU_LIST" "$MAU_PENDING_IDS")"
+                    MAU_REGRESSED_IDS="$(printf '%s\n' "$MAU_REGRESSED" \
+                        | awk 'NF { print $1 }' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                    if [ -n "$MAU_REGRESSED_IDS" ]; then
+                        printf '%s\n' "$MAU_REGRESSED" | while read -r r_id r_offered r_installed; do
+                            [ -n "$r_id" ] && print_warn "$(internet_msg \
+                                "$L_INTERNET_MS_REGRESSION_FMT" "$r_id" "$r_offered" "$r_installed")"
+                        done
+                        print_info "$L_INTERNET_MS_REGRESSION_NOTE"
+                        internet_diag_log "MAU upstream package regression (offered <= installed): $(printf '%s\n' "$MAU_REGRESSED" | tr '\n' ';')"
+                    fi
+                    mau_reconcile_deferrals "$MAU_REGRESSED_IDS" || true
+
+                    # TEAMS21 is dropped by mau_installable_ids: Microsoft
+                    # documents Teams as unmanageable through msupdate.
+                    MAU_INSTALL_IDS="$(printf '%s\n' "$MAU_PENDING" \
+                        | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                    MAU_INSTALL_IDS="$(mau_installable_ids "$MAU_INSTALL_IDS")"
+
+                    if [ -z "$MAU_INSTALL_IDS" ]; then
+                        # Everything pending is quarantined or Teams-owned:
+                        # there is nothing msupdate can usefully install.
+                        if [ -n "$MAU_REGRESSED_IDS" ]; then
+                            STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
                         else
-                            print_warn "Microsoft AutoUpdate did not pass the final update check."
-                            [ -n "$MAU_VERIFY" ] && printf '%s\n' "$MAU_VERIFY" | tail -n 20
-                            internet_diag_log "ERROR: Microsoft AutoUpdate final verification failed (exit=$MAU_VERIFY_EXIT)"
-                            STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                            print_ok "$L_INTERNET_MS_CURRENT"
+                            STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
                         fi
                     else
-                        if [ "$MAU_INSTALL_EXIT" = "124" ] || [ "$MAU_INSTALL_EXIT" = "137" ] || [ "$MAU_INSTALL_EXIT" = "143" ]; then
-                            print_warn "$L_INTERNET_MS_TIMEOUT"
-                        else
-                            print_warn "$(internet_msg "$L_INTERNET_MS_INSTALL_ERROR" "$MAU_INSTALL_EXIT")"
-                        fi
-                        [ -n "$MAU_INSTALL_OUT" ] && printf '%s\n' "$MAU_INSTALL_OUT" | tail -n 20
-                        if [ -d "$MAU_APP" ]; then
-                            if open -a "$MAU_APP" 2>/dev/null; then
-                                print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                        MAU_INSTALL_EXIT=0
+                        mau_run_scoped_install "$MAU_INSTALL_IDS" || MAU_INSTALL_EXIT=$?
+                        if [ "$MAU_INSTALL_EXIT" -eq 0 ]; then
+                            MAU_VERIFY_EXIT=0
+                            MAU_VERIFY=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
+                            # Quarantined products are still offered by the
+                            # feed, so they are expected to remain listed.
+                            MAU_REMAINING="$(mau_parse_pending "$MAU_VERIFY" \
+                                | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                            if [ "$MAU_VERIFY_EXIT" -ne 0 ]; then
+                                print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_EXIT")"
+                                internet_diag_log "ERROR: msupdate --list re-verification failed (exit=$MAU_VERIFY_EXIT)"
+                                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                            elif [ -n "$MAU_REMAINING" ]; then
+                                print_warn "$L_INTERNET_MS_STILL_PENDING"
+                                printf '%s\n' "$MAU_REMAINING" | while IFS= read -r line; do
+                                    [ -n "$line" ] && print_info "  → $line"
+                                done
+                                internet_diag_log "WARN: Microsoft updates still pending after install: $(printf '%s\n' "$MAU_REMAINING" | tr '\n' ' ')"
+                                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                            elif [ -n "$MAU_REGRESSED_IDS" ]; then
+                                # Installable set succeeded, quarantine stands.
+                                STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
                             else
-                                print_warn "Could not launch Microsoft AutoUpdate after the CLI failure."
+                                print_ok "$L_INTERNET_MS_UPDATED"
+                                STATUS_MICROSOFT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "Microsoft apps")"
+                                if [ "$MAU_TEAMS21_OFFERED" -eq 1 ]; then
+                                    MAU_TEAMS21_VERIFIED=1
+                                fi
                             fi
+                        else
+                            if [ "$MAU_INSTALL_EXIT" = "124" ] || [ "$MAU_INSTALL_EXIT" = "137" ] || [ "$MAU_INSTALL_EXIT" = "143" ]; then
+                                print_warn "$L_INTERNET_MS_TIMEOUT"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_MS_INSTALL_ERROR" "$MAU_INSTALL_EXIT")"
+                            fi
+                            if [ -d "$MAU_APP" ]; then
+                                if open -a "$MAU_APP" 2>/dev/null; then
+                                    print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                                else
+                                    print_warn "Could not launch Microsoft AutoUpdate after the CLI failure."
+                                fi
+                            fi
+                            STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
                         fi
-                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
                     fi
                 else
-                    print_ok "$L_INTERNET_MS_CURRENT"
-                    STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+                    # Nothing offered. A live quarantine could be the reason, so
+                    # say so instead of claiming everything is up to date.
+                    MAU_HELD="$(mau_active_office_deferrals)"
+                    if [ -n "$MAU_HELD" ]; then
+                        print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_HOLDING_FMT" "$MAU_HELD")"
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
+                    else
+                        print_ok "$L_INTERNET_MS_CURRENT"
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+                    fi
                 fi
             fi
         elif [ -d "$MAU_APP" ]; then

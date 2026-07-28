@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.20** — Orchestrateur de mise à jour en une commande pour **Mac Apple Silicon sous macOS 13+**. Il coordonne les mises à jour vérifiées et signale honnêtement les déclenchements intégrés — **uniquement pour les logiciels déjà installés**. **Multilingue** (7 langues). Couche privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+> **v1.0.21** — Orchestrateur de mise à jour en une commande pour **Mac Apple Silicon sous macOS 13+**. Il coordonne les mises à jour vérifiées et signale honnêtement les déclenchements intégrés — **uniquement pour les logiciels déjà installés**. **Multilingue** (7 langues). Couche privée optionnelle via [`dev_sync/`](dev_sync/README.md).
 
 **Dépôt public :** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publication : [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 

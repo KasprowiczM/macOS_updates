@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.20** — Gotowy do produkcji jednokomendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13+**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwie raportowane wyzwalanie aktualizatorów aplikacji — **wyłącznie dla oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka w chmurze przez [`dev_sync/`](dev_sync/README.md).
+> **v1.0.21** — Gotowy do produkcji jednokomendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13+**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwie raportowane wyzwalanie aktualizatorów aplikacji — **wyłącznie dla oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka w chmurze przez [`dev_sync/`](dev_sync/README.md).
 
 **Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -93,7 +93,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Wersja pakietu (1.0.20)
+├── VERSION                     # Wersja pakietu (1.0.21)
 ├── install.sh                  # Jednolinijkowy instalator
 ├── uninstall.sh                # Usuwa sklonowane pliki (zachowuje Homebrew/aplikacje)
 ├── setup.sh                    # Konfiguracja pierwszego uruchomienia (bez chmury)
