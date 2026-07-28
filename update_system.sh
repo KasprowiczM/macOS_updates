@@ -191,7 +191,13 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
             print_ok "$L_SYSTEM_UPGRADED $BEFORE_VER → $AFTER_VER"
             echo "${BEFORE_VER}|${AFTER_VER}" > "$MAC_UPDATE_SESSION_DIR/system_upgrade.txt"
         else
-            print_info "$L_SYSTEM_VERSION_UNCHANGED $AFTER_VER"
+            # Version unchanged: check if an update was staged and requires restart
+            if [ "$NEEDS_RESTART" = true ]; then
+                print_info "$L_SYSTEM_UPDATE_STAGED $AFTER_VER"
+                print_warn "$L_SYSTEM_RESTART_REQUIRED_TO_APPLY"
+            else
+                print_info "$L_SYSTEM_VERSION_UNCHANGED $AFTER_VER"
+            fi
         fi
     fi
 fi

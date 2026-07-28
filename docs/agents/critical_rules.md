@@ -83,7 +83,34 @@ These methods are not equivalent proof levels:
 - Never bypass that protection by editing a signed Office bundle, deleting it, or forcing a lower short-version component into place.
 - If Microsoft has published a malformed `Recommended` Preview update, use its documented per-app `OptionalUpdatesDeferrals` mechanism as a temporary quarantine. Preserve existing nested deferrals; critical updates must remain eligible.
 - Deferral-day preferences persist across releases. Remove only the incident-specific app IDs after Microsoft corrects the feed, then require a clean `msupdate --list`.
-- The evidence and reversible commands for the 2026-07-14 Preview incident are in `docs/agents/troubleshooting.md`.
+- The evidence and reversible commands for the 2026-07-14 and 2026-07-28 Preview incidents are in `docs/agents/troubleshooting.md`.
+
+### 9a. Automated regression guard (`lib/internet_app_updates.sh`)
+
+The quarantine is now maintained by the toolkit instead of by hand:
+
+- `mau_regressed_entries` compares the **short version** the feed offers for each
+  pending product ID against the installed `CFBundleShortVersionString`. Only a
+  **strictly older** offer counts as a regression — an equal short version with a
+  newer build is a legitimate build-only update that PackageKit accepts, and
+  quarantining it would block real updates.
+- Never compare `CFBundleVersion` against a short version. `16.111.26071215` and
+  `16.111.5` are different numbering scales and mixing them inverts the test.
+- Regressed products are **not** passed to `msupdate --install`. Retrying them
+  re-downloads multi-hundred-MB packages that provably cannot install.
+- `mau_deferral_preflight` must **not** clear the Office `DeferralDays`
+  quarantine — it runs before `msupdate --list`, so it cannot yet know whether a
+  deferral is stale or still protective. Clearing it there unconditionally is what
+  caused a failing re-download on every run. Only `mau_reconcile_deferrals`, which
+  runs after the list, may arm or release it.
+- Arming uses `MAC_UPDATE_MAU_DEFERRAL_DAYS` (default and maximum 28, Microsoft's
+  documented range). The long window is safe because the quarantine is
+  re-evaluated every run: a corrected offer releases it on the next run.
+- A live quarantine reports `L_INTERNET_STATUS_MAU_QUARANTINED`, classified as a
+  **soft** failure (exit 10). It surfaces as a warning and never defers the macOS
+  system update.
+- `MAC_UPDATE_MAU_KEEP_DEFERRALS=1` disables all deferral mutation; `--dry-run`
+  reports the intended change without writing preferences.
 
 ## 10. Step Severity Contract and Non-blocking Update Gating
 
