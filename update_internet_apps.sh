@@ -478,7 +478,16 @@ internet_dispatch_run_all
 # ── Snapshot PO aktualizacji ──────────────────────────────────
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_INTERNET_SNAPSHOT_AFTER"
-    sleep 15  # Daj czas auto-updatrom na zaktualizowanie Info.plist
+    # Vendor updaters launched above rewrite Info.plist asynchronously, so the
+    # "after" snapshot has to let them land. There is no completion signal to
+    # poll, hence a fixed settle. It is ~18% of this step's wall clock, so it is
+    # configurable: lower it on a fast machine, raise it on a slow link.
+    INTERNET_SETTLE="${MAC_UPDATE_INTERNET_SETTLE_SECONDS:-15}"
+    case "$INTERNET_SETTLE" in
+        ''|*[!0-9]*) INTERNET_SETTLE=15 ;;
+    esac
+    [ "$INTERNET_SETTLE" -gt 120 ] && INTERNET_SETTLE=120
+    [ "$INTERNET_SETTLE" -gt 0 ] && sleep "$INTERNET_SETTLE"
     capture_internet_app_versions "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
     print_ok "$(internet_msg "$L_INTERNET_SNAPSHOTS_SAVED" "$MAC_UPDATE_SESSION_DIR")"
 fi
