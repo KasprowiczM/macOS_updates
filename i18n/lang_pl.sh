@@ -381,6 +381,7 @@ L_INTERNET_MS_DEFERRALS_CLEARED_FMT="Zwolniono odroczenia Microsoft AutoUpdate: 
 L_INTERNET_MS_DEFERRALS_ARMED_FMT="Wstrzymano produkty Microsoft %s na %s dni"
 L_INTERNET_MS_DEFERRALS_DRYRUN_FMT="[DRY-RUN] Wstrzymano by produkty Microsoft: %s"
 L_INTERNET_MS_DEFERRALS_HOLDING_FMT="Brak dostępnych aktualizacji — te produkty Microsoft są wstrzymane przez odroczenie: %s"
+L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT="Odroczenie Microsoft AutoUpdate nie zostało zapisane dla: %s"
 L_INTERNET_MS_TIMEOUT="msupdate --install przekroczył limit czasu — przerwano"
 L_INTERNET_MS_UPDATED="Microsoft 365 zaktualizowany przez msupdate"
 L_INTERNET_MS_UPDATES_AVAILABLE="Dostępne aktualizacje Microsoft (%s):"

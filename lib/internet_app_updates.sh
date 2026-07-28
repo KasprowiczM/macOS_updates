@@ -1086,7 +1086,7 @@ mau_active_office_deferrals() {
 # to mau_reconcile_deferrals. Clearing it here unconditionally is what made
 # every run re-download a package that provably could not install.
 mau_deferral_preflight() {
-    local plist verify backup before after warnings removed
+    local plist before warnings
     plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
     # defaults import replaces the whole domain, so stop MAU first — otherwise
     # its daemon can race the rewrite and win.
@@ -1114,82 +1114,28 @@ mau_deferral_preflight() {
         internet_diag_log "MAU deferral health: $(printf '%s\n' "$warnings" | tr '\n' ';')"
     fi
 
-    if [ "${MAC_UPDATE_MAU_KEEP_DEFERRALS:-0}" = "1" ]; then
-        print_info "$L_INTERNET_MS_DEFERRALS_KEPT"
-        rm -f "$plist" 2>/dev/null || true
-        return 0
-    fi
-    if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
-        print_info "[DRY-RUN] Would remove stale Microsoft AutoUpdate deferrals"
-        rm -f "$plist" 2>/dev/null || true
-        return 0
-    fi
-
-    # Back up the untouched export before mutating anything.
-    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
-        backup="$MAC_UPDATE_SESSION_DIR/mau_prefs_backup.plist"
-    else
-        backup="$(mktemp "${TMPDIR:-/tmp}/mau-prefs-backup.XXXXXX")" || backup=""
-    fi
-    if [ -z "$backup" ] || ! cp "$plist" "$backup" 2>/dev/null; then
-        print_warn "Could not back up Microsoft AutoUpdate preferences — leaving deferrals untouched"
-        internet_diag_log "ERROR: MAU preference backup failed; skipped deferral cleanup"
-        rm -f "$plist" 2>/dev/null || true
-        return 1
-    fi
-    print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_BACKUP_FMT" "$backup")"
-
-    removed="$(mau_clean_stale_deferrals "$plist" "")"
-    if [ -z "$removed" ]; then
-        internet_diag_log "MAU: no stale deferral entries to remove"
-        rm -f "$plist" 2>/dev/null || true
-        return 0
-    fi
-
-    # Validate the mutated copy before it is allowed to replace live prefs.
-    if ! plutil -lint "$plist" >/dev/null 2>&1; then
-        print_warn "Rewritten Microsoft AutoUpdate preferences failed plutil -lint — not imported"
-        internet_diag_log "ERROR: MAU preference rewrite failed lint; backup at $backup"
-        rm -f "$plist" 2>/dev/null || true
-        return 1
-    fi
-    if ! defaults import com.microsoft.autoupdate2 "$plist" >/dev/null 2>&1; then
-        print_warn "Could not import cleaned Microsoft AutoUpdate preferences"
-        print_info "Restore with: defaults import com.microsoft.autoupdate2 $backup"
-        internet_diag_log "ERROR: defaults import failed; backup at $backup"
-        rm -f "$plist" 2>/dev/null || true
-        return 1
-    fi
+    # Read-only by design. Every deferral mutation happens exactly once per run,
+    # in mau_reconcile_deferrals after msupdate --list. Two export/import cycles
+    # in a single run raced each other: `killall cfprefsd` invalidates the
+    # preference daemon's cache, so the next `defaults export` could return
+    # pre-mutation (or empty) state, and re-importing that resurrected an entry
+    # the first pass had just removed while reporting it as gone.
     rm -f "$plist" 2>/dev/null || true
-    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
-    killall cfprefsd 2>/dev/null || true
-
-    print_ok "$(internet_msg "$L_INTERNET_MS_DEFERRALS_CLEARED_FMT" "$removed")"
-    verify="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 0
-    if mau_prefs_export "$verify"; then
-        after="$(mau_deferral_state "$verify")"
-        if [ -n "$after" ]; then
-            print_info "Remaining Microsoft AutoUpdate deferrals: $(printf '%s\n' "$after" | tr '\n' ' ')"
-        else
-            print_info "No Microsoft AutoUpdate deferrals remain"
-        fi
-        internet_diag_log "MAU deferrals after cleanup: $(printf '%s\n' "$after" | tr '\n' ' ')"
-    fi
-    rm -f "$verify" 2>/dev/null || true
     return 0
 }
 
 # Quarantine window in days, clamped to Microsoft's documented 1-28 range.
-# The documented maximum is the safe default because the quarantine is
-# re-evaluated on every run: a corrected offer releases it on the next run
-# instead of waiting the window out.
+# 7 rather than the 28 maximum: an active deferral hides the product from
+# msupdate --list, so the window is also how long the toolkit stays blind to a
+# corrected package. A week keeps MAU's daemon quiet while still re-evaluating
+# the feed regularly; 28 would delay a genuine fix by up to a month.
 mau_deferral_days_value() {
-    local raw="${MAC_UPDATE_MAU_DEFERRAL_DAYS:-28}"
+    local raw="${MAC_UPDATE_MAU_DEFERRAL_DAYS:-7}"
     case "$raw" in
-        ''|*[!0-9]*) echo 28; return 0 ;;
+        ''|*[!0-9]*) echo 7; return 0 ;;
     esac
     if [ "$raw" -lt 1 ] || [ "$raw" -gt 28 ]; then
-        echo 28
+        echo 7
     else
         echo "$raw"
     fi
@@ -1200,7 +1146,7 @@ mau_deferral_days_value() {
 # loop, and release it for every product whose offer has since been corrected.
 # Runs after msupdate --list, because only the offer tells the two apart.
 mau_reconcile_deferrals() {
-    local regressed="$1" plist backup release id armed removed days
+    local regressed="$1" plist backup release id armed removed days verify unverified=""
     release=""
     for id in $MAU_OFFICE_DEFERRAL_IDS; do
         case " $regressed " in
@@ -1266,8 +1212,30 @@ mau_reconcile_deferrals() {
         return 1
     fi
     rm -f "$plist" 2>/dev/null || true
+    # Deliberately no `killall cfprefsd` here. defaults import hands the write
+    # to the preference daemon, which flushes it lazily; killing the daemon
+    # straight afterwards discards the write. That silently reverted every
+    # reconcile while still reporting success. Only MAU is restarted, so it
+    # re-reads the domain on its next launch.
     killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
-    killall cfprefsd 2>/dev/null || true
+
+    # Never claim a change that did not land: re-read the live domain and
+    # report what it actually contains.
+    verify="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 0
+    if mau_prefs_export "$verify"; then
+        for id in $armed; do
+            if [ "$(mau_deferral_value "$verify" DeferralDays "$id")" != "$days" ]; then
+                unverified="$unverified $id"
+            fi
+        done
+        if [ -n "$unverified" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT" "${unverified# }")"
+            internet_diag_log "ERROR: MAU deferral write did not persist for:${unverified}"
+            rm -f "$verify" 2>/dev/null || true
+            return 1
+        fi
+    fi
+    rm -f "$verify" 2>/dev/null || true
 
     [ -n "$armed" ] && print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_ARMED_FMT" "$armed" "$days")"
     [ -n "$removed" ] && print_ok "$(internet_msg "$L_INTERNET_MS_DEFERRALS_CLEARED_FMT" "$removed")"
@@ -1418,6 +1386,14 @@ iu_microsoft_365() {
                 else
                     # Nothing offered. A live quarantine could be the reason, so
                     # say so instead of claiming everything is up to date.
+                    # An active DeferralDays entry suppresses the product from
+                    # msupdate --list entirely, so an empty list is NOT evidence
+                    # that the feed was corrected. Releasing here would arm and
+                    # release on alternating runs forever. The quarantine is
+                    # only ever released on positive evidence: an offer whose
+                    # short version is newer than what is installed. Until then
+                    # it lapses on its own after MAC_UPDATE_MAU_DEFERRAL_DAYS,
+                    # which is what makes the next re-evaluation possible.
                     MAU_HELD="$(mau_active_office_deferrals)"
                     if [ -n "$MAU_HELD" ]; then
                         print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_HOLDING_FMT" "$MAU_HELD")"

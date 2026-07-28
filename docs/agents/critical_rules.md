@@ -103,9 +103,22 @@ The quarantine is now maintained by the toolkit instead of by hand:
   deferral is stale or still protective. Clearing it there unconditionally is what
   caused a failing re-download on every run. Only `mau_reconcile_deferrals`, which
   runs after the list, may arm or release it.
-- Arming uses `MAC_UPDATE_MAU_DEFERRAL_DAYS` (default and maximum 28, Microsoft's
-  documented range). The long window is safe because the quarantine is
-  re-evaluated every run: a corrected offer releases it on the next run.
+- An **active `DeferralDays` entry hides the product from `msupdate --list`**.
+  An empty list is therefore *not* evidence the feed was corrected, and the
+  quarantine must never be released on that basis — doing so armed and released
+  it on alternating runs forever. Release only on positive evidence: an offer
+  whose short version is newer than what is installed.
+- Arming uses `MAC_UPDATE_MAU_DEFERRAL_DAYS` (default 7, clamped to Microsoft's
+  documented 1-28). The window doubles as how long the toolkit stays blind to a
+  corrected package, so the 28 maximum is deliberately *not* the default.
+- **Never `killall cfprefsd` after `defaults import`.** The import hands the
+  write to the preference daemon, which flushes lazily; killing it immediately
+  discards the write while the script still reports success. Restart MAU only.
+  `mau_reconcile_deferrals` re-reads the domain afterwards and fails loudly if
+  the change did not land.
+- Exactly one function may import preferences. `mau_deferral_preflight` is
+  read-only: two export/import cycles in one run raced each other and
+  resurrected entries the first pass had removed.
 - A live quarantine reports `L_INTERNET_STATUS_MAU_QUARANTINED`, classified as a
   **soft** failure (exit 10). It surfaces as a warning and never defers the macOS
   system update.

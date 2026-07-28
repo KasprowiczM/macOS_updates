@@ -1330,6 +1330,19 @@ class MauRegressionGuardTests(unittest.TestCase):
 
     LIB = REPO_ROOT / "lib" / "internet_app_updates.sh"
 
+    @staticmethod
+    def _strip_comments(shell: str) -> str:
+        """Drop whole-line comments so a rule described in prose is not
+        mistaken for the code it forbids."""
+        return "\n".join(
+            line for line in shell.splitlines() if not line.lstrip().startswith("#")
+        )
+
+    def _code_of(self, func: str) -> str:
+        """Executable body of one shell function, comments removed."""
+        body = self.LIB.read_text(encoding="utf-8").split(f"{func}()", 1)[1]
+        return self._strip_comments(body.split("\n}", 1)[0])
+
     def _relation(self, installed: str, offered: str) -> str:
         """Run the shell predicate the guard actually uses."""
         script = (
@@ -1368,13 +1381,36 @@ class MauRegressionGuardTests(unittest.TestCase):
             source, r"mau_installed_short_version\(\)\s*\{[^}]*CFBundleShortVersionString"
         )
 
-    def test_office_deferrals_are_not_cleared_unconditionally(self) -> None:
-        """The preflight must not release the quarantine before the feed has
-        been inspected — that is what caused the re-download loop."""
-        source = self.LIB.read_text(encoding="utf-8")
-        preflight = source.split("mau_deferral_preflight()", 1)[1].split("\n}", 1)[0]
-        self.assertIn('mau_clean_stale_deferrals "$plist" ""', preflight)
+    def test_preflight_is_read_only(self) -> None:
+        """The preflight must not mutate preferences at all. It runs before
+        msupdate --list, so it cannot know whether a deferral is stale or still
+        protective — releasing it there caused the re-download loop. A second
+        mutation point in one run also raced the first: `killall cfprefsd`
+        invalidates the daemon cache, so the next export could read stale state
+        and re-import it, resurrecting an entry reported as removed."""
+        preflight = self._code_of("mau_deferral_preflight")
+        for mutation in ("defaults import", "plutil -remove", "plutil -replace",
+                         "plutil -insert", "mau_clean_stale_deferrals",
+                         "mau_arm_deferrals", "killall cfprefsd"):
+            self.assertNotIn(
+                mutation, preflight, f"mau_deferral_preflight must not run {mutation}"
+            )
         self.assertNotIn("$MAU_OFFICE_DEFERRAL_IDS", preflight)
+
+    def test_reconcile_is_the_only_mutation_point(self) -> None:
+        """Exactly one place may import preferences, so two passes can never
+        race each other within a run."""
+        code = self._strip_comments(self.LIB.read_text(encoding="utf-8"))
+        calls = re.findall(
+            r"^\s*(?:if\s+!\s+)?defaults import com\.microsoft\.autoupdate2",
+            code,
+            re.MULTILINE,
+        )
+        self.assertEqual(len(calls), 1, "exactly one MAU preference importer expected")
+        self.assertIn(
+            "defaults import com.microsoft.autoupdate2",
+            self._code_of("mau_reconcile_deferrals"),
+        )
 
     def test_deferral_days_stay_in_documented_range(self) -> None:
         script = (
@@ -1393,8 +1429,10 @@ class MauRegressionGuardTests(unittest.TestCase):
             cwd=REPO_ROOT,
             check=True,
         )
+        # inputs:        ''  abc  0   1   28  29  999
+        # 0/29/999 are outside Microsoft's 1-28 range and fall back to 7.
         values = [int(line) for line in result.stdout.split()]
-        self.assertEqual(values, [28, 28, 28, 1, 28, 28, 28])
+        self.assertEqual(values, [7, 7, 7, 1, 28, 7, 7])
         for value in values:
             self.assertTrue(1 <= value <= 28)
 

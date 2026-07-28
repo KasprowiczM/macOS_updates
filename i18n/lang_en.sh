@@ -384,6 +384,7 @@ L_INTERNET_MS_DEFERRALS_CLEARED_FMT="Released Microsoft AutoUpdate deferrals: %s
 L_INTERNET_MS_DEFERRALS_ARMED_FMT="Quarantined Microsoft products %s for %s days"
 L_INTERNET_MS_DEFERRALS_DRYRUN_FMT="[DRY-RUN] Would quarantine Microsoft products: %s"
 L_INTERNET_MS_DEFERRALS_HOLDING_FMT="No updates offered — these Microsoft products are held by a deferral: %s"
+L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT="Microsoft AutoUpdate deferral did not persist for: %s"
 L_INTERNET_DOCKER_CHECKING="Checking Docker Desktop updates via CLI..."
 L_INTERNET_DOCKER_CLI_OK="Docker Desktop — update checked via CLI"
 L_INTERNET_DOCKER_MENU_NOTIFY="Docker Desktop will show an update notification in the menu bar."

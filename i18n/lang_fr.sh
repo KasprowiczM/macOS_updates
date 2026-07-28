@@ -357,6 +357,7 @@ L_INTERNET_MS_DEFERRALS_CLEARED_FMT="Reports de Microsoft AutoUpdate libérés :
 L_INTERNET_MS_DEFERRALS_ARMED_FMT="Produits Microsoft %s retenus pour %s jours"
 L_INTERNET_MS_DEFERRALS_DRYRUN_FMT="[DRY-RUN] Produits Microsoft seraient retenus : %s"
 L_INTERNET_MS_DEFERRALS_HOLDING_FMT="Aucune mise à jour disponible — ces produits Microsoft sont retenus par un report : %s"
+L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT="Le report Microsoft AutoUpdate n'a pas été enregistré pour : %s"
 L_INTERNET_MS_ACCEPT_GUI="Acceptez les mises à jour dans la fenêtre Microsoft AutoUpdate ouverte"
 L_INTERNET_DOCKER_CLI_OK="Docker Desktop — mise à jour vérifiée via CLI"
 L_INTERNET_DOCKER_MENU_NOTIFY="Docker Desktop affichera une notification de mise à jour dans la barre de menus."

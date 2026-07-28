@@ -382,6 +382,7 @@ L_INTERNET_MS_DEFERRALS_CLEARED_FMT="Adiamentos do Microsoft AutoUpdate liberado
 L_INTERNET_MS_DEFERRALS_ARMED_FMT="Produtos Microsoft %s retidos por %s dias"
 L_INTERNET_MS_DEFERRALS_DRYRUN_FMT="[DRY-RUN] Produtos Microsoft seriam retidos: %s"
 L_INTERNET_MS_DEFERRALS_HOLDING_FMT="Nenhuma atualização disponível — esses produtos Microsoft estão retidos por um adiamento: %s"
+L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT="O adiamento do Microsoft AutoUpdate não foi guardado para: %s"
 L_INTERNET_MS_ACCEPT_GUI="Aceite as atualizações na janela Microsoft AutoUpdate aberta"
 L_INTERNET_DOCKER_CLI_OK="Docker Desktop — atualização verificada via CLI"
 L_INTERNET_DOCKER_MENU_NOTIFY="O Docker Desktop mostrará uma notificação de atualização na barra de menus."
