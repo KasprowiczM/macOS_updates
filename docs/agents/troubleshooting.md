@@ -26,6 +26,7 @@
 | Office reported "Held back — upstream package regression" | Expected: Microsoft is offering a package older than what is installed. Nothing to do — it clears itself. See the section below |
 | Office re-downloads the same failing update every run | Fixed in v1.0.21. If it recurs, confirm `mau_deferral_preflight` is not clearing `DeferralDays` (see `critical_rules.md` §9a) |
 | Microsoft Teams not updating | Launch Teams for its normal self-update; if MAU surfaces fallback product `TEAMS21`, the shared handler installs it and verifies a clean final `msupdate --list` |
+| Internet-apps step feels slow | ~18% of it is a fixed settle that lets launched vendor updaters rewrite `Info.plist`. Lower with `MAC_UPDATE_INTERNET_SETTLE_SECONDS=5` (0 disables, clamped to 120) |
 | `mas outdated` or `mas upgrade` hangs | The script stops checks after 120s and upgrades after 1800s; override with `MAC_UPDATE_MAS_CHECK_TIMEOUT` / `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` only for unusually large downloads |
 | Docker not updating | Docker Desktop v4.37+ for `docker desktop update` |
 | App is only “triggered-unverified” | The toolkit launched the vendor updater but cannot prove completion; reopen the app and verify its About/version screen |
