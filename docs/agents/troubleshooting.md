@@ -71,7 +71,7 @@ Escape hatches:
 | Need | Command |
 |------|---------|
 | Never touch deferrals | `MAC_UPDATE_MAU_KEEP_DEFERRALS=1 bash update_all.sh` |
-| Shorten the quarantine window | `MAC_UPDATE_MAU_DEFERRAL_DAYS=7 bash update_all.sh` (clamped to 1–28) |
+| Shorten the quarantine window | `MAC_UPDATE_MAU_DEFERRAL_DAYS=14 bash update_all.sh` (default 7, clamped to 1–28) |
 | Preview the change only | `bash update_all.sh --dry-run` |
 | Undo everything by hand | `defaults import com.microsoft.autoupdate2 "$MAC_UPDATE_SESSION_DIR/mau_prefs_reconcile_backup.plist"` |
 

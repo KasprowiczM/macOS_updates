@@ -382,6 +382,7 @@ L_INTERNET_MS_DEFERRALS_CLEARED_FMT="Rilasciati differimenti di Microsoft AutoUp
 L_INTERNET_MS_DEFERRALS_ARMED_FMT="Trattenuti prodotti Microsoft %s per %s giorni"
 L_INTERNET_MS_DEFERRALS_DRYRUN_FMT="[DRY-RUN] Verrebbero trattenuti prodotti Microsoft: %s"
 L_INTERNET_MS_DEFERRALS_HOLDING_FMT="Nessun aggiornamento disponibile — questi prodotti Microsoft sono trattenuti da un differimento: %s"
+L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT="Il rinvio di Microsoft AutoUpdate non è stato salvato per: %s"
 L_INTERNET_MS_ACCEPT_GUI="Accettare gli aggiornamenti nella finestra Microsoft AutoUpdate aperta"
 L_INTERNET_DOCKER_CLI_OK="Docker Desktop — aggiornamento verificato via CLI"
 L_INTERNET_DOCKER_MENU_NOTIFY="Docker Desktop mostrerà una notifica di aggiornamento nella barra dei menu."

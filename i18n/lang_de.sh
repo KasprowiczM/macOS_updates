@@ -357,6 +357,7 @@ L_INTERNET_MS_DEFERRALS_CLEARED_FMT="Microsoft AutoUpdate-Aufschübe aufgehoben:
 L_INTERNET_MS_DEFERRALS_ARMED_FMT="Microsoft-Produkte %s für %s Tage zurückgehalten"
 L_INTERNET_MS_DEFERRALS_DRYRUN_FMT="[DRY-RUN] Würden Microsoft-Produkte zurückhalten: %s"
 L_INTERNET_MS_DEFERRALS_HOLDING_FMT="Keine Updates verfügbar — diese Microsoft-Produkte werden durch eine Verschiebung zurückgehalten: %s"
+L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT="Microsoft AutoUpdate-Zurückstellung wurde nicht gespeichert für: %s"
 L_INTERNET_MS_ACCEPT_GUI="Updates im geöffneten Microsoft-AutoUpdate-Fenster bestätigen"
 L_INTERNET_DOCKER_CLI_OK="Docker Desktop — Update über CLI geprüft"
 L_INTERNET_DOCKER_MENU_NOTIFY="Docker Desktop zeigt eine Update-Benachrichtigung in der Menüleiste an."

@@ -382,6 +382,7 @@ L_INTERNET_MS_DEFERRALS_CLEARED_FMT="Se liberaron aplazamientos de Microsoft Aut
 L_INTERNET_MS_DEFERRALS_ARMED_FMT="Retenidos productos Microsoft %s durante %s días"
 L_INTERNET_MS_DEFERRALS_DRYRUN_FMT="[DRY-RUN] Se retendrían productos Microsoft: %s"
 L_INTERNET_MS_DEFERRALS_HOLDING_FMT="No hay actualizaciones disponibles — estos productos Microsoft están retenidos por un aplazamiento: %s"
+L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT="El aplazamiento de Microsoft AutoUpdate no se guardó para: %s"
 L_INTERNET_MS_ACCEPT_GUI="Acepte las actualizaciones en la ventana abierta de Microsoft AutoUpdate"
 L_INTERNET_DOCKER_CLI_OK="Docker Desktop — actualización comprobada vía CLI"
 L_INTERNET_DOCKER_MENU_NOTIFY="Docker Desktop mostrará una notificación de actualización en la barra de menús."
