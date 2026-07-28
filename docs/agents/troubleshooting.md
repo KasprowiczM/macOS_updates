@@ -23,6 +23,8 @@
 | Firefox / KeePassXC / Trezor not updating | Check connectivity, `hdiutil verify`, `spctl --assess` |
 | Dev sync import rejects manifest path | Regenerate with `dev_sync/dev-sync-export.sh` |
 | Microsoft Office not updating | `msupdate` CLI required (ships with Office); inspect `msupdate --list`, then use the MAU package-regression procedure below before reinstalling anything |
+| Office reported "Held back — upstream package regression" | Expected: Microsoft is offering a package older than what is installed. Nothing to do — it clears itself. See the section below |
+| Office re-downloads the same failing update every run | Fixed in v1.0.21. If it recurs, confirm `mau_deferral_preflight` is not clearing `DeferralDays` (see `critical_rules.md` §9a) |
 | Microsoft Teams not updating | Launch Teams for its normal self-update; if MAU surfaces fallback product `TEAMS21`, the shared handler installs it and verifies a clean final `msupdate --list` |
 | `mas outdated` or `mas upgrade` hangs | The script stops checks after 120s and upgrades after 1800s; override with `MAC_UPDATE_MAS_CHECK_TIMEOUT` / `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` only for unusually large downloads |
 | Docker not updating | Docker Desktop v4.37+ for `docker desktop update` |
@@ -30,6 +32,51 @@
 | Intel Mac or macOS 12 and older | **Not supported** — Apple Silicon with macOS 13+ only |
 | Homebrew "untrusted taps" warning | `brew trust --formula <user>/<tap>/<formula>` or `brew untap` |
 | CI shellcheck fails | See `.shellcheckrc`; run same `find \| xargs shellcheck` as `.github/workflows/ci.yml` |
+
+## Microsoft AutoUpdate: the toolkit says "Held back — upstream package regression"
+
+This is the expected, correct outcome when Microsoft's Preview feed offers an
+Office package whose short version is **lower** than what is installed. It is not
+a bug in the toolkit and needs no action — the quarantine lifts automatically.
+
+Observed twice so far:
+
+| Date | Installed | Offered | Result |
+|------|-----------|---------|--------|
+| 2026-07-14 | `16.111.5` (`16.111.26071215`) | `16.111` → normalized `16.111.0` | PackageKit skip + code 112 |
+| 2026-07-28 | `16.111.5` (`16.111.26071215`) | `16.111.1` (`26071913`) | PackageKit skip + code 112 |
+
+Since v1.0.21 `update_internet_apps.sh` detects this before installing:
+
+1. `msupdate --list` runs first; the DeferralDays quarantine is left untouched.
+2. Each pending product's offered short version is compared to the installed
+   `CFBundleShortVersionString`.
+3. Strictly-older offers are quarantined via `OptionalUpdatesDeferrals` and
+   **excluded from `msupdate --install`** — the packages are never downloaded.
+4. Products whose offer has been corrected are released from the quarantine and
+   installed normally, in the same run.
+
+To confirm the diagnosis by hand:
+
+```bash
+MAU_CLI="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate"
+"$MAU_CLI" --list                       # what the feed offers
+defaults read "/Applications/Microsoft Word.app/Contents/Info" CFBundleShortVersionString
+defaults read com.microsoft.autoupdate2 OptionalUpdatesDeferrals
+grep -E 'Skipping component|Code=112' /var/log/install.log | tail -n 10
+```
+
+Escape hatches:
+
+| Need | Command |
+|------|---------|
+| Never touch deferrals | `MAC_UPDATE_MAU_KEEP_DEFERRALS=1 bash update_all.sh` |
+| Shorten the quarantine window | `MAC_UPDATE_MAU_DEFERRAL_DAYS=7 bash update_all.sh` (clamped to 1–28) |
+| Preview the change only | `bash update_all.sh --dry-run` |
+| Undo everything by hand | `defaults import com.microsoft.autoupdate2 "$MAC_UPDATE_SESSION_DIR/mau_prefs_reconcile_backup.plist"` |
+
+Do **not** work around it by editing a signed Office bundle, deleting the app, or
+forcing the lower component into place.
 
 ## Microsoft AutoUpdate: installer succeeded with no version change
 

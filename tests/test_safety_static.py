@@ -1220,5 +1220,184 @@ class InternetLibParserTests(unittest.TestCase):
             )
 
 
+I18N_DIR = REPO_ROOT / "i18n"
+LANGS = ("en", "pl", "es", "it", "pt", "de", "fr")
+KEY_DEF_RE = re.compile(r"^(L_[A-Z0-9_]+)=", re.MULTILINE)
+KEY_REF_RE = re.compile(r"\$\{?(L_[A-Z0-9_]+)")
+
+
+def _lang_keys(lang: str) -> dict[str, str]:
+    """Map every L_* key defined in one language file to its raw value."""
+    text = (I18N_DIR / f"lang_{lang}.sh").read_text(encoding="utf-8")
+    keys = {}
+    for line in text.splitlines():
+        match = re.match(r"^(L_[A-Z0-9_]+)=(.*)$", line)
+        if match:
+            keys[match.group(1)] = match.group(2)
+    return keys
+
+
+def _shell_sources() -> list[Path]:
+    """Every shell source that may reference a localization key."""
+    paths = sorted(REPO_ROOT.glob("*.sh")) + sorted((REPO_ROOT / "lib").glob("*.sh"))
+    return [p for p in paths if p.is_file()]
+
+
+class I18nCompletenessTests(unittest.TestCase):
+    """A referenced-but-undefined key expands to an empty string, so the run
+    prints a bare '⚠️' with no text. That shipped once already for the
+    L_INTERNET_MS_DEFERRALS_* keys; these tests make it a test failure."""
+
+    def test_every_referenced_key_is_defined_in_english(self) -> None:
+        defined = set(_lang_keys("en"))
+        referenced = set()
+        for path in _shell_sources():
+            referenced |= set(KEY_REF_RE.findall(path.read_text(encoding="utf-8")))
+        missing = sorted(referenced - defined)
+        self.assertEqual(
+            missing,
+            [],
+            f"referenced in shell but undefined in i18n/lang_en.sh: {missing}",
+        )
+
+    def test_all_languages_define_the_same_keys(self) -> None:
+        english = set(_lang_keys("en"))
+        for lang in LANGS:
+            with self.subTest(lang=lang):
+                keys = set(_lang_keys(lang))
+                self.assertEqual(
+                    sorted(english - keys), [], f"lang_{lang}.sh is missing keys"
+                )
+                self.assertEqual(
+                    sorted(keys - english), [], f"lang_{lang}.sh has extra keys"
+                )
+
+    def test_placeholder_counts_match_english(self) -> None:
+        """A translation that drops or adds a %s makes printf emit the wrong
+        text or consume the wrong argument."""
+        english = _lang_keys("en")
+        for lang in LANGS[1:]:
+            keys = _lang_keys(lang)
+            for key, en_value in english.items():
+                if key not in keys:
+                    continue
+                with self.subTest(lang=lang, key=key):
+                    self.assertEqual(
+                        keys[key].count("%s"),
+                        en_value.count("%s"),
+                        f"lang_{lang}.sh {key} has a different %s count than English",
+                    )
+
+    def test_exact_match_status_keys_stay_static(self) -> None:
+        """update_internet_apps.sh classifies failures by comparing the status
+        string exactly. A %s in any of these would silently reclassify it."""
+        static_keys = (
+            "L_INTERNET_STATUS_INSTALL_ERROR",
+            "L_INTERNET_STATUS_MOUNT_ERROR",
+            "L_INTERNET_STATUS_DOWNLOAD_ERROR",
+            "L_INTERNET_STATUS_EXTRACT_ERROR",
+            "L_INTERNET_STATUS_OFFLINE",
+            "L_INTERNET_STATUS_NO_URL",
+            "L_INTERNET_STATUS_CHECK_MAU",
+            "L_INTERNET_STATUS_MAU_MISSING",
+            "L_INTERNET_STATUS_MAU_QUARANTINED",
+            "L_INTERNET_STATUS_LAUNCH_FAILED",
+        )
+        for lang in LANGS:
+            keys = _lang_keys(lang)
+            for key in static_keys:
+                with self.subTest(lang=lang, key=key):
+                    self.assertIn(key, keys, f"lang_{lang}.sh is missing {key}")
+                    self.assertNotIn(
+                        "%s", keys[key], f"lang_{lang}.sh {key} must stay static"
+                    )
+
+    def test_quarantined_status_is_classified_as_soft_failure(self) -> None:
+        """The upstream-regression quarantine must warn without deferring the
+        macOS system update (step severity contract, exit 10 not exit 1)."""
+        text = (REPO_ROOT / "update_internet_apps.sh").read_text(encoding="utf-8")
+        soft_block = text.split("INTERNET_SOFT_FAIL=1")[0].rsplit("case ", 1)[-1]
+        self.assertIn("L_INTERNET_STATUS_MAU_QUARANTINED", soft_block)
+        hard_block = text.split("INTERNET_HARD_FAIL=1")[0].rsplit("case ", 1)[-1]
+        self.assertNotIn("L_INTERNET_STATUS_MAU_QUARANTINED", hard_block)
+
+
+class MauRegressionGuardTests(unittest.TestCase):
+    """Microsoft's Preview feed has twice offered an Office package whose short
+    version is lower than the installed app. PackageKit skips such a component
+    and the delta postinstall then fails with PKInstallErrorDomain Code=112, so
+    installing it can never succeed and must not be retried every run."""
+
+    LIB = REPO_ROOT / "lib" / "internet_app_updates.sh"
+
+    def _relation(self, installed: str, offered: str) -> str:
+        """Run the shell predicate the guard actually uses."""
+        script = (
+            "print_step(){ :; }; print_info(){ :; }; print_warn(){ :; };\n"
+            "print_ok(){ :; }; internet_msg(){ :; }; internet_diag_log(){ :; };\n"
+            "run_with_timeout(){ shift; \"$@\"; }; app_version(){ echo '?'; };\n"
+            "silent_launch_app(){ return 0; };\n"
+            f". '{self.LIB}'\n"
+            f"internet_version_relation '{installed}' '{offered}'\n"
+        )
+        result = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    def test_strictly_older_offer_is_a_regression(self) -> None:
+        self.assertEqual(self._relation("16.111.5", "16.111.1"), "newer")
+
+    def test_equal_short_version_is_not_a_regression(self) -> None:
+        """A build-only update keeps the short version; PackageKit accepts it."""
+        self.assertNotEqual(self._relation("16.111.5", "16.111.5"), "newer")
+
+    def test_corrected_feed_is_not_a_regression(self) -> None:
+        self.assertNotEqual(self._relation("16.111.5", "16.112.0"), "newer")
+
+    def test_guard_compares_short_version_not_build(self) -> None:
+        """CFBundleVersion (16.111.26071215) is a different numbering scale to
+        CFBundleShortVersionString (16.111.5); mixing them inverts the test."""
+        source = self.LIB.read_text(encoding="utf-8")
+        self.assertIn("CFBundleShortVersionString", source)
+        self.assertRegex(
+            source, r"mau_installed_short_version\(\)\s*\{[^}]*CFBundleShortVersionString"
+        )
+
+    def test_office_deferrals_are_not_cleared_unconditionally(self) -> None:
+        """The preflight must not release the quarantine before the feed has
+        been inspected — that is what caused the re-download loop."""
+        source = self.LIB.read_text(encoding="utf-8")
+        preflight = source.split("mau_deferral_preflight()", 1)[1].split("\n}", 1)[0]
+        self.assertIn('mau_clean_stale_deferrals "$plist" ""', preflight)
+        self.assertNotIn("$MAU_OFFICE_DEFERRAL_IDS", preflight)
+
+    def test_deferral_days_stay_in_documented_range(self) -> None:
+        script = (
+            "print_step(){ :; }; print_info(){ :; }; print_warn(){ :; };\n"
+            "print_ok(){ :; }; internet_msg(){ :; }; internet_diag_log(){ :; };\n"
+            "run_with_timeout(){ shift; \"$@\"; }; app_version(){ echo '?'; };\n"
+            "silent_launch_app(){ return 0; };\n"
+            f". '{self.LIB}'\n"
+            "for v in '' abc 0 1 28 29 999; do "
+            "MAC_UPDATE_MAU_DEFERRAL_DAYS=\"$v\" mau_deferral_days_value; done\n"
+        )
+        result = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=True,
+        )
+        values = [int(line) for line in result.stdout.split()]
+        self.assertEqual(values, [28, 28, 28, 1, 28, 28, 28])
+        for value in values:
+            self.assertTrue(1 <= value <= 28)
+
+
 if __name__ == "__main__":
     unittest.main()
