@@ -667,8 +667,32 @@ ACCEPTANCE CHECK output:
 0
 1
 ```
-Tests: run_tests.sh: 121 passed
-Deviations: none
+
+## Final Deliverables Summary (Tasks T1–T14)
+
+| Task | Title | Finding / Topic | Status | Commit |
+|------|-------|-----------------|--------|--------|
+| **T1** | Add TODO(H5) markers | H5 | Done | `467ba33` |
+| **T2** | Fix tautological Atlas test | T2a | Done | `562ac7b` |
+| **T3** | Deduplicate print_* functions | UI helper cleanup | Done | `d25d6db` |
+| **T4** | Localize last Polish strings | Polish strings / i18n | Done | `8902fa0` |
+| **T5** | Correct install.sh --help text | Architecture docs | Done | `5112add` |
+| **T6** | Surface copy_verified_app failures | Failure diagnostics | Done | `245ef2b` |
+| **T7** | Wait for TEE_PID in cleanup | Log truncation | Done | `b26ca20` |
+| **T8** | Gate version map merge | Inventory logic | Done | `833ef7b` |
+| **T9** | Pre-authenticate sudo | Non-interactive runs | Done | `14a348a` |
+| **T10** | Dynamic Bun version resolution | M21 | Done | `e1d3801` |
+| **T11** | Redact secrets in dev_sync Python | M22 | Done | `7d47b74` |
+| **T12** | Correct mas rationale and gate | M17 | Done | `d78fa23` |
+| **T13** | Document PATH decision | Scope drift decision | Done | `8caa547` |
+| **T14** | Low items remediation | L24–L32 | Done | `32619b9` |
+
+### Final Verification Results
+- `bash run_tests.sh`: **121 passed** (0 failures, 0 errors)
+- `gitleaks detect`: **0 secret leaks**
+- `bash -n *.sh`: **All shell scripts parse clean**
+- i18n Key Parity: **653 keys** across all 7 `lang_*.sh` files
+
 
 
 
