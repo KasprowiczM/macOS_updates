@@ -456,7 +456,61 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
         ''|*[!0-9]*) INTERNET_SETTLE=15 ;;
     esac
     [ "$INTERNET_SETTLE" -gt 120 ] && INTERNET_SETTLE=120
-    [ "$INTERNET_SETTLE" -gt 0 ] && sleep "$INTERNET_SETTLE"
+
+    unverified_apps=""
+    for status_var in STATUS_BRAVE STATUS_CLAUDE_APP STATUS_COMET STATUS_ANTIGRAVITY STATUS_ANTIGRAVITY_IDE STATUS_GEMINI STATUS_LMSTUDIO STATUS_PROTONVPN STATUS_PROTON_MAIL STATUS_MEGASYNC STATUS_PROTON_DRIVE STATUS_WARP STATUS_CURSOR STATUS_ASCENDO STATUS_APPCLEANER STATUS_OBSIDIAN STATUS_SPOTIFY STATUS_CAPCUT STATUS_RDMANAGER; do
+        eval "st=\$$status_var"
+        if [ "$st" = "$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED" ]; then
+            unverified_apps="$unverified_apps $status_var"
+        fi
+    done
+
+    if [ -n "$unverified_apps" ] && [ "$INTERNET_SETTLE" -gt 0 ]; then
+        stable_count=0
+        last_versions=""
+        elapsed=0
+        while [ "$elapsed" -lt "$INTERNET_SETTLE" ]; do
+            current_versions=""
+            for var in $unverified_apps; do
+                case "$var" in
+                    STATUS_BRAVE) ver="$(app_version '/Applications/Brave Browser.app' 2>/dev/null)" ;;
+                    STATUS_CLAUDE_APP) ver="$(app_version '/Applications/Claude.app' 2>/dev/null)" ;;
+                    STATUS_COMET) ver="$(app_version '/Applications/Comet.app' 2>/dev/null)" ;;
+                    STATUS_ANTIGRAVITY) ver="$(app_version '/Applications/Antigravity.app' 2>/dev/null)" ;;
+                    STATUS_ANTIGRAVITY_IDE) ver="$(app_version '/Applications/Antigravity IDE.app' 2>/dev/null)" ;;
+                    STATUS_GEMINI) ver="$(app_version '/Applications/Gemini.app' 2>/dev/null)" ;;
+                    STATUS_LMSTUDIO) ver="$(app_version '/Applications/LM Studio.app' 2>/dev/null)" ;;
+                    STATUS_PROTONVPN) ver="$(app_version '/Applications/ProtonVPN.app' 2>/dev/null)" ;;
+                    STATUS_PROTON_MAIL) ver="$(app_version '/Applications/Proton Mail.app' 2>/dev/null)" ;;
+                    STATUS_MEGASYNC) ver="$(app_version '/Applications/MEGAsync.app' 2>/dev/null)" ;;
+                    STATUS_PROTON_DRIVE) ver="$(app_version '/Applications/Proton Drive.app' 2>/dev/null)" ;;
+                    STATUS_WARP) ver="$(app_version '/Applications/Warp.app' 2>/dev/null)" ;;
+                    STATUS_CURSOR) ver="$(app_version '/Applications/Cursor.app' 2>/dev/null)" ;;
+                    STATUS_ASCENDO) ver="$(app_version '/Applications/Ascendo.app' 2>/dev/null)" ;;
+                    STATUS_APPCLEANER) ver="$(app_version '/Applications/AppCleaner.app' 2>/dev/null)" ;;
+                    STATUS_OBSIDIAN) ver="$(app_version '/Applications/Obsidian.app' 2>/dev/null)" ;;
+                    STATUS_SPOTIFY) ver="$(app_version '/Applications/Spotify.app' 2>/dev/null)" ;;
+                    STATUS_CAPCUT) ver="$(app_version '/Applications/CapCut.app' 2>/dev/null)" ;;
+                    STATUS_RDMANAGER) ver="$(app_version '/Applications/Remote Desktop Manager.app' 2>/dev/null)" ;;
+                    *) ver="" ;;
+                esac
+                current_versions="$current_versions $ver"
+            done
+            if [ -n "$last_versions" ] && [ "$current_versions" = "$last_versions" ]; then
+                stable_count=$((stable_count + 1))
+                if [ "$stable_count" -ge 3 ]; then
+                    break
+                fi
+            else
+                stable_count=0
+                last_versions="$current_versions"
+            fi
+            sleep 1
+            elapsed=$((elapsed + 1))
+        done
+    elif [ "$INTERNET_SETTLE" -gt 0 ]; then
+        sleep "$INTERNET_SETTLE"
+    fi
     capture_internet_app_versions "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
     print_ok "$(internet_msg "$L_INTERNET_SNAPSHOTS_SAVED" "$MAC_UPDATE_SESSION_DIR")"
 fi

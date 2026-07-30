@@ -339,6 +339,20 @@ i18n/lang_pt.sh 648
 Tests: test_all_update_scripts_source_i18n_and_no_polish_diacritics_in_print_statements — run_tests.sh: 120 passed
 Deviations: none
 
+## Task R17 - Performance pass
+Files: update_internet_apps.sh, lib/internet_registry.sh, lib/internet_apps.sh
+What changed: Replaced fixed settle sleep in `update_internet_apps.sh` with adaptive 1s polling for `LAUNCHED_UNVERIFIED` apps (early exit on 3 consecutive stable polls). Guarded config loading in `lib/internet_registry.sh` with `_INTERNET_REGISTRY_LOADED=1`. Replaced `sed` subprocess whitespace trimming in `lib/internet_registry.sh` and `lib/internet_apps.sh` with bash 3.2 parameter expansion. Kept python heredoc in `internet_version_relation` (R17d) to preserve 100% exact tuple comparison semantics for `MauRegressionGuardTests`.
+Why: Finding M23 and Performance items 2-4
+ACCEPTANCE CHECK command: grep -c '_INTERNET_REGISTRY_LOADED' lib/internet_registry.sh ; grep -c 'LAUNCHED_UNVERIFIED' update_internet_apps.sh
+ACCEPTANCE CHECK output:
+```
+3
+1
+```
+Tests: run_tests.sh: 120 passed
+Deviations: R17d skipped per prompt instruction ("if you cannot preserve them exactly, SKIP R17d and say so") to maintain exact version key tuple comparison semantics.
+
+
 
 
 

@@ -5,8 +5,11 @@ _internet_methods_config_path() {
     echo "${SCRIPT_DIR}/config/internet_app_methods.txt"
 }
 
+_INTERNET_REGISTRY_LOADED=0
+
 # Populates INTERNET_METHOD_APPS[], INTERNET_METHOD_TYPES[], INTERNET_METHOD_STATUS[]
 internet_registry_load() {
+    [ "${_INTERNET_REGISTRY_LOADED:-0}" -eq 1 ] && return 0
     local cfg line app method status
     INTERNET_METHOD_APPS=()
     INTERNET_METHOD_TYPES=()
@@ -15,7 +18,8 @@ internet_registry_load() {
     [ -f "$cfg" ] || return 1
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line%%#*}"
-        line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
         [ -n "$line" ] || continue
         # Validate: exactly 3 pipe-delimited fields (AppName|method|STATUS_VAR)
         case "$line" in
@@ -33,6 +37,7 @@ internet_registry_load() {
         INTERNET_METHOD_TYPES+=("$method")
         INTERNET_METHOD_STATUS+=("$status")
     done < "$cfg"
+    _INTERNET_REGISTRY_LOADED=1
     return 0
 }
 
@@ -62,7 +67,8 @@ internet_dispatch_run_all() {
     [ -f "$cfg" ] || return 1
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line%%#*}"
-        line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
         [ -n "$line" ] || continue
         fn="$line"
         if type "$fn" >/dev/null 2>&1; then
