@@ -827,6 +827,14 @@ class StaticShellSafetyTests(unittest.TestCase):
         # remaining greedy casks block should be informational only, not setting BREW_EXIT=1
         self.assertIn('Casks listed in greedy outdated check (informational only):', text)
 
+    def test_leaf_scripts_source_severity_and_have_soft_exit_path(self) -> None:
+        for script_name in ["update_brew.sh", "update_appstore.sh", "update_npm_cli.sh"]:
+            with self.subTest(script=script_name):
+                text = self.read_script(script_name)
+                self.assertIn('lib/severity.sh', text, msg=f"{script_name} must source lib/severity.sh")
+                self.assertIn('mac_update_severity_exit_code', text, msg=f"{script_name} must exit with mac_update_severity_exit_code")
+                self.assertIn('SOFT_FAIL=1', text, msg=f"{script_name} must set SOFT_FAIL=1 for non-fatal soft errors")
+
     def test_cli_flags_all_consumed(self) -> None:
         """Every MAC_UPDATE_* flag exported by lib/cli.sh must be read somewhere.
 

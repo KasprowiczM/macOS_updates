@@ -31,6 +31,8 @@ mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
 . "$SCRIPT_DIR/i18n/loader.sh"
+. "$SCRIPT_DIR/lib/severity.sh"
+mac_update_severity_init
 
 cleanup_brew() {
     [ -f "${BREW_UPGRADE_LOG:-}" ] && rm -f "$BREW_UPGRADE_LOG" 2>/dev/null || true
@@ -47,7 +49,6 @@ print_error(){ echo -e "  ${RED}❌ $1${NC}"; }
 
 # ============================================================
 print_header "$L_BREW_TITLE"
-BREW_EXIT=0
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
     print_warn "DRY-RUN mode — Homebrew upgrades will not run"
 fi
@@ -70,11 +71,11 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_BREW_SAVING_BEFORE"
     if ! brew list --formula --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_formulae_before.txt"; then
         print_warn "Could not save the pre-update formula snapshot."
-        BREW_EXIT=1
+        SOFT_FAIL=1
     fi
     if ! brew list --cask --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_casks_before.txt"; then
         print_warn "Could not save the pre-update cask snapshot."
-        BREW_EXIT=1
+        SOFT_FAIL=1
     fi
 fi
 
@@ -89,7 +90,7 @@ if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
     echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
     HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy || exit 1
     print_info "[DRY-RUN] Would run: brew update, brew upgrade, cleanup, doctor"
-    exit "$BREW_EXIT"
+    exit 0
 fi
 
 # ============================================================
@@ -100,8 +101,9 @@ print_header "$L_BREW_UPDATE"
 if brew update; then
     print_ok "$L_BREW_UPDATED"
 else
-    print_error "brew update failed; refusing to use potentially stale metadata."
-    exit 1
+    print_warn "brew update failed; refusing to use potentially stale metadata."
+    SOFT_FAIL=1
+    exit "$(mac_update_severity_exit_code)"
 fi
 
 # ============================================================
@@ -111,9 +113,10 @@ print_header "$L_BREW_OUTDATED"
 
 echo -e "${CYAN}$L_BREW_OUTDATED_LIST${NC}"
 if ! OUTDATED_FORMULAE=$(brew outdated --formula 2>&1); then
-    print_error "brew outdated --formula failed; update state is unknown."
+    print_warn "brew outdated --formula failed; update state is unknown."
     [ -n "$OUTDATED_FORMULAE" ] && printf '%s\n' "$OUTDATED_FORMULAE"
-    exit 1
+    SOFT_FAIL=1
+    exit "$(mac_update_severity_exit_code)"
 fi
 if [ -z "$OUTDATED_FORMULAE" ]; then
     print_ok "All formulae are up to date!"
@@ -124,9 +127,10 @@ fi
 echo ""
 echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
 if ! OUTDATED_CASKS=$(brew outdated --cask --greedy 2>&1); then
-    print_error "brew outdated --cask --greedy failed; update state is unknown."
+    print_warn "brew outdated --cask --greedy failed; update state is unknown."
     [ -n "$OUTDATED_CASKS" ] && printf '%s\n' "$OUTDATED_CASKS"
-    exit 1
+    SOFT_FAIL=1
+    exit "$(mac_update_severity_exit_code)"
 fi
 if [ -z "$OUTDATED_CASKS" ]; then
     print_ok "All casks are up to date!"
@@ -164,12 +168,9 @@ fi
 # KROK 3: AKTUALIZACJA FORMULAE
 # ============================================================
 print_header "$L_BREW_UPGRADE_FORMULAE"
-BREW_EXIT_BEFORE_FORMULA=$BREW_EXIT
 FORMULA_UPGRADE_FAILED=0
 
 # Capture output so we can detect recoverable link conflicts
-# (e.g., "Error: The `brew link` step did not complete successfully" for uv,
-# which happens when an unmanaged binary squats on /opt/homebrew/bin/<name>).
 BREW_UPGRADE_LOG=$(mktemp "${TMPDIR:-/tmp}/brew_upgrade.XXXXXX") || {
     print_error "Could not create the Homebrew upgrade diagnostic log."
     exit 1
@@ -178,22 +179,14 @@ if brew upgrade --formula 2>&1 | tee "$BREW_UPGRADE_LOG"; then
     print_ok "$L_BREW_FORMULAE_OK"
 else
     print_warn "$L_BREW_FORMULAE_WARN"
-    BREW_EXIT=1
+    HARD_FAIL=1
     FORMULA_UPGRADE_FAILED=1
 fi
 
 # ============================================================
 # KROK 3.5: OPT-IN RECOVERY DLA "BREW LINK DID NOT COMPLETE"
-# Wykrywa kegi, które się zainstalowały, ale nie zostały zlinkowane
-# (typowo przez kolizję z istniejącym binarnym w /opt/homebrew/bin lub
-# /usr/local/bin). Recovery is disabled by default because --overwrite can
-# replace an intentionally unmanaged command. It requires an explicit env opt-in.
 # ============================================================
 LINK_FAILED_KEGS=$(awk '
-    # A per-formula header ("==> Upgrading uv") names a keg. Skip the
-    # "==> Upgrading N outdated packages:" summary so its count is never
-    # mistaken for a keg name. $3 stays the formula even if brew later adds
-    # trailing "old -> new" version text to the header line.
     /^==> Upgrading / {
         if ($0 !~ /outdated package/) { kegname = $3 }
         next
@@ -214,7 +207,6 @@ elif [ -n "$LINK_FAILED_KEGS" ]; then
     while IFS= read -r keg; do
         keg=$(echo "$keg" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         [ -z "$keg" ] && continue
-        # Reject anything that isn't a plain formula name to keep `brew link` safe
         case "$keg" in
             ""|*[!a-zA-Z0-9@+_./-]*) continue ;;
         esac
@@ -230,11 +222,12 @@ elif [ -n "$LINK_FAILED_KEGS" ]; then
 $LINK_FAILED_KEGS
 EOF
     if [ "$RELINKED" -gt 0 ] && [ "$RELINK_FAILED" -eq 0 ]; then
-        # Clear only the formula-upgrade failure; preserve earlier snapshot errors.
         if [ "$FORMULA_UPGRADE_FAILED" -eq 1 ]; then
-            BREW_EXIT=$BREW_EXIT_BEFORE_FORMULA
+            HARD_FAIL=0
         fi
         print_ok "$L_BREW_LINK_RECOVERY_OK"
+    elif [ "$RELINK_FAILED" -gt 0 ]; then
+        SOFT_FAIL=1
     fi
 fi
 
@@ -243,12 +236,11 @@ fi
 # ============================================================
 print_header "$L_BREW_CASKS_UPGRADE"
 
-# Aktualizuj casks — flaga --no-quarantine usunięta w Homebrew 4.x (była przestarzała)
 if brew upgrade --cask --greedy; then
     print_ok "$L_BREW_CASKS_OK"
 else
     print_warn "$L_BREW_CASKS_WARN"
-    BREW_EXIT=1
+    HARD_FAIL=1
 fi
 fi
 
@@ -256,23 +248,23 @@ fi
 # formula or greedy cask remains outdated, or if verification itself fails.
 print_header "$L_BREW_OUTDATED"
 if ! REMAINING_FORMULAE=$(brew outdated --formula 2>&1); then
-    print_error "Final brew outdated --formula verification failed."
+    print_warn "Final brew outdated --formula verification failed."
     [ -n "$REMAINING_FORMULAE" ] && printf '%s\n' "$REMAINING_FORMULAE"
-    BREW_EXIT=1
+    SOFT_FAIL=1
 elif [ -n "$REMAINING_FORMULAE" ]; then
     print_error "Formulae still outdated after upgrade:"
     printf '%s\n' "$REMAINING_FORMULAE"
-    BREW_EXIT=1
+    HARD_FAIL=1
 fi
 if ! REMAINING_CASKS=$(brew outdated --cask --greedy 2>&1); then
-    print_error "Final brew outdated --cask --greedy verification failed."
+    print_warn "Final brew outdated --cask --greedy verification failed."
     [ -n "$REMAINING_CASKS" ] && printf '%s\n' "$REMAINING_CASKS"
-    BREW_EXIT=1
+    SOFT_FAIL=1
 elif [ -n "$REMAINING_CASKS" ]; then
     print_info "Casks listed in greedy outdated check (informational only):"
     printf '%s\n' "$REMAINING_CASKS"
 fi
-if [ "$BREW_EXIT" -eq 0 ]; then
+if [ "$HARD_FAIL" -eq 0 ] && [ "$SOFT_FAIL" -eq 0 ]; then
     print_ok "$L_BREW_SUMMARY"
 fi
 
@@ -284,14 +276,9 @@ if [ "${MAC_UPDATE_SKIP_DOCTOR:-0}" = "1" ]; then
 else
 print_header "$L_BREW_HEALTH_CHECKING"
 
-# brew doctor returns non-zero for warnings. Keep the status so an unexpected
-# diagnostic cannot be turned into a green result by output filtering.
 DOCTOR_OUT=$(brew doctor 2>&1)
 DOCTOR_EXIT=$?
 
-# Druga warstwa auto-recovery: brew doctor czasem zgłasza "unlinked kegs" nawet
-# kiedy brew upgrade nie pokazał Error (np. keg od poprzedniej sesji).
-# Wyciągnij nazwy ze sekcji "You have unlinked kegs in your Cellar".
 UNLINKED_KEGS=$(echo "$DOCTOR_OUT" | awk '
     /You have unlinked kegs in your Cellar/ { in_block = 1; next }
     in_block && /^$/ { in_block = 0; next }
@@ -318,15 +305,11 @@ elif [ -n "$UNLINKED_KEGS" ]; then
 $UNLINKED_KEGS
 EOF
     if [ "$RELINKED2" -gt 0 ]; then
-        # Re-run doctor po naprawie, żeby aktualne wyjście nie zawierało już tej sekcji
         DOCTOR_OUT=$(brew doctor 2>&1)
         DOCTOR_EXIT=$?
     fi
 fi
 
-# Suppress one narrowly-known false positive only when the complete dylib list
-# contains exactly Cisco's libASAF.dylib. Any second path preserves the whole
-# warning block, including its header and remediation text.
 DOCTOR_FILTERED=$(printf '%s\n' "$DOCTOR_OUT" | awk '
     function emit_dylib_block() {
         if (!(dylib_paths == 1 && asaf_paths == 1)) {
@@ -375,7 +358,7 @@ DOCTOR_ERRORS=$(printf '%s\n' "$DOCTOR_FILTERED" | grep '^Error:' 2>/dev/null ||
 if [ -n "$DOCTOR_ERRORS" ]; then
     [ -n "$DOCTOR_FILTERED" ] && printf '%s\n' "$DOCTOR_FILTERED"
     print_warn "$L_BREW_HEALTH_WARN"
-    BREW_EXIT=1
+    SOFT_FAIL=1
 elif [ -n "$REAL_WARNINGS" ]; then
     [ -n "$DOCTOR_FILTERED" ] && printf '%s\n' "$DOCTOR_FILTERED"
     print_info "brew doctor reported health advisories (warnings only)."
@@ -404,7 +387,7 @@ if brew cleanup --prune=all 2>/dev/null || brew cleanup; then
     fi
 else
     print_warn "Homebrew cleanup failed."
-    BREW_EXIT=1
+    SOFT_FAIL=1
 fi
 
 # ============================================================
@@ -426,12 +409,12 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     if ! brew list --formula --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_formulae_after.txt"; then
         print_warn "Could not save the post-update formula snapshot."
         BREW_SNAPSHOT_OK=0
-        BREW_EXIT=1
+        SOFT_FAIL=1
     fi
     if ! brew list --cask --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_casks_after.txt"; then
         print_warn "Could not save the post-update cask snapshot."
         BREW_SNAPSHOT_OK=0
-        BREW_EXIT=1
+        SOFT_FAIL=1
     fi
     if [ "$BREW_SNAPSHOT_OK" -eq 1 ]; then
         print_ok "$L_BREW_SNAPSHOTS_SAVED_TO $MAC_UPDATE_SESSION_DIR"
@@ -439,10 +422,11 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
 fi
 
 print_header "$L_BREW_SCRIPT_DONE"
-if [ "$BREW_EXIT" -eq 0 ]; then
+BREW_FINAL_EXIT="$(mac_update_severity_exit_code)"
+if [ "$BREW_FINAL_EXIT" -eq 0 ]; then
     echo -e "  ${GREEN}$L_BREW_ALL_DONE${NC}"
 else
-    print_error "Homebrew finished with errors. Review output above."
+    print_error "Homebrew finished with errors or soft warnings. Review output above."
 fi
 echo ""
-exit "$BREW_EXIT"
+exit "$BREW_FINAL_EXIT"

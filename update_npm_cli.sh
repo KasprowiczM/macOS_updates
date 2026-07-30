@@ -30,6 +30,8 @@ mac_update_require_supported_platform || exit 1
 
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
+. "$SCRIPT_DIR/lib/severity.sh"
+mac_update_severity_init
 
 TOOLCHAIN_HOME="${MAC_UPDATE_TOOLCHAIN_HOME:-$HOME/.local/share/mac-update}"
 N_PREFIX="$TOOLCHAIN_HOME/node"
@@ -335,8 +337,15 @@ write_cli_snapshot() {
 }
 
 detect_latest_node_version() {
-    curl -fsSL --max-time 60 --retry 3 --retry-delay 2 https://nodejs.org/dist/index.json \
-        | python3 -c 'import json,sys; arr=json.load(sys.stdin); print(arr[0]["version"])' 2>/dev/null
+    local ver
+    ver="$(curl -fsSL --max-time 60 --retry 3 --retry-delay 2 https://nodejs.org/dist/index.json \
+        | python3 -c 'import json,sys; arr=json.load(sys.stdin); print(arr[0]["version"])' 2>/dev/null)"
+    if [ -n "$ver" ]; then
+        echo "$ver"
+        return 0
+    fi
+    SOFT_FAIL=1
+    return 1
 }
 
 install_node_tarball() {
@@ -682,10 +691,11 @@ install_latest_npm_packages() {
     hash -r 2>/dev/null || true
 
     if [ "$failures" -ne 0 ]; then
-        print_error "$failures aktualizacji npm/self-update zakończyło się błędem"
+        print_warn "$failures aktualizacji npm/self-update zakończyło się błędem"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
             print_info "Diagnostyka: $MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"
         fi
+        SOFT_FAIL=1
         return 1
     fi
     return 0
@@ -752,46 +762,46 @@ fi
 NPM_CLI_EXIT=0
 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
     if ! : > "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"; then
-        print_error "Nie udało się utworzyć logu diagnostycznego npm"
-        NPM_CLI_EXIT=1
+        print_warn "Nie udało się utworzyć logu diagnostycznego npm"
+        SOFT_FAIL=1
     fi
 fi
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "Zapisuję snapshot CLI przed aktualizacją..."
     if ! write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_before.txt"; then
-        print_error "Nie udało się zapisać snapshotu CLI przed aktualizacją"
-        NPM_CLI_EXIT=1
+        print_warn "Nie udało się zapisać snapshotu CLI przed aktualizacją"
+        SOFT_FAIL=1
     fi
 fi
 
 NODE_READY=1
 if ! ensure_latest_node; then
-    NPM_CLI_EXIT=1
     NODE_READY=0
 fi
 if [ "$NODE_READY" -eq 1 ]; then
-    install_latest_npm_packages || NPM_CLI_EXIT=1
+    install_latest_npm_packages || SOFT_FAIL=1
 else
     print_error "Pomijam pakiety npm, ponieważ aktualizacja Node.js nie powiodła się"
 fi
-ensure_latest_bun || NPM_CLI_EXIT=1
+ensure_latest_bun || true
 remove_legacy_brew_formulas
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "Zapisuję snapshot CLI po aktualizacji..."
     if ! write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_after.txt"; then
-        print_error "Nie udało się zapisać snapshotu CLI po aktualizacji"
-        NPM_CLI_EXIT=1
+        print_warn "Nie udało się zapisać snapshotu CLI po aktualizacji"
+        SOFT_FAIL=1
     fi
 fi
 
+NPM_CLI_EXIT="$(mac_update_severity_exit_code)"
 if [ "$NPM_CLI_EXIT" -ne 0 ]; then
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -s "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
         print_warn "Ostatnia diagnostyka npm/self-update (sanityzowana):"
         tail -n 20 "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" | sed 's/^/    /'
     fi
-    print_header "❌ Native CLI & npm — zakończono z błędami"
+    print_header "⚠️  Native CLI & npm — zakończono z błędami/ostrzeżeniami"
     exit "$NPM_CLI_EXIT"
 fi
 
