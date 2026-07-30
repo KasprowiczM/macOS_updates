@@ -41,7 +41,7 @@ trap cleanup_brew EXIT
 trap 'cleanup_brew; exit 130' INT TERM
 
 strip_ansi() {
-    sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g' -e 's/\033\[[0-9;]*[a-zA-Z]//g'
+    sed $'s/\033\\[[0-9;]*[a-zA-Z]//g'
 }
 
 print_header() { ui_print_header "$1"; }

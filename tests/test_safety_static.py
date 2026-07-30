@@ -999,12 +999,29 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("fallback_mas", prescan_block)
         self.assertIn("fallback_new", prescan_block)
 
+    @unittest.skipUnless(
+        __import__("shutil").which("bash"),
+        "bash not available"
+    )
     def test_brew_outputs_use_ansi_stripping(self) -> None:
         """update_brew.sh must define strip_ansi and pipe brew outputs through it."""
         text = self.read_script("update_brew.sh")
         self.assertIn("strip_ansi() {", text)
         self.assertIn("brew outdated --formula 2>&1 | strip_ansi", text)
         self.assertIn("brew doctor 2>&1 | strip_ansi", text)
+
+        script = (
+            f'strip_ansi() {{ {text.split("strip_ansi() {")[1].split("}")[0]} }}\n'
+            f'printf "A\\033[0;31mR\\033[0mB\\n" | strip_ansi\n'
+        )
+        res = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=REPO_ROOT,
+        )
+        self.assertEqual(res.stdout.strip(), "ARB")
 
     def test_update_npm_cli_expands_node_manager_paths(self) -> None:
         """update_npm_cli.sh must expand PATH to include standard Node manager locations."""
