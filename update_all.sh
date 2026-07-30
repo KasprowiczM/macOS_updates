@@ -696,18 +696,24 @@ if os.path.exists(new_formula_file):
         pattern_4a = r'((?:\| [^\n]+\|\n)+)(\n+### 4b\.)'
         m4a = re.search(pattern_4a, content)
         if m4a:
-            insert_pos = m4a.start(2)  # pozycja przed \n\n### 4b.
+            insert_pos = m4a.start(2)
             content = content[:insert_pos] + new_rows + content[insert_pos:]
             changes_made = True
             print(f"  ✅ Dodano {len(items)} nowych formulae do APPLICATIONS.md (sekcja 4a)")
+        else:
+            fallback_4a = r'(### 4a\..*?)(\n+###|\n+##|\Z)'
+            m4a_fb = re.search(fallback_4a, content, re.DOTALL)
+            if m4a_fb:
+                insert_pos = m4a_fb.start(2)
+                content = content[:insert_pos] + new_rows + content[insert_pos:]
+                changes_made = True
+                print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia {len(items)} formulae w sekcji 4a")
 
 # Add new brew casks (appended at end of 4c table)
-# POPRAWKA: wstawiamy NA KOŃCU tabeli 4c, nie przed uwagą tekstową
 new_cask_file = os.path.join(session_dir, 'new_brew_casks.txt')
 if os.path.exists(new_cask_file):
     with open(new_cask_file) as f:
         items = [l.strip().split(None, 1) for l in f if l.strip()]
-    # Deduplikuj
     items = [p for p in items if not re.search(r'\|\s*' + re.escape(p[0]) + r'\s*\|', content)]
     if items:
         new_rows = ''
@@ -715,15 +721,21 @@ if os.path.exists(new_cask_file):
             name = parts[0]
             ver = parts[1] if len(parts) > 1 else '?'
             new_rows += f"| {name} | {ver} | 🆕 NOWY — opis do uzupełnienia |\n"
-        # Znajdź tabelę 4c i wstaw na końcu (przed > **Uwaga lub przed ## Podsumowanie)
-        # Wzorzec: ostatni wiersz tabeli 4c przed pustą linią lub uwagą
         pattern_4c = r'(### 4c\..*?)((?:\| [^\n]+\|\n)+)(\n+>|\n+##)'
         m4c = re.search(pattern_4c, content, re.DOTALL)
         if m4c:
-            insert_pos = m4c.start(3)  # pozycja przed pustą linią/uwagą
+            insert_pos = m4c.start(3)
             content = content[:insert_pos] + new_rows + content[insert_pos:]
             changes_made = True
             print(f"  ✅ Dodano {len(items)} nowych casks do APPLICATIONS.md (sekcja 4c)")
+        else:
+            fallback_4c = r'(### 4c\..*?)(\n+###|\n+##|\Z)'
+            m4c_fb = re.search(fallback_4c, content, re.DOTALL)
+            if m4c_fb:
+                insert_pos = m4c_fb.start(2)
+                content = content[:insert_pos] + new_rows + content[insert_pos:]
+                changes_made = True
+                print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia {len(items)} casks w sekcji 4c")
 
 # Add new App Store apps (to GRUPA 2, before iPad apps note)
 new_mas_file = os.path.join(session_dir, 'new_mas_apps.txt')
@@ -743,6 +755,12 @@ if os.path.exists(new_mas_file):
             content = content.replace(marker, new_rows + "\n" + marker)
             changes_made = True
             print(f"  ✅ Dodano {len(lines)} nowych aplikacji App Store do APPLICATIONS.md (GRUPA 2)")
+        else:
+            fallback_mas = "## GRUPA 3"
+            if fallback_mas in content:
+                content = content.replace(fallback_mas, new_rows + "\n" + fallback_mas)
+                changes_made = True
+                print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia aplikacji App Store przed GRUPĄ 3")
 
 # Add new /Applications apps not already handled via brew/mas
 new_apps_file = os.path.join(session_dir, 'new_apps.txt')
@@ -809,6 +827,16 @@ if os.path.exists(new_apps_file):
                 content = content.replace(marker, new_section + "\n" + marker)
                 changes_made = True
                 print(f"  ✅ Dodano {len(unhandled)} nowych aplikacji do APPLICATIONS.md (GRUPA 3 — sekcja 🆕)")
+            else:
+                fallback_new = "## GRUPA 4"
+                if fallback_new in content:
+                    content = content.replace(fallback_new, new_section + "\n" + fallback_new)
+                    changes_made = True
+                    print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia nowych aplikacji przed GRUPĄ 4")
+                else:
+                    content = content.rstrip() + "\n\n" + new_section
+                    changes_made = True
+                    print(f"  ⚠️  Użyto kotwicy zapasowej (dołączenie na końcu) dla nowych aplikacji")
 
 # Update the analysis date
 today = datetime.now().strftime('%Y-%m-%d')
