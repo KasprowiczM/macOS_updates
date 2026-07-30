@@ -34,7 +34,7 @@ bash -n update_all.sh                   # Syntax check
 ## Non-Negotiable Rules
 
 1. **`softwareupdate` MUST have `-R`**
-2. **`mas upgrade` MUST have `sudo`** (CVE-2025-43411)
+2. **`mas upgrade` MUST have `sudo`** (macOS 15.7.2+/14.8.2+/26.1+ entitlement change, see https://github.com/orgs/Homebrew/discussions/6550)
 3. **Bash 3.2 only** — no `declare -A`, `mapfile`, `readarray`
 4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests); `dev_sync/` and `scripts/fix_mcp_configs.py` are the existing Python backend/tools.
 5. **No hardcoded paths** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`

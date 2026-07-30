@@ -7,7 +7,7 @@ sudo softwareupdate -ia -R --verbose   # CORRECT — writes boot metadata
 ```
 `-R` only restarts or shuts down when required, so it is safe to keep on every install path. If the user declines a restart-required update, do not install it without `-R`; exit non-zero with manual instructions.
 
-## 2. mas MUST use `sudo` (CVE-2025-43411)
+## 2. mas MUST use `sudo` (macOS 15.7.2+/14.8.2+/26.1+ entitlement change, see https://github.com/orgs/Homebrew/discussions/6550)
 ```bash
 export MAS_NO_AUTO_INDEX=1   # suppress Spotlight warnings
 sudo env MAS_NO_AUTO_INDEX=1 mas upgrade

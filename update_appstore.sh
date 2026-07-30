@@ -12,7 +12,7 @@ set -o pipefail
 # Strategia dwutorowa:
 #   TOR 1 — sudo mas upgrade
 #     Aktualizuje wszystkie natywne aplikacje macOS z App Store.
-#     Wymaga sudo (macOS 26.x, CVE-2025-43411).
+#     Wymaga sudo (macOS entitlement change, see https://github.com/orgs/Homebrew/discussions/6550).
 #
 #   TOR 2 — Automatyzacja GUI App Store (AppleScript)
 #     Aktualizuje aplikacje iPad na Apple Silicon (np. UniFi,
@@ -21,7 +21,7 @@ set -o pipefail
 #
 # Wymagania:
 #   - Homebrew  (wykrywany automatycznie)
-#   - mas 4.0+  (instalowany/aktualizowany automatycznie)
+#   - mas 4.1+  (instalowany/aktualizowany automatycznie)
 #   - sudo      (hasło przy mas upgrade)
 #   - Accessibility dla terminala (sprawdzane i instruowane)
 #
@@ -105,9 +105,11 @@ if ! command -v mas &> /dev/null; then
     fi
 fi
 
-# Check version — only update if < 4.0 (avoid slow brew update)
+# Check version — only update if < 4.1 (avoid slow brew update)
 MAS_VER=$(mas version 2>/dev/null || echo "0.0.0")
 MAS_MAJOR=$(echo "$MAS_VER" | cut -d'.' -f1)
+MAS_MINOR=$(echo "$MAS_VER" | cut -d'.' -f2)
+MAS_MINOR=${MAS_MINOR:-0}
 print_ok "$L_MAS_VERSION $MAS_VER"
 
 case "$MAS_MAJOR" in
@@ -116,8 +118,13 @@ case "$MAS_MAJOR" in
         exit 1
         ;;
 esac
+case "$MAS_MINOR" in
+    ''|*[!0-9]*)
+        MAS_MINOR=0
+        ;;
+esac
 
-if [ "$MAS_MAJOR" -lt 4 ]; then
+if [ "$MAS_MAJOR" -lt 4 ] || { [ "$MAS_MAJOR" -eq 4 ] && [ "$MAS_MINOR" -lt 1 ]; }; then
     print_warn "$L_MAS_VERSION_OLD"
     if ! HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade mas 2>/dev/null \
         && ! brew upgrade mas; then
@@ -126,14 +133,21 @@ if [ "$MAS_MAJOR" -lt 4 ]; then
     fi
     MAS_VER=$(mas version 2>/dev/null || echo "?")
     MAS_MAJOR=$(echo "$MAS_VER" | cut -d'.' -f1)
+    MAS_MINOR=$(echo "$MAS_VER" | cut -d'.' -f2)
+    MAS_MINOR=${MAS_MINOR:-0}
     case "$MAS_MAJOR" in
         ''|*[!0-9]*)
             print_error "Could not parse the upgraded mas version: $MAS_VER"
             exit 1
             ;;
     esac
-    if [ "$MAS_MAJOR" -lt 4 ]; then
-        print_error "mas 4.0 or newer is required; detected: $MAS_VER"
+    case "$MAS_MINOR" in
+        ''|*[!0-9]*)
+            MAS_MINOR=0
+            ;;
+    esac
+    if [ "$MAS_MAJOR" -lt 4 ] || { [ "$MAS_MAJOR" -eq 4 ] && [ "$MAS_MINOR" -lt 1 ]; }; then
+        print_error "mas 4.1 or newer is required; detected: $MAS_VER"
         exit 1
     fi
     print_ok "$L_MAS_VERSION_UPDATED $MAS_VER"
@@ -231,6 +245,7 @@ if [ -z "$NATIVE_OUTDATED" ]; then
     print_ok "$L_APPSTORE_NO_UPDATES — sudo mas upgrade skipped"
 else
     if sudo -v; then
+        # TODO(M17): Test whether mas 4.1+ can be invoked without outer sudo on real hardware (see https://github.com/orgs/Homebrew/discussions/6550)
         MAS_TOR1_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
             sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade 2>&1)
         MAS_TOR1_EXIT=$?

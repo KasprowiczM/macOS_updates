@@ -190,7 +190,7 @@ bash update_all.sh --dry-run -y
 ## Critical technical notes
 
 - **`softwareupdate` must use `-R`** — otherwise updates download but never apply.
-- **`mas upgrade` must use `sudo`** on macOS 26.x (CVE-2025-43411).
+- **`mas upgrade` must use `sudo`** on macOS 14.8.2+/15.7.2+/26.x (entitlement change, see https://github.com/orgs/Homebrew/discussions/6550).
 - **Bash 3.2+** throughout — no `declare -A`, `mapfile`, `readarray`.
 - Downloaded app bundles are verified, installed through a rollback-safe staged swap, and mounted at unique per-session DMG mountpoints.
 - Private inventory/history writes and cloud imports use atomic replacement; imports stage accepted private files before committing them.
