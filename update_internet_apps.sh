@@ -274,7 +274,7 @@ copy_verified_app() {
 
     # Quit the running app before replacing its bundle (ignore errors if not running).
     app_name="${app_label%.app}"
-    osascript -e "tell application \"$app_name\" to quit" 2>/dev/null || true
+    osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' -- "$app_name" 2>/dev/null || true
     sleep 1
 
     if [ "$had_existing" -eq 1 ] && ! mv "$dest" "$backup" 2>/dev/null; then
