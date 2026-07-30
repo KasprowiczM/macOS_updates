@@ -13,3 +13,10 @@ What changed: Created lib/severity.sh defining MAC_UPDATE_SOFT_EXIT=10 and sever
 Why: Finding C1 - Leaf orchestrators lacked soft exit paths, causing non-critical unverifiable states (like offline checks, snapshot errors, or background installs) to trigger hard exit code 1 and block system updates.
 Tests: test_leaf_scripts_source_severity_and_have_soft_exit_path, test_appstore_success_header_depends_on_final_exit_status (run_tests.sh passed 96 tests)
 Deviations: none
+
+## Task 3 - Classify the three unclassified internet-app statuses
+Files: update_internet_apps.sh, tests/test_safety_static.py
+What changed: Added L_INTERNET_STATUS_UNKNOWN_VERSION and L_INTERNET_STATUS_MAU_OPENED to the SOFT failure case in update_internet_apps.sh. Extended I18nCompletenessTests with test_all_internet_status_constants_are_classified to enforce that every L_INTERNET_STATUS_* constant belongs to hard, soft, or benign allowlist.
+Why: Finding H12 - Unclassified status constants previously produced exit code 0, misreporting unverifiable runs as completely clean.
+Tests: test_all_internet_status_constants_are_classified (run_tests.sh passed 97 tests)
+Deviations: none

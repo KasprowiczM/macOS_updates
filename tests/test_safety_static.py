@@ -1336,6 +1336,45 @@ class I18nCompletenessTests(unittest.TestCase):
         hard_block = text.split("INTERNET_HARD_FAIL=1")[0].rsplit("case ", 1)[-1]
         self.assertNotIn("L_INTERNET_STATUS_MAU_QUARANTINED", hard_block)
 
+    def test_all_internet_status_constants_are_classified(self) -> None:
+        """Every L_INTERNET_STATUS_* assigned anywhere in update_internet_apps.sh or lib/*.sh
+        must appear in exactly one of: hard case, soft case, or BENIGN_STATUSES allow-list.
+        """
+        all_sh_content = (REPO_ROOT / "update_internet_apps.sh").read_text(encoding="utf-8")
+        for p in (REPO_ROOT / "lib").glob("*.sh"):
+            all_sh_content += "\n" + p.read_text(encoding="utf-8")
+
+        all_status_keys = set(re.findall(r'L_INTERNET_STATUS_[A-Z0-9_]+', all_sh_content))
+
+        orchestrator_text = (REPO_ROOT / "update_internet_apps.sh").read_text(encoding="utf-8")
+        hard_block = orchestrator_text.split("INTERNET_HARD_FAIL=1")[0].rsplit("case ", 1)[-1]
+        soft_block = orchestrator_text.split("INTERNET_SOFT_FAIL=1")[0].rsplit("case ", 1)[-1]
+
+        hard_statuses = set(re.findall(r'L_INTERNET_STATUS_[A-Z0-9_]+', hard_block))
+        soft_statuses = set(re.findall(r'L_INTERNET_STATUS_[A-Z0-9_]+', soft_block))
+
+        benign_statuses = {
+            "L_INTERNET_STATUS_NO_DESKTOP_APP",
+            "L_INTERNET_STATUS_CURRENT",
+            "L_INTERNET_STATUS_CURRENT_FMT",
+            "L_INTERNET_STATUS_UPDATED_FMT",
+            "L_INTERNET_STATUS_CHECKED_CLI",
+            "L_INTERNET_STATUS_LAUNCHED_UNVERIFIED",
+            "L_INTERNET_STATUS_MANUAL_UPDATE",
+            "L_INTERNET_STATUS_SKIPPED",
+        }
+
+        for key in all_status_keys:
+            with self.subTest(status_key=key):
+                in_hard = key in hard_statuses
+                in_soft = key in soft_statuses
+                in_benign = key in benign_statuses
+                count = sum([in_hard, in_soft, in_benign])
+                self.assertEqual(
+                    count, 1,
+                    msg=f"Status constant {key} must be in exactly 1 of (hard, soft, benign); found in {count}"
+                )
+
 
 class MauRegressionGuardTests(unittest.TestCase):
     """Microsoft's Preview feed has twice offered an Office package whose short
