@@ -358,7 +358,7 @@ def scan_installed_apps():
         except OSError:
             continue
         for path in entries:
-            if not path.name.casefold().endswith(".app") or not path.is_dir():
+            if not path.name.casefold().endswith(".app") or not path.is_dir() or path.parent != root:
                 continue
             name = path.name[:-4]
             plist = plist_metadata(path)
