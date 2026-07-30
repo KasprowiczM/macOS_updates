@@ -463,6 +463,20 @@ exit=1
 (No tracked files are gitignored)
 
 
+## Task T1 - Add the three TODO(H5) markers
+Files: lib/internet_app_updates.sh
+What changed: Added `# TODO(H5):` comments at the download sites of KeePassXC, CodeEdit, and Trezor Suite recording that publisher digests are unverified.
+Why: Finding H5
+ACCEPTANCE CHECK command: grep -c 'TODO(H5)' lib/internet_app_updates.sh
+ACCEPTANCE CHECK output:
+```
+3
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
+
 
 
 
