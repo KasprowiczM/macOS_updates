@@ -548,6 +548,19 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task T7 - M19: stop tee race truncating failure diagnostics
+Files: update_all.sh
+What changed: Captured `TEE_PID=$!` after `exec > >(tee -a "$LOG_FILE") 2>&1` in `update_all.sh` and added `wait "$TEE_PID"` at the end of `cleanup_session_dir` so session directory snapshots and final summary lines flush completely to disk before process exit.
+Why: Finding M19
+ACCEPTANCE CHECK command: grep -c 'TEE_PID' update_all.sh
+ACCEPTANCE CHECK output:
+```
+3
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 

@@ -193,6 +193,7 @@ print_info "Run log: $LOG_FILE"
 # AFTER the interactive confirmation read above (tee on FD 0 is fine but
 # we already consumed user input).
 exec > >(tee -a "$LOG_FILE") 2>&1
+TEE_PID=$!
 
 cleanup_session_dir() {
     if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
@@ -244,6 +245,9 @@ PYJSON
             rm -rf "$SESSION_DIR" 2>/dev/null || true
             ;;
     esac
+    if [ -n "${TEE_PID:-}" ]; then
+        wait "$TEE_PID" 2>/dev/null || true
+    fi
 }
 trap cleanup_session_dir EXIT
 trap 'cleanup_session_dir; exit 130' INT TERM
