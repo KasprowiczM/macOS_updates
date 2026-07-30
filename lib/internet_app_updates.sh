@@ -364,6 +364,7 @@ iu_keepassxc() {
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_KPX" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$LATEST_KPX ($KPX_ARCH)")"
+            # TODO(H5): Publisher digest is unverified for KeePassXC download
             KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/KeePassXC-${LATEST_KPX}-${KPX_ARCH}.dmg"
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
             if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL"; then
@@ -1357,6 +1358,7 @@ iu_codeedit() {
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_CE" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "CodeEdit" "$LATEST_CE")"
+            # TODO(H5): Publisher digest is unverified for CodeEdit download
             CE_URL="https://github.com/CodeEditApp/CodeEdit/releases/download/${LATEST_CE_TAG}/CodeEdit.dmg"
             TEMP_DMG="$(make_temp_dmg CodeEdit)"
             if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL"; then
@@ -1622,6 +1624,7 @@ except Exception:
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_TS" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_ARM" "Trezor Suite" "$LATEST_TS")"
+            # TODO(H5): Publisher digest is unverified for Trezor Suite download
             TS_URL="https://github.com/trezor/trezor-suite/releases/download/${LATEST_TS_TAG}/Trezor-Suite-${LATEST_TS}-mac-arm64.dmg"
             TEMP_DMG="$(make_temp_dmg TrezorSuite)"
             if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL"; then
