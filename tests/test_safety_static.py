@@ -909,6 +909,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("awk", fn_block)
         self.assertIn('SOFT_FAIL=1', fn_block)
 
+    def test_bun_shasum_pattern_is_resilient(self) -> None:
+        """Bun SHA-256 pattern in update_npm_cli.sh must match flexible whitespace and optional ./ prefix."""
+        text = self.read_script("update_npm_cli.sh")
+        fn_block = text.split("install_bun_tarball() {")[1].split("installed_version=")[0]
+        self.assertIn(r'grep -E "[[:space:]]+(\./)?${archive_name}\$"', fn_block)
+        self.assertIn("SOFT_FAIL=1", fn_block)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:

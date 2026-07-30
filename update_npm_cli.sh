@@ -541,13 +541,16 @@ install_bun_tarball() {
         rm -rf "$tmpdir"
         return 1
     fi
-    if ! grep "  ${archive_name}$" "$tmpdir/SHASUMS256.txt" > "$tmpdir/bun.sha256"; then
+    if ! grep -E "[[:space:]]+(\./)?${archive_name}\$" "$tmpdir/SHASUMS256.txt" | awk '{print $1 "  " "'"$archive_name"'"}' > "$tmpdir/bun.sha256" || [ ! -s "$tmpdir/bun.sha256" ]; then
+        print_warn "Nie można znaleźć sumy kontrolnej dla $archive_name w SHASUMS256.txt"
         rm -rf "$tmpdir"
+        SOFT_FAIL=1
         return 1
     fi
     if ! (cd "$tmpdir" && shasum -a 256 -c bun.sha256 >/dev/null 2>&1); then
         print_error "Checksum Bun nie zgadza się dla $archive_name"
         rm -rf "$tmpdir"
+        SOFT_FAIL=1
         return 1
     fi
     if ! unzip -q -o "$tmpdir/$archive_name" -d "$tmpdir"; then

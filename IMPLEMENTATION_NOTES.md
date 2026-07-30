@@ -62,3 +62,10 @@ What changed: Added an awk-based fallback JSON parser in detect_latest_node_vers
 Why: Finding H5 - Lack of a fallback parser in Node version detection caused false failures in environments where python3 inline execution failed.
 Tests: test_detect_latest_node_version_contains_python_and_awk_fallback (run_tests.sh passed 103 tests)
 Deviations: none
+
+## Task 10 - Make Bun SHA-256 matching resilient in update_npm_cli.sh
+Files: update_npm_cli.sh, tests/test_safety_static.py
+What changed: Updated grep in install_bun_tarball to use extended regex grep -E "[[:space:]]+(\./)?${archive_name}\$", allowing flexible spacing and optional ./ prefixes in SHASUMS256.txt. Set SOFT_FAIL=1 on checksum lookup or verification failures. Added test_bun_shasum_pattern_is_resilient to test_safety_static.py.
+Why: Finding H16 - Rigid double-space grep pattern caused Bun tarball installation to fail if upstream SHASUMS256 formatting changed.
+Tests: test_bun_shasum_pattern_is_resilient (run_tests.sh passed 104 tests)
+Deviations: none
