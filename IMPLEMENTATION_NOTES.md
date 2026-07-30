@@ -118,3 +118,10 @@ What changed: Confirmed schema_version: 2 and top-level classification_counts su
 Why: Finding M10 - JSON consumers require explicit schema versioning and structured classification counts for stability across updates.
 Tests: test_report_update_coverage_json_schema_v2 (run_tests.sh passed 111 tests)
 Deviations: none
+
+## Task 18 - Expand TARGET_ALIASES for multi-name apps in report_update_coverage.sh
+Files: scripts/report_update_coverage.sh, tests/test_safety_static.py
+What changed: Expanded TARGET_ALIASES dictionary in scripts/report_update_coverage.sh to cover name and bundle_id variants for Visual Studio Code, Brave Browser, DJI Assistant 2, OpenCode, and zoom.us. Added test_target_aliases_contains_all_multi_name_apps to test_safety_static.py.
+Why: Finding M14 - Missing name/bundle_id aliases caused multi-name apps to fall back to unknown classification on systems with variant bundle names.
+Tests: test_target_aliases_contains_all_multi_name_apps (run_tests.sh passed 112 tests)
+Deviations: none

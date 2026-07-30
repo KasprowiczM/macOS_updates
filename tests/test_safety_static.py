@@ -968,6 +968,15 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('"schema_version": 2', text)
         self.assertIn('"classification_counts":', text)
 
+    def test_target_aliases_contains_all_multi_name_apps(self) -> None:
+        """TARGET_ALIASES must define aliases for DJI Assistant 2, OpenCode, zoom.us, Visual Studio Code, and Brave Browser."""
+        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
+        self.assertIn('"DJI Assistant 2":', text)
+        self.assertIn('"OpenCode":', text)
+        self.assertIn('"zoom.us":', text)
+        self.assertIn('"Visual Studio Code":', text)
+        self.assertIn('"Brave Browser":', text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
