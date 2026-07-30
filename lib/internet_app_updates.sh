@@ -1750,6 +1750,13 @@ iu_ledger() {
 
         LEDGER_YML=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
         LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
+        LEDGER_SHA512=$(python3 -c "
+import sys, re
+yml = sys.stdin.read()
+match = re.search(r'sha512:\s*([A-Za-z0-9+/=]+)', yml)
+if match:
+    print(match.group(1).strip())
+" <<< "$LEDGER_YML" 2>/dev/null || true)
         LEDGER_RELATION="$(internet_version_relation "$LATEST_LEDGER" "$VER")"
 
         if [ -z "$LATEST_LEDGER" ]; then
@@ -1772,6 +1779,27 @@ iu_ledger() {
             LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
             if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL"; then
+                if [ -n "$LEDGER_SHA512" ]; then
+                    ACTUAL_SHA512=$(shasum -a 512 "$TEMP_DMG" | awk '{print $1}')
+                    if ! python3 -c "
+import sys, base64, binascii
+exp = sys.argv[1].strip()
+act = sys.argv[2].strip().lower()
+if len(exp) == 128:
+    exp_hex = exp.lower()
+else:
+    try:
+        exp_hex = binascii.hexlify(base64.b64decode(exp)).decode('ascii').lower()
+    except Exception:
+        exp_hex = ''
+sys.exit(0 if exp_hex and exp_hex == act else 1)
+" "$LEDGER_SHA512" "$ACTUAL_SHA512"; then
+                        print_warn "Checksum SHA512 Ledger Live nie zgadza się dla $TEMP_DMG"
+                        STATUS_LEDGER="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                        rm -f "$TEMP_DMG" 2>/dev/null || true
+                        return 0
+                    fi
+                fi
                 LEDGER_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$LEDGER_MOUNT" ]; then
                     if [ -d "$LEDGER_MOUNT/Ledger Live.app" ] || [ -d "$LEDGER_MOUNT/Ledger Wallet.app" ]; then
