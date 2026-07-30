@@ -104,3 +104,10 @@ What changed: Added expand_node_manager_paths function to update_npm_cli.sh to i
 Why: Finding M5 - Custom or non-standard Node manager paths caused command -v npm to fail in non-interactive shells.
 Tests: test_update_npm_cli_expands_node_manager_paths (run_tests.sh passed 109 tests)
 Deviations: none
+
+## Task 16 - Add Location header fallback to github_latest_tag in lib/github_release.sh
+Files: lib/github_release.sh, tests/test_safety_static.py
+What changed: Updated github_latest_tag in lib/github_release.sh to fall back to parsing the Location header redirect from https://github.com/owner/repo/releases/latest if the API endpoint returns empty or rate-limit error. Added test_github_latest_tag_contains_location_fallback to test_safety_static.py.
+Why: Finding M9 - GitHub API rate limits or JSON format changes could cause version resolution to fail without a secondary fallback.
+Tests: test_github_latest_tag_contains_location_fallback (run_tests.sh passed 110 tests)
+Deviations: none
