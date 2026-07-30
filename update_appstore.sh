@@ -50,49 +50,9 @@ mac_update_require_supported_platform || exit 1
 # ── i18n: load language strings ──────────────────────────────
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
-. "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
 mac_update_severity_init
-
-print_header() { ui_print_header "$1"; }
-print_ok()    { echo -e "  ${GREEN}✅ $1${NC}"; }
-print_info()  { echo -e "  ${CYAN}ℹ️  $1${NC}"; }
-print_warn()  { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
-print_error() { echo -e "  ${RED}❌ $1${NC}"; }
-print_step()  { echo -e "  ${BOLD}▶  $1${NC}"; }
-
-run_with_timeout() {
-    local seconds="$1"
-    local command_pid command_exit elapsed grace
-    shift
-    if command -v timeout >/dev/null 2>&1; then
-        timeout "$seconds" "$@"
-    elif command -v gtimeout >/dev/null 2>&1; then
-        gtimeout "$seconds" "$@"
-    else
-        "$@" &
-        command_pid=$!
-        elapsed=0
-        while kill -0 "$command_pid" 2>/dev/null; do
-            if [ "$elapsed" -ge "$seconds" ]; then
-                kill -TERM "$command_pid" 2>/dev/null || true
-                grace=0
-                while kill -0 "$command_pid" 2>/dev/null && [ "$grace" -lt 5 ]; do
-                    sleep 1
-                    grace=$((grace + 1))
-                done
-                kill -KILL "$command_pid" 2>/dev/null || true
-                wait "$command_pid" 2>/dev/null || true
-                return 124
-            fi
-            sleep 1
-            elapsed=$((elapsed + 1))
-        done
-        wait "$command_pid"
-        command_exit=$?
-        return "$command_exit"
-    fi
-}
+. "$SCRIPT_DIR/lib/proc.sh"
 
 # Suppress mas Spotlight auto-indexing warnings
 export MAS_NO_AUTO_INDEX=1
