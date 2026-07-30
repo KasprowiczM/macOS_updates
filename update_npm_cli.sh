@@ -32,6 +32,7 @@ mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/lib/ui.sh"
 . "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
+. "$SCRIPT_DIR/lib/github_release.sh"
 mac_update_severity_init
 
 TOOLCHAIN_HOME="${MAC_UPDATE_TOOLCHAIN_HOME:-$HOME/.local/share/mac-update}"
@@ -560,13 +561,28 @@ ensure_latest_node() {
 read_bun_version() {
     local ver
     if [ -f "$BUN_VERSION_PATH" ]; then
-        ver="$(sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$BUN_VERSION_PATH" | head -1)"
+        ver="$(grep -v '^[[:space:]]*#' "$BUN_VERSION_PATH" | grep -v '^[[:space:]]*$' | head -1 | tr -d ' \r\n')"
         if [ -n "$ver" ]; then
             echo "$ver"
             return 0
         fi
     fi
     return 1
+}
+
+detect_latest_bun_version() {
+    local tag latest min_floor
+    tag="$(github_latest_tag "oven-sh/bun")" # oven-sh/bun releases/latest
+    if [ -n "$tag" ] && [ "$tag" != "?" ]; then
+        latest="$(echo "$tag" | sed 's/^bun-v//; s/^v//')"
+    fi
+    min_floor="$(read_bun_version 2>/dev/null || echo "")"
+    if [ -z "$latest" ]; then
+        latest="$min_floor"
+    elif [ -n "$min_floor" ] && semver_is_newer "$min_floor" "$latest"; then
+        latest="$min_floor"
+    fi
+    echo "$latest"
 }
 
 install_bun_tarball() {
@@ -667,11 +683,19 @@ install_bun_tarball() {
 }
 
 ensure_latest_bun() {
-    local pinned
-    local current
+    local target_ver
+    local current=""
+    local floor_ver
 
     export BUN_INSTALL="$BUN_HOME"
     mkdir -p "$BUN_HOME" "$BUN_BIN" || return 1
+
+    target_ver="$(detect_latest_bun_version)"
+    if [ -z "$target_ver" ]; then
+        print_warn "Could not resolve latest Bun version and no floor version available"
+        SOFT_FAIL=1
+        return 0
+    fi
 
     if [ -x "$BUN_BIN/bun" ]; then
         current="$(normalize_semver "$("$BUN_BIN/bun" --version 2>/dev/null || echo '?')")"
@@ -680,25 +704,15 @@ ensure_latest_bun() {
             print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
         else
             print_warn "$L_NPM_BUN_UPGRADE_WARN"
-            if pinned="$(read_bun_version)"; then
-                if semver_is_newer "$pinned" "$current"; then
-                    install_bun_tarball "$pinned" || return 1
-                    print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
-                else
-                    print_ok "$(printf "$L_NPM_BUN_NOT_OLDER_THAN_FALLBACK" "$current" "$pinned")"
-                fi
+            if semver_is_newer "$target_ver" "$current"; then
+                install_bun_tarball "$target_ver" || return 1
+                print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
             else
-                print_error "$L_NPM_BUN_MISSING_VERSION_TXT"
-                return 1
+                print_ok "$(printf "$L_NPM_BUN_NOT_OLDER_THAN_FALLBACK" "$current" "$target_ver")"
             fi
         fi
     else
-        pinned="$(read_bun_version)" || pinned=""
-        if [ -z "$pinned" ]; then
-            print_error "$L_NPM_BUN_MISSING_VERSION_TXT_SHA"
-            return 1
-        fi
-        if install_bun_tarball "$pinned"; then
+        if install_bun_tarball "$target_ver"; then
             print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
         elif [ "${HARD_FAIL:-0}" -ne 0 ]; then
             print_error "$L_NPM_BUN_INSTALL_FAILED"

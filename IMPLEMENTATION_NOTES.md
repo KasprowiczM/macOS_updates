@@ -584,6 +584,20 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task T10 - M21: stop pinning Bun to a static version
+Files: update_npm_cli.sh, config/bun_version.txt
+What changed: Updated `update_npm_cli.sh` to resolve the latest Bun release tag dynamically via GitHub API (`github_latest_tag "oven-sh/bun"`), keeping `config/bun_version.txt` as a documented minimum version floor. Preserved soft failure status (exit 10) on tag resolution network errors and hard failure status (exit 1) on tarball extraction/verification failures.
+Why: Finding M21
+ACCEPTANCE CHECK command: grep -c 'bun_version.txt' update_npm_cli.sh ; grep -cE 'oven-sh/bun.*(releases|latest)' update_npm_cli.sh
+ACCEPTANCE CHECK output:
+```
+1
+3
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 
