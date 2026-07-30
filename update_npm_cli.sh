@@ -203,6 +203,8 @@ remove_npmrc_prefix() {
 }
 
 expand_node_manager_paths() {
+    # Homebrew paths (/usr/local/bin, /opt/homebrew/bin) are appended at the end of PATH as
+    # fallback lookup locations for system node managers, without overriding managed toolchain paths.
     local node_dir
     for node_dir in "$HOME/.n/bin" /usr/local/bin /opt/homebrew/bin; do
         if [ -d "$node_dir" ]; then
