@@ -835,6 +835,159 @@ class StaticShellSafetyTests(unittest.TestCase):
                 self.assertIn('mac_update_severity_exit_code', text, msg=f"{script_name} must exit with mac_update_severity_exit_code")
                 self.assertIn('SOFT_FAIL=1', text, msg=f"{script_name} must set SOFT_FAIL=1 for non-fatal soft errors")
 
+    def test_producer_side_soft_exit_references(self) -> None:
+        """Each leaf orchestrator script must reference soft exit code (10) and have soft exit path."""
+        scripts = [
+            "update_brew.sh",
+            "update_appstore.sh",
+            "update_npm_cli.sh",
+            "update_internet_apps.sh",
+        ]
+        for script_name in scripts:
+            with self.subTest(script=script_name):
+                text = self.read_script(script_name)
+                has_soft_exit_ref = (
+                    "MAC_UPDATE_SOFT_EXIT" in text
+                    or "INTERNET_SOFT_EXIT" in text
+                    or "INTERNET_SOFT_FAIL" in text
+                    or "SOFT_FAIL" in text
+                )
+                self.assertTrue(
+                    has_soft_exit_ref,
+                    msg=f"Leaf script {script_name} lacks soft exit code reference (MAC_UPDATE_SOFT_EXIT / SOFT_FAIL / INTERNET_SOFT_EXIT)",
+                )
+
+    def test_leaf_script_behavioural_severity(self) -> None:
+        """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            mock_bin = tmp_path / "mock-bin"
+            mock_bin.mkdir()
+
+            (mock_bin / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+            (mock_bin / "sw_vers").write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                "  -productVersion) echo 26.5.2 ;;\n"
+                "  -buildVersion) echo TESTBUILD ;;\n"
+                "  *) echo 'ProductName: macOS' ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            (mock_bin / "uname").chmod(0o755)
+            (mock_bin / "sw_vers").chmod(0o755)
+
+            base_env = os.environ.copy()
+            base_env.update(
+                {
+                    "PATH": f"{mock_bin}:{base_env.get('PATH', '/usr/bin:/bin')}",
+                    "MAC_UPDATE_YES": "1",
+                    "MAC_LANG": "en",
+                }
+            )
+
+            # Scenario 1: update_brew.sh with doctor warning => exit 0
+            brew_script_1 = mock_bin / "brew"
+            brew_script_1.write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                '  --version) echo "Homebrew 4.2.0" ;;\n'
+                '  doctor) echo "Warning: unbrewed dylib found" ; exit 1 ;;\n'
+                '  *) exit 0 ;;\n'
+                'esac\n',
+                encoding="utf-8",
+            )
+            brew_script_1.chmod(0o755)
+            res1 = subprocess.run(
+                ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
+                env=base_env,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(res1.returncode, 0, msg=f"brew doctor warning should result in exit 0, got {res1.returncode}\n{res1.stderr}")
+
+            # Scenario 2: update_brew.sh with greedy cask remaining => exit 0 or 10, never 1
+            brew_script_2 = mock_bin / "brew"
+            brew_script_2.write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                '  --version) echo "Homebrew 4.2.0" ;;\n'
+                '  outdated) if [ "$2" = "--cask" ]; then echo "some-greedy-cask"; fi ;;\n'
+                '  *) exit 0 ;;\n'
+                'esac\n',
+                encoding="utf-8",
+            )
+            brew_script_2.chmod(0o755)
+            res2 = subprocess.run(
+                ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
+                env=base_env,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
+            )
+            self.assertIn(res2.returncode, (0, 10), msg=f"remaining greedy cask should result in exit 0 or 10, got {res2.returncode}")
+            self.assertNotEqual(res2.returncode, 1)
+
+            # Scenario 3: update_brew.sh with upgrade --formula failing => exit 1
+            brew_script_3 = mock_bin / "brew"
+            brew_script_3.write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                '  --version) echo "Homebrew 4.2.0" ;;\n'
+                '  outdated) echo "some-formula" ;;\n'
+                '  upgrade) if [ "$2" = "--formula" ]; then echo "Upgrade failed"; exit 1; fi ;;\n'
+                '  *) exit 0 ;;\n'
+                'esac\n',
+                encoding="utf-8",
+            )
+            brew_script_3.chmod(0o755)
+            res3 = subprocess.run(
+                ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
+                env=base_env,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(res3.returncode, 1, msg=f"brew upgrade --formula failing should result in exit 1, got {res3.returncode}")
+
+            # Scenario 4: update_appstore.sh with mas outdated failing => exit 10
+            mas_script = mock_bin / "mas"
+            mas_script.write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                '  version) echo "4.2.0" ;;\n'
+                '  list) echo "12345 TestApp (1.0)" ;;\n'
+                '  account) exit 0 ;;\n'
+                '  outdated) echo "mas outdated failed"; exit 1 ;;\n'
+                '  *) exit 0 ;;\n'
+                'esac\n',
+                encoding="utf-8",
+            )
+            mas_script.chmod(0o755)
+            res4 = subprocess.run(
+                ["/bin/bash", str(REPO_ROOT / "update_appstore.sh")],
+                env=base_env,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(res4.returncode, 10, msg=f"mas outdated failing should result in exit 10, got {res4.returncode}\n{res4.stderr}")
+
+            # Scenario 5: update_npm_cli.sh with curl failing => exit 10 (never 1)
+            curl_script = mock_bin / "curl"
+            curl_script.write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
+            curl_script.chmod(0o755)
+            res5 = subprocess.run(
+                ["/bin/bash", str(REPO_ROOT / "update_npm_cli.sh")],
+                env=base_env,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(res5.returncode, 10, msg=f"update_npm_cli.sh offline curl failure should result in exit 10, got {res5.returncode}\n{res5.stderr}")
+            self.assertNotEqual(res5.returncode, 1)
+
     def test_cli_flags_all_consumed(self) -> None:
         """Every MAC_UPDATE_* flag exported by lib/cli.sh must be read somewhere.
 

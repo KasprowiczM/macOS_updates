@@ -462,6 +462,9 @@ ensure_latest_node() {
     local n_bin="$NPM_GLOBAL_BIN/n"
 
     latest_node="$(detect_latest_node_version)"
+    if [ -z "$latest_node" ]; then
+        SOFT_FAIL=1
+    fi
     current_node="$([ -x "$N_PREFIX/bin/node" ] && "$N_PREFIX/bin/node" -v 2>/dev/null || true)"
     if [ -z "$current_node" ] && command -v node >/dev/null 2>&1; then
         current_node="$(node -v 2>/dev/null || true)"
