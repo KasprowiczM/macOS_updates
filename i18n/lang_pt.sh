@@ -732,3 +732,9 @@ L_POSTUPDATE_CREATING_MINIMAL_TEMPLATE="APPLICATIONS.md não existe — criando 
 L_POSTUPDATE_INVENTORY_MODE_SKIPPED_UPDATES_MD="Modo de inventário: entrada ignorada em UPDATES.md"
 L_POSTUPDATE_UPDATING_HISTORY_UPDATES_MD="Atualizando o histórico de sessão em UPDATES.md..."
 L_POSTUPDATE_TOTAL_VERSION_CHANGES="Total de alterações de versão: %s"
+
+L_INTERNET_HINT_CHROME="Chrome → Ajuda → Sobre o Google Chrome"
+L_INTERNET_HINT_FIREFOX="Firefox → Ajuda → Sobre o Firefox"
+L_INTERNET_HINT_BRAVE="Brave → Ajuda → Sobre o Brave Browser"
+L_INTERNET_HINT_COMET="Comet → Ajuda → Sobre o Comet"
+L_INTERNET_OPENCODE_CLI_SEPARATE="Nota: CLI 'opencode' é atualizado separadamente via update_npm_cli.sh"

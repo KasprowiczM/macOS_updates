@@ -502,6 +502,26 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: Left setup.sh and migration_setup.sh un-deduplicated per T3a instruction because their two-space emoji padding differs from lib/ui.sh.
 
+## Task T4 - Remove the last nine hardcoded Polish strings
+Files: i18n/lang_*.sh, lib/internet_app_updates.sh
+What changed: Added 5 new `L_INTERNET_HINT_*` and `L_INTERNET_OPENCODE_CLI_SEPARATE` keys across all seven `lang_*.sh` files (653 key count parity each). Replaced hardcoded Polish strings in `lib/internet_app_updates.sh` with localized keys.
+Why: Finding H9
+ACCEPTANCE CHECK command: for f in i18n/lang_*.sh; do printf '%s %s\n' "$f" "$(grep -c '^L_[A-Z0-9_]*=' "$f")"; done ; grep -c 'Pomoc' lib/internet_app_updates.sh
+ACCEPTANCE CHECK output:
+```
+i18n/lang_de.sh 653
+i18n/lang_en.sh 653
+i18n/lang_es.sh 653
+i18n/lang_fr.sh 653
+i18n/lang_it.sh 653
+i18n/lang_pl.sh 653
+i18n/lang_pt.sh 653
+0
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 
