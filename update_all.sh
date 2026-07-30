@@ -1748,15 +1748,7 @@ if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" != "1" ]; then
 fi
 echo ""
 
-if [ "$OVERALL_EXIT" -ne 0 ]; then
-    FINAL_EXIT="$OVERALL_EXIT"
-elif [ "$DEGRADED" -ne 0 ]; then
-    FINAL_EXIT="$MAC_UPDATE_SOFT_EXIT"
-else
-    FINAL_EXIT=0
-fi
-
-export MAC_UPDATE_OVERALL_EXIT="$FINAL_EXIT"
+export MAC_UPDATE_OVERALL_EXIT="$OVERALL_EXIT"
 export MAC_UPDATE_BLOCKING_EXIT="$BLOCKING_EXIT"
 export MAC_UPDATE_DEGRADED="$DEGRADED"
 export MAC_UPDATE_DURATION_SEC="$DURATION"
@@ -1782,4 +1774,4 @@ EOS
 )
 ui_summary_table "$_ui_summary"
 
-exit "$FINAL_EXIT"
+exit "$OVERALL_EXIT"
