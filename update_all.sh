@@ -103,10 +103,7 @@ print_section() {
     echo ""
 }
 
-print_ok()   { echo -e "  ${GREEN}✅ $1${NC}"; }
-print_info() { echo -e "  ${CYAN}ℹ️  $1${NC}"; }
-print_warn() { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
-print_error(){ echo -e "  ${RED}❌ $1${NC}"; }
+
 
 # ============================================================
 # START

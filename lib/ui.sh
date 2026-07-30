@@ -7,6 +7,19 @@ ui_is_tty() {
     [ -t 1 ]
 }
 
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+MAGENTA='\033[0;35m'
+NC='\033[0m'
+
+print_ok()    { echo -e "  ${GREEN}✅ $1${NC}"; }
+print_info()  { echo -e "  ${CYAN}ℹ️  $1${NC}"; }
+print_warn()  { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
+print_error() { echo -e "  ${RED}❌ $1${NC}"; }
+print_step()  { echo -e "  ${MAGENTA}▶  $1${NC}"; }
+
 # Repeat a single character (Bash 3.2 — no seq/printf %*s).
 _ui_repeat_char() {
     local char="$1" count="$2" out="" i=0

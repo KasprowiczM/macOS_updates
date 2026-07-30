@@ -50,10 +50,7 @@ NPMRC_PATH="$HOME/.npmrc"
 
 print_header() { ui_print_header "$1"; }
 
-print_ok()   { echo -e "  ${GREEN}✅ $1${NC}"; }
-print_info() { echo -e "  ${CYAN}ℹ️  $1${NC}"; }
-print_warn() { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
-print_error(){ echo -e "  ${RED}❌ $1${NC}"; }
+
 
 sanitize_npm_stderr() {
     awk '

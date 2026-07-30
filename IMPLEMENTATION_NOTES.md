@@ -490,6 +490,19 @@ OK
 Tests: test_chatgpt_atlas_ignores_codex_bundle — run_tests.sh: 120 passed
 Deviations: none
 
+## Task T3 - Finish the print_* deduplication
+Files: lib/ui.sh, update_all.sh, update_brew.sh, update_internet_apps.sh, update_npm_cli.sh, update_system.sh
+What changed: Added shared `print_ok`, `print_info`, `print_warn`, `print_error`, `print_step` implementations to `lib/ui.sh`. Removed redundant local `print_*` definitions from `update_all.sh`, `update_brew.sh`, `update_internet_apps.sh`, `update_npm_cli.sh`, and `update_system.sh`. Preserved local definitions in `setup.sh` and `migration_setup.sh` because their custom two-space emoji padding formatting differs from standard `lib/ui.sh`.
+Why: Finding M15
+ACCEPTANCE CHECK command: grep -l 'print_ok()' *.sh lib/*.sh | wc -l
+ACCEPTANCE CHECK output:
+```
+       3
+```
+Tests: run_tests.sh: 120 passed
+Deviations: Left setup.sh and migration_setup.sh un-deduplicated per T3a instruction because their two-space emoji padding differs from lib/ui.sh.
+
+
 
 
 

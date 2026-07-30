@@ -64,11 +64,7 @@ mac_update_require_supported_platform || exit 1
 
 print_header() { ui_print_header "$1"; }
 
-print_ok()    { echo -e "  ${GREEN}✅ $1${NC}"; }
-print_info()  { echo -e "  ${CYAN}ℹ️  $1${NC}"; }
-print_warn()  { echo -e "  ${YELLOW}⚠️  $1${NC}"; }
-print_error() { echo -e "  ${RED}❌ $1${NC}"; }
-print_step()  { echo -e "  ${MAGENTA}▶  $1${NC}"; }
+
 
 # ── Severity contract with update_all.sh (see its comment block) ──
 #   0  = clean
