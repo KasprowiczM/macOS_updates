@@ -542,7 +542,7 @@ if new_apps:
     with open(os.path.join(session_dir, 'new_apps.txt'), 'w') as f:
         f.write('\n'.join(new_apps) + '\n')
 else:
-    print("  ✅ Wszystkie aplikacje z /Applications są w APPLICATIONS.md")
+    print(f"  ✅ {os.environ.get('L_PRESCAN_ALL_APPS_IN_MD', 'All applications from /Applications are in APPLICATIONS.md')}")
 
 # ── 2. Skanowanie Homebrew formulae ──────────────────────────
 print("\n  Skanowanie Homebrew formulae...")
@@ -568,9 +568,9 @@ try:
             for name, ver in new_formulae:
                 f.write(f"{name} {ver}\n")
     else:
-        print("  ✅ Wszystkie formulae Homebrew są w APPLICATIONS.md")
+        print(f"  ✅ {os.environ.get('L_PRESCAN_ALL_BREW_FORMULAE_IN_MD', 'All Homebrew formulae are in APPLICATIONS.md')}")
 except Exception as e:
-    print(f"  ⚠️  Nie można sprawdzić Homebrew formulae: {e}")
+    print(f"  ⚠️  {os.environ.get('L_PRESCAN_ERR_BREW_FORMULAE', 'Could not check Homebrew formulae: %s') % e}")
 
 # ── 3. Skanowanie Homebrew casks ─────────────────────────────
 print("\n  Skanowanie Homebrew casks...")
@@ -596,9 +596,9 @@ try:
             for name, ver in new_casks:
                 f.write(f"{name} {ver}\n")
     else:
-        print("  ✅ Wszystkie casks Homebrew są w APPLICATIONS.md")
+        print(f"  ✅ {os.environ.get('L_PRESCAN_ALL_BREW_CASKS_IN_MD', 'All Homebrew casks are in APPLICATIONS.md')}")
 except Exception as e:
-    print(f"  ⚠️  Nie można sprawdzić Homebrew casks: {e}")
+    print(f"  ⚠️  {os.environ.get('L_PRESCAN_ERR_BREW_CASKS', 'Could not check Homebrew casks: %s') % e}")
 
 # ── 4. Skanowanie App Store (mas) ────────────────────────────
 print("\n  Skanowanie App Store (mas)...")
@@ -625,15 +625,15 @@ try:
             for app_id, name, ver in new_mas:
                 f.write(f"{app_id} {name} ({ver})\n")
     else:
-        print("  ✅ Wszystkie aplikacje App Store są w APPLICATIONS.md")
+        print(f"  ✅ {os.environ.get('L_PRESCAN_ALL_MAS_APPS_IN_MD', 'All App Store applications are in APPLICATIONS.md')}")
 except FileNotFoundError:
     print("  ℹ️  mas nie jest zainstalowany — pomijam skan App Store")
 except Exception as e:
-    print(f"  ℹ️  mas niedostępny: {e}")
+    print(f"  ℹ️  {os.environ.get('L_PRESCAN_MAS_UNAVAILABLE', 'mas unavailable: %s') % e}")
 
 # ── 5. Wykryj usunięte aplikacje (są w APPLICATIONS.md GRUPA 3, ale nie ma w /Applications) ──
 # Skanuj GRUPĘ 3 tabeli APPLICATIONS.md i sprawdź, czy wciąż są zainstalowane
-print("\n  Sprawdzanie usuniętych aplikacji z GRUPY 3...")
+print(f"\n  {os.environ.get('L_PRESCAN_CHECKING_REMOVED_GROUP3', 'Checking removed applications from GROUP 3...')}")
 removed_apps = []
 try:
     # Wyodrębnij GRUPĘ 3 (od ## GRUPA 3 do ## GRUPA 4)
@@ -664,16 +664,16 @@ try:
             f.write('\n'.join(removed_apps) + '\n')
         any_new_found = True  # trigger update section
     else:
-        print("  ✅ Wszystkie aplikacje z GRUPY 3 są nadal zainstalowane")
+        print(f"  ✅ {os.environ.get('L_PRESCAN_ALL_GROUP3_STILL_INSTALLED', 'All applications from GROUP 3 are still installed')}")
 except Exception as e:
-    print(f"  ⚠️  Błąd przy sprawdzaniu usuniętych aplikacji: {e}")
+    print(f"  ⚠️  {os.environ.get('L_PRESCAN_ERR_CHECKING_REMOVED', 'Error checking removed applications: %s') % e}")
 
 # ── 6. Aktualizuj APPLICATIONS.md o nowe wpisy ───────────────────
 if not any_new_found:
     print("\n  ✅ APPLICATIONS.md jest aktualny — nie wykryto zmian.")
     sys.exit(0)
 
-print("\n  📝 Aktualizuję APPLICATIONS.md o nowe wpisy...")
+print(f"\n  📝 {os.environ.get('L_PRESCAN_UPDATING_APPS_MD', 'Updating APPLICATIONS.md with new entries...')}")
 
 content = read_md()
 changes_made = False
@@ -708,7 +708,7 @@ if os.path.exists(new_formula_file):
                 insert_pos = m4a_fb.start(2)
                 content = content[:insert_pos] + new_rows + content[insert_pos:]
                 changes_made = True
-                print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia {len(items)} formulae w sekcji 4a")
+                print(f"  ⚠️  {os.environ.get('L_PRESCAN_FALLBACK_ANCHOR_FORMULAE', 'Used fallback anchor to insert %s formulae in section 4a') % len(items)}")
 
 # Add new brew casks (appended at end of 4c table)
 new_cask_file = os.path.join(session_dir, 'new_brew_casks.txt')
@@ -736,7 +736,7 @@ if os.path.exists(new_cask_file):
                 insert_pos = m4c_fb.start(2)
                 content = content[:insert_pos] + new_rows + content[insert_pos:]
                 changes_made = True
-                print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia {len(items)} casks w sekcji 4c")
+                print(f"  ⚠️  {os.environ.get('L_PRESCAN_FALLBACK_ANCHOR_CASKS', 'Used fallback anchor to insert %s casks in section 4c') % len(items)}")
 
 # Add new App Store apps (to GRUPA 2, before iPad apps note)
 new_mas_file = os.path.join(session_dir, 'new_mas_apps.txt')
@@ -761,7 +761,7 @@ if os.path.exists(new_mas_file):
             if fallback_mas in content:
                 content = content.replace(fallback_mas, new_rows + "\n" + fallback_mas)
                 changes_made = True
-                print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia aplikacji App Store przed GRUPĄ 3")
+                print(f"  ⚠️  {os.environ.get('L_PRESCAN_FALLBACK_ANCHOR_MAS', 'Used fallback anchor to insert App Store applications before GROUP 3')}")
 
 # Add new /Applications apps not already handled via brew/mas
 new_apps_file = os.path.join(session_dir, 'new_apps.txt')
@@ -806,7 +806,7 @@ if os.path.exists(new_apps_file):
                                              for a in unhandled_dedup)
                     content = content[:insert_pos] + new_rows_dedup + content[insert_pos:]
                     changes_made = True
-                    print(f"  ✅ Dołączono {len(unhandled_dedup)} nowych aplikacji do istniejącej sekcji 🆕")
+                    print(f"  ✅ {os.environ.get('L_PRESCAN_APPENDED_NEW_APPS', 'Appended %s new applications to section 🆕') % len(unhandled_dedup)}")
             else:
                 # Fallback: użyj replace gdy regex nie znalazł tabeli
                 content = content.replace(
@@ -833,11 +833,11 @@ if os.path.exists(new_apps_file):
                 if fallback_new in content:
                     content = content.replace(fallback_new, new_section + "\n" + fallback_new)
                     changes_made = True
-                    print(f"  ⚠️  Użyto kotwicy zapasowej (fallback) do wstawienia nowych aplikacji przed GRUPĄ 4")
+                    print(f"  ⚠️  {os.environ.get('L_PRESCAN_FALLBACK_ANCHOR_NEW_BEFORE_GROUP4', 'Used fallback anchor to insert new applications before GROUP 4')}")
                 else:
                     content = content.rstrip() + "\n\n" + new_section
                     changes_made = True
-                    print(f"  ⚠️  Użyto kotwicy zapasowej (dołączenie na końcu) dla nowych aplikacji")
+                    print(f"  ⚠️  {os.environ.get('L_PRESCAN_FALLBACK_ANCHOR_NEW_END', 'Used fallback anchor (append at end) for new applications')}")
 
 # Update the analysis date
 today = datetime.now().strftime('%Y-%m-%d')
@@ -858,13 +858,13 @@ if os.path.exists(removed_apps_file):
             removed_count += 1
     if removed_count > 0:
         changes_made = True
-        print(f"  🗑️  Usunięto {removed_count} odinstalowanych aplikacji z APPLICATIONS.md")
+        print(f"  🗑️  {os.environ.get('L_PRESCAN_REMOVED_UNINSTALLED_APPS', 'Removed %s uninstalled applications from APPLICATIONS.md') % removed_count}")
 
 if changes_made:
     atomic_write_text(programy_md_path, content)
     print(f"\n  📝 APPLICATIONS.md zaktualizowany o nowe aplikacje")
 else:
-    print(f"\n  ℹ️  APPLICATIONS.md — nowe wpisy zostały zgłoszone ale nie wymagały edycji tabel")
+    print(f"\n  ℹ️  {os.environ.get('L_PRESCAN_NO_TABLE_EDITS_NEEDED', 'APPLICATIONS.md — new entries were reported but did not require table edits')}")
 
 PYEOF
 
@@ -1302,7 +1302,7 @@ def version_for_table_row(table_name, versions):
     return None
 
 # ── Update APPLICATIONS.md version numbers ───────────────────────
-print("  Aktualizuję wersje w APPLICATIONS.md...")
+print(f"  {os.environ.get('L_POSTUPDATE_UPDATING_VERSIONS_MD', 'Updating versions in APPLICATIONS.md...')}")
 
 try:
     with open(programy_md_path, 'r') as f:
@@ -1347,7 +1347,7 @@ except FileNotFoundError:
         "> **Uwaga:** Casks zarządzane przez Homebrew.\n\n"
         f"## Podsumowanie\n\n*Zaktualizowano: {_t1}*\n"
     )
-    print("  ℹ️  APPLICATIONS.md nie istnieje — tworzę minimalny szablon")
+    print(f"  ℹ️  {os.environ.get('L_POSTUPDATE_CREATING_MINIMAL_TEMPLATE', 'APPLICATIONS.md does not exist — creating minimal template')}")
 
 # Merge all updated versions (brew formulae + casks + internet apps)
 all_new_versions = {}
@@ -1482,11 +1482,11 @@ atomic_write_text(programy_md_path, content)
 print(f"  ✅ APPLICATIONS.md zaktualizowany (zmieniono {updated_count} wersji)")
 
 if os.environ.get('MAC_UPDATE_INVENTORY_ONLY') == '1':
-    print("  ✅ Tryb inwentarza: pominięto wpis do UPDATES.md")
+    print(f"  ✅ {os.environ.get('L_POSTUPDATE_INVENTORY_MODE_SKIPPED_UPDATES_MD', 'Inventory mode: skipped entry in UPDATES.md')}")
     sys.exit(0)
 
 # ── Build UPDATES.md history entry ──────────────────────
-print("\n  Aktualizuję historię sesji w UPDATES.md...")
+print(f"\n  {os.environ.get('L_POSTUPDATE_UPDATING_HISTORY_UPDATES_MD', 'Updating session history in UPDATES.md...')}")
 
 now = datetime.now().strftime('%Y-%m-%d %H:%M')
 total_upgrades = len(formula_upgrades) + len(cask_upgrades) + len(internet_upgrades) + len(npm_cli_upgrades)
@@ -1617,7 +1617,7 @@ print(f"     Casks Homebrew zaktualizowane:    {len(cask_upgrades)}")
 print(f"     Nowe pakiety Homebrew:            {len(formula_new) + len(cask_new)}")
 print(f"     Native CLI + npm:                 {len(npm_cli_upgrades) + len(npm_cli_new)}")
 print(f"     Zmiany wersji aplikacji inet.:    {len(internet_upgrades)}")
-print(f"     Łącznie zmiany wersji:            {updated_count}")
+print(f"     {os.environ.get('L_POSTUPDATE_TOTAL_VERSION_CHANGES', 'Total version changes: %s') % updated_count}")
 
 PYEOF
 

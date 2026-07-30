@@ -30,6 +30,7 @@ mac_update_require_supported_platform || exit 1
 
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
+. "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
 mac_update_severity_init
 
@@ -126,7 +127,7 @@ resolve_target_file() {
                 target="$link_dest"
             fi
             if [ -L "$target" ]; then
-                print_warn "Głęboki łańcuch symlinków dla $1 — używam $target"
+                print_warn "$(printf "$L_NPM_DEEP_SYMLINK_CHAIN" "$1" "$target")"
             fi
         fi
     fi
@@ -409,7 +410,7 @@ install_node_tarball() {
     local backup_dir
 
     if [ -z "$latest_node" ]; then
-        print_error "Nie udało się ustalić najnowszej wersji Node.js"
+        print_error "$L_NPM_NODE_LATEST_VERSION_FAILED"
         return 1
     fi
 
@@ -417,7 +418,7 @@ install_node_tarball() {
         arm64)  archive_arch="arm64" ;;
         x86_64) archive_arch="x64" ;;
         *)
-            print_error "Nieobsługiwana architektura dla bootstrapu Node.js: $(uname -m)"
+            print_error "$(printf "$L_NPM_NODE_UNSUPPORTED_ARCH" "$(uname -m)")"
             return 1
             ;;
     esac
@@ -427,7 +428,7 @@ install_node_tarball() {
     shasums_url="https://nodejs.org/dist/${latest_node}/SHASUMS256.txt"
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/mac_update_node.XXXXXX")" || return 1
 
-    print_info "Bootstrapuję Node.js bez npm z oficjalnego archiwum..."
+    print_info "$L_NPM_NODE_BOOTSTRAPPING"
     if ! curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$tmpdir/$archive_name" "$archive_url"; then
         rm -rf "$tmpdir"
         return 1
@@ -442,7 +443,7 @@ install_node_tarball() {
         return 1
     fi
     if ! (cd "$tmpdir" && shasum -a 256 -c node.sha256 >/dev/null 2>&1); then
-        print_error "Checksum Node.js nie zgadza się dla $archive_name"
+        print_error "$(printf "$L_NPM_NODE_CHECKSUM_MISMATCH" "$archive_name")"
         rm -rf "$tmpdir"
         return 1
     fi
@@ -496,7 +497,7 @@ ensure_n_helper() {
     local npm_bin
     npm_bin="$(bootstrap_npm)"
     if [ -z "$npm_bin" ]; then
-        print_error "Brak bootstrap npm — nie mogę zainstalować narzędzia n"
+        print_error "$L_NPM_NODE_NO_NPM_BOOTSTRAP"
         return 1
     fi
 
@@ -522,7 +523,7 @@ ensure_latest_node() {
 
     if ! ensure_n_helper; then
         if ! install_node_tarball "$latest_node"; then
-            print_error "Nie udało się zbootstrapować Node.js"
+            print_error "$L_NPM_NODE_BOOTSTRAP_FAILED"
             return 1
         fi
         if ! ensure_n_helper; then
@@ -531,17 +532,17 @@ ensure_latest_node() {
     fi
 
     if [ ! -x "$N_PREFIX/bin/node" ] || [ "$(normalize_semver "$current_node")" != "$(normalize_semver "$latest_node")" ]; then
-        print_info "Aktualizuję Node.js do ${latest_node:-latest} przez n (bez Homebrew)..."
+        print_info "$(printf "$L_NPM_NODE_UPDATING_VIA_N" "${latest_node:-latest}")"
         if N_PREFIX="$N_PREFIX" "$n_bin" latest; then
             export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:$PATH"
             hash -r 2>/dev/null || true
             print_ok "Node.js aktywny: $("$N_PREFIX/bin/node" -v 2>/dev/null)"
         else
-            print_error "Aktualizacja Node.js przez n nie powiodła się"
+            print_error "$L_NPM_NODE_UPDATE_N_FAILED"
             return 1
         fi
     else
-        print_ok "Node.js już jest aktualny: $(normalize_semver "$current_node")"
+        print_ok "$(printf "$L_NPM_NODE_ALREADY_CURRENT" "$(normalize_semver "$current_node")")"
     fi
 }
 
@@ -566,7 +567,7 @@ install_bun_tarball() {
         arm64)  archive_arch="aarch64" ;;
         x86_64) archive_arch="x64" ;;
         *)
-            print_error "Nieobsługiwana architektura dla Bun: $(uname -m)"
+            print_error "$(printf "$L_NPM_BUN_UNSUPPORTED_ARCH" "$(uname -m)")"
             return 1
             ;;
     esac
@@ -577,7 +578,7 @@ install_bun_tarball() {
     shasums_url="https://github.com/oven-sh/bun/releases/download/${tag}/SHASUMS256.txt"
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/mac_update_bun.XXXXXX")" || return 1
 
-    print_info "Instaluję Bun ${bun_version} z oficjalnego archiwum GitHub..."
+    print_info "$(printf "$L_NPM_BUN_INSTALLING" "${bun_version}")"
     if ! curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$tmpdir/$archive_name" "$archive_url"; then
         rm -rf "$tmpdir"
         SOFT_FAIL=1
@@ -589,13 +590,13 @@ install_bun_tarball() {
         return 1
     fi
     if ! grep -E "[[:space:]]+(\./)?${archive_name}\$" "$tmpdir/SHASUMS256.txt" | awk '{print $1 "  " "'"$archive_name"'"}' > "$tmpdir/bun.sha256" || [ ! -s "$tmpdir/bun.sha256" ]; then
-        print_warn "Nie można znaleźć sumy kontrolnej dla $archive_name w SHASUMS256.txt"
+        print_warn "$(printf "$L_NPM_BUN_CHECKSUM_NOT_FOUND" "$archive_name")"
         rm -rf "$tmpdir"
         SOFT_FAIL=1
         return 1
     fi
     if ! (cd "$tmpdir" && shasum -a 256 -c bun.sha256 >/dev/null 2>&1); then
-        print_error "Checksum Bun nie zgadza się dla $archive_name"
+        print_error "$(printf "$L_NPM_BUN_CHECKSUM_MISMATCH" "$archive_name")"
         rm -rf "$tmpdir"
         HARD_FAIL=1
         return 1
@@ -642,7 +643,7 @@ install_bun_tarball() {
     fi
     installed_version="$(normalize_semver "$("$BUN_BIN/bun" --version 2>/dev/null || echo '?')")"
     if [ "$installed_version" != "$(normalize_semver "$bun_version")" ]; then
-        print_error "Weryfikacja wersji Bun nie powiodła się: oczekiwano $bun_version, wykryto $installed_version"
+        print_error "$(printf "$L_NPM_BUN_VERIFY_FAILED" "$bun_version" "$installed_version")"
         rm -f "$BUN_BIN/bun" 2>/dev/null || true
         [ -f "$backup_bin" ] && mv "$backup_bin" "$BUN_BIN/bun" 2>/dev/null || true
         rm -rf "$tmpdir"
@@ -663,33 +664,33 @@ ensure_latest_bun() {
 
     if [ -x "$BUN_BIN/bun" ]; then
         current="$(normalize_semver "$("$BUN_BIN/bun" --version 2>/dev/null || echo '?')")"
-        print_info "Aktualizuję Bun natywnie przez bun upgrade..."
+        print_info "$L_NPM_BUN_UPDATING_NATIVELY"
         if run_quiet_with_error_log "bun upgrade" "$BUN_BIN/bun" upgrade; then
             print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
         else
-            print_warn "bun upgrade zakończony ostrzeżeniem — próbuję instalacji z archiwum..."
+            print_warn "$L_NPM_BUN_UPGRADE_WARN"
             if pinned="$(read_bun_version)"; then
                 if semver_is_newer "$pinned" "$current"; then
                     install_bun_tarball "$pinned" || return 1
                     print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
                 else
-                    print_ok "Bun $current nie jest starszy niż zweryfikowany fallback $pinned — bez downgrade"
+                    print_ok "$(printf "$L_NPM_BUN_NOT_OLDER_THAN_FALLBACK" "$current" "$pinned")"
                 fi
             else
-                print_error "Brak config/bun_version.txt — nie mogę zweryfikować fallbacku Bun"
+                print_error "$L_NPM_BUN_MISSING_VERSION_TXT"
                 return 1
             fi
         fi
     else
         pinned="$(read_bun_version)" || pinned=""
         if [ -z "$pinned" ]; then
-            print_error "Brak config/bun_version.txt — nie mogę zainstalować Bun bez weryfikacji SHA256"
+            print_error "$L_NPM_BUN_MISSING_VERSION_TXT_SHA"
             return 1
         fi
         if install_bun_tarball "$pinned"; then
             print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
         elif [ "${HARD_FAIL:-0}" -ne 0 ]; then
-            print_error "Instalacja Bun nie powiodła się"
+            print_error "$L_NPM_BUN_INSTALL_FAILED"
             return 1
         fi
     fi
@@ -714,7 +715,7 @@ install_latest_npm_packages() {
     fi
 
     if [ -z "$active_npm" ]; then
-        print_error "Brak działającego npm po instalacji Node.js"
+        print_error "$L_NPM_NO_NPM_AFTER_NODE"
         return 1
     fi
 
@@ -725,25 +726,25 @@ install_latest_npm_packages() {
 
         if [ "$method" = "npm" ]; then
             package_spec="${package_name}@latest"
-            print_info "Aktualizuję ${display_name} przez npm (${package_spec})..."
+            print_info "$(printf "$L_NPM_UPDATING_PACKAGE_VIA_NPM" "${display_name}" "${package_spec}")"
             if run_quiet_with_error_log \
                 "npm install ${package_spec}" \
                 "$active_npm" install -g --prefix "$NPM_GLOBAL_PREFIX" "$package_spec"; then
                 print_ok "${display_name}: $(detect_command_version "$display_name" "$NPM_GLOBAL_BIN/$command_name")"
             else
-                print_warn "Aktualizacja ${display_name} nie powiodła się"
+                print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                 failures=$((failures + 1))
             fi
         elif [ "$method" = "self-update" ]; then
             if command_path="$(resolve_command_path "$command_name")"; then
-                print_info "Aktualizuję ${display_name} przez własny updater (${command_name} update)..."
+                print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "${command_name}")"
                 if run_quiet_with_error_log \
                     "${command_name} update" \
                     run_with_timeout 300 "$command_path" update; then
                     command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
                 else
-                    print_warn "Aktualizacja ${display_name} nie powiodła się"
+                    print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                     failures=$((failures + 1))
                 fi
             else
@@ -756,7 +757,7 @@ install_latest_npm_packages() {
     hash -r 2>/dev/null || true
 
     if [ "$failures" -ne 0 ]; then
-        print_warn "$failures aktualizacji npm/self-update zakończyło się błędem"
+        print_warn "$(printf "$L_NPM_FAILURES_SUMMARY" "$failures")"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
             print_info "Diagnostyka: $MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"
         fi
@@ -771,7 +772,7 @@ remove_legacy_brew_formulas() {
         return 0
     fi
 
-    print_info "Usuwam legacy formulae CLI z Homebrew, jeśli zostały pomyślnie zmigrowane..."
+    print_info "$L_NPM_REMOVING_LEGACY_BREW"
 
     local formula
     local command_name
@@ -793,9 +794,9 @@ remove_legacy_brew_formulas() {
         command_path="$(command -v "$command_name" 2>/dev/null || true)"
         if [ -n "$command_path" ] && ! echo "$command_path" | grep -q "^${brew_prefix}/"; then
             if brew uninstall --formula "$formula" >/dev/null 2>&1; then
-                print_ok "Usunięto z Homebrew: $formula"
+                print_ok "$(printf "$L_NPM_REMOVED_FROM_BREW" "$formula")"
             else
-                print_warn "Nie udało się usunąć z Homebrew: $formula"
+                print_warn "$(printf "$L_NPM_FAILED_REMOVE_BREW" "$formula")"
             fi
         else
             print_warn "Pomijam uninstall $formula — aktywna komenda nadal wskazuje Homebrew"
@@ -820,22 +821,22 @@ fi
 trap cleanup_npm_cli EXIT
 trap 'cleanup_npm_cli; exit 130' INT TERM
 if ! ensure_toolchain_paths; then
-    print_error "Nie udało się bezpiecznie skonfigurować ścieżek natywnego toolchainu"
+    print_error "$L_NPM_PATH_CONFIG_FAILED"
     exit 1
 fi
 
 NPM_CLI_EXIT=0
 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
     if ! : > "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"; then
-        print_warn "Nie udało się utworzyć logu diagnostycznego npm"
+        print_warn "$L_NPM_DIAGNOSTIC_LOG_FAILED"
         SOFT_FAIL=1
     fi
 fi
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-    print_info "Zapisuję snapshot CLI przed aktualizacją..."
+    print_info "$L_NPM_SAVING_PRE_SNAPSHOT"
     if ! write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_before.txt"; then
-        print_warn "Nie udało się zapisać snapshotu CLI przed aktualizacją"
+        print_warn "$L_NPM_SAVE_PRE_SNAPSHOT_FAILED"
         SOFT_FAIL=1
     fi
 fi
@@ -848,15 +849,15 @@ fi
 if [ "$NODE_READY" -eq 1 ]; then
     install_latest_npm_packages || SOFT_FAIL=1
 else
-    print_error "Pomijam pakiety npm, ponieważ aktualizacja Node.js nie powiodła się"
+    print_error "$L_NPM_SKIPPING_PACKAGES_NODE_FAILED"
 fi
 ensure_latest_bun || HARD_FAIL=1
 remove_legacy_brew_formulas
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-    print_info "Zapisuję snapshot CLI po aktualizacji..."
+    print_info "$L_NPM_SAVING_POST_SNAPSHOT"
     if ! write_cli_snapshot "$MAC_UPDATE_SESSION_DIR/npm_cli_after.txt"; then
-        print_warn "Nie udało się zapisać snapshotu CLI po aktualizacji"
+        print_warn "$L_NPM_SAVE_POST_SNAPSHOT_FAILED"
         SOFT_FAIL=1
     fi
 fi
@@ -867,7 +868,7 @@ if [ "$NPM_CLI_EXIT" -ne 0 ]; then
         print_warn "Ostatnia diagnostyka npm/self-update (sanityzowana):"
         tail -n 20 "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" | sed 's/^/    /'
     fi
-    print_header "⚠️  Native CLI & npm — zakończono z błędami/ostrzeżeniami"
+    print_header "$L_NPM_HEADER_FINISHED_WITH_ERRORS"
     exit "$NPM_CLI_EXIT"
 fi
 

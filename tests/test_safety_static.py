@@ -795,6 +795,25 @@ class StaticShellSafetyTests(unittest.TestCase):
                 msg=f"lang_{lang}.sh key set differs from lang_en.sh",
             )
 
+    def test_all_update_scripts_source_i18n_and_no_polish_diacritics_in_print_statements(self) -> None:
+        """Every update_*.sh must source i18n/loader.sh, and no .sh outside i18n/
+        may contain Polish diacritics in print_* calls."""
+        for name in ("update_all.sh", "update_system.sh", "update_appstore.sh", "update_brew.sh", "update_npm_cli.sh", "update_internet_apps.sh"):
+            text = self.read_script(name)
+            self.assertIn("i18n/loader.sh", text, f"{name} must source i18n/loader.sh")
+
+        sh_files = list(REPO_ROOT.glob("*.sh")) + list((REPO_ROOT / "lib").glob("*.sh")) + list((REPO_ROOT / "scripts").glob("*.sh"))
+        diacritic_pattern = re.compile(r'print_\w+.*?[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]')
+        for path in sh_files:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for idx, line in enumerate(text.splitlines(), 1):
+                if line.lstrip().startswith("#"):
+                    continue
+                self.assertFalse(
+                    diacritic_pattern.search(line),
+                    f"Hardcoded Polish string in print_* at {path.name}:{idx}: {line.strip()}"
+                )
+
     def test_i18n_loader_uses_set_a_not_manual_exports(self) -> None:
         """i18n/loader.sh must use set -a to auto-export lang variables.
 
