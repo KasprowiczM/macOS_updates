@@ -475,6 +475,22 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task T2 - Fix the tautological, non-portable Atlas test
+Files: tests/test_safety_static.py, tests/__init__.py
+What changed: Rewrote `test_chatgpt_atlas_ignores_codex_bundle` per T2a to invoke `iu_chatgpt_atlas` directly in a subprocess with a stubbed `defaults` function echoing `com.openai.codex`, and asserted `ATLAS_APP` is empty.
+Why: Test quality improvement (Finding T2)
+ACCEPTANCE CHECK command: PYTHONPATH=dev_sync python3 -m unittest tests.test_safety_static -k chatgpt_atlas -v 2>&1 | tail -5
+ACCEPTANCE CHECK output:
+```
+----------------------------------------------------------------------
+Ran 1 test in 0.007s
+
+OK
+```
+Tests: test_chatgpt_atlas_ignores_codex_bundle — run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 
