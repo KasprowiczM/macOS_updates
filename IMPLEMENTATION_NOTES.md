@@ -174,5 +174,18 @@ HOME UNTOUCHED
 Tests: test_leaf_script_behavioural_severity, test_subprocess_runs_targeting_update_scripts_set_sandboxed_home — run_tests.sh: 115 passed
 Deviations: none
 
+## Task R4 - Restore hard-failure classification in update_npm_cli.sh
+Files: update_npm_cli.sh, tests/test_safety_static.py
+What changed: Updated update_npm_cli.sh to assign `HARD_FAIL=1` when Node.js (`ensure_latest_node`) or Bun (`ensure_latest_bun`) tarball installation/verification fails mid-mutation. Retained `SOFT_FAIL=1` for offline feed lookup failures. Added a new test scenario to `test_leaf_script_behavioural_severity` asserting Bun tarball extraction failure produces exit 1 while offline curl failures produce exit 10.
+Why: Finding N3
+ACCEPTANCE CHECK command: grep -c 'HARD_FAIL=1' update_npm_cli.sh
+ACCEPTANCE CHECK output:
+```
+10
+```
+Tests: test_leaf_script_behavioural_severity — run_tests.sh: 115 passed
+Deviations: none
+
+
 
 

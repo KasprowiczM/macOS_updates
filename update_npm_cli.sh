@@ -492,6 +492,7 @@ ensure_latest_node() {
     latest_node="$(detect_latest_node_version)"
     if [ -z "$latest_node" ]; then
         SOFT_FAIL=1
+        return 0
     fi
     current_node="$([ -x "$N_PREFIX/bin/node" ] && "$N_PREFIX/bin/node" -v 2>/dev/null || true)"
     if [ -z "$current_node" ] && command -v node >/dev/null 2>&1; then
@@ -558,10 +559,12 @@ install_bun_tarball() {
     print_info "Instaluję Bun ${bun_version} z oficjalnego archiwum GitHub..."
     if ! curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$tmpdir/$archive_name" "$archive_url"; then
         rm -rf "$tmpdir"
+        SOFT_FAIL=1
         return 1
     fi
     if ! curl -fsSL --max-time 60 --retry 3 --retry-delay 2 -o "$tmpdir/SHASUMS256.txt" "$shasums_url"; then
         rm -rf "$tmpdir"
+        SOFT_FAIL=1
         return 1
     fi
     if ! grep -E "[[:space:]]+(\./)?${archive_name}\$" "$tmpdir/SHASUMS256.txt" | awk '{print $1 "  " "'"$archive_name"'"}' > "$tmpdir/bun.sha256" || [ ! -s "$tmpdir/bun.sha256" ]; then
@@ -573,16 +576,18 @@ install_bun_tarball() {
     if ! (cd "$tmpdir" && shasum -a 256 -c bun.sha256 >/dev/null 2>&1); then
         print_error "Checksum Bun nie zgadza się dla $archive_name"
         rm -rf "$tmpdir"
-        SOFT_FAIL=1
+        HARD_FAIL=1
         return 1
     fi
     if ! unzip -q -o "$tmpdir/$archive_name" -d "$tmpdir"; then
         rm -rf "$tmpdir"
+        HARD_FAIL=1
         return 1
     fi
     bun_binary="$tmpdir/bun-darwin-${archive_arch}/bun"
     if [ ! -f "$bun_binary" ]; then
         rm -rf "$tmpdir"
+        HARD_FAIL=1
         return 1
     fi
     chmod +x "$bun_binary" 2>/dev/null || true
@@ -590,10 +595,12 @@ install_bun_tarball() {
     mkdir -p "$BUN_BIN"
     staging_bin="$(mktemp "${TMPDIR:-/tmp}/mac_update_bun_bin.XXXXXX")" || {
         rm -rf "$tmpdir"
+        HARD_FAIL=1
         return 1
     }
     if ! cp "$bun_binary" "$staging_bin"; then
         rm -rf "$tmpdir" "$staging_bin"
+        HARD_FAIL=1
         return 1
     fi
     chmod +x "$staging_bin"
@@ -602,12 +609,14 @@ install_bun_tarball() {
         if ! mv "$BUN_BIN/bun" "$backup_bin" 2>/dev/null; then
             rm -rf "$tmpdir"
             rm -f "$staging_bin" 2>/dev/null || true
+            HARD_FAIL=1
             return 1
         fi
     fi
     if ! mv "$staging_bin" "$BUN_BIN/bun"; then
         [ -f "$backup_bin" ] && mv "$backup_bin" "$BUN_BIN/bun" 2>/dev/null || true
         rm -rf "$tmpdir"
+        HARD_FAIL=1
         return 1
     fi
     installed_version="$(normalize_semver "$("$BUN_BIN/bun" --version 2>/dev/null || echo '?')")"
@@ -616,6 +625,7 @@ install_bun_tarball() {
         rm -f "$BUN_BIN/bun" 2>/dev/null || true
         [ -f "$backup_bin" ] && mv "$backup_bin" "$BUN_BIN/bun" 2>/dev/null || true
         rm -rf "$tmpdir"
+        HARD_FAIL=1
         return 1
     fi
     rm -f "$backup_bin" 2>/dev/null || true
@@ -657,7 +667,7 @@ ensure_latest_bun() {
         fi
         if install_bun_tarball "$pinned"; then
             print_ok "Bun aktywny: $("$BUN_BIN/bun" --version 2>/dev/null)"
-        else
+        elif [ "${HARD_FAIL:-0}" -ne 0 ]; then
             print_error "Instalacja Bun nie powiodła się"
             return 1
         fi
@@ -811,6 +821,7 @@ fi
 
 NODE_READY=1
 if ! ensure_latest_node; then
+    HARD_FAIL=1
     NODE_READY=0
 fi
 if [ "$NODE_READY" -eq 1 ]; then
@@ -818,7 +829,7 @@ if [ "$NODE_READY" -eq 1 ]; then
 else
     print_error "Pomijam pakiety npm, ponieważ aktualizacja Node.js nie powiodła się"
 fi
-ensure_latest_bun || true
+ensure_latest_bun || HARD_FAIL=1
 remove_legacy_brew_formulas
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
