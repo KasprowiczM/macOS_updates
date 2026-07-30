@@ -939,6 +939,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("fallback_mas", prescan_block)
         self.assertIn("fallback_new", prescan_block)
 
+    def test_brew_outputs_use_ansi_stripping(self) -> None:
+        """update_brew.sh must define strip_ansi and pipe brew outputs through it."""
+        text = self.read_script("update_brew.sh")
+        self.assertIn("strip_ansi() {", text)
+        self.assertIn("brew outdated --formula 2>&1 | strip_ansi", text)
+        self.assertIn("brew doctor 2>&1 | strip_ansi", text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:

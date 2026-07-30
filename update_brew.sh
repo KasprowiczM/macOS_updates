@@ -40,6 +40,10 @@ cleanup_brew() {
 trap cleanup_brew EXIT
 trap 'cleanup_brew; exit 130' INT TERM
 
+strip_ansi() {
+    sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g' -e 's/\033\[[0-9;]*[a-zA-Z]//g'
+}
+
 print_header() { ui_print_header "$1"; }
 
 print_ok()   { echo -e "  ${GREEN}✅ $1${NC}"; }
@@ -69,11 +73,11 @@ print_info "Location: $(which brew)"
 # ── Snapshot of installed packages before update ──
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_BREW_SAVING_BEFORE"
-    if ! brew list --formula --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_formulae_before.txt"; then
+    if ! brew list --formula --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_formulae_before.txt"; then
         print_warn "Could not save the pre-update formula snapshot."
         SOFT_FAIL=1
     fi
-    if ! brew list --cask --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_casks_before.txt"; then
+    if ! brew list --cask --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_before.txt"; then
         print_warn "Could not save the pre-update cask snapshot."
         SOFT_FAIL=1
     fi
@@ -247,7 +251,7 @@ fi
 # A successful upgrade is not enough: query Homebrew again and fail if any
 # formula or greedy cask remains outdated, or if verification itself fails.
 print_header "$L_BREW_OUTDATED"
-if ! REMAINING_FORMULAE=$(brew outdated --formula 2>&1); then
+if ! REMAINING_FORMULAE=$(brew outdated --formula 2>&1 | strip_ansi); then
     print_warn "Final brew outdated --formula verification failed."
     [ -n "$REMAINING_FORMULAE" ] && printf '%s\n' "$REMAINING_FORMULAE"
     SOFT_FAIL=1
@@ -256,7 +260,7 @@ elif [ -n "$REMAINING_FORMULAE" ]; then
     printf '%s\n' "$REMAINING_FORMULAE"
     HARD_FAIL=1
 fi
-if ! REMAINING_CASKS=$(brew outdated --cask --greedy 2>&1); then
+if ! REMAINING_CASKS=$(brew outdated --cask --greedy 2>&1 | strip_ansi); then
     print_warn "Final brew outdated --cask --greedy verification failed."
     [ -n "$REMAINING_CASKS" ] && printf '%s\n' "$REMAINING_CASKS"
     SOFT_FAIL=1
@@ -276,7 +280,7 @@ if [ "${MAC_UPDATE_SKIP_DOCTOR:-0}" = "1" ]; then
 else
 print_header "$L_BREW_HEALTH_CHECKING"
 
-DOCTOR_OUT=$(brew doctor 2>&1)
+DOCTOR_OUT=$(brew doctor 2>&1 | strip_ansi)
 DOCTOR_EXIT=$?
 
 UNLINKED_KEGS=$(echo "$DOCTOR_OUT" | awk '
@@ -406,12 +410,12 @@ brew list --cask --versions 2>/dev/null | column -t || brew list --cask --versio
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_BREW_SAVING_SNAPSHOT"
     BREW_SNAPSHOT_OK=1
-    if ! brew list --formula --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_formulae_after.txt"; then
+    if ! brew list --formula --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_formulae_after.txt"; then
         print_warn "Could not save the post-update formula snapshot."
         BREW_SNAPSHOT_OK=0
         SOFT_FAIL=1
     fi
-    if ! brew list --cask --versions 2>/dev/null > "$MAC_UPDATE_SESSION_DIR/brew_casks_after.txt"; then
+    if ! brew list --cask --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_after.txt"; then
         print_warn "Could not save the post-update cask snapshot."
         BREW_SNAPSHOT_OK=0
         SOFT_FAIL=1

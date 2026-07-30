@@ -90,3 +90,10 @@ What changed: Added fallback anchors and warning logs for 4a formulae, 4c casks,
 Why: Finding M3 - Fragile regex section matching could silently fail or misplace inventory entries if section header formatting changed.
 Tests: test_inventory_insertion_has_fallback_anchors (run_tests.sh passed 107 tests)
 Deviations: none
+
+## Task 14 - Add ANSI escape sequence stripping to update_brew.sh
+Files: update_brew.sh, tests/test_safety_static.py
+What changed: Added strip_ansi helper to update_brew.sh and piped brew list, brew outdated, and brew doctor outputs through it to strip ANSI control sequences. Added test_brew_outputs_use_ansi_stripping to test_safety_static.py.
+Why: Finding M4 - Unstripped ANSI escape codes in Homebrew command outputs could corrupt package names and version tracking.
+Tests: test_brew_outputs_use_ansi_stripping (run_tests.sh passed 108 tests)
+Deviations: none
