@@ -210,6 +210,19 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 116 passed
 Deviations: none
 
+## Task R7 - Verify Ledger Live sha512 checksum before mounting DMG
+Files: lib/internet_app_updates.sh
+What changed: Updated `iu_ledger` to extract `sha512` hash from `latest-mac.yml` and verify the downloaded DMG via `shasum -a 512` before mounting. Implemented base64/hex normalization comparison logic. Aborts DMG mounting with `L_INTERNET_STATUS_DOWNLOAD_ERROR` on checksum mismatch.
+Why: Finding H7
+ACCEPTANCE CHECK command: awk '/^iu_ledger\(\)/,/^}/' lib/internet_app_updates.sh | grep -cE 'shasum -a 512|sha512'
+ACCEPTANCE CHECK output:
+```
+2
+```
+Tests: run_tests.sh: 116 passed
+Deviations: none
+
+
 
 
 
