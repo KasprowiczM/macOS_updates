@@ -553,8 +553,10 @@ externally_managed_count = len(classifications["externally_managed"])
 manual_count = len(classifications["manual"])
 unknown_count = len(classifications["unknown"])
 installed_unique_count = len(installed)
+supported_count = verified_direct_count + triggered_unverified_count + externally_managed_count
 automatic_count = verified_direct_count + externally_managed_count
 known_count = installed_unique_count - unknown_count
+supported_percent = round((supported_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
 automatic_percent = round((automatic_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
 known_percent = round((known_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
 
@@ -572,6 +574,8 @@ report = {
     "schema_version": 2,
     "version": version,
     "installed_unique_count": installed_unique_count,
+    "supported_coverage_count": supported_count,
+    "supported_coverage_percent": supported_percent,
     "automatic_coverage_count": automatic_count,
     "automatic_coverage_percent": automatic_percent,
     "known_coverage_count": known_count,
@@ -611,6 +615,7 @@ print(f"  {title}")
 print(f"  {ver_label} {version}")
 print("")
 print(f"  📦 {class_text['unique']}: {installed_unique_count}")
+print(f"  📊 Update Coverage: {supported_count}/{installed_unique_count} ({supported_percent:.1f}%)")
 print(f"  ✅ {class_text['automatic']}: {automatic_count}/{installed_unique_count} ({automatic_percent:.1f}%)")
 print(f"  🧭 {class_text['known']}: {known_count}/{installed_unique_count} ({known_percent:.1f}%)")
 

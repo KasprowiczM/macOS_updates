@@ -382,12 +382,23 @@ fi
 print_header "$L_BREW_CACHE_CLEANING"
 
 CACHE_DIR=$(brew --cache 2>/dev/null || echo "")
-if brew cleanup --prune=all 2>/dev/null || brew cleanup; then
-    if [ -n "$CACHE_DIR" ] && [ -d "$CACHE_DIR" ]; then
-        CACHE_SIZE=$(du -sh "$CACHE_DIR" 2>/dev/null | awk '{print $1}' || echo "?")
-        print_ok "$L_BREW_CACHE_CLEANED (~$CACHE_SIZE)"
+CLEANUP_OUT=$(brew cleanup --prune=all 2>&1 | strip_ansi)
+CLEANUP_EXIT=$?
+if [ -n "$MAC_UPDATE_SESSION_DIR" ] && [ -n "$CLEANUP_OUT" ]; then
+    echo "$CLEANUP_OUT" >> "$MAC_UPDATE_SESSION_DIR/brew_cleanup.log"
+fi
+if [ "$CLEANUP_EXIT" -eq 0 ]; then
+    if echo "$CLEANUP_OUT" | grep -qi "warning"; then
+        print_warn "Homebrew cleanup completed with warnings."
+    elif [ -z "$CLEANUP_OUT" ] || echo "$CLEANUP_OUT" | grep -qi "Nothing to remove"; then
+        print_info "Homebrew cleanup: no obsolete cache to clean."
     else
-        print_ok "$L_BREW_CACHE_CLEANED"
+        if [ -n "$CACHE_DIR" ] && [ -d "$CACHE_DIR" ]; then
+            CACHE_SIZE=$(du -sh "$CACHE_DIR" 2>/dev/null | awk '{print $1}' || echo "?")
+            print_ok "$L_BREW_CACHE_CLEANED (~$CACHE_SIZE)"
+        else
+            print_ok "$L_BREW_CACHE_CLEANED"
+        fi
     fi
 else
     print_warn "Homebrew cleanup failed."

@@ -352,6 +352,20 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: R17d skipped per prompt instruction ("if you cannot preserve them exactly, SKIP R17d and say so") to maintain exact version key tuple comparison semantics.
 
+## Task R18 - Address remaining Medium items
+Files: update_appstore.sh, update_brew.sh, update_npm_cli.sh, scripts/report_update_coverage.sh
+What changed: Recorded `STATUS_FAILED` into `update_appstore_results.txt` and registered severity error on Track 2 osascript failure in `update_appstore.sh`. Updated `brew cleanup` message in `update_brew.sh` to distinguish "no obsolete cache to clean" from "cleanup produced warnings", and logged output to session dir. Added `$HOME/n/bin/node` fallback in `update_npm_cli.sh` when `$N_PREFIX/bin/node` is missing/unset. Updated `scripts/report_update_coverage.sh` to classify Sparkle/silent-launch/vendor-updaters under supported coverage and print `Update Coverage: X/Y (Z%)`.
+Why: Findings M16, M18, M20, M21
+ACCEPTANCE CHECK command: grep -c 'STATUS_FAILED' update_appstore.sh ; bash scripts/report_update_coverage.sh | grep -i 'coverage'
+ACCEPTANCE CHECK output:
+```
+1
+  📊 Update Coverage: 64/66 (97.0%)
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 

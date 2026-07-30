@@ -516,9 +516,15 @@ ensure_latest_node() {
         SOFT_FAIL=1
         return 0
     fi
-    current_node="$([ -x "$N_PREFIX/bin/node" ] && "$N_PREFIX/bin/node" -v 2>/dev/null || true)"
-    if [ -z "$current_node" ] && command -v node >/dev/null 2>&1; then
+    current_node=""
+    if [ -x "$N_PREFIX/bin/node" ]; then
+        current_node="$("$N_PREFIX/bin/node" -v 2>/dev/null || true)"
+    elif [ -x "$HOME/n/bin/node" ]; then
+        current_node="$("$HOME/n/bin/node" -v 2>/dev/null || true)"
+    elif command -v node >/dev/null 2>&1; then
         current_node="$(node -v 2>/dev/null || true)"
+    else
+        print_warn "No node executable found in $N_PREFIX/bin, $HOME/n/bin, or PATH"
     fi
 
     if ! ensure_n_helper; then
@@ -531,12 +537,20 @@ ensure_latest_node() {
         fi
     fi
 
-    if [ ! -x "$N_PREFIX/bin/node" ] || [ "$(normalize_semver "$current_node")" != "$(normalize_semver "$latest_node")" ]; then
+    if [ ! -x "$N_PREFIX/bin/node" ] && [ ! -x "$HOME/n/bin/node" ] || [ "$(normalize_semver "$current_node")" != "$(normalize_semver "$latest_node")" ]; then
         print_info "$(printf "$L_NPM_NODE_UPDATING_VIA_N" "${latest_node:-latest}")"
         if N_PREFIX="$N_PREFIX" "$n_bin" latest; then
-            export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:$PATH"
+            export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$HOME/n/bin:$BUN_BIN:$PATH"
             hash -r 2>/dev/null || true
-            print_ok "Node.js aktywny: $("$N_PREFIX/bin/node" -v 2>/dev/null)"
+            local active_node=""
+            if [ -x "$N_PREFIX/bin/node" ]; then
+                active_node="$("$N_PREFIX/bin/node" -v 2>/dev/null || true)"
+            elif [ -x "$HOME/n/bin/node" ]; then
+                active_node="$("$HOME/n/bin/node" -v 2>/dev/null || true)"
+            else
+                print_warn "Neither $N_PREFIX/bin/node nor $HOME/n/bin/node exists after n update"
+            fi
+            print_ok "Node.js active: $active_node"
         else
             print_error "$L_NPM_NODE_UPDATE_N_FAILED"
             return 1
