@@ -31,9 +31,11 @@ if [ -f "$PREFS_FILE" ]; then
     # Parse MAC_LANG from .mac_update_prefs
     # Simple key=value format: MAC_LANG=en (no spaces around =)
     while IFS='=' read -r key value; do
-        # Remove leading/trailing whitespace
-        key="$(echo "$key" | xargs)"
-        value="$(echo "$value" | xargs)"
+        # Remove leading/trailing whitespace without quote/backslash processing
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
         if [ "$key" = "MAC_LANG" ]; then
             MAC_LANG="$value"
             break
@@ -68,7 +70,7 @@ else
         set +a
     else
         echo "Error: English language file not found. Aborting." >&2
-        exit 1
+        return 1
     fi
 fi
 

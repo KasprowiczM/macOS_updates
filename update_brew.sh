@@ -86,10 +86,10 @@ fi
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
     print_header "$L_BREW_OUTDATED"
     echo -e "${CYAN}$L_BREW_OUTDATED_LIST${NC}"
-    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula || exit 1
+    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula || true
     echo ""
     echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
-    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy || exit 1
+    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy || true
     print_info "[DRY-RUN] Would run: brew update, brew upgrade, cleanup, doctor"
     exit 0
 fi

@@ -23,7 +23,11 @@ internet_registry_load() {
         [ -n "$line" ] || continue
         # Validate: exactly 3 pipe-delimited fields (AppName|method|STATUS_VAR)
         case "$line" in
-            *"|"*"|"*) ;;
+            *\|*\|*\|*)
+                echo "internet_registry_load: malformed row (more than 3 fields): $line" >&2
+                continue
+                ;;
+            *\|*\|*) ;;
             *)
                 echo "internet_registry_load: malformed row (need 3 fields): $line" >&2
                 continue
@@ -75,6 +79,7 @@ internet_dispatch_run_all() {
             "$fn"
         else
             print_warn "Missing internet handler: $fn"
+            INTERNET_HARD_FAIL=1
             INTERNET_EXIT=1
         fi
     done < "$cfg"

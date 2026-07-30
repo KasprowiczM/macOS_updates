@@ -648,6 +648,29 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 121 passed
 Deviations: none
 
+## Task T14 - Low items remediation (L24, L25, L26, L27, L29, L30, L31, L32)
+Files: i18n/loader.sh, lib/internet_registry.sh, update_brew.sh, update_appstore.sh, update_internet_apps.sh, lib/internet_app_updates.sh
+What changed:
+- L24: Changed `exit 1` to `return 1` in `i18n/loader.sh` fallback branch so sourced callers are not terminated.
+- L25: Replaced `xargs` whitespace trimming with pure Bash 3.2 parameter expansion in `i18n/loader.sh` to prevent quote/backslash mangling.
+- L26: Updated `lib/internet_registry.sh` row validation case pattern to reject rows containing 4 or more pipe-delimited fields.
+- L27: Set `INTERNET_HARD_FAIL=1` when an internet handler function is missing in `lib/internet_registry.sh`.
+- L28/L29: Changed `|| exit 1` to `|| true` in `update_brew.sh` dry-run mode so dry-run checks exit 0 cleanly without mutating.
+- L30: Removed redundant `or btnName contains "Update"` condition in `update_appstore.sh` AppleScript button matcher to prevent double-clicking and dead code.
+- L31: Updated `update_internet_apps.sh` to pass `$app_name` to `osascript` as a positional argument (`-- "$app_name"`) with `on run argv`.
+- L32: Changed offline host argument in `iu_ledger` in `lib/internet_app_updates.sh` from `"GitHub"` to `"download.live.ledger.com"`.
+Why: Findings L24, L25, L26, L27, L29, L30, L31, L32
+ACCEPTANCE CHECK command: sed -n '71p' i18n/loader.sh ; grep -c 'xargs' i18n/loader.sh ; grep -c 'INTERNET_HARD_FAIL' lib/internet_registry.sh
+ACCEPTANCE CHECK output:
+```
+    else
+0
+1
+```
+Tests: run_tests.sh: 121 passed
+Deviations: none
+
+
 
 
 

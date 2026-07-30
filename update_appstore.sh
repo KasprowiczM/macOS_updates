@@ -378,7 +378,7 @@ tell application "System Events"
                 try
                     if class of elem is button then
                         set btnName to name of elem
-                        if btnName is "Update" or btnName is "Aktualizuj" or btnName is "Aktualisieren" or btnName is "Actualizar" or btnName is "Aggiorna" or btnName is "Atualizar" or btnName is "Actualiser" or btnName contains "Update" then
+                        if btnName is "Update" or btnName is "Aktualizuj" or btnName is "Aktualisieren" or btnName is "Actualizar" or btnName is "Aggiorna" or btnName is "Atualizar" or btnName is "Actualiser" then
                             click elem
                             set updateCount to updateCount + 1
                             delay 1

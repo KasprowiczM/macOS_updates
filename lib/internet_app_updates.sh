@@ -1500,7 +1500,7 @@ if match:
         LEDGER_RELATION="$(internet_version_relation "$LATEST_LEDGER" "$VER")"
 
         if [ -z "$LATEST_LEDGER" ]; then
-            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
+            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "download.live.ledger.com")"
             STATUS_LEDGER="$L_INTERNET_STATUS_OFFLINE"
         elif [ "$LEDGER_RELATION" = "unknown" ]; then
             print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Ledger version")"
