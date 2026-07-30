@@ -97,3 +97,10 @@ What changed: Added strip_ansi helper to update_brew.sh and piped brew list, bre
 Why: Finding M4 - Unstripped ANSI escape codes in Homebrew command outputs could corrupt package names and version tracking.
 Tests: test_brew_outputs_use_ansi_stripping (run_tests.sh passed 108 tests)
 Deviations: none
+
+## Task 15 - Expand PATH for Node manager locations in update_npm_cli.sh
+Files: update_npm_cli.sh, tests/test_safety_static.py
+What changed: Added expand_node_manager_paths function to update_npm_cli.sh to include ~/.n/bin, ~/.nvm/versions/node/v*/bin, /usr/local/bin, and /opt/homebrew/bin in PATH before running toolchain checks. Added test_update_npm_cli_expands_node_manager_paths to test_safety_static.py.
+Why: Finding M5 - Custom or non-standard Node manager paths caused command -v npm to fail in non-interactive shells.
+Tests: test_update_npm_cli_expands_node_manager_paths (run_tests.sh passed 109 tests)
+Deviations: none

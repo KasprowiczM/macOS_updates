@@ -149,6 +149,28 @@ remove_npmrc_prefix() {
     [ -s "$NPMRC_PATH" ] || rm -f "$NPMRC_PATH"
 }
 
+expand_node_manager_paths() {
+    local node_dir
+    for node_dir in "$HOME/.n/bin" /usr/local/bin /opt/homebrew/bin; do
+        if [ -d "$node_dir" ]; then
+            case ":$PATH:" in
+                *":$node_dir:"*) ;;
+                *) export PATH="$PATH:$node_dir" ;;
+            esac
+        fi
+    done
+    if [ -d "$HOME/.nvm/versions/node" ]; then
+        for node_dir in "$HOME/.nvm/versions/node"/v*/bin; do
+            if [ -d "$node_dir" ]; then
+                case ":$PATH:" in
+                    *":$node_dir:"*) ;;
+                    *) export PATH="$PATH:$node_dir" ;;
+                esac
+            fi
+        done
+    fi
+}
+
 ensure_toolchain_paths() {
     local profile
 
@@ -158,6 +180,7 @@ ensure_toolchain_paths() {
     export N_PREFIX
     export BUN_INSTALL="$BUN_HOME"
     export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:$PATH"
+    expand_node_manager_paths
     hash -r 2>/dev/null || true
 
     profile="$(find_shell_profile)"

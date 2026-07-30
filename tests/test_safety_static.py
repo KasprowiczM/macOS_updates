@@ -946,6 +946,15 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("brew outdated --formula 2>&1 | strip_ansi", text)
         self.assertIn("brew doctor 2>&1 | strip_ansi", text)
 
+    def test_update_npm_cli_expands_node_manager_paths(self) -> None:
+        """update_npm_cli.sh must expand PATH to include standard Node manager locations."""
+        text = self.read_script("update_npm_cli.sh")
+        self.assertIn("expand_node_manager_paths() {", text)
+        self.assertIn("$HOME/.n/bin", text)
+        self.assertIn("$HOME/.nvm/versions/node", text)
+        self.assertIn("/usr/local/bin", text)
+        self.assertIn("/opt/homebrew/bin", text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
