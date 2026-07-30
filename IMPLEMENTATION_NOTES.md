@@ -111,3 +111,10 @@ What changed: Updated github_latest_tag in lib/github_release.sh to fall back to
 Why: Finding M9 - GitHub API rate limits or JSON format changes could cause version resolution to fail without a secondary fallback.
 Tests: test_github_latest_tag_contains_location_fallback (run_tests.sh passed 110 tests)
 Deviations: none
+
+## Task 17 - Ensure schema_version 2 and classification_counts in coverage report JSON
+Files: scripts/report_update_coverage.sh, tests/test_safety_static.py
+What changed: Confirmed schema_version: 2 and top-level classification_counts summary dictionary in scripts/report_update_coverage.sh JSON payload. Added test_report_update_coverage_json_schema_v2 to test_safety_static.py.
+Why: Finding M10 - JSON consumers require explicit schema versioning and structured classification counts for stability across updates.
+Tests: test_report_update_coverage_json_schema_v2 (run_tests.sh passed 111 tests)
+Deviations: none
