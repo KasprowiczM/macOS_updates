@@ -69,3 +69,10 @@ What changed: Updated grep in install_bun_tarball to use extended regex grep -E 
 Why: Finding H16 - Rigid double-space grep pattern caused Bun tarball installation to fail if upstream SHASUMS256 formatting changed.
 Tests: test_bun_shasum_pattern_is_resilient (run_tests.sh passed 104 tests)
 Deviations: none
+
+## Task 11 - Sanitize inventory table formatting in report_update_coverage.sh
+Files: scripts/report_update_coverage.sh, tests/test_safety_static.py
+What changed: Added clean_app_name to strip markdown links ([App](url)), bold/italic formatting (**App**), and emojis before name normalization in scripts/report_update_coverage.sh. Added test_report_update_coverage_sanitizes_formatted_rows to test_safety_static.py.
+Why: Finding H18 - Markdown formatting and links in APPLICATIONS.md caused formatted inventory rows to fail matching against update categories and fall through to unknown.
+Tests: test_report_update_coverage_sanitizes_formatted_rows (run_tests.sh passed 105 tests)
+Deviations: none

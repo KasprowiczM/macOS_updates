@@ -916,6 +916,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn(r'grep -E "[[:space:]]+(\./)?${archive_name}\$"', fn_block)
         self.assertIn("SOFT_FAIL=1", fn_block)
 
+    def test_report_update_coverage_sanitizes_formatted_rows(self) -> None:
+        """report_update_coverage.sh must sanitize markdown links, bold text, and emojis when normalizing app names."""
+        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
+        self.assertIn("clean_app_name", text)
+        self.assertIn(r"\[([^\]]+)\]\([^)]+\)", text)
+        self.assertIn(r"\*+([^*]+)\*+", text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
