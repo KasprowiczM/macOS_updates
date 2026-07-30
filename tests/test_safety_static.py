@@ -739,6 +739,47 @@ class StaticShellSafetyTests(unittest.TestCase):
                     f"but not declared in internet_app_methods.txt — orphaned?",
             )
 
+    def test_handler_registry_dmg_consistency(self) -> None:
+        """Handlers matching method 'silent_launch' must not call mount_verified_dmg; 'github_dmg' must."""
+        methods_text = (REPO_ROOT / "config" / "internet_app_methods.txt").read_text(encoding="utf-8")
+        handlers_text = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
+
+        for line in methods_text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|")
+            if len(parts) != 3:
+                continue
+            app_name, method, status_var = parts
+            var_slug = status_var.replace("STATUS_", "").lower()
+            # Map known status var / app name overrides to handler names if needed
+            handler_name = f"iu_{var_slug}"
+            if status_var == "STATUS_FIREFOX":
+                handler_name = "iu_firefox_developer_edition"
+            elif status_var == "STATUS_CHATGPT":
+                handler_name = "iu_chatgpt_codex"
+            elif status_var == "STATUS_CLAUDE_APP":
+                handler_name = "iu_claude_desktop"
+            elif status_var == "STATUS_TREZOR":
+                handler_name = "iu_trezor_suite"
+            elif status_var == "STATUS_RDMANAGER":
+                handler_name = "iu_remote_desktop_manager"
+
+            match = re.search(rf"{handler_name}\(\)\s*\{{(.*?)\n\}}(?=\n\n|\n[a-z_]+\(\)|\Z)", handlers_text, re.DOTALL)
+            if match:
+                body = match.group(1)
+                if method == "silent_launch":
+                    self.assertNotIn(
+                        "mount_verified_dmg", body,
+                        msg=f"Handler {handler_name} for {app_name} declared as silent_launch must not contain mount_verified_dmg",
+                    )
+                elif method == "github_dmg":
+                    self.assertIn(
+                        "mount_verified_dmg", body,
+                        msg=f"Handler {handler_name} for {app_name} declared as github_dmg must contain mount_verified_dmg",
+                    )
+
     def test_i18n_lang_files_key_parity(self) -> None:
         langs = ["en", "pl", "de", "fr", "es", "it", "pt"]
         keys_by_lang = {}

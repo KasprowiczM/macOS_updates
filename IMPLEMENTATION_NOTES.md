@@ -222,6 +222,19 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 116 passed
 Deviations: none
 
+## Task R8 - Make the ChatGPT Atlas registry row match its handler
+Files: config/internet_app_methods.txt, docs/agents/critical_rules.md, tests/test_safety_static.py
+What changed: Updated `config/internet_app_methods.txt` to register ChatGPT Atlas as `silent_launch`. Updated `docs/agents/critical_rules.md` Section 5 to categorize ChatGPT Atlas under `Built-in auto-updater (silent launch, triggered-unverified)`. Added `test_handler_registry_dmg_consistency` in `tests/test_safety_static.py` asserting registry method consistency with `mount_verified_dmg` usage.
+Why: Finding N5
+ACCEPTANCE CHECK command: grep -n 'ChatGPT Atlas' config/internet_app_methods.txt
+ACCEPTANCE CHECK output:
+```
+7:ChatGPT Atlas|silent_launch|STATUS_ATLAS
+```
+Tests: test_handler_registry_dmg_consistency — run_tests.sh: 117 passed
+Deviations: none
+
+
 
 
 

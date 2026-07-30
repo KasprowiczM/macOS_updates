@@ -32,7 +32,6 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 
 | Method | Apps |
 |--------|------|
-| Sparkle appcast + DMG | ChatGPT Atlas |
 | Mozilla product-details/download + DMG | Firefox Dev |
 | GitHub API / Official Metadata + DMG | KeePassXC, CodeEdit, Trezor Suite, Ledger Wallet / Live |
 | Google Keystone | Chrome, Google Drive |
@@ -41,7 +40,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 | Docker CLI | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
 | Homebrew cask --greedy | Inkscape |
-| Built-in auto-updater (silent launch) | Brave, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian, Ascendo |
+| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT Atlas, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian, Ascendo |
 | Hybrid self-update + MAU fallback | Teams (`TEAMS21` is accepted only when surfaced by MAU and is verified by a final `msupdate --list`) |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
 | Manual only | IPMIView, DJI Assistant 2 |
