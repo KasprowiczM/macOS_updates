@@ -202,6 +202,9 @@ iu_chatgpt_atlas() {
     ATLAS_NAME="ChatGPT Atlas"
     for apath in "/Applications/ChatGPT Atlas.app" "/Applications/Atlas.app" "/Applications/ChatGPT.app"; do
         if [ -d "$apath" ]; then
+            if [ "$(defaults read "$apath/Contents/Info" CFBundleIdentifier 2>/dev/null)" = "com.openai.codex" ]; then
+                continue
+            fi
             ATLAS_APP="$apath"
             ATLAS_NAME="$(basename "$apath" .app)"
             break

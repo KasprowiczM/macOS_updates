@@ -234,6 +234,19 @@ ACCEPTANCE CHECK output:
 Tests: test_handler_registry_dmg_consistency — run_tests.sh: 117 passed
 Deviations: none
 
+## Task R9 - Stop the Atlas handler claiming the ChatGPT/Codex bundle
+Files: lib/internet_app_updates.sh, tests/test_safety_static.py
+What changed: Added a `com.openai.codex` bundle ID exclusion check in `iu_chatgpt_atlas` candidate loop so `/Applications/ChatGPT.app` is skipped if it belongs to ChatGPT / Codex. Added unit test `test_chatgpt_atlas_ignores_codex_bundle` asserting that `com.openai.codex` bundle ID candidates are excluded.
+Why: Finding N6
+ACCEPTANCE CHECK command: awk '/^iu_chatgpt_atlas\(\)/,/^}/' lib/internet_app_updates.sh | grep -c 'com.openai.codex\|/Applications/ChatGPT.app'
+ACCEPTANCE CHECK output:
+```
+2
+```
+Tests: test_chatgpt_atlas_ignores_codex_bundle — run_tests.sh: 118 passed
+Deviations: none
+
+
 
 
 
