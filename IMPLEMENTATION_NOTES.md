@@ -246,6 +246,19 @@ ACCEPTANCE CHECK output:
 Tests: test_chatgpt_atlas_ignores_codex_bundle — run_tests.sh: 118 passed
 Deviations: none
 
+## Task R10 - Make strip_ansi actually work on macOS
+Files: update_brew.sh, tests/test_safety_static.py
+What changed: Investigated BSD sed escape sequence behavior (`printf 'A\033[0;31mR\033[0mB\n' | sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g' | cat -v` returned `ARB`). Refactored `strip_ansi` in `update_brew.sh` to use bash ANSI-C quoting `sed $'s/\033\\[[0-9;]*[a-zA-Z]//g'`. Updated `test_brew_outputs_use_ansi_stripping` in `tests/test_safety_static.py` to pipe literal ESC sequences through `strip_ansi` and assert removal.
+Why: Finding N7
+ACCEPTANCE CHECK command: printf 'A\033[0;31mR\033[0mB\n' | sed $'s/\033\\[[0-9;]*[a-zA-Z]//g' | cat -v
+ACCEPTANCE CHECK output:
+```
+ARB
+```
+Tests: test_brew_outputs_use_ansi_stripping — run_tests.sh: 118 passed
+Deviations: none
+
+
 
 
 
