@@ -1286,7 +1286,7 @@ iu_visual_studio_code() {
                 if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
                     if [ -n "$VSCODE_SHA256" ]; then
                         if ! echo "$VSCODE_SHA256  $TEMP_ZIP" | shasum -a 256 -c >/dev/null 2>&1; then
-                            print_warn "Checksum VS Code nie zgadza się dla $TEMP_ZIP"
+                            print_warn "$(printf "$L_INTERNET_VSCODE_CHECKSUM_MISMATCH" "$TEMP_ZIP")"
                             STATUS_VSCODE="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
                             rm -f "$TEMP_ZIP" 2>/dev/null || true
                             rm -rf "$TEMP_DIR" 2>/dev/null || true
@@ -1532,7 +1532,7 @@ else:
         exp_hex = ''
 sys.exit(0 if exp_hex and exp_hex == act else 1)
 " "$LEDGER_SHA512" "$ACTUAL_SHA512"; then
-                        print_warn "Checksum SHA512 Ledger Live nie zgadza się dla $TEMP_DMG"
+                        print_warn "$(printf "$L_INTERNET_LEDGER_CHECKSUM_MISMATCH" "$TEMP_DMG")"
                         STATUS_LEDGER="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
                         rm -f "$TEMP_DMG" 2>/dev/null || true
                         return 0

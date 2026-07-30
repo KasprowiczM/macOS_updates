@@ -321,6 +321,25 @@ PROC_SH_EXISTS
 Tests: run_tests.sh: 119 passed
 Deviations: none
 
+## Task R16 - Localise steps 0, 2 and 5
+Files: i18n/lang_*.sh, update_npm_cli.sh, lib/internet_app_updates.sh, update_all.sh, tests/test_safety_static.py
+What changed: Sourced `i18n/loader.sh` in `update_npm_cli.sh`. Added 63 new `L_*` keys to `lang_en.sh` and translated into `pl`, `de`, `fr`, `es`, `it`, `pt` (maintaining 648 key count parity across all 7 files). Localized hardcoded strings in `update_npm_cli.sh`, `lib/internet_app_updates.sh`, and `update_all.sh` heredocs. Preserved structural table headers in `APPLICATIONS.md` / `UPDATES.md`. Added `test_all_update_scripts_source_i18n_and_no_polish_diacritics_in_print_statements` to `tests/test_safety_static.py`.
+Why: Finding H9
+ACCEPTANCE CHECK command: for f in i18n/lang_*.sh; do printf '%s %s\n' "$f" "$(grep -c '^L_[A-Z0-9_]*=' "$f")"; done
+ACCEPTANCE CHECK output:
+```
+i18n/lang_de.sh 648
+i18n/lang_en.sh 648
+i18n/lang_es.sh 648
+i18n/lang_fr.sh 648
+i18n/lang_it.sh 648
+i18n/lang_pl.sh 648
+i18n/lang_pt.sh 648
+```
+Tests: test_all_update_scripts_source_i18n_and_no_polish_diacritics_in_print_statements — run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 
