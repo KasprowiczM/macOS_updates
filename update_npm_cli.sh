@@ -337,12 +337,17 @@ write_cli_snapshot() {
 }
 
 detect_latest_node_version() {
-    local ver
-    ver="$(curl -fsSL --max-time 60 --retry 3 --retry-delay 2 https://nodejs.org/dist/index.json \
-        | python3 -c 'import json,sys; arr=json.load(sys.stdin); print(arr[0]["version"])' 2>/dev/null)"
-    if [ -n "$ver" ]; then
-        echo "$ver"
-        return 0
+    local json_body ver
+    json_body="$(curl -fsSL --max-time 60 --retry 3 --retry-delay 2 https://nodejs.org/dist/index.json 2>/dev/null)"
+    if [ -n "$json_body" ]; then
+        ver="$(echo "$json_body" | python3 -c 'import json,sys; arr=json.load(sys.stdin); print(arr[0]["version"])' 2>/dev/null)"
+        if [ -z "$ver" ]; then
+            ver="$(echo "$json_body" | awk -F'"' '/"version":/ {print $4; exit}')"
+        fi
+        if [ -n "$ver" ]; then
+            echo "$ver"
+            return 0
+        fi
     fi
     SOFT_FAIL=1
     return 1
