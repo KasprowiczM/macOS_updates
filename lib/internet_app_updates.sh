@@ -95,6 +95,11 @@ iu_firefox_developer_edition() {
     print_header "🦊 Firefox Developer Edition"
     if [ -d "/Applications/Firefox Developer Edition.app" ]; then
         VER=$(firefox_dev_version)
+        if [ "$VER" = "?" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Firefox Developer Edition version")"
+            STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            return 0
+        fi
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
         LATEST_FF=$(curl -fsSL --max-time 20 --retry 2 \
@@ -193,94 +198,29 @@ iu_brave_browser() {
 
 iu_chatgpt_atlas() {
     print_header "🔵 ChatGPT Atlas"
-    # Atlas może być zainstalowany jako "ChatGPT Atlas.app" lub "Atlas.app"
     ATLAS_APP=""
-    for apath in "/Applications/ChatGPT Atlas.app" "/Applications/Atlas.app"; do
-        [ -d "$apath" ] && ATLAS_APP="$apath" && break
+    ATLAS_NAME="ChatGPT Atlas"
+    for apath in "/Applications/ChatGPT Atlas.app" "/Applications/Atlas.app" "/Applications/ChatGPT.app"; do
+        if [ -d "$apath" ]; then
+            ATLAS_APP="$apath"
+            ATLAS_NAME="$(basename "$apath" .app)"
+            break
+        fi
     done
     if [ -n "$ATLAS_APP" ]; then
         VER=$(app_version "$ATLAS_APP")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-
-        # Pobierz najnowszą wersję z Sparkle appcast OpenAI
-        ATLAS_XML=$(curl -fsSL --compressed --max-time 20 --retry 3 --retry-delay 2 \
-            "https://persistent.oaistatic.com/atlas/public/sparkle_public_appcast.xml")
-        # Parse the highest shortVersionString (appcast may have multiple items)
-        ATLAS_LATEST=$(echo "$ATLAS_XML" | grep 'sparkle:shortVersionString' | \
-            sed 's|.*<sparkle:shortVersionString>\(.*\)</sparkle:shortVersionString>.*|\1|' | \
-            sort -V | tail -1)
-        ATLAS_DMG_URL=$(echo "$ATLAS_XML" | grep -m1 'enclosure url=".*\.dmg"' | \
-            sed 's|.*enclosure url="\([^"]*\.dmg\)".*|\1|')
-        ATLAS_RELATION="$(internet_version_relation "$ATLAS_LATEST" "$VER")"
-
-        if [ -z "$ATLAS_LATEST" ]; then
-            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "OpenAI server")"
-            STATUS_ATLAS="$L_INTERNET_STATUS_OFFLINE"
-        elif [ "$ATLAS_RELATION" = "unknown" ]; then
-            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "ChatGPT Atlas version")"
-            STATUS_ATLAS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
-        elif [ "$ATLAS_RELATION" = "current" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "ChatGPT Atlas" "$VER (remote: $ATLAS_LATEST)")"
-            STATUS_ATLAS="$L_INTERNET_STATUS_CURRENT"
+        if silent_launch_app "$ATLAS_NAME"; then
+            print_info "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$ATLAS_NAME")"
+            STATUS_ATLAS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
         else
-            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$ATLAS_LATEST" "$VER")"
-            if [ -n "$ATLAS_DMG_URL" ]; then
-                print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_SIZE" "ChatGPT Atlas" "$ATLAS_LATEST" "~250 MB")"
-                TEMP_DMG="$(make_temp_dmg ChatGPT_Atlas)"
-                if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$ATLAS_DMG_URL"; then
-                    ATLAS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
-                    if [ -n "$ATLAS_MOUNT" ]; then
-                        ATLAS_SRC=""
-                        for ATLAS_CANDIDATE in "$ATLAS_MOUNT/ChatGPT Atlas.app" "$ATLAS_MOUNT/Atlas.app"; do
-                            [ -d "$ATLAS_CANDIDATE" ] && ATLAS_SRC="$ATLAS_CANDIDATE" && break
-                        done
-                        if [ -n "$ATLAS_SRC" ]; then
-                            ATLAS_DEST="$(basename "$ATLAS_APP")"
-                            ATLAS_SOURCE_VER=$(app_version "$ATLAS_SRC")
-                            if [ "$(internet_version_relation "$ATLAS_SOURCE_VER" "$VER")" != "newer" ]; then
-                                print_warn "Refusing non-newer Atlas payload: $ATLAS_SOURCE_VER (installed: $VER)"
-                                STATUS_ATLAS="$L_INTERNET_STATUS_INSTALL_ERROR"
-                            elif copy_verified_app "$ATLAS_SRC" "$ATLAS_DEST"; then
-                                print_ok "$(internet_msg "$L_INTERNET_APP_COPIED" "$ATLAS_DEST")"
-                                NEW_VER=$(app_version "$ATLAS_APP")
-                                print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "ChatGPT Atlas" "$NEW_VER")"
-                                STATUS_ATLAS="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
-                            else
-                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$ATLAS_DEST")"
-                                STATUS_ATLAS="$L_INTERNET_STATUS_INSTALL_ERROR"
-                            fi
-                        else
-                            print_warn "$L_INTERNET_APP_NOT_ON_VOLUME"
-                            STATUS_ATLAS="$L_INTERNET_STATUS_INSTALL_ERROR"
-                        fi
-                        detach_verified_dmg "$ATLAS_MOUNT" || true
-                    else
-                        print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
-                        STATUS_ATLAS="$L_INTERNET_STATUS_MOUNT_ERROR"
-                    fi
-                    rm -f "$TEMP_DMG"
-                else
-                    print_warn "$L_INTERNET_DOWNLOAD_VERIFY_FAILED"
-                    print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://chatgpt.com/atlas/")"
-                    STATUS_ATLAS="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
-                    rm -f "$TEMP_DMG" 2>/dev/null || true
-                fi
-            else
-                print_warn "$L_INTERNET_NO_DOWNLOAD_URL"
-                print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://chatgpt.com/atlas/")"
-                STATUS_ATLAS="$L_INTERNET_STATUS_NO_URL"
-            fi
+            print_warn "$L_INTERNET_STATUS_LAUNCH_FAILED"
+            STATUS_ATLAS="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT Atlas")"
-        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://chatgpt.com/atlas/")"
+        STATUS_ATLAS="$L_INTERNET_STATUS_NO_DESKTOP_APP"
     fi
-
-    # ============================================================
-    # ██ SEKCJA 2: APLIKACJE AI
-    # ============================================================
-
-    # ── 5. CHATGPT ────────────────────────────────────────────────
 }
 
 iu_chatgpt() {
@@ -515,8 +455,10 @@ iu_keepassxc() {
         LATEST_KPX_TAG=$(github_latest_tag "keepassxreboot/keepassxc")
         LATEST_KPX=$(echo "$LATEST_KPX_TAG" | sed 's/^v//')
         KPX_RELATION="$(internet_version_relation "$LATEST_KPX" "$VER")"
-        # Arch detection for DMG URL
-        KPX_ARCH=$([ "$(uname -m)" = "arm64" ] && echo "arm64" || echo "x86_64")
+        # Arch detection for DMG URL with safe fallback
+        KPX_UNAME="$(uname -m 2>/dev/null || echo "arm64")"
+        KPX_ARCH="x86_64"
+        [ "$KPX_UNAME" = "arm64" ] && KPX_ARCH="arm64"
 
         if [ "$LATEST_KPX" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
