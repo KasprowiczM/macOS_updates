@@ -1,6 +1,6 @@
 # Public GitHub vs Private Cloud Overlay
 
-**Production release:** v**1.0.20** · Repository: [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates)
+**Production release:** v**1.0.21** · Repository: [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates)
 
 This repository is designed for **public GitHub** plus an optional **private overlay** synced to your cloud provider (Proton Drive, iCloud, Google Drive, etc.).
 

@@ -1,6 +1,6 @@
 # Início rápido (Português)
 
-**Mac com Apple Silicon obrigatório** · macOS 13+ · **v1.0.20**
+**Mac com Apple Silicon obrigatório** · macOS 13+ · **v1.0.21**
 
 ## Instalação numa linha
 
