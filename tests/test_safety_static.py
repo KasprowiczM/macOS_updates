@@ -2005,5 +2005,19 @@ class MauRegressionGuardTests(unittest.TestCase):
         self.assertNotIn("XCLW2019", result.stdout)
 
 
+class TestDevSyncRedact(unittest.TestCase):
+    def test_redact_url_credentials_and_secrets(self) -> None:
+        """_redact must strip URL credentials and token parameters."""
+        from dev_sync.dev_sync_core import _redact
+        raw_url = "https://user:tok123@host.com/path?token=secret123"
+        redacted = _redact(raw_url)
+        self.assertNotIn("user:tok123", redacted)
+        self.assertIn("https://[REDACTED]@host.com", redacted)
+        self.assertIn("token=[REDACTED]", redacted)
+
+        raw_auth = "_authToken: dummy_auth_val"
+        self.assertIn("_authToken=[REDACTED]", _redact(raw_auth))
+
+
 if __name__ == "__main__":
     unittest.main()
