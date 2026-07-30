@@ -26,6 +26,11 @@ jobs:
       - name: Forbidden tracked private files
         run: |
           set -e
+          IGNORED_TRACKED="$(git ls-files -z | xargs -0 git check-ignore --no-index 2>/dev/null || true)"
+          if [ -n "$IGNORED_TRACKED" ]; then
+            echo "FORBIDDEN tracked gitignored file(s): $IGNORED_TRACKED"
+            exit 1
+          fi
           for f in .env .dev_sync_config.json APPLICATIONS.md UPDATES.md; do
             if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
               echo "FORBIDDEN tracked file: $f"

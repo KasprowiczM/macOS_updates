@@ -11,5 +11,18 @@
     "mcp__claude_ai_Google_Calendar",
     "mcp__claude_ai_Google_Drive",
     "memory"
-  ]
+  ],
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(.dev_sync_config.json)",
+      "Read(**/.git/objects/**)",
+      "Read(**/dev_sync_logs/**)",
+      "Read(**.pem)",
+      "Read(**.key)",
+      "Read(**.p12)",
+      "Read(secrets/**)"
+    ]
+  }
 }

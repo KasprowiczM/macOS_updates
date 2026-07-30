@@ -283,6 +283,19 @@ ACCEPTANCE CHECK output:
 Tests: test_reconcile_does_not_release_hidden_unoffered_deferral — run_tests.sh: 119 passed
 Deviations: none
 
+## Task R13 - Untrack gitignored files and ship the deny rules
+Files: .claude/settings.json, .claude/settings.local.json, scripts/scan_secrets.sh, .github/workflows/gitleaks.yml
+What changed: Untracked gitignored files `.claude/settings.local.json`, `.claude/.DS_Store`, and `skills/.DS_Store` via `git rm --cached`. Moved the `permissions.deny` security rules array into tracked `.claude/settings.json`. Updated `scripts/scan_secrets.sh` and `.github/workflows/gitleaks.yml` with general `git check-ignore --no-index` validation across all tracked files.
+Why: Finding M14
+ACCEPTANCE CHECK command: git ls-files -z | xargs -0 git check-ignore --no-index -v ; echo "exit=$?"
+ACCEPTANCE CHECK output:
+```
+exit=1
+```
+Tests: run_tests.sh: 119 passed
+Deviations: none
+
+
 
 
 

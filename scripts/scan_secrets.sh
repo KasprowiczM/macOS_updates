@@ -35,6 +35,13 @@ else
 fi
 
 # Tracked files that must never be committed
+IGNORED_TRACKED="$(git ls-files -z | xargs -0 git check-ignore --no-index 2>/dev/null || true)"
+if [ -n "$IGNORED_TRACKED" ]; then
+    echo "  FAIL tracked gitignored file(s):"
+    printf '%s\n' "$IGNORED_TRACKED"
+    FAIL=1
+fi
+
 FORBIDDEN_TRACKED=(
     .env
     .dev_sync_config.json
