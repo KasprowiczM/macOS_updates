@@ -820,6 +820,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("MAC_UPDATE_SKIP_DOCTOR", text,
                        msg="update_brew.sh must read MAC_UPDATE_SKIP_DOCTOR")
 
+    def test_brew_doctor_and_greedy_cask_no_hard_failure(self) -> None:
+        text = self.read_script("update_brew.sh")
+        # brew doctor warnings should not set BREW_EXIT=1 (or HARD_FAIL=1)
+        self.assertIn('elif [ -n "$REAL_WARNINGS" ]; then', text)
+        # remaining greedy casks block should be informational only, not setting BREW_EXIT=1
+        self.assertIn('Casks listed in greedy outdated check (informational only):', text)
+
     def test_cli_flags_all_consumed(self) -> None:
         """Every MAC_UPDATE_* flag exported by lib/cli.sh must be read somewhere.
 
