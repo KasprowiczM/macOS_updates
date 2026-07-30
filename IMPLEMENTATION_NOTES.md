@@ -148,3 +148,18 @@ ACCEPTANCE CHECK output:
 Tests: test_soft_internet_failure_still_runs_macos_system_step, test_soft_failure_in_every_layer_never_blocks_macos_system_step, test_degraded_only_exits_zero — run_tests.sh: 113 passed
 Deviations: none
 
+## Task R2 - Fix App Store Track 2, which is silently broken on stock macOS
+Files: update_appstore.sh, tests/test_safety_static.py
+What changed: Updated update_appstore.sh to write the Track 2 AppleScript payload to a session or temp script file before invoking `run_with_timeout "$GUI_TIMEOUT" osascript "$AS_SCRIPT_FILE"`. Removed the piped heredoc from the run_with_timeout invocation to prevent stdin loss when running background fallback tasks. Added unit test `test_no_run_with_timeout_uses_piped_heredoc` asserting no run_with_timeout call uses piped heredocs.
+Why: Finding N2
+ACCEPTANCE CHECK command: grep -n -A2 'run_with_timeout .*osascript' update_appstore.sh
+ACCEPTANCE CHECK output:
+```
+426:if ! AS_RESULT=$(run_with_timeout "$GUI_TIMEOUT" osascript "$AS_SCRIPT_FILE" 2>&1); then
+427-    print_warn "Track 2 (App Store GUI) timed out or failed; review window manually"
+428-    SOFT_FAIL=1
+```
+Tests: test_appstore_track2_gui_wrapped_in_timeout, test_no_run_with_timeout_uses_piped_heredoc — run_tests.sh: 114 passed
+Deviations: none
+
+

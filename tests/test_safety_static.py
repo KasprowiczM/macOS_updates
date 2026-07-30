@@ -888,6 +888,17 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("SOFT_FAIL=1", text)
         self.assertIn("Track 2 (App Store GUI) timed out or failed", text)
 
+    def test_no_run_with_timeout_uses_piped_heredoc(self) -> None:
+        """Assert no run_with_timeout call anywhere in .sh files has a piped heredoc (<<)."""
+        sh_files = list(REPO_ROOT.glob("*.sh")) + list((REPO_ROOT / "lib").glob("*.sh"))
+        for file_path in sh_files:
+            lines = file_path.read_text(encoding="utf-8").splitlines()
+            for idx, line in enumerate(lines):
+                if "run_with_timeout" in line:
+                    # Check this line and subsequent 2 lines for '<<'
+                    combined = " ".join(lines[idx:idx + 3])
+                    self.assertNotIn("<<", combined, msg=f"Piped heredoc found near run_with_timeout in {file_path.name}:{idx + 1}")
+
     def test_task_8_edge_cases_handling(self) -> None:
         """Assert iu_firefox_developer_edition, iu_chatgpt_atlas, and iu_keepassxc edge cases."""
         script_text = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")

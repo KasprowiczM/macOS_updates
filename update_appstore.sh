@@ -337,7 +337,14 @@ echo ""
 print_step "$L_APPSTORE_OPEN"
 
 GUI_TIMEOUT="${MAC_UPDATE_APPSTORE_GUI_TIMEOUT:-180}"
-if ! AS_RESULT=$(run_with_timeout "$GUI_TIMEOUT" osascript 2>&1 <<'APPLESCRIPT'
+AS_SCRIPT_DIR="${MAC_UPDATE_SESSION_DIR:-}"
+if [ -n "$AS_SCRIPT_DIR" ] && [ -d "$AS_SCRIPT_DIR" ]; then
+    AS_SCRIPT_FILE="$AS_SCRIPT_DIR/appstore_track2.scpt"
+else
+    AS_SCRIPT_FILE="$(mktemp "${TMPDIR:-/tmp}/mac_update_as.XXXXXX")"
+fi
+
+cat <<'APPLESCRIPT' > "$AS_SCRIPT_FILE"
 
 tell application "App Store" to activate
 delay 2
@@ -415,11 +422,13 @@ tell application "System Events"
 end tell
 
 APPLESCRIPT
-); then
+
+if ! AS_RESULT=$(run_with_timeout "$GUI_TIMEOUT" osascript "$AS_SCRIPT_FILE" 2>&1); then
     print_warn "Track 2 (App Store GUI) timed out or failed; review window manually"
     SOFT_FAIL=1
     AS_RESULT="TIMEOUT_OR_FAILED: $AS_RESULT"
 fi
+rm -f "$AS_SCRIPT_FILE"
 
 echo ""
 APPSTORE_TOR2_BRANCH="unexpected"
