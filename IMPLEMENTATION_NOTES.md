@@ -727,17 +727,54 @@ ACCEPTANCE CHECK output:
 10
 ```
 Tests: run_tests.sh: 127 passed
+## Task X1 - Restore print_header (MEDIUM)
+Files: lib/ui.sh, tests/test_safety_static.py
+What changed:
+- X1a: Added global `print_header() { ui_print_header "$1"; }` alias wrapper to `lib/ui.sh`. Restored missing `print_header` for `update_appstore.sh` without requiring local duplicates.
+- X1c: Added `test_orchestrators_all_print_functions_defined` in `tests/test_safety_static.py` asserting that for every orchestrator script, all `print_*` functions it calls are defined locally or in `lib/ui.sh`.
+Why: Task X1 (Fix undefined `print_header` command errors in `update_appstore.sh`)
+ACCEPTANCE CHECK command:
+```bash
+bash -n update_appstore.sh && echo SYNTAX_OK
+grep -c 'print_header' update_appstore.sh
+M=$(mktemp -d); printf '#!/bin/sh\necho arm64\n' > "$M/uname"; printf '#!/bin/sh\ncase "$1" in -productVersion) echo 26.5.2;; -buildVersion) echo T;; *) echo x;; esac\n' > "$M/sw_vers"; printf '#!/bin/sh\ncase "$1" in version) echo 4.2.0;; list) echo "1 App (1.0)";; account) exit 0;; outdated) echo fail; exit 1;; *) exit 0;; esac\n' > "$M/mas"; printf '#!/bin/sh\nexit 0\n' > "$M/brew"; chmod +x "$M"/*; PATH="$M:/usr/bin:/bin" MAC_UPDATE_YES=1 MAC_LANG=en bash ./update_appstore.sh >/dev/null 2>/tmp/x1.err; echo "EXIT=$?"; grep -c 'command not found' /tmp/x1.err
+```
+ACCEPTANCE CHECK output:
+```
+SYNTAX_OK
+10
+EXIT=10
+0
+```
+Tests: run_tests.sh: 128 passed
+Deviations: none
+
+## Task X2 - Make the suite environment-independent
+Files: tests/test_safety_static.py
+What changed:
+- X2a/X2b: Added `brew` and `mas` executable stubs (`#!/bin/sh\nexit 0\n`) to `_make_leaf_test_env` and `run_update_all_with_layer_exit` mock-bin setups in `tests/test_safety_static.py` so test scenarios do not depend on ambient host binaries.
+- X2c: Preserved all 6 severity exit-code expectations (0, 0-or-10, 1, 10, 10, 1).
+Why: Task X2 (Eliminate ambient host Homebrew dependency in test suite)
+ACCEPTANCE CHECK command: PYTHONPATH=dev_sync python3 -m unittest discover tests 2>&1 | tail -4
+ACCEPTANCE CHECK output:
+```
+----------------------------------------------------------------------
+Ran 128 tests in 41.379s
+
+OK
+safe
+```
+Tests: 128 tests passed (0 failures, 0 errors)
 Deviations: none
 
 ---
 
-## Final Release Deliverables Summary (Tasks P1–P3)
+## Final v1.0.21 Release Deliverables Summary (Tasks X1–X2)
 
 | Task | Title | Finding / Topic | Status | Commit |
 |------|-------|-----------------|--------|--------|
-| **P1** | Fix process deadlock in `update_all.sh` | Critical hang on `wait "$TEE_PID"` | Done | `a0f7890` |
-| **P2** | Get suite green & honest | Test suite refactoring / timeouts | Done | `a0f7890` |
-| **P3** | Two small leftovers | `SKIPPED - R17d` & sudo guard string comparison | Done | `a0f7890` / `407473f` |
+| **X1** | Restore `print_header` | Undefined `print_header` in `update_appstore.sh` | Done | `86ce9f5` |
+| **X2** | Make suite environment-independent | Add default `brew` / `mas` stubs to mock_bin | Done | `86ce9f5` |
 
 ### Final Verification Results & Output
 
@@ -748,9 +785,9 @@ Deviations: none
   ✅ all python modules compile
   ✅ all inline heredoc python blocks compile
 ── 3/4  python3 -m unittest discover tests
-...............................................................................................................................
+................................................................................................................................
 ----------------------------------------------------------------------
-Ran 127 tests in 43.395s
+Ran 128 tests in 40.682s
 
 OK
 safe
@@ -758,9 +795,9 @@ safe
 ── 4/4  scripts/scan_secrets.sh
 ── gitleaks detect (tracked git content) ──
 
-9:19PM INF 73 commits scanned.
-9:19PM INF scanned ~1482707 bytes (1.48 MB) in 316ms
-9:19PM INF no leaks found
+9:39PM INF 75 commits scanned.
+9:39PM INF scanned ~1492947 bytes (1.49 MB) in 299ms
+9:39PM INF no leaks found
   OK gitleaks
 Secret scan passed
   ✅ secret scan passed
@@ -774,8 +811,22 @@ GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
 **Tested Shell Version**:
 `GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)`
 
-**Items Deliberately Not Done / Skipped**:
-- `R17d`: Porting `internet_version_relation` in `lib/internet_app_updates.sh` to pure `awk` was skipped per P3a option because the existing Python helper implementation is fully functional, passes all 127 unit tests (including `MauRegressionGuardTests` for prerelease version ordering and exact match semantics), and performance impact of ~20 inline Python invocations per update run is negligible.
+**Output of `timeout 30 bash update_all.sh --yes --dry-run; echo "exit=$?"`**:
+```
+  0. Scan new apps:           [DRY-RUN] skipped
+  1. App Store:               [DRY-RUN] skipped
+  2. Native CLI + npm:        [DRY-RUN] skipped
+  3. Homebrew:                [DRY-RUN] skipped
+  4. Internet apps:           [DRY-RUN] skipped
+  5. Aktualizacja APPLICATIONS.md: [DRY-RUN] skipped
+  6. macOS System:            [DRY-RUN] skipped
+
+  Duration: 0 min 0 sek
+
+  ✅ WSZYSTKIE AKTUALIZACJE ZAKOŃCZONE!
+  ℹ️  DRY-RUN: no applications, inventory, or history files were changed.
+exit=0
+```
 
 
 
