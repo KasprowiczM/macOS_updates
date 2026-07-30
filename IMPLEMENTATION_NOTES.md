@@ -83,3 +83,10 @@ What changed: Confirmed bundle ID prioritization in target_for and bundle-ID-onl
 Why: Finding H19 - Target matching by string equality without checking bundle ID could misidentify legacy com.openai.chat as com.openai.codex.
 Tests: test_chatgpt_codex_target_alias_is_bundle_id_only (run_tests.sh passed 106 tests)
 Deviations: none
+
+## Task 13 - Add robust fallback anchors for section insertions in build_inventory.sh
+Files: update_all.sh, tests/test_safety_static.py
+What changed: Added fallback anchors and warning logs for 4a formulae, 4c casks, GRUPA 2 App Store, and GRUPA 3 new app section insertions in update_all.sh prescan block. Added test_inventory_insertion_has_fallback_anchors to test_safety_static.py.
+Why: Finding M3 - Fragile regex section matching could silently fail or misplace inventory entries if section header formatting changed.
+Tests: test_inventory_insertion_has_fallback_anchors (run_tests.sh passed 107 tests)
+Deviations: none

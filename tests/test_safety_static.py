@@ -930,6 +930,15 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('"names": []', text)
         self.assertIn('"bundle_ids": ["com.openai.codex"]', text)
 
+    def test_inventory_insertion_has_fallback_anchors(self) -> None:
+        """update_all.sh prescan Python block must define fallback anchors for section insertions."""
+        text = self.read_script("update_all.sh")
+        prescan_block = text.split('cat > "$SESSION_DIR/prescan.py"')[1].split('cat > "$SESSION_DIR/postupdate.py"')[0]
+        self.assertIn("fallback_4a", prescan_block)
+        self.assertIn("fallback_4c", prescan_block)
+        self.assertIn("fallback_mas", prescan_block)
+        self.assertIn("fallback_new", prescan_block)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
