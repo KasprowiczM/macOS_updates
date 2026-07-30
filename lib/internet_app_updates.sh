@@ -178,23 +178,10 @@ iu_firefox_developer_edition() {
 }
 
 iu_brave_browser() {
-    print_header "🦁 Brave Browser"
-    if [ -d "/Applications/Brave Browser.app" ]; then
-        VER=$(app_version "/Applications/Brave Browser.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Brave")"
-        if silent_launch_app "Brave Browser"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Brave → Pomoc → O Brave Browser")"
-            STATUS_BRAVE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_BRAVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Brave Browser")"
-    fi
+    internet_dispatch_silent_launch "🦁 Brave Browser" "Brave Browser" "STATUS_BRAVE" "Brave Browser" "Brave → Pomoc → O Brave Browser"
+}
 
     # ── 4b. CHATGPT ATLAS (Sparkle appcast + DMG) ────────────────
-}
 
 iu_chatgpt_atlas() {
     print_header "🔵 ChatGPT Atlas"
@@ -247,120 +234,30 @@ iu_chatgpt() {
 }
 
 iu_claude() {
-    print_header "🟣 Claude"
-    if [ -d "/Applications/Claude.app" ]; then
-        VER=$(app_version "/Applications/Claude.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Claude")"
-        if silent_launch_app "Claude"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
-            STATUS_CLAUDE_APP="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_CLAUDE_APP="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Claude Desktop")"
-    fi
-
-    # ── 7. COMET (Perplexity AI) ──────────────────────────────────
+    internet_dispatch_silent_launch "🟣 Claude" "Claude Desktop" "STATUS_CLAUDE_APP" "Claude" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
 }
 
 iu_comet() {
-    print_header "☄️  Comet (Perplexity AI)"
-    if [ -d "/Applications/Comet.app" ]; then
-        VER=$(app_version "/Applications/Comet.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Comet")"
-        if silent_launch_app "Comet"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Comet → Pomoc → O Comet")"
-            STATUS_COMET="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_COMET="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Comet")"
-    fi
-
-    # ── 8. ANTIGRAVITY ────────────────────────────────────────────
+    internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "Comet → Pomoc → O Comet"
 }
 
 iu_antigravity() {
-    print_header "🪐 Antigravity"
-    if [ -d "/Applications/Antigravity.app" ]; then
-        VER=$(app_version "/Applications/Antigravity.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Antigravity")"
-        if silent_launch_app "Antigravity"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity")"
-            STATUS_ANTIGRAVITY="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_ANTIGRAVITY="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Antigravity")"
-    fi
-
-    # ── 8a. ANTIGRAVITY IDE ───────────────────────────────────────
+    internet_dispatch_silent_launch "🪐 Antigravity" "Antigravity" "STATUS_ANTIGRAVITY" "Antigravity" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity")"
 }
 
 iu_antigravity_ide() {
-    print_header "🪐 Antigravity IDE"
-    if [ -d "/Applications/Antigravity IDE.app" ]; then
-        VER=$(app_version "/Applications/Antigravity IDE.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Antigravity IDE")"
-        if silent_launch_app "Antigravity IDE"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity IDE")"
-            STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Antigravity IDE")"
-        STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_SKIPPED"
-    fi
-
-    # ── 8b. GEMINI DESKTOP ───────────────────────────────────────
+    internet_dispatch_silent_launch "🪐 Antigravity IDE" "Antigravity IDE" "STATUS_ANTIGRAVITY_IDE" "Antigravity IDE" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity IDE")"
 }
 
 iu_gemini() {
-    print_header "✨ Gemini"
-    if [ -d "/Applications/Gemini.app" ]; then
-        VER=$(app_version "/Applications/Gemini.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Gemini")"
-        if silent_launch_app "Gemini"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Gemini → app menu → Check for updates")"
-            STATUS_GEMINI="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_GEMINI="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Gemini")"
-        STATUS_GEMINI="$L_INTERNET_STATUS_SKIPPED"
-    fi
-
-    # ── 9. LM STUDIO ──────────────────────────────────────────────
+    internet_dispatch_silent_launch "✨ Gemini" "Gemini" "STATUS_GEMINI" "Gemini" "Gemini → app menu → Check for updates"
 }
 
 iu_lm_studio() {
-    print_header "🧠 LM Studio"
-    if [ -d "/Applications/LM Studio.app" ]; then
-        VER=$(app_version "/Applications/LM Studio.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "LM Studio")"
-        if silent_launch_app "LM Studio"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "LM Studio → menu → Check for updates")"
-            STATUS_LMSTUDIO="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_LMSTUDIO="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "LM Studio")"
-    fi
+    internet_dispatch_silent_launch "🧠 LM Studio" "LM Studio" "STATUS_LMSTUDIO" "LM Studio" "LM Studio → menu → Check for updates"
+}
 
     # ── 10. PERPLEXITY DESKTOP ────────────────────────────────────
-}
 
 iu_perplexity_desktop() {
     print_header "🔍 Perplexity Desktop"
@@ -422,32 +319,19 @@ iu_opencode_desktop() {
         print_info "Desktop App: pobierz z https://opencode.ai"
         STATUS_OPENCODE="$L_INTERNET_STATUS_NO_DESKTOP_APP"
     fi
+}
 
     # ============================================================
     # ██ SEKCJA 3: VPN I BEZPIECZEŃSTWO
     # ============================================================
 
     # ── 12. PROTONVPN ─────────────────────────────────────────────
-}
 
 iu_protonvpn() {
-    print_header "🛡️  ProtonVPN"
-    if [ -d "/Applications/ProtonVPN.app" ]; then
-        VER=$(app_version "/Applications/ProtonVPN.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "ProtonVPN")"
-        if silent_launch_app "ProtonVPN"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ProtonVPN → Check for updates")"
-            STATUS_PROTONVPN="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_PROTONVPN="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ProtonVPN")"
-    fi
+    internet_dispatch_silent_launch "🛡️  ProtonVPN" "ProtonVPN" "STATUS_PROTONVPN" "ProtonVPN" "ProtonVPN → Check for updates"
+}
 
     # ── 13. KEEPASSXC (GitHub API + DMG arm64) ────────────────────
-}
 
 iu_keepassxc() {
     print_header "🔑 KeePassXC"
@@ -528,27 +412,10 @@ iu_keepassxc() {
 }
 
 iu_proton_mail() {
-    print_header "📧 Proton Mail"
-    if [ -d "/Applications/Proton Mail.app" ]; then
-        VER=$(app_version "/Applications/Proton Mail.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-
-        # Proton does not publish a stable public desktop-release endpoint.
-        # Trigger its built-in updater and report the result honestly instead
-        # of turning the chronic GitHub 404 into a false offline failure.
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Proton Mail")"
-        if silent_launch_app "/Applications/Proton Mail.app"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Mail")"
-            STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_PROTONMAIL="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Proton Mail")"
-    fi
+    internet_dispatch_silent_launch "📧 Proton Mail" "Proton Mail" "STATUS_PROTONMAIL" "Proton Mail" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Mail")"
+}
 
     # ── 15. ZOOM ──────────────────────────────────────────────────
-}
 
 iu_zoom() {
     print_header "📹 Zoom"
@@ -612,40 +479,11 @@ iu_google_drive() {
 }
 
 iu_megasync() {
-    print_header "☁️  MEGAsync"
-    if [ -d "/Applications/MEGAsync.app" ]; then
-        VER=$(app_version "/Applications/MEGAsync.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "MEGAsync")"
-        if silent_launch_app "MEGAsync"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "MEGAsync")"
-            STATUS_MEGASYNC="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_MEGASYNC="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "MEGAsync")"
-    fi
-
-    # ── 18. PROTON DRIVE ──────────────────────────────────────────
+    internet_dispatch_silent_launch "☁️  MEGAsync" "MEGAsync" "STATUS_MEGASYNC" "MEGAsync" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "MEGAsync")"
 }
 
 iu_proton_drive() {
-    print_header "🔵 Proton Drive"
-    if [ -d "/Applications/Proton Drive.app" ]; then
-        VER=$(app_version "/Applications/Proton Drive.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Proton Drive")"
-        if silent_launch_app "Proton Drive"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Drive")"
-            STATUS_PROTONDRIVE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_PROTONDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Proton Drive")"
-    fi
-
+    internet_dispatch_silent_launch "🔵 Proton Drive" "Proton Drive" "STATUS_PROTONDRIVE" "Proton Drive" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Drive")"
     # ============================================================
     # ██ SEKCJA 6: MICROSOFT 365
     # ============================================================
@@ -1605,141 +1443,31 @@ iu_docker_desktop() {
 }
 
 iu_warp() {
-    print_header "⚡ Warp"
-    if [ -d "/Applications/Warp.app" ]; then
-        VER=$(app_version "/Applications/Warp.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Warp")"
-        if silent_launch_app "Warp"; then
-            print_info "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Warp")"
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Warp → Warp → O Warp / Check for Updates")"
-            STATUS_WARP="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_WARP="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Warp")"
-    fi
-
-    # ── 23. CURSOR ────────────────────────────────────────────────
+    internet_dispatch_silent_launch "⚡ Warp" "Warp" "STATUS_WARP" "Warp" "Warp → Warp → O Warp / Check for Updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Warp")"
 }
 
 iu_cursor() {
-    print_header "⚡ Cursor"
-    if [ -d "/Applications/Cursor.app" ]; then
-        VER=$(app_version "/Applications/Cursor.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Cursor")"
-        if silent_launch_app "Cursor"; then
-            print_info "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Cursor → Cursor → Check for updates")"
-            STATUS_CURSOR="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_CURSOR="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Cursor")"
-    fi
+    internet_dispatch_silent_launch "⚡ Cursor" "Cursor" "STATUS_CURSOR" "Cursor" "Cursor → Cursor → Check for updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
 }
 
 iu_ascendo() {
-    print_header "📊 Ascendo"
-    if [ -d "/Applications/Ascendo.app" ]; then
-        VER=$(app_version "/Applications/Ascendo.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Ascendo")"
-        if silent_launch_app "Ascendo"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Ascendo → Check for updates")"
-            STATUS_ASCENDO="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_ASCENDO="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Ascendo")"
-    fi
+    internet_dispatch_silent_launch "📊 Ascendo" "Ascendo" "STATUS_ASCENDO" "Ascendo" "Ascendo → Check for updates"
 }
 
 iu_appcleaner() {
-    print_header "🧹 AppCleaner"
-    if [ -d "/Applications/AppCleaner.app" ]; then
-        VER=$(app_version "/Applications/AppCleaner.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "AppCleaner")"
-        if silent_launch_app "AppCleaner"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "AppCleaner")"
-            STATUS_APPCLEANER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_APPCLEANER="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "AppCleaner")"
-    fi
-
-    # ── 25. OBSIDIAN ──────────────────────────────────────────────
+    internet_dispatch_silent_launch "🧹 AppCleaner" "AppCleaner" "STATUS_APPCLEANER" "AppCleaner" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "AppCleaner")"
 }
 
 iu_obsidian() {
-    print_header "📝 Obsidian"
-    if [ -d "/Applications/Obsidian.app" ]; then
-        VER=$(app_version "/Applications/Obsidian.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Obsidian")"
-        if silent_launch_app "Obsidian"; then
-            print_info "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Obsidian")"
-            STATUS_OBSIDIAN="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_OBSIDIAN="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Obsidian")"
-    fi
-
-    # ============================================================
-    # ██ SEKCJA 9: MULTIMEDIA I GRAFIKA
-    # ============================================================
-
-    # ── 27. SPOTIFY ───────────────────────────────────────────────
+    internet_dispatch_silent_launch "📝 Obsidian" "Obsidian" "STATUS_OBSIDIAN" "Obsidian" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Obsidian")"
 }
 
 iu_spotify() {
-    print_header "🎵 Spotify"
-    if [ -d "/Applications/Spotify.app" ]; then
-        VER=$(app_version "/Applications/Spotify.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Spotify")"
-        if silent_launch_app "Spotify"; then
-            print_info "$L_INTERNET_SPOTIFY_PROFILE_DOT"
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Spotify → Spotify → O Spotify")"
-            STATUS_SPOTIFY="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_SPOTIFY="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Spotify")"
-    fi
-
-    # ============================================================
-    # ██ SEKCJA 10: KRYPTO I FINANSE
-    # ============================================================
-
-    # ── 30. LEDGER LIVE / LEDGER WALLET ───────────────────────────
+    internet_dispatch_silent_launch "🎵 Spotify" "Spotify" "STATUS_SPOTIFY" "Spotify" "Spotify → Spotify → O Spotify" "$L_INTERNET_SPOTIFY_PROFILE_DOT"
 }
 
 iu_capcut() {
-    print_header "🎬 CapCut"
-    if [ -d "/Applications/CapCut.app" ]; then
-        VER=$(app_version "/Applications/CapCut.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "CapCut")"
-        if silent_launch_app "CapCut"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "CapCut → CapCut → Check for Updates")"
-            STATUS_CAPCUT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_CAPCUT="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "CapCut")"
-    fi
+    internet_dispatch_silent_launch "🎬 CapCut" "CapCut" "STATUS_CAPCUT" "CapCut" "CapCut → CapCut → Check for Updates"
 }
 
 iu_ledger() {
@@ -1942,24 +1670,10 @@ except Exception:
 }
 
 iu_remote_desktop_manager() {
-    print_header "🖥️  Remote Desktop Manager"
-    if [ -d "/Applications/Remote Desktop Manager.app" ]; then
-        VER=$(app_version "/Applications/Remote Desktop Manager.app")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Remote Desktop Manager")"
-        if silent_launch_app "Remote Desktop Manager"; then
-            print_info "$(internet_msg "$L_INTERNET_UPDATE_NOTIFY_LAUNCH" "Remote Desktop Manager")"
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://devolutions.net/remote-desktop-manager/release-notes/mac/")"
-            STATUS_RDMANAGER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_RDMANAGER="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Remote Desktop Manager")"
-    fi
+    internet_dispatch_silent_launch "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager" "https://devolutions.net/remote-desktop-manager/release-notes/mac/" "$(internet_msg "$L_INTERNET_UPDATE_NOTIFY_LAUNCH" "Remote Desktop Manager")"
+}
 
     # ── 34. IPMIVIEW (Supermicro) ────────────────────────────────
-}
 
 iu_ipmiview() {
     print_header "🔧 IPMIView (Supermicro)"
