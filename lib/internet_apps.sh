@@ -15,7 +15,8 @@ internet_apps_load_config() {
     fi
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line%%#*}"
-        line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
         [ -n "$line" ] || continue
         INTERNET_APPS_LIST+=("$line")
     done < "$cfg"
