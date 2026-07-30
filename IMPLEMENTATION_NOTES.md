@@ -162,4 +162,17 @@ ACCEPTANCE CHECK output:
 Tests: test_appstore_track2_gui_wrapped_in_timeout, test_no_run_with_timeout_uses_piped_heredoc — run_tests.sh: 114 passed
 Deviations: none
 
+## Task R3 - Stop the test suite from mutating the developer's home directory
+Files: tests/test_safety_static.py
+What changed: Updated test environment builders (`run_update_all_with_layer_exit` and `test_leaf_script_behavioural_severity`) in `tests/test_safety_static.py` to set `"HOME": str(tmp_path / "fake-home")` and create the fake home directory before launching subprocesses. Added unit test `test_subprocess_runs_targeting_update_scripts_set_sandboxed_home` asserting that every subprocess invocation executing an `update_*.sh` script sets a sandboxed `HOME` in its environment.
+Why: Finding N4
+ACCEPTANCE CHECK command: ls -la "$HOME/.zshrc" > /tmp/before.txt 2>&1; bash run_tests.sh > /dev/null 2>&1; ls -la "$HOME/.zshrc" > /tmp/after.txt 2>&1; diff /tmp/before.txt /tmp/after.txt && echo "HOME UNTOUCHED"
+ACCEPTANCE CHECK output:
+```
+HOME UNTOUCHED
+```
+Tests: test_leaf_script_behavioural_severity, test_subprocess_runs_targeting_update_scripts_set_sandboxed_home — run_tests.sh: 115 passed
+Deviations: none
+
+
 
