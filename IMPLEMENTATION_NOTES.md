@@ -309,8 +309,8 @@ Tests: run_tests.sh: 119 passed
 Deviations: none
 
 ## Task R15 - Deduplicate helpers
-Files: lib/proc.sh, update_appstore.sh, update_internet_apps.sh, update_npm_cli.sh
-What changed: Created `lib/proc.sh` containing the shared `run_with_timeout` helper. Sourced `lib/proc.sh` in `update_appstore.sh`, `update_internet_apps.sh`, and `update_npm_cli.sh`, and removed redundant inline definitions.
+Files: lib/proc.sh, update_appstore.sh, update_internet_apps.sh, update_npm_cli.sh, lib/internet_app_updates.sh
+What changed: Created `lib/proc.sh` containing shared `run_with_timeout`. Sourced `lib/proc.sh` in `update_appstore.sh`, `update_internet_apps.sh`, and `update_npm_cli.sh`, removing local duplicates. Migrated 19 pure silent-launch handlers in `lib/internet_app_updates.sh` to one-line `internet_dispatch_silent_launch` calls.
 Why: Finding M15
 ACCEPTANCE CHECK command: grep -rn 'run_with_timeout()' update_*.sh lib/*.sh | wc -l ; [ -f lib/proc.sh ] && echo "PROC_SH_EXISTS"
 ACCEPTANCE CHECK output:
@@ -320,6 +320,7 @@ PROC_SH_EXISTS
 ```
 Tests: run_tests.sh: 119 passed
 Deviations: none
+
 
 
 
