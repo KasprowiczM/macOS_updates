@@ -1022,6 +1022,8 @@ class StaticShellSafetyTests(unittest.TestCase):
             base_env.update(
                 {
                     "HOME": str(fake_home),
+                    "BUN_INSTALL": str(fake_home / ".bun"),
+                    "TOOLCHAIN_HOME": str(fake_home / ".local/share/mac-update"),
                     "PATH": f"{mock_bin}:{base_env.get('PATH', '/usr/bin:/bin')}",
                     "MAC_UPDATE_YES": "1",
                     "MAC_LANG": "en",
@@ -1129,6 +1131,39 @@ class StaticShellSafetyTests(unittest.TestCase):
             )
             self.assertEqual(res5.returncode, 10, msg=f"update_npm_cli.sh offline curl failure should result in exit 10, got {res5.returncode}\n{res5.stderr}")
             self.assertNotEqual(res5.returncode, 1)
+
+            # Scenario 6: update_npm_cli.sh with Bun tarball install failing => exit 1
+            unzip_script = mock_bin / "unzip"
+            unzip_script.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            unzip_script.chmod(0o755)
+
+            bun_curl_script = mock_bin / "curl"
+            bun_curl_script.write_text(
+                "#!/bin/sh\n"
+                'out=""\n'
+                'prev=""\n'
+                'for arg in "$@"; do\n'
+                '  if [ "$prev" = "-o" ]; then out="$arg"; fi\n'
+                '  prev="$arg"\n'
+                'done\n'
+                'case "$*" in\n'
+                '  *nodejs.org*) echo "v22.1.0" ;;\n'
+                '  *SHASUMS256.txt*) if [ -n "$out" ]; then echo "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  bun-darwin-aarch64.zip" > "$out"; else echo "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  bun-darwin-aarch64.zip"; fi ;;\n'
+                '  *) if [ -n "$out" ]; then touch "$out"; fi ;;\n'
+                'esac\n'
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            bun_curl_script.chmod(0o755)
+
+            res6 = subprocess.run(
+                ["/bin/bash", str(REPO_ROOT / "update_npm_cli.sh")],
+                env=base_env,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
+            )
+            self.assertEqual(res6.returncode, 1, msg=f"update_npm_cli.sh Bun tarball install failure must result in exit 1, got {res6.returncode}\n{res6.stderr}")
 
     def test_subprocess_runs_targeting_update_scripts_set_sandboxed_home(self) -> None:
         """Scan test_safety_static.py for subprocess.run executing update_*.sh and assert HOME is set in env."""
