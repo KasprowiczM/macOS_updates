@@ -114,39 +114,93 @@ find_shell_profile() {
     fi
 }
 
-ensure_line_in_file() {
-    local file_path="$1"
-    local line="$2"
-    touch "$file_path" || return 1
-    if ! grep -Fqx "$line" "$file_path" 2>/dev/null; then
-        printf '%s\n' "$line" >> "$file_path"
+resolve_target_file() {
+    local target="$1"
+    if [ -L "$target" ]; then
+        local link_dest
+        link_dest="$(readlink "$target")" || link_dest=""
+        if [ -n "$link_dest" ]; then
+            if [ "${link_dest#/}" = "$link_dest" ]; then
+                target="$(dirname "$target")/$link_dest"
+            else
+                target="$link_dest"
+            fi
+            if [ -L "$target" ]; then
+                print_warn "Głęboki łańcuch symlinków dla $1 — używam $target"
+            fi
+        fi
     fi
+    echo "$target"
 }
-remove_line_from_file() {
-    local file_path="$1"
-    local line="$2"
-    [ -f "$file_path" ] || return 0
-    local tmpfile
-    tmpfile="$(mktemp "${TMPDIR:-/tmp}/mac_update_profile.XXXXXX")" || return 1
-    grep -Fvx "$line" "$file_path" > "$tmpfile" 2>/dev/null || true
-    if ! mv "$tmpfile" "$file_path"; then
-        rm -f "$tmpfile"
-        return 1
+
+declare_profile_backup() {
+    local raw_target="$1"
+    local real_target
+    real_target="$(resolve_target_file "$raw_target")"
+    [ -f "$real_target" ] || return 0
+
+    local backup_key
+    backup_key="$(echo "$real_target" | tr '/. ' '___')"
+    local backed_up=0
+    eval "backed_up=\${_MACUPD_BACKED_UP_${backup_key}:-0}"
+    if [ "$backed_up" -ne 1 ]; then
+        local ts backup_path
+        ts="$(date +%Y%m%d%H%M%S)"
+        backup_path="${real_target}.macupd-backup-${ts}"
+        if cp "$real_target" "$backup_path" 2>/dev/null; then
+            print_info "Kopia zapasowa profilu: $backup_path"
+            eval "_MACUPD_BACKED_UP_${backup_key}=1"
+        fi
     fi
 }
 
-remove_npmrc_prefix() {
-    [ -f "$NPMRC_PATH" ] || return 0
+ensure_line_in_file() {
+    local raw_target="$1"
+    local line="$2"
+    local target
+    target="$(resolve_target_file "$raw_target")"
+    touch "$target" || return 1
+    if ! grep -Fqx "$line" "$target" 2>/dev/null; then
+        declare_profile_backup "$raw_target"
+        printf '%s\n' "$line" >> "$target"
+    fi
+}
+
+remove_line_from_file() {
+    local raw_target="$1"
+    local line="$2"
+    local target
+    target="$(resolve_target_file "$raw_target")"
+    [ -f "$target" ] || return 0
+
+    declare_profile_backup "$raw_target"
+
     local tmpfile
-    tmpfile="$(mktemp "${TMPDIR:-/tmp}/mac_update_npmrc.XXXXXX")" || return 1
-    # grep -Ev exits 1 when *all* lines match the filter (i.e., the file would become empty);
-    # treat that as success so the empty result still replaces the original.
-    grep -Ev '^(prefix|globalconfig) *=' "$NPMRC_PATH" > "$tmpfile" 2>/dev/null || true
-    if ! mv "$tmpfile" "$NPMRC_PATH"; then
+    tmpfile="$(mktemp "${TMPDIR:-/tmp}/mac_update_profile.XXXXXX")" || return 1
+    grep -Fvx "$line" "$target" > "$tmpfile" 2>/dev/null || true
+    if ! cat "$tmpfile" > "$target"; then
         rm -f "$tmpfile"
         return 1
     fi
-    [ -s "$NPMRC_PATH" ] || rm -f "$NPMRC_PATH"
+    rm -f "$tmpfile"
+}
+
+remove_npmrc_prefix() {
+    local target
+    target="$(resolve_target_file "$NPMRC_PATH")"
+    [ -f "$target" ] || return 0
+
+    declare_profile_backup "$NPMRC_PATH"
+
+    local tmpfile
+    tmpfile="$(mktemp "${TMPDIR:-/tmp}/mac_update_npmrc.XXXXXX")" || return 1
+    grep -Ev '^(prefix|globalconfig) *=' "$target" > "$tmpfile" 2>/dev/null || true
+    if ! cat "$tmpfile" > "$target"; then
+        rm -f "$tmpfile"
+        return 1
+    fi
+    rm -f "$tmpfile"
+    [ -s "$target" ] || rm -f "$target"
 }
 
 expand_node_manager_paths() {

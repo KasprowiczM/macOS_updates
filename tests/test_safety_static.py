@@ -1174,6 +1174,44 @@ class StaticShellSafetyTests(unittest.TestCase):
             pattern = rf"{env_var}\.update\([^)]*\"HOME\":"
             self.assertRegex(code, pattern, msg=f"Env dictionary {env_var} must set HOME")
 
+    @unittest.skipUnless(
+        __import__("shutil").which("bash"),
+        "bash not available"
+    )
+    def test_remove_line_from_file_preserves_symlink(self) -> None:
+        """remove_line_from_file must edit symlink target in place and preserve symlink."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            real_dir = tmp_path / "real"
+            real_dir.mkdir()
+            real_profile = real_dir / "profile"
+            real_profile.write_text("export FOO=1\nexport REMOVE_ME=2\nexport BAR=3\n", encoding="utf-8")
+
+            symlink_profile = tmp_path / "profile_link"
+            symlink_profile.symlink_to(real_profile)
+
+            sh_code = (REPO_ROOT / "update_npm_cli.sh").read_text(encoding="utf-8")
+            helpers = sh_code.split("resolve_target_file() {")[1].split("expand_node_manager_paths()")[0]
+            script = (
+                f'SCRIPT_DIR="{REPO_ROOT}"\n'
+                f'. "{REPO_ROOT}/lib/ui.sh"\n'
+                f'resolve_target_file() {{\n{helpers}\n'
+                f'remove_line_from_file "{symlink_profile}" "export REMOVE_ME=2"\n'
+            )
+            subprocess.run(
+                ["bash", "-c", script],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=REPO_ROOT,
+            )
+            self.assertTrue(symlink_profile.is_symlink(), msg="symlink must be preserved")
+            self.assertEqual(symlink_profile.resolve(), real_profile.resolve())
+            new_content = real_profile.read_text(encoding="utf-8")
+            self.assertNotIn("export REMOVE_ME=2", new_content)
+            self.assertIn("export FOO=1", new_content)
+            self.assertIn("export BAR=3", new_content)
+
     def test_cli_flags_all_consumed(self) -> None:
         """Every MAC_UPDATE_* flag exported by lib/cli.sh must be read somewhere.
 
