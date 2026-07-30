@@ -92,6 +92,13 @@ INTERNET_MOUNT_TRACK_FILE="$(mktemp "$INTERNET_TEMP_ROOT/mounted_dmgs.XXXXXX")" 
     exit 1
 }
 
+# Startup sweep for orphaned staging/backup directories in /Applications (REPORT ONLY)
+for orphaned in /Applications/.macupd_staging.* /Applications/.macupd_backup.*; do
+    if [ -d "$orphaned" ]; then
+        print_warn "Orphaned staging or backup directory detected from previous run: $orphaned"
+    fi
+done
+
 cleanup_internet_temp() {
     local mount_cleanup_failed=0
     if [ -f "${INTERNET_MOUNT_TRACK_FILE:-}" ]; then
@@ -278,6 +285,7 @@ copy_verified_app() {
     if ! mv "$staging" "$dest" 2>/dev/null; then
         if [ "$had_existing" -eq 1 ] && ! mv "$backup" "$dest" 2>/dev/null; then
             internet_diag_log "CRITICAL: install failed and rollback is at $backup"
+            print_error "CRITICAL: Install failed for $app_label and automatic rollback failed! Retained backup is at $backup. Restore with: mv \"$backup\" \"$dest\""
             rm -rf "$staging_root" 2>/dev/null || true
             return 1
         fi
@@ -294,11 +302,13 @@ copy_verified_app() {
             internet_diag_log "WARN: could not preserve rejected app; removing it before rollback"
             if ! rm -rf "$dest" 2>/dev/null; then
                 internet_diag_log "CRITICAL: could not remove rejected app; rollback remains at $backup"
+                print_error "CRITICAL: Could not remove rejected app $dest; retained backup is at $backup. Restore with: mv \"$backup\" \"$dest\""
                 return 1
             fi
         fi
         if [ "$had_existing" -eq 1 ] && ! mv "$backup" "$dest" 2>/dev/null; then
             internet_diag_log "CRITICAL: rejected app is at $rejected; rollback remains at $backup"
+            print_error "CRITICAL: Rejected app is at $rejected; automatic rollback failed! Retained backup is at $backup. Restore with: mv \"$backup\" \"$dest\""
             return 1
         fi
         rm -rf "$staging_root" "$backup_root" 2>/dev/null || true

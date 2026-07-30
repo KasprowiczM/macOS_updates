@@ -535,6 +535,20 @@ lib/python absent (expected)
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task T6 - M16: surface copy_verified_app's catastrophic branches
+Files: update_internet_apps.sh
+What changed: Added `print_error` calls to all critical rollback/installation failure branches in `copy_verified_app`, outputting exact retained backup directory paths and the `mv` command for manual recovery. Added a startup sweep in `update_internet_apps.sh` that reports orphaned `/Applications/.macupd_staging.*` and `.macupd_backup.*` directories from previous runs without deleting them.
+Why: Finding M16
+ACCEPTANCE CHECK command: grep -c 'macupd_backup\|macupd_staging' update_internet_apps.sh ; grep -cE 'print_error.*(backup|restore|mv )' update_internet_apps.sh
+ACCEPTANCE CHECK output:
+```
+3
+3
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 
