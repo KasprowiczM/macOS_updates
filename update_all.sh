@@ -189,6 +189,13 @@ fi
 
 print_info "Run log: $LOG_FILE"
 
+# Pre-authenticate sudo credentials for step 6 before tee swallows prompt FD
+if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" -ne 1 ] && [ -t 0 ]; then
+    if ! sudo -v 2>/dev/null; then
+        print_warn "sudo pre-authentication failed or skipped; step 6 may prompt interactively later."
+    fi
+fi
+
 # Tee everything from this point to the log file. Note: this MUST come
 # AFTER the interactive confirmation read above (tee on FD 0 is fine but
 # we already consumed user input).

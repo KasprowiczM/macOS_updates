@@ -28,3 +28,11 @@ Options:
 ## Dry-run
 
 With `MAC_UPDATE_DRY_RUN=1` or `bash update_all.sh --dry-run`, leaf scripts print `[DRY-RUN]` and exit **0** without mutating the system. A dry-run does not prove that an external or built-in GUI updater would complete.
+
+## Sudo Pre-authentication and Unattended / Cron Runs
+
+`update_all.sh` attempts a single `sudo -v` pre-authentication before starting execution to ensure credentials are cached for step 6 (`softwareupdate`).
+
+For unattended runs or cron jobs:
+- Either the user stays present for step 6 to enter credentials if the `sudo` timestamp expires during long runs,
+- Or run with `--skip-system` (`bash update_all.sh --skip-system`) and apply macOS system updates interactively at a later time.
