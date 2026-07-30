@@ -20,3 +20,10 @@ What changed: Added L_INTERNET_STATUS_UNKNOWN_VERSION and L_INTERNET_STATUS_MAU_
 Why: Finding H12 - Unclassified status constants previously produced exit code 0, misreporting unverifiable runs as completely clean.
 Tests: test_all_internet_status_constants_are_classified (run_tests.sh passed 97 tests)
 Deviations: none
+
+## Task 4 - Make the severity tests exercise the real scripts, not stubs
+Files: tests/test_safety_static.py
+What changed: Added producer-side static test test_producer_side_soft_exit_references verifying each leaf script references soft exit code and has a soft exit path. Added test_leaf_script_behavioural_severity running real leaf orchestrators against mock-PATH binaries to assert exit codes for doctor warnings (0), greedy casks (0/10), formula upgrade failures (1), mas outdated failures (10), and offline curl failures (10).
+Why: Finding H3 - Test suite previously stubbed children with exit N, leaving real leaf severity logic untested.
+Tests: test_producer_side_soft_exit_references, test_leaf_script_behavioural_severity (run_tests.sh passed 99 tests)
+Deviations: none
