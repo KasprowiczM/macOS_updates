@@ -76,3 +76,10 @@ What changed: Added clean_app_name to strip markdown links ([App](url)), bold/it
 Why: Finding H18 - Markdown formatting and links in APPLICATIONS.md caused formatted inventory rows to fail matching against update categories and fall through to unknown.
 Tests: test_report_update_coverage_sanitizes_formatted_rows (run_tests.sh passed 105 tests)
 Deviations: none
+
+## Task 12 - Prioritize bundle IDs over name matching for ChatGPT Codex
+Files: scripts/report_update_coverage.sh, tests/test_safety_static.py
+What changed: Confirmed bundle ID prioritization in target_for and bundle-ID-only alias for ChatGPT / Codex in scripts/report_update_coverage.sh. Added test_chatgpt_codex_target_alias_is_bundle_id_only to test_safety_static.py.
+Why: Finding H19 - Target matching by string equality without checking bundle ID could misidentify legacy com.openai.chat as com.openai.codex.
+Tests: test_chatgpt_codex_target_alias_is_bundle_id_only (run_tests.sh passed 106 tests)
+Deviations: none

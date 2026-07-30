@@ -923,6 +923,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn(r"\[([^\]]+)\]\([^)]+\)", text)
         self.assertIn(r"\*+([^*]+)\*+", text)
 
+    def test_chatgpt_codex_target_alias_is_bundle_id_only(self) -> None:
+        """TARGET_ALIASES['ChatGPT / Codex'] must specify empty names and bundle_id com.openai.codex."""
+        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
+        self.assertIn('"ChatGPT / Codex": {', text)
+        self.assertIn('"names": []', text)
+        self.assertIn('"bundle_ids": ["com.openai.codex"]', text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
