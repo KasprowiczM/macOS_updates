@@ -560,6 +560,19 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task T8 - M20: gate whole-/Applications version map
+Files: update_all.sh
+What changed: Gated the `all_new_versions.update(installed_apps_after)` dictionary merge in `update_all.sh` postupdate block on `MAC_UPDATE_INVENTORY_ONLY == "1"`, preventing whole-system `/Applications` bundle version strings from overwriting Homebrew cask rows during regular update runs.
+Why: Finding M20
+ACCEPTANCE CHECK command: sed -n '1345,1365p' update_all.sh | grep -c 'INVENTORY_ONLY'
+ACCEPTANCE CHECK output:
+```
+1
+```
+Tests: run_tests.sh: 120 passed
+Deviations: Direct unit test for APPLICATIONS.md structure is missing per prompt instruction ("if you cannot build a faithful one, implement the gate and SAY in the notes that the test is missing").
+
+
 
 
 

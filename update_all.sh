@@ -1356,7 +1356,8 @@ all_new_versions.update(brew_formula_after)
 all_new_versions.update(brew_cask_after)
 # The all-app snapshot also refreshes system and arbitrary GUI bundles during
 # inventory-only runs. Canonical internet snapshots below take precedence.
-all_new_versions.update(installed_apps_after)
+if os.environ.get("MAC_UPDATE_INVENTORY_ONLY") == "1":
+    all_new_versions.update(installed_apps_after)
 # Add internet app versions (snapshot keys + APPLICATIONS.md aliases)
 all_new_versions.update(expand_internet_versions(internet_after))
 all_new_versions.update(npm_cli_after)
