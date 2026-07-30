@@ -271,6 +271,19 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 118 passed
 Deviations: none
 
+## Task R12 - Stop Microsoft AutoUpdate quarantine oscillating for hidden products
+Files: lib/internet_app_updates.sh, tests/test_safety_static.py
+What changed: Updated `mau_reconcile_deferrals` in `lib/internet_app_updates.sh` to receive the offered products list as a second argument (`$offered`) and restricted release targets to IDs that are BOTH offered in the list and non-regressed. Preserved read-only contract of `mau_deferral_preflight`. Added `test_reconcile_does_not_release_hidden_unoffered_deferral` to `MauRegressionGuardTests` asserting unoffered products remain deferred.
+Why: Finding H10
+ACCEPTANCE CHECK command: awk '/^mau_reconcile_deferrals\(\)/,/^}/' lib/internet_app_updates.sh | grep -c 'msupdate_list\|RAW_LIST\|LIST_OUTPUT\|OFFERED\|offered'
+ACCEPTANCE CHECK output:
+```
+2
+```
+Tests: test_reconcile_does_not_release_hidden_unoffered_deferral — run_tests.sh: 119 passed
+Deviations: none
+
+
 
 
 

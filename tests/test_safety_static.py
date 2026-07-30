@@ -1956,6 +1956,38 @@ class MauRegressionGuardTests(unittest.TestCase):
         for value in values:
             self.assertTrue(1 <= value <= 28)
 
+    @unittest.skipUnless(
+        __import__("shutil").which("bash"),
+        "bash not available"
+    )
+    def test_reconcile_does_not_release_hidden_unoffered_deferral(self) -> None:
+        """mau_reconcile_deferrals must not release deferral for hidden/unoffered products."""
+        script = (
+            "print_step(){ :; }; print_info(){ :; }; print_warn(){ :; };\n"
+            "print_ok(){ :; }; internet_msg(){ :; }; internet_diag_log(){ :; };\n"
+            "run_with_timeout(){ shift; \"$@\"; }; app_version(){ echo '?'; };\n"
+            "silent_launch_app(){ return 0; };\n"
+            f". '{self.LIB}'\n"
+            "MAU_OFFICE_DEFERRAL_IDS='MSWD2019 XCLW2019 PPT32019'\n"
+            "regressed='MSWD2019'\n"
+            "offered='MSWD2019'\n"
+            "release=''\n"
+            "for id in $MAU_OFFICE_DEFERRAL_IDS; do\n"
+            "    case \" $offered \" in\n"
+            "        *\" $id \"*) case \" $regressed \" in *\" $id \"*) ;; *) release=\"$release $id\" ;; esac ;;\n"
+            "    esac\n"
+            "done\n"
+            "echo \"$release\"\n"
+        )
+        result = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=True,
+        )
+        self.assertNotIn("XCLW2019", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

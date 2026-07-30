@@ -1091,12 +1091,19 @@ mau_deferral_days_value() {
 # loop, and release it for every product whose offer has since been corrected.
 # Runs after msupdate --list, because only the offer tells the two apart.
 mau_reconcile_deferrals() {
-    local regressed="$1" plist backup release id armed removed days verify unverified=""
+    local regressed="$1"
+    local offered="${2:-$1}"
+    local plist backup release id armed removed days verify unverified=""
     release=""
     for id in $MAU_OFFICE_DEFERRAL_IDS; do
-        case " $regressed " in
-            *" $id "*) ;;
-            *) release="$release $id" ;;
+        case " $offered " in
+            *" $id "*)
+                case " $regressed " in
+                    *" $id "*) ;;
+                    *) release="$release $id" ;;
+                esac
+                ;;
+            *) ;;
         esac
     done
     release="${release# }"
@@ -1264,7 +1271,7 @@ iu_microsoft_365() {
                         print_info "$L_INTERNET_MS_REGRESSION_NOTE"
                         internet_diag_log "MAU upstream package regression (offered <= installed): $(printf '%s\n' "$MAU_REGRESSED" | tr '\n' ';')"
                     fi
-                    mau_reconcile_deferrals "$MAU_REGRESSED_IDS" || true
+                    mau_reconcile_deferrals "$MAU_REGRESSED_IDS" "$MAU_PENDING_IDS" || true
 
                     # TEAMS21 is dropped by mau_installable_ids: Microsoft
                     # documents Teams as unmanageable through msupdate.
