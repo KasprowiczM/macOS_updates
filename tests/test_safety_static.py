@@ -430,9 +430,12 @@ class StaticShellSafetyTests(unittest.TestCase):
                 "internet": "--skip-internet",
             }
             args.extend(flag for layer, flag in skip_flags.items() if layer != selected)
+            fake_home = Path(tmp) / "fake-home"
+            fake_home.mkdir(exist_ok=True)
             env = os.environ.copy()
             env.update(
                 {
+                    "HOME": str(fake_home),
                     "PATH": f"{mock_bin}:/usr/bin:/bin",
                     "SYSTEM_MARKER": str(marker),
                     "MAC_LANG": "en",
@@ -1013,9 +1016,12 @@ class StaticShellSafetyTests(unittest.TestCase):
             (mock_bin / "uname").chmod(0o755)
             (mock_bin / "sw_vers").chmod(0o755)
 
+            fake_home = tmp_path / "fake-home"
+            fake_home.mkdir(exist_ok=True)
             base_env = os.environ.copy()
             base_env.update(
                 {
+                    "HOME": str(fake_home),
                     "PATH": f"{mock_bin}:{base_env.get('PATH', '/usr/bin:/bin')}",
                     "MAC_UPDATE_YES": "1",
                     "MAC_LANG": "en",
@@ -1123,6 +1129,15 @@ class StaticShellSafetyTests(unittest.TestCase):
             )
             self.assertEqual(res5.returncode, 10, msg=f"update_npm_cli.sh offline curl failure should result in exit 10, got {res5.returncode}\n{res5.stderr}")
             self.assertNotEqual(res5.returncode, 1)
+
+    def test_subprocess_runs_targeting_update_scripts_set_sandboxed_home(self) -> None:
+        """Scan test_safety_static.py for subprocess.run executing update_*.sh and assert HOME is set in env."""
+        code = (REPO_ROOT / "tests" / "test_safety_static.py").read_text(encoding="utf-8")
+        matches = set(re.findall(r"subprocess\.run\(\s*\[[^\]]*update_[^\]]*\].*?env=([a-zA-Z0-9_]+)", code, re.DOTALL))
+        self.assertGreater(len(matches), 0, "Expected at least one subprocess.run targeting update_*.sh")
+        for env_var in matches:
+            pattern = rf"{env_var}\.update\([^)]*\"HOME\":"
+            self.assertRegex(code, pattern, msg=f"Env dictionary {env_var} must set HOME")
 
     def test_cli_flags_all_consumed(self) -> None:
         """Every MAC_UPDATE_* flag exported by lib/cli.sh must be read somewhere.
