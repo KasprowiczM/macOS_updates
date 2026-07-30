@@ -572,6 +572,19 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: Direct unit test for APPLICATIONS.md structure is missing per prompt instruction ("if you cannot build a faithful one, implement the gate and SAY in the notes that the test is missing").
 
+## Task T9 - M18: pre-authenticate sudo before step 6
+Files: update_all.sh, docs/agents/exit_codes.md
+What changed: Added single `sudo -v` pre-authentication call in `update_all.sh` when `MAC_UPDATE_SKIP_SYSTEM != 1` and `[ -t 0 ]` before tee output redirection. Added section documenting sudo pre-authentication and non-interactive/cron behavior in `docs/agents/exit_codes.md`.
+Why: Finding M18
+ACCEPTANCE CHECK command: grep -n 'sudo -v' update_all.sh
+ACCEPTANCE CHECK output:
+```
+194:    if ! sudo -v 2>/dev/null; then
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 
