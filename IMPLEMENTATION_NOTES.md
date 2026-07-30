@@ -295,6 +295,20 @@ exit=1
 Tests: run_tests.sh: 119 passed
 Deviations: none
 
+## Task R14 - Bring inline Python under quality gate
+Files: run_tests.sh, CLAUDE.md, AGENTS.md, GEMINI.md, CONTRIBUTING.md, update_all.sh
+What changed: Added step 2 heredoc Python extraction and `py_compile` quality gate in `run_tests.sh` (with non-fatal `ruff check` pass if present). Updated non-negotiable rule 4 across `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and `CONTRIBUTING.md` to permit importable pure-function modules under `lib/python/`. Added `# TODO(H4):` comments above prescan and postupdate heredocs in `update_all.sh`.
+Why: Finding H4
+ACCEPTANCE CHECK command: bash run_tests.sh 2>&1 | grep -i 'heredoc\|py_compile'
+ACCEPTANCE CHECK output:
+```
+── 2/4  python3 -m py_compile on all .py and inline heredocs
+  ✅ all inline heredoc python blocks compile
+```
+Tests: run_tests.sh: 119 passed
+Deviations: none
+
+
 
 
 

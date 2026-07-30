@@ -36,6 +36,6 @@ bash -n update_all.sh                   # Syntax check
 1. **`softwareupdate` MUST have `-R`**
 2. **`mas upgrade` MUST have `sudo`** (CVE-2025-43411)
 3. **Bash 3.2 only** — no `declare -A`, `mapfile`, `readarray`
-4. **No new standalone update `.py` files** — heredocs + `dev_sync/` + `scripts/fix_mcp_configs.py`
+4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests); `dev_sync/` and `scripts/fix_mcp_configs.py` are the existing Python backend/tools.
 5. **No hardcoded paths** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`
 6. **Never install apps for users** — update only what is already installed; build inventory per Mac
