@@ -3,7 +3,7 @@
 
 github_latest_tag() {
     local repo="$1"
-    local result
+    local result=""
     local auth_header=""
     if [ -n "${GITHUB_TOKEN:-}" ]; then
         auth_header="-H"
@@ -18,5 +18,14 @@ try:
     print(d.get("tag_name","").strip() or "?")
 except Exception:
     print("?")' 2>/dev/null)
+
+    if [ -z "$result" ] || [ "$result" = "?" ]; then
+        # Fallback: parse Location header redirect from github.com/owner/repo/releases/latest
+        local loc
+        loc=$(curl -fssI --max-time 15 --retry 2 "https://github.com/${repo}/releases/latest" 2>/dev/null \
+            | grep -i '^location:' | tr -d '\r' | awk -F'/' '{print $NF}')
+        result="${loc:-?}"
+    fi
+
     echo "${result:-?}"
 }

@@ -955,6 +955,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("/usr/local/bin", text)
         self.assertIn("/opt/homebrew/bin", text)
 
+    def test_github_latest_tag_contains_location_fallback(self) -> None:
+        """github_latest_tag in lib/github_release.sh must contain Location header fallback."""
+        text = (REPO_ROOT / "lib" / "github_release.sh").read_text(encoding="utf-8")
+        self.assertIn("github_latest_tag() {", text)
+        self.assertIn("curl -fssI", text)
+        self.assertIn("grep -i '^location:'", text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
