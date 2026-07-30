@@ -385,6 +385,10 @@ APPLESCRIPT
 
 if ! AS_RESULT=$(run_with_timeout "$GUI_TIMEOUT" osascript "$AS_SCRIPT_FILE" 2>&1); then
     print_warn "Track 2 (App Store GUI) timed out or failed; review window manually"
+    mac_update_severity_register "error" "Track 2 (App Store GUI) timed out or failed"
+    if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+        echo "STATUS_FAILED: Track 2 GUI automation failed" >> "$MAC_UPDATE_SESSION_DIR/update_appstore_results.txt"
+    fi
     SOFT_FAIL=1
     AS_RESULT="TIMEOUT_OR_FAILED: $AS_RESULT"
 fi
