@@ -254,12 +254,12 @@ TARGET_ALIASES = {
         "bundle_ids": ["us.zoom.xos"],
     },
     "Visual Studio Code": {
-        "names": ["Visual Studio Code", "VS Code"],
-        "bundle_ids": ["com.microsoft.VSCode"],
+        "names": ["Visual Studio Code", "VS Code", "Code"],
+        "bundle_ids": ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"],
     },
     "Brave Browser": {
-        "names": ["Brave Browser", "Brave"],
-        "bundle_ids": ["com.brave.Browser"],
+        "names": ["Brave Browser", "Brave", "Brave Browser Beta", "Brave Browser Nightly"],
+        "bundle_ids": ["com.brave.Browser", "com.brave.Browser.beta", "com.brave.Browser.nightly"],
     },
 }
 
