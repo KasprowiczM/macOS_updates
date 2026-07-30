@@ -962,6 +962,12 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("curl -fssI", text)
         self.assertIn("grep -i '^location:'", text)
 
+    def test_report_update_coverage_json_schema_v2(self) -> None:
+        """report_update_coverage.sh JSON payload must specify schema_version: 2 and classification_counts."""
+        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
+        self.assertIn('"schema_version": 2', text)
+        self.assertIn('"classification_counts":', text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
