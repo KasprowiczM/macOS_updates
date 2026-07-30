@@ -132,3 +132,19 @@ What changed: Conducted full repository verification. Ran complete test suite (1
 Why: Ensure all 19 reviewed findings and tasks are fully implemented, verified, and documented without regressions.
 Tests: run_tests.sh (112 tests passed), bash -n, shellcheck, report_update_coverage.sh
 Deviations: none
+
+## Task R1 - Revert the update_all.sh exit-code change and restore the two tests
+Files: update_all.sh, tests/test_safety_static.py
+What changed: Restored `exit "$OVERALL_EXIT"` as the final statement in update_all.sh and removed the `FINAL_EXIT` block so soft/degraded runs exit 0. Restored returncode 0 assertions in test_soft_internet_failure_still_runs_macos_system_step and test_soft_failure_in_every_layer_never_blocks_macos_system_step. Added unit test test_degraded_only_exits_zero asserting exit code 0 when only DEGRADED is set.
+Why: Finding N1
+ACCEPTANCE CHECK command: grep -c 'FINAL_EXIT' update_all.sh ; grep -n 'result.returncode, 0' tests/test_safety_static.py | head -3
+ACCEPTANCE CHECK output:
+```
+0
+458:                    result.returncode, 0, msg=result.stdout + result.stderr
+479:        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+495:                    result.returncode, 0, msg=result.stdout + result.stderr
+```
+Tests: test_soft_internet_failure_still_runs_macos_system_step, test_soft_failure_in_every_layer_never_blocks_macos_system_step, test_degraded_only_exits_zero — run_tests.sh: 113 passed
+Deviations: none
+
