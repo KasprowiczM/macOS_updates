@@ -48,6 +48,8 @@ ui_print_header() {
     echo ""
 }
 
+print_header() { ui_print_header "$1"; }
+
 # Centered single-line boxed message (summary banners).
 ui_print_box() {
     local text="$1"

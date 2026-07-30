@@ -411,10 +411,14 @@ class StaticShellSafetyTests(unittest.TestCase):
                 "esac\n",
                 encoding="utf-8",
             )
+            (mock_bin / "brew").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            (mock_bin / "mas").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             for executable in [*layers.values(), "update_system.sh"]:
                 (root / executable).chmod(0o755)
             (mock_bin / "uname").chmod(0o755)
             (mock_bin / "sw_vers").chmod(0o755)
+            (mock_bin / "brew").chmod(0o755)
+            (mock_bin / "mas").chmod(0o755)
 
             args = [
                 "/bin/bash",
@@ -1079,6 +1083,31 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertTrue(system_ran)
 
+    def test_orchestrators_all_print_functions_defined(self) -> None:
+        """X1c: For every orchestrator script, all print_* functions it calls must be defined locally or in lib/ui.sh."""
+        ui_text = (REPO_ROOT / "lib" / "ui.sh").read_text(encoding="utf-8")
+        ui_defined = set(re.findall(r"^([a-z_]+)\(\)\s*\{", ui_text, re.MULTILINE))
+
+        orchestrators = [
+            "update_all.sh",
+            "update_system.sh",
+            "update_appstore.sh",
+            "update_brew.sh",
+            "update_npm_cli.sh",
+            "update_internet_apps.sh",
+        ]
+        for script_name in orchestrators:
+            with self.subTest(script=script_name):
+                text = self.read_script(script_name)
+                local_defined = set(re.findall(r"^([a-z_]+)\(\)\s*\{", text, re.MULTILINE))
+                available = ui_defined | local_defined
+                calls = set(re.findall(r"\b(print_[a-z_]+)\b", text))
+                for fn in calls:
+                    self.assertIn(
+                        fn, available,
+                        msg=f"Orchestrator {script_name} calls '{fn}' but it is not defined in {script_name} or lib/ui.sh",
+                    )
+
     def _make_leaf_test_env(self, tmp_path: Path) -> tuple[Path, dict[str, str]]:
         mock_bin = tmp_path / "mock-bin"
         mock_bin.mkdir(exist_ok=True)
@@ -1093,8 +1122,12 @@ class StaticShellSafetyTests(unittest.TestCase):
             "esac\n",
             encoding="utf-8",
         )
+        (mock_bin / "brew").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        (mock_bin / "mas").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         (mock_bin / "uname").chmod(0o755)
         (mock_bin / "sw_vers").chmod(0o755)
+        (mock_bin / "brew").chmod(0o755)
+        (mock_bin / "mas").chmod(0o755)
 
         fake_home = tmp_path / "fake-home"
         fake_home.mkdir(exist_ok=True)
