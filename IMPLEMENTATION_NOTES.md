@@ -198,6 +198,19 @@ NO MV ONTO PROFILE
 Tests: test_remove_line_from_file_preserves_symlink — run_tests.sh: 116 passed
 Deviations: none
 
+## Task R6 - Fix VS Code handler: official API, checksum, and ditto
+Files: lib/internet_app_updates.sh
+What changed: Refactored `iu_visual_studio_code` to query the official Microsoft VS Code update API endpoint (`https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest`) for `productVersion`, `url`, and `sha256hash`. Added sha256 checksum validation prior to archive extraction, and replaced `unzip -q` with `ditto -x -k` to preserve code signature attributes.
+Why: Finding H6
+ACCEPTANCE CHECK command: awk '/^iu_visual_studio_code\(\)/,/^}/' lib/internet_app_updates.sh | grep -cE 'api/update/darwin-arm64|sha256hash|ditto -x -k'
+ACCEPTANCE CHECK output:
+```
+3
+```
+Tests: run_tests.sh: 116 passed
+Deviations: none
+
+
 
 
 
