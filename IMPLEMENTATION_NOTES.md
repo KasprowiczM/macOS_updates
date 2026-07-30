@@ -41,3 +41,10 @@ What changed: Updated update_all.sh to track soft failures (DEGRADED), continue 
 Why: Finding M1 - update_all.sh previously exited 0 on soft warnings, failing to convey degraded status to callers while correctly keeping step 6 unblocked.
 Tests: test_soft_internet_failure_still_runs_macos_system_step, test_soft_failure_in_every_layer_never_blocks_macos_system_step (run_tests.sh passed 100 tests)
 Deviations: none
+
+## Task 7 - Wrap Track 2 App Store AppleScript GUI automation in a timeout
+Files: update_appstore.sh, tests/test_safety_static.py
+What changed: Wrapped Track 2 osascript execution in run_with_timeout using MAC_UPDATE_APPSTORE_GUI_TIMEOUT (default 180s). On timeout or error, set SOFT_FAIL=1 and log warning without setting hard exit 1 or blocking execution. Added static test test_appstore_track2_gui_wrapped_in_timeout.
+Why: Finding H6 - AppleScript GUI automation could hang indefinitely on custom themes or high contrast settings.
+Tests: test_appstore_track2_gui_wrapped_in_timeout (run_tests.sh passed 101 tests)
+Deviations: none

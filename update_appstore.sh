@@ -336,7 +336,8 @@ print_ok "$L_AX_COMPLETE"
 echo ""
 print_step "$L_APPSTORE_OPEN"
 
-AS_RESULT=$(osascript 2>&1 <<'APPLESCRIPT'
+GUI_TIMEOUT="${MAC_UPDATE_APPSTORE_GUI_TIMEOUT:-180}"
+if ! AS_RESULT=$(run_with_timeout "$GUI_TIMEOUT" osascript 2>&1 <<'APPLESCRIPT'
 
 tell application "App Store" to activate
 delay 2
@@ -414,7 +415,11 @@ tell application "System Events"
 end tell
 
 APPLESCRIPT
-)
+); then
+    print_warn "Track 2 (App Store GUI) timed out or failed; review window manually"
+    SOFT_FAIL=1
+    AS_RESULT="TIMEOUT_OR_FAILED: $AS_RESULT"
+fi
 
 echo ""
 APPSTORE_TOR2_BRANCH="unexpected"
