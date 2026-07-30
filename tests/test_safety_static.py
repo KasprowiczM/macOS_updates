@@ -1073,43 +1073,50 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('"Visual Studio Code":', text)
         self.assertIn('"Brave Browser":', text)
 
-    def test_leaf_script_behavioural_severity(self) -> None:
-        """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
+    def test_update_all_does_not_hang_on_tee_wait(self) -> None:
+        """P1d: update_all.sh must return within timeout (not hang on tee wait) and persist summary to log."""
+        result, system_ran = self.run_update_all_with_layer_exit("internet", 0)
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(system_ran)
+
+    def _make_leaf_test_env(self, tmp_path: Path) -> tuple[Path, dict[str, str]]:
+        mock_bin = tmp_path / "mock-bin"
+        mock_bin.mkdir(exist_ok=True)
+
+        (mock_bin / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+        (mock_bin / "sw_vers").write_text(
+            "#!/bin/sh\n"
+            'case "$1" in\n'
+            "  -productVersion) echo 26.5.2 ;;\n"
+            "  -buildVersion) echo TESTBUILD ;;\n"
+            "  *) echo 'ProductName: macOS' ;;\n"
+            "esac\n",
+            encoding="utf-8",
+        )
+        (mock_bin / "uname").chmod(0o755)
+        (mock_bin / "sw_vers").chmod(0o755)
+
+        fake_home = tmp_path / "fake-home"
+        fake_home.mkdir(exist_ok=True)
+        base_env = os.environ.copy()
+        base_env.update(
+            {
+                "HOME": str(fake_home),
+                "BUN_INSTALL": str(fake_home / ".bun"),
+                "TOOLCHAIN_HOME": str(fake_home / ".local/share/mac-update"),
+                "PATH": f"{mock_bin}:{base_env.get('PATH', '/usr/bin:/bin')}",
+                "MAC_UPDATE_YES": "1",
+                "MAC_LANG": "en",
+            }
+        )
+        return mock_bin, base_env
+
+    def test_leaf_script_severity_brew_doctor_warning(self) -> None:
+        """Scenario 1: update_brew.sh with doctor warning => exit 0"""
         with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            mock_bin = tmp_path / "mock-bin"
-            mock_bin.mkdir()
-
-            (mock_bin / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
-            (mock_bin / "sw_vers").write_text(
-                "#!/bin/sh\n"
-                'case "$1" in\n'
-                "  -productVersion) echo 26.5.2 ;;\n"
-                "  -buildVersion) echo TESTBUILD ;;\n"
-                "  *) echo 'ProductName: macOS' ;;\n"
-                "esac\n",
-                encoding="utf-8",
-            )
-            (mock_bin / "uname").chmod(0o755)
-            (mock_bin / "sw_vers").chmod(0o755)
-
-            fake_home = tmp_path / "fake-home"
-            fake_home.mkdir(exist_ok=True)
-            base_env = os.environ.copy()
-            base_env.update(
-                {
-                    "HOME": str(fake_home),
-                    "BUN_INSTALL": str(fake_home / ".bun"),
-                    "TOOLCHAIN_HOME": str(fake_home / ".local/share/mac-update"),
-                    "PATH": f"{mock_bin}:{base_env.get('PATH', '/usr/bin:/bin')}",
-                    "MAC_UPDATE_YES": "1",
-                    "MAC_LANG": "en",
-                }
-            )
-
-            # Scenario 1: update_brew.sh with doctor warning => exit 0
-            brew_script_1 = mock_bin / "brew"
-            brew_script_1.write_text(
+            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
+            brew_script = mock_bin / "brew"
+            brew_script.write_text(
                 "#!/bin/sh\n"
                 'case "$1" in\n'
                 '  --version) echo "Homebrew 4.2.0" ;;\n'
@@ -1118,19 +1125,23 @@ class StaticShellSafetyTests(unittest.TestCase):
                 'esac\n',
                 encoding="utf-8",
             )
-            brew_script_1.chmod(0o755)
-            res1 = subprocess.run(
+            brew_script.chmod(0o755)
+            res = subprocess.run(
                 ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
                 env=base_env,
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
+                timeout=15,
             )
-            self.assertEqual(res1.returncode, 0, msg=f"brew doctor warning should result in exit 0, got {res1.returncode}\n{res1.stderr}")
+            self.assertEqual(res.returncode, 0, msg=f"brew doctor warning should result in exit 0, got {res.returncode}\n{res.stderr}")
 
-            # Scenario 2: update_brew.sh with greedy cask remaining => exit 0 or 10, never 1
-            brew_script_2 = mock_bin / "brew"
-            brew_script_2.write_text(
+    def test_leaf_script_severity_brew_greedy_cask(self) -> None:
+        """Scenario 2: update_brew.sh with greedy cask remaining => exit 0 or 10, never 1"""
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
+            brew_script = mock_bin / "brew"
+            brew_script.write_text(
                 "#!/bin/sh\n"
                 'case "$1" in\n'
                 '  --version) echo "Homebrew 4.2.0" ;;\n'
@@ -1139,20 +1150,24 @@ class StaticShellSafetyTests(unittest.TestCase):
                 'esac\n',
                 encoding="utf-8",
             )
-            brew_script_2.chmod(0o755)
-            res2 = subprocess.run(
+            brew_script.chmod(0o755)
+            res = subprocess.run(
                 ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
                 env=base_env,
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
+                timeout=15,
             )
-            self.assertIn(res2.returncode, (0, 10), msg=f"remaining greedy cask should result in exit 0 or 10, got {res2.returncode}")
-            self.assertNotEqual(res2.returncode, 1)
+            self.assertIn(res.returncode, (0, 10), msg=f"remaining greedy cask should result in exit 0 or 10, got {res.returncode}")
+            self.assertNotEqual(res.returncode, 1)
 
-            # Scenario 3: update_brew.sh with upgrade --formula failing => exit 1
-            brew_script_3 = mock_bin / "brew"
-            brew_script_3.write_text(
+    def test_leaf_script_severity_brew_upgrade_fail(self) -> None:
+        """Scenario 3: update_brew.sh with upgrade --formula failing => exit 1"""
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
+            brew_script = mock_bin / "brew"
+            brew_script.write_text(
                 "#!/bin/sh\n"
                 'case "$1" in\n'
                 '  --version) echo "Homebrew 4.2.0" ;;\n'
@@ -1162,17 +1177,21 @@ class StaticShellSafetyTests(unittest.TestCase):
                 'esac\n',
                 encoding="utf-8",
             )
-            brew_script_3.chmod(0o755)
-            res3 = subprocess.run(
+            brew_script.chmod(0o755)
+            res = subprocess.run(
                 ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
                 env=base_env,
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
+                timeout=15,
             )
-            self.assertEqual(res3.returncode, 1, msg=f"brew upgrade --formula failing should result in exit 1, got {res3.returncode}")
+            self.assertEqual(res.returncode, 1, msg=f"brew upgrade --formula failing should result in exit 1, got {res.returncode}")
 
-            # Scenario 4: update_appstore.sh with mas outdated failing => exit 10
+    def test_leaf_script_severity_mas_outdated_fail(self) -> None:
+        """Scenario 4: update_appstore.sh with mas outdated failing => exit 10"""
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
             mas_script = mock_bin / "mas"
             mas_script.write_text(
                 "#!/bin/sh\n"
@@ -1186,30 +1205,38 @@ class StaticShellSafetyTests(unittest.TestCase):
                 encoding="utf-8",
             )
             mas_script.chmod(0o755)
-            res4 = subprocess.run(
+            res = subprocess.run(
                 ["/bin/bash", str(REPO_ROOT / "update_appstore.sh")],
                 env=base_env,
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
+                timeout=15,
             )
-            self.assertEqual(res4.returncode, 10, msg=f"mas outdated failing should result in exit 10, got {res4.returncode}\n{res4.stderr}")
+            self.assertEqual(res.returncode, 10, msg=f"mas outdated failing should result in exit 10, got {res.returncode}\n{res.stderr}")
 
-            # Scenario 5: update_npm_cli.sh with curl failing => exit 10 (never 1)
+    def test_leaf_script_severity_npm_offline_curl(self) -> None:
+        """Scenario 5: update_npm_cli.sh with curl failing => exit 10 (never 1)"""
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
             curl_script = mock_bin / "curl"
             curl_script.write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
             curl_script.chmod(0o755)
-            res5 = subprocess.run(
+            res = subprocess.run(
                 ["/bin/bash", str(REPO_ROOT / "update_npm_cli.sh")],
                 env=base_env,
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
+                timeout=30,
             )
-            self.assertEqual(res5.returncode, 10, msg=f"update_npm_cli.sh offline curl failure should result in exit 10, got {res5.returncode}\n{res5.stderr}")
-            self.assertNotEqual(res5.returncode, 1)
+            self.assertEqual(res.returncode, 10, msg=f"update_npm_cli.sh offline curl failure should result in exit 10, got {res.returncode}\n{res.stderr}")
+            self.assertNotEqual(res.returncode, 1)
 
-            # Scenario 6: update_npm_cli.sh with Bun tarball install failing => exit 1
+    def test_leaf_script_severity_npm_tarball_install_fail(self) -> None:
+        """Scenario 6: update_npm_cli.sh with Bun tarball install failing => exit 1"""
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
             unzip_script = mock_bin / "unzip"
             unzip_script.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
             unzip_script.chmod(0o755)
@@ -1233,14 +1260,15 @@ class StaticShellSafetyTests(unittest.TestCase):
             )
             bun_curl_script.chmod(0o755)
 
-            res6 = subprocess.run(
+            res = subprocess.run(
                 ["/bin/bash", str(REPO_ROOT / "update_npm_cli.sh")],
                 env=base_env,
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
+                timeout=30,
             )
-            self.assertEqual(res6.returncode, 1, msg=f"update_npm_cli.sh Bun tarball install failure must result in exit 1, got {res6.returncode}\n{res6.stderr}")
+            self.assertEqual(res.returncode, 1, msg=f"update_npm_cli.sh Bun tarball install failure must result in exit 1, got {res.returncode}\n{res.stderr}")
 
     def test_subprocess_runs_targeting_update_scripts_set_sandboxed_home(self) -> None:
         """Scan test_safety_static.py for subprocess.run executing update_*.sh and assert HOME is set in env."""
