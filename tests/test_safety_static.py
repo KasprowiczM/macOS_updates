@@ -1295,30 +1295,27 @@ class StaticShellSafetyTests(unittest.TestCase):
     )
     def test_chatgpt_atlas_ignores_codex_bundle(self) -> None:
         """iu_chatgpt_atlas must not select /Applications/ChatGPT.app if bundle ID is com.openai.codex."""
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            app_dir = tmp_path / "ChatGPT.app" / "Contents"
-            app_dir.mkdir(parents=True)
-            info_plist = app_dir / "Info.plist"
-            info_plist.write_text("CFBundleIdentifier = \"com.openai.codex\";\n", encoding="utf-8")
-
-            sh_code = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
-            atlas_func = sh_code.split("iu_chatgpt_atlas() {")[1].split("iu_chatgpt() {")[0]
-            script = (
-                f'SCRIPT_DIR="{REPO_ROOT}"\n'
-                f'. "{REPO_ROOT}/lib/ui.sh"\n'
-                f'iu_chatgpt_atlas() {{\n{atlas_func}\n'
-                f'apath="{tmp_path / "ChatGPT.app"}"\n'
-                f'if [ "$(defaults read "$apath/Contents/Info" CFBundleIdentifier 2>/dev/null)" = "com.openai.codex" ]; then echo "EXCLUDED"; else echo "ACCEPTED"; fi\n'
-            )
-            res = subprocess.run(
-                ["bash", "-c", script],
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=REPO_ROOT,
-            )
-            self.assertIn("EXCLUDED", res.stdout)
+        script = (
+            f'SCRIPT_DIR="{REPO_ROOT}"\n'
+            f'print_header() {{ :; }}\n'
+            f'print_info() {{ :; }}\n'
+            f'print_step() {{ :; }}\n'
+            f'internet_msg() {{ echo "$2"; }}\n'
+            f'defaults() {{ echo "com.openai.codex"; }}\n'
+            f'app_version() {{ echo "1.0"; }}\n'
+            f'silent_launch_app() {{ return 0; }}\n'
+            f'. "{REPO_ROOT}/lib/internet_app_updates.sh"\n'
+            f'iu_chatgpt_atlas\n'
+            f'echo "ATLAS_APP=$ATLAS_APP"\n'
+        )
+        res = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=REPO_ROOT,
+        )
+        self.assertEqual(res.stdout.strip(), "ATLAS_APP=")
 
     def test_cli_flags_all_consumed(self) -> None:
         """Every MAC_UPDATE_* flag exported by lib/cli.sh must be read somewhere.
