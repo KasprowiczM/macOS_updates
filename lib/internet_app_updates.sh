@@ -1404,11 +1404,13 @@ iu_visual_studio_code() {
         VER=$(app_version "/Applications/Visual Studio Code.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        LATEST_VSCODE=$(github_latest_tag "microsoft/vscode" | sed 's/^v//')
-        VSCODE_RELATION="$(internet_version_relation "$LATEST_VSCODE" "$VER")"
+        VSCODE_JSON=$(curl -fsSL --max-time 30 --retry 3 --retry-delay 2 "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest" 2>/dev/null || true)
+        LATEST_VSCODE=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('productVersion', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
+        VSCODE_URL=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('url', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
+        VSCODE_SHA256=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('sha256hash', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
 
-        if [ "$LATEST_VSCODE" = "?" ]; then
-            # Offline or GitHub unreachable — launch app for built-in updater
+        if [ -z "$LATEST_VSCODE" ] || [ -z "$VSCODE_URL" ]; then
+            # Offline or API unreachable — launch app for built-in updater
             print_warn "$L_INTERNET_STATUS_OFFLINE"
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Visual Studio Code")"
             if silent_launch_app "Visual Studio Code"; then
@@ -1417,51 +1419,62 @@ iu_visual_studio_code() {
             else
                 STATUS_VSCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
             fi
-        elif [ "$VSCODE_RELATION" = "unknown" ]; then
-            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Visual Studio Code version")"
-            STATUS_VSCODE="$L_INTERNET_STATUS_UNKNOWN_VERSION"
-        elif [ "$VSCODE_RELATION" = "current" ]; then
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER (remote: $LATEST_VSCODE)")"
-            STATUS_VSCODE="$L_INTERNET_STATUS_CURRENT"
         else
-            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
-            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "Visual Studio Code" "$LATEST_VSCODE")"
-            VSCODE_URL="https://update.code.visualstudio.com/latest/darwin-arm64/stable"
-            TEMP_ZIP="$(mktemp "$INTERNET_TEMP_ROOT/vscode.XXXXXX.zip")"
-            TEMP_DIR="$INTERNET_TEMP_ROOT/vscode_extracted"
-            rm -rf "$TEMP_DIR" 2>/dev/null || true
-            mkdir -p "$TEMP_DIR"
+            VSCODE_RELATION="$(internet_version_relation "$LATEST_VSCODE" "$VER")"
+            if [ "$VSCODE_RELATION" = "unknown" ]; then
+                print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Visual Studio Code version")"
+                STATUS_VSCODE="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            elif [ "$VSCODE_RELATION" = "current" ]; then
+                print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER (remote: $LATEST_VSCODE)")"
+                STATUS_VSCODE="$L_INTERNET_STATUS_CURRENT"
+            else
+                print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
+                print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "Visual Studio Code" "$LATEST_VSCODE")"
+                TEMP_ZIP="$(mktemp "$INTERNET_TEMP_ROOT/vscode.XXXXXX.zip")"
+                TEMP_DIR="$INTERNET_TEMP_ROOT/vscode_extracted"
+                rm -rf "$TEMP_DIR" 2>/dev/null || true
+                mkdir -p "$TEMP_DIR"
 
-            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
-                print_step "$(internet_msg "$L_INTERNET_EXTRACTING" "Visual Studio Code")"
-                if unzip -q "$TEMP_ZIP" -d "$TEMP_DIR" 2>/dev/null; then
-                    if [ -d "$TEMP_DIR/Visual Studio Code.app" ]; then
-                        VSCODE_SOURCE_VER=$(app_version "$TEMP_DIR/Visual Studio Code.app")
-                        if [ "$(internet_version_relation "$VSCODE_SOURCE_VER" "$VER")" != "newer" ]; then
-                            print_warn "Refusing non-newer VS Code payload: $VSCODE_SOURCE_VER (installed: $VER)"
-                            STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
-                        elif copy_verified_app "$TEMP_DIR/Visual Studio Code.app" "Visual Studio Code.app"; then
-                            NEW_VER=$(app_version "/Applications/Visual Studio Code.app")
-                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Visual Studio Code" "$NEW_VER")"
-                            STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
+                    if [ -n "$VSCODE_SHA256" ]; then
+                        if ! echo "$VSCODE_SHA256  $TEMP_ZIP" | shasum -a 256 -c >/dev/null 2>&1; then
+                            print_warn "Checksum VS Code nie zgadza się dla $TEMP_ZIP"
+                            STATUS_VSCODE="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                            rm -f "$TEMP_ZIP" 2>/dev/null || true
+                            rm -rf "$TEMP_DIR" 2>/dev/null || true
+                            return 0
+                        fi
+                    fi
+                    print_step "$(internet_msg "$L_INTERNET_EXTRACTING" "Visual Studio Code")"
+                    if ditto -x -k "$TEMP_ZIP" "$TEMP_DIR" 2>/dev/null; then
+                        if [ -d "$TEMP_DIR/Visual Studio Code.app" ]; then
+                            VSCODE_SOURCE_VER=$(app_version "$TEMP_DIR/Visual Studio Code.app")
+                            if [ "$(internet_version_relation "$VSCODE_SOURCE_VER" "$VER")" != "newer" ]; then
+                                print_warn "Refusing non-newer VS Code payload: $VSCODE_SOURCE_VER (installed: $VER)"
+                                STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            elif copy_verified_app "$TEMP_DIR/Visual Studio Code.app" "Visual Studio Code.app"; then
+                                NEW_VER=$(app_version "/Applications/Visual Studio Code.app")
+                                print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Visual Studio Code" "$NEW_VER")"
+                                STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
+                                STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
+                            print_warn "$(internet_msg "$L_INTERNET_APP_NOT_IN_ARCHIVE" "Visual Studio Code")"
                             STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
                         fi
                     else
-                        print_warn "$(internet_msg "$L_INTERNET_APP_NOT_IN_ARCHIVE" "Visual Studio Code")"
-                        STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        print_warn "$L_INTERNET_STATUS_EXTRACT_ERROR"
+                        STATUS_VSCODE="$L_INTERNET_STATUS_EXTRACT_ERROR"
                     fi
                 else
-                    print_warn "$L_INTERNET_STATUS_EXTRACT_ERROR"
-                    STATUS_VSCODE="$L_INTERNET_STATUS_EXTRACT_ERROR"
+                    print_warn "$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                    STATUS_VSCODE="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
                 fi
-            else
-                print_warn "$L_INTERNET_STATUS_DOWNLOAD_ERROR"
-                STATUS_VSCODE="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                rm -f "$TEMP_ZIP" 2>/dev/null || true
+                rm -rf "$TEMP_DIR" 2>/dev/null || true
             fi
-            rm -f "$TEMP_ZIP" 2>/dev/null || true
-            rm -rf "$TEMP_DIR" 2>/dev/null || true
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Visual Studio Code")"
