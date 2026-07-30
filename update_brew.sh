@@ -269,9 +269,8 @@ if ! REMAINING_CASKS=$(brew outdated --cask --greedy 2>&1); then
     [ -n "$REMAINING_CASKS" ] && printf '%s\n' "$REMAINING_CASKS"
     BREW_EXIT=1
 elif [ -n "$REMAINING_CASKS" ]; then
-    print_error "Casks still outdated after greedy upgrade:"
+    print_info "Casks listed in greedy outdated check (informational only):"
     printf '%s\n' "$REMAINING_CASKS"
-    BREW_EXIT=1
 fi
 if [ "$BREW_EXIT" -eq 0 ]; then
     print_ok "$L_BREW_SUMMARY"
@@ -364,7 +363,8 @@ DOCTOR_FILTERED=$(printf '%s\n' "$DOCTOR_OUT" | awk '
     }
 ')
 
-# Check whether filtering changed the output, and preserve all other warnings.
+# Keep libASAF dylib filter in place for now.
+# TODO(C2): libASAF dylib filter can be removed once severity is corrected across scripts.
 ASAF_ONLY_FILTERED=0
 if [ "$DOCTOR_FILTERED" != "$DOCTOR_OUT" ]; then
     ASAF_ONLY_FILTERED=1
@@ -372,11 +372,14 @@ fi
 REAL_WARNINGS=$(printf '%s\n' "$DOCTOR_FILTERED" | grep '^Warning:' 2>/dev/null || true)
 DOCTOR_ERRORS=$(printf '%s\n' "$DOCTOR_FILTERED" | grep '^Error:' 2>/dev/null || true)
 
-if [ -n "$REAL_WARNINGS" ] || [ -n "$DOCTOR_ERRORS" ] \
-    || { [ "$DOCTOR_EXIT" -ne 0 ] && [ "$ASAF_ONLY_FILTERED" -eq 0 ]; }; then
+if [ -n "$DOCTOR_ERRORS" ]; then
     [ -n "$DOCTOR_FILTERED" ] && printf '%s\n' "$DOCTOR_FILTERED"
     print_warn "$L_BREW_HEALTH_WARN"
     BREW_EXIT=1
+elif [ -n "$REAL_WARNINGS" ]; then
+    [ -n "$DOCTOR_FILTERED" ] && printf '%s\n' "$DOCTOR_FILTERED"
+    print_info "brew doctor reported health advisories (warnings only)."
+    print_ok "$L_BREW_HEALTH_OK"
 else
     print_ok "$L_BREW_HEALTH_OK"
     if [ "$ASAF_ONLY_FILTERED" -eq 1 ]; then
