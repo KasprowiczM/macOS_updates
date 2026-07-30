@@ -294,8 +294,20 @@ def read_lines(path):
     return out
 
 
+def clean_app_name(value):
+    if not value:
+        return ""
+    # Strip markdown links [Text](url) -> Text
+    value = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', value)
+    # Strip bold/italic **text** or *text*
+    value = re.sub(r'\*+([^*]+)\*+', r'\1', value)
+    # Strip emojis
+    value = re.sub(r'[\U0001F300-\U0001FFFF]', '', value)
+    return value.strip()
+
+
 def normalize(value):
-    value = value.casefold()
+    value = clean_app_name(value).casefold()
     if value.endswith(".app"):
         value = value[:-4]
     return re.sub(r"[^a-z0-9]+", "", value)
