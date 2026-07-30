@@ -321,6 +321,7 @@ elif mac_update_dry_run_msg "prescan.py (APPLICATIONS.md scan)"; then
 else
 ui_step_header 0 6 "$L_ALL_STEP0"
 
+# TODO(H4): Recommended follow-up is extracting pure functions (row_exists, installed_app_version, 4a/4c/4d table-insertion helpers, version_for_table_row, expand_internet_versions) into lib/python/, which requires a real APPLICATIONS.md test fixture.
 # Write the pre-scan Python script to session dir
 cat > "$SESSION_DIR/prescan.py" << 'PYEOF'
 import os
@@ -1142,6 +1143,7 @@ if mac_update_dry_run_msg "postupdate.py (APPLICATIONS.md / UPDATES.md)"; then
     RESULT_MD="[DRY-RUN] skipped"
 else
 
+# TODO(H4): Recommended follow-up is extracting pure functions (row_exists, installed_app_version, 4a/4c/4d table-insertion helpers, version_for_table_row, expand_internet_versions) into lib/python/, which requires a real APPLICATIONS.md test fixture.
 # Write the post-update Python script
 cat > "$SESSION_DIR/postupdate.py" << 'PYEOF'
 import os

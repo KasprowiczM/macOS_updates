@@ -29,7 +29,7 @@ shellcheck --severity=warning $(find . -name '*.sh' ! -path './.git/*' -print)  
 1. `softwareupdate` install paths **must** include `-R`
 2. `mas upgrade` **must** use `sudo` (CVE-2025-43411)
 3. All `update_*.sh` orchestrators **must** use `set -o pipefail`
-4. **No new standalone `update_*.py` files** — pipeline Python stays in heredocs
+4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests)
 5. Use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"` — no hardcoded user paths
 6. Temp files: `mktemp` with `${TMPDIR:-/tmp}/mac_update_*` prefix
 7. **Do not install apps for users** — handlers run only when the app is already installed

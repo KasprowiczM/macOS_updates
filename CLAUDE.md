@@ -54,7 +54,7 @@ Load only when relevant to your task:
 1. **`softwareupdate` MUST have `-R`** — without it, macOS updates download but never apply.
 2. **`mas upgrade` MUST have `sudo`** — CVE-2025-43411 (Sequoia).
 3. **Bash 3.2 only** — no `declare -A`, `mapfile`, `readarray`.
-4. **No new standalone update `.py` files** — update pipeline Python stays in heredocs; `dev_sync/` and `scripts/fix_mcp_configs.py` are the existing Python backend/tools.
+4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests); `dev_sync/` and `scripts/fix_mcp_configs.py` are the existing Python backend/tools.
 5. **No hardcoded paths** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`.
    For temp files: `mktemp -d "${TMPDIR:-/tmp}/mac_update_*.XXXXXX"` (never bare `/tmp/`).
 6. **All `update_*.sh` orchestrators must `set -o pipefail`** — without it, a
