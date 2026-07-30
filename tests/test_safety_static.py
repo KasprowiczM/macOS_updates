@@ -349,8 +349,15 @@ class StaticShellSafetyTests(unittest.TestCase):
         text = self.read_script("update_appstore.sh")
         final_block = text[text.rindex("# ── mas snapshot AFTER update") :]
         self.assertIn('if [ "$APPSTORE_EXIT" -eq 0 ]; then', final_block)
-        self.assertIn("FINISHED WITH ERRORS OR PENDING UPDATES", final_block)
         self.assertIn('if [ "$APPSTORE_TOR2_BRANCH" = "no_updates" ]; then', final_block)
+        # Three distinct reporting states, matching update_all.sh: clean / warnings /
+        # errors. The banner previously said "ERRORS OR PENDING UPDATES" for a soft
+        # exit 10, which is the normal outcome when Track 2 queued background
+        # installs — that trained users to ignore the banner.
+        self.assertIn('elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then', final_block)
+        self.assertIn("FINISHED WITH WARNINGS", final_block)
+        self.assertIn("FINISHED WITH ERRORS", final_block)
+        self.assertNotIn("FINISHED WITH ERRORS OR PENDING UPDATES", final_block)
 
     def test_update_all_runs_reboot_capable_system_step_last(self) -> None:
         text = self.read_script("update_all.sh")
@@ -1377,6 +1384,66 @@ class StaticShellSafetyTests(unittest.TestCase):
             cwd=REPO_ROOT,
         )
         self.assertEqual(res.stdout.strip(), "ATLAS_APP=")
+
+    def test_appstore_ax_probe_grep_handles_leading_dash(self) -> None:
+        """The Accessibility probe must classify -1743 without grep eating it as options.
+
+        Observed in a real run: `grep -qi "-1743\\|not allowed\\|..."` made grep treat
+        the pattern as flags ("grep: invalid option -- \\"), so the probe always
+        reported "permission OK" and the exit-2 contract was dead.
+        """
+        text = self.read_script("update_appstore.sh")
+        probe = [ln for ln in text.splitlines() if "AX_TEST" in ln and "grep" in ln]
+        self.assertTrue(probe, msg="Accessibility probe grep line not found")
+        for line in probe:
+            self.assertNotIn(
+                'grep -qi "-',
+                line,
+                msg=f"grep pattern starts with a dash and will be parsed as options: {line.strip()}",
+            )
+
+        # Behavioural: the real classification must work in both directions and
+        # must not emit a grep usage error.
+        cases = [
+            ("Terminal", False),
+            (
+                "System Events got an error: osascript is not allowed "
+                "assistive access. (-1743)",
+                True,
+            ),
+            ("System Events got an error: Application isn't running. (-600)", False),
+        ]
+        for ax_text, should_match in cases:
+            with self.subTest(ax=ax_text[:40]):
+                res = subprocess.run(
+                    [
+                        "bash",
+                        "-c",
+                        "printf '%s\\n' \"$1\" | grep -qi -e '(-1743)' -e 'not allowed' "
+                        "-e 'assistive' -e 'accessibility' -e 'not authorized'",
+                        "_",
+                        ax_text,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                self.assertEqual(
+                    res.stderr.strip(), "", msg=f"grep emitted an error: {res.stderr}"
+                )
+                self.assertEqual(
+                    res.returncode == 0,
+                    should_match,
+                    msg=f"wrong classification for {ax_text!r}",
+                )
+
+    def test_appstore_soft_and_hard_banners_are_distinct(self) -> None:
+        """A soft (exit 10) App Store result must not be reported as an error."""
+        text = self.read_script("update_appstore.sh")
+        self.assertIn("SCRIPT 2 FINISHED WITH WARNINGS", text)
+        self.assertIn("SCRIPT 2 FINISHED WITH ERRORS", text)
+        self.assertNotIn("SCRIPT 2 FINISHED WITH ERRORS OR PENDING UPDATES", text)
+        self.assertIn('-eq "$MAC_UPDATE_SOFT_EXIT"', text)
 
     def test_cli_flags_all_consumed(self) -> None:
         """Every MAC_UPDATE_* flag exported by lib/cli.sh must be read somewhere.

@@ -285,7 +285,11 @@ print_step "$L_AX_PERMISSION_CHECK"
 
 AX_TEST=$(osascript -e 'tell application "System Events" to return name of first process whose frontmost is true' 2>&1)
 
-if echo "$AX_TEST" | grep -qi "-1743\|not allowed\|assistive\|accessibility\|not authorized"; then
+# `--` terminates option parsing: the AppleScript error number -1743
+# (errAEEventNotPermitted) begins with a dash and would otherwise be consumed as
+# grep options ("grep: invalid option -- \" on BSD grep), which silently turned a
+# denied-permission probe into a pass.
+if printf '%s\n' "$AX_TEST" | grep -qi -e '(-1743)' -e 'not allowed' -e 'assistive' -e 'accessibility' -e 'not authorized'; then
     echo ""
     print_error "$L_AX_PERMISSION_DENIED"
     echo ""
@@ -541,9 +545,21 @@ if [ "$APPSTORE_EXIT" -eq 0 ]; then
         print_info "$L_SCRIPT_2_SUMMARY_TOR2"
         print_warn "$L_SCRIPT_2_CHECK_WINDOW"
     fi
+elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
+    # Soft is the expected outcome whenever Track 2 queued installs: the App Store
+    # keeps downloading in the background and `mas outdated` still lists those apps
+    # until it finishes. Reporting that as an error trained users to ignore the
+    # banner, so the three states are kept distinct here exactly as update_all.sh
+    # does: clean / warnings / errors.
+    print_header "⚠️  SCRIPT 2 FINISHED WITH WARNINGS"
+    if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
+        print_info "App Store is still installing in the background; mas cannot confirm those apps until it finishes. Re-run later to verify."
+    else
+        print_info "Some App Store state could not be verified; review the diagnostics above. Nothing was left mid-install."
+    fi
 else
-    print_header "❌ SCRIPT 2 FINISHED WITH ERRORS OR PENDING UPDATES"
-    print_info "App Store did not pass every final verification; review the diagnostics above."
+    print_header "❌ SCRIPT 2 FINISHED WITH ERRORS"
+    print_info "An App Store operation failed; review the diagnostics above."
 fi
 echo ""
 exit "$APPSTORE_EXIT"
