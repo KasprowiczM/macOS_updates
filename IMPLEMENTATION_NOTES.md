@@ -34,3 +34,10 @@ What changed: Added -f / -fsSL flags to 11 curl calls across lib/internet_app_up
 Why: Finding H7 - Missing -f flag caused HTTP 404 responses to exit 0 with HTML error text written into archives, leading to false MOUNT_ERROR hard failures.
 Tests: test_curl_invocations_use_fail_flag_and_download_error_is_soft (run_tests.sh passed 100 tests)
 Deviations: none
+
+## Task 6 - Handle exit 10 soft failures gracefully in update_all.sh
+Files: update_all.sh, tests/test_safety_static.py
+What changed: Updated update_all.sh to track soft failures (DEGRADED), continue through all steps including step 6 (macOS system update), and exit with code 10 at top level when soft warnings occurred without hard failures. Updated tests to assert top-level exit code 10 on degraded execution.
+Why: Finding M1 - update_all.sh previously exited 0 on soft warnings, failing to convey degraded status to callers while correctly keeping step 6 unblocked.
+Tests: test_soft_internet_failure_still_runs_macos_system_step, test_soft_failure_in_every_layer_never_blocks_macos_system_step (run_tests.sh passed 100 tests)
+Deviations: none

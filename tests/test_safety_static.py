@@ -476,7 +476,7 @@ class StaticShellSafetyTests(unittest.TestCase):
             + result.stderr,
         )
         self.assertNotIn("Skipping the final macOS update", result.stdout)
-        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 10, msg=result.stdout + result.stderr)
         # The warning must stay visible — soft results are surfaced, not hidden.
         self.assertIn("UPDATE COMPLETED WITH WARNINGS", result.stdout)
         self.assertIn("macOS step not blocked", result.stdout)
@@ -492,7 +492,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                     + result.stderr,
                 )
                 self.assertEqual(
-                    result.returncode, 0, msg=result.stdout + result.stderr
+                    result.returncode, 10, msg=result.stdout + result.stderr
                 )
 
     def test_internet_apps_split_soft_and_hard_severities(self) -> None:
