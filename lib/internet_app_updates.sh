@@ -78,7 +78,7 @@ iu_google_chrome() {
         else
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Chrome")"
             if silent_launch_app "Google Chrome"; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Chrome → Pomoc → O Google Chrome")"
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$L_INTERNET_HINT_CHROME")"
                 STATUS_CHROME="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
             else
                 STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
@@ -117,7 +117,7 @@ iu_firefox_developer_edition() {
         if [ "$LATEST_FF" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "Mozilla API")"
             if silent_launch_app "Firefox Developer Edition"; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Firefox → Pomoc → O Firefoksie")"
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$L_INTERNET_HINT_FIREFOX")"
                 STATUS_FIREFOX="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
             else
                 STATUS_FIREFOX="$L_INTERNET_STATUS_LAUNCH_FAILED"
@@ -178,7 +178,7 @@ iu_firefox_developer_edition() {
 }
 
 iu_brave_browser() {
-    internet_dispatch_silent_launch "🦁 Brave Browser" "Brave Browser" "STATUS_BRAVE" "Brave Browser" "Brave → Pomoc → O Brave Browser"
+    internet_dispatch_silent_launch "🦁 Brave Browser" "Brave Browser" "STATUS_BRAVE" "Brave Browser" "$L_INTERNET_HINT_BRAVE"
 }
 
     # ── 4b. CHATGPT ATLAS (Sparkle appcast + DMG) ────────────────
@@ -238,7 +238,7 @@ iu_claude() {
 }
 
 iu_comet() {
-    internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "Comet → Pomoc → O Comet"
+    internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
 }
 
 iu_antigravity() {
@@ -308,7 +308,7 @@ iu_opencode_desktop() {
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "OpenCode Desktop")"
         if silent_launch_app "$OPENCODE_APP_PATH"; then
             print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://opencode.ai")"
-            print_info "Uwaga: CLI 'opencode' aktualizowane osobno przez update_npm_cli.sh"
+            print_info "$L_INTERNET_OPENCODE_CLI_SEPARATE"
             STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
         else
             STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
