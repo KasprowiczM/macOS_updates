@@ -27,3 +27,10 @@ What changed: Added producer-side static test test_producer_side_soft_exit_refer
 Why: Finding H3 - Test suite previously stubbed children with exit N, leaving real leaf severity logic untested.
 Tests: test_producer_side_soft_exit_references, test_leaf_script_behavioural_severity (run_tests.sh passed 99 tests)
 Deviations: none
+
+## Task 5 - Add `--fail` to every internet-app curl invocation
+Files: lib/internet_app_updates.sh, lib/github_release.sh, update_internet_apps.sh, tests/test_safety_static.py
+What changed: Added -f / -fsSL flags to 11 curl calls across lib/internet_app_updates.sh and lib/github_release.sh. Reclassified L_INTERNET_STATUS_DOWNLOAD_ERROR from hard to soft failure (exit 10) in update_internet_apps.sh since a failed download leaves system state unmutated. Added test_curl_invocations_use_fail_flag_and_download_error_is_soft.
+Why: Finding H7 - Missing -f flag caused HTTP 404 responses to exit 0 with HTML error text written into archives, leading to false MOUNT_ERROR hard failures.
+Tests: test_curl_invocations_use_fail_flag_and_download_error_is_soft (run_tests.sh passed 100 tests)
+Deviations: none

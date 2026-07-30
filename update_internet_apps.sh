@@ -603,7 +603,6 @@ do
     case "$status" in
         "$L_INTERNET_STATUS_INSTALL_ERROR"|\
         "$L_INTERNET_STATUS_MOUNT_ERROR"|\
-        "$L_INTERNET_STATUS_DOWNLOAD_ERROR"|\
         "$L_INTERNET_STATUS_EXTRACT_ERROR")
             INTERNET_HARD_FAIL=1
             ;;
@@ -613,6 +612,7 @@ do
     case "$status" in
         "$L_INTERNET_STATUS_OFFLINE"|\
         "$L_INTERNET_STATUS_NO_URL"|\
+        "$L_INTERNET_STATUS_DOWNLOAD_ERROR"|\
         "$L_INTERNET_STATUS_CHECK_MAU"|\
         "$L_INTERNET_STATUS_MAU_MISSING"|\
         "$L_INTERNET_STATUS_MAU_QUARANTINED"|\

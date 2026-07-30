@@ -97,8 +97,8 @@ iu_firefox_developer_edition() {
         VER=$(firefox_dev_version)
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        LATEST_FF=$(curl -s --max-time 20 --retry 2 \
-            "https://product-details.mozilla.org/1.0/firefox_versions.json" 2>/dev/null \
+        LATEST_FF=$(curl -fsSL --max-time 20 --retry 2 \
+            "https://product-details.mozilla.org/1.0/firefox_versions.json" \
             | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('FIREFOX_DEVEDITION','?'))" \
             2>/dev/null || echo "?")
 
@@ -129,7 +129,7 @@ iu_firefox_developer_edition() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_APPLE_SILICON" "Firefox Developer Edition" "$LATEST_FF")"
             FF_URL="https://download.mozilla.org/?product=firefox-devedition-latest&os=osx&lang=pl"
             TEMP_DMG="$(make_temp_dmg Firefox_DevEd)"
-            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL" 2>/dev/null; then
+            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL"; then
                 FF_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$FF_MOUNT" ]; then
                     if [ -d "$FF_MOUNT/Firefox Developer Edition.app" ]; then
@@ -203,8 +203,8 @@ iu_chatgpt_atlas() {
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
         # Pobierz najnowszą wersję z Sparkle appcast OpenAI
-        ATLAS_XML=$(curl -s --compressed --max-time 20 --retry 3 --retry-delay 2 \
-            "https://persistent.oaistatic.com/atlas/public/sparkle_public_appcast.xml" 2>/dev/null)
+        ATLAS_XML=$(curl -fsSL --compressed --max-time 20 --retry 3 --retry-delay 2 \
+            "https://persistent.oaistatic.com/atlas/public/sparkle_public_appcast.xml")
         # Parse the highest shortVersionString (appcast may have multiple items)
         ATLAS_LATEST=$(echo "$ATLAS_XML" | grep 'sparkle:shortVersionString' | \
             sed 's|.*<sparkle:shortVersionString>\(.*\)</sparkle:shortVersionString>.*|\1|' | \
@@ -227,7 +227,7 @@ iu_chatgpt_atlas() {
             if [ -n "$ATLAS_DMG_URL" ]; then
                 print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_SIZE" "ChatGPT Atlas" "$ATLAS_LATEST" "~250 MB")"
                 TEMP_DMG="$(make_temp_dmg ChatGPT_Atlas)"
-                if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$ATLAS_DMG_URL" 2>/dev/null; then
+                if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$ATLAS_DMG_URL"; then
                     ATLAS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                     if [ -n "$ATLAS_MOUNT" ]; then
                         ATLAS_SRC=""
@@ -537,7 +537,7 @@ iu_keepassxc() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$LATEST_KPX ($KPX_ARCH)")"
             KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/KeePassXC-${LATEST_KPX}-${KPX_ARCH}.dmg"
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
-            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" 2>/dev/null; then
+            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL"; then
                 KPX_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$KPX_MOUNT" ]; then
                     if [ -d "$KPX_MOUNT/KeePassXC.app" ]; then
@@ -1490,7 +1490,7 @@ iu_visual_studio_code() {
             rm -rf "$TEMP_DIR" 2>/dev/null || true
             mkdir -p "$TEMP_DIR"
 
-            if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL" 2>/dev/null; then
+            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
                 print_step "$(internet_msg "$L_INTERNET_EXTRACTING" "Visual Studio Code")"
                 if unzip -q "$TEMP_ZIP" -d "$TEMP_DIR" 2>/dev/null; then
                     if [ -d "$TEMP_DIR/Visual Studio Code.app" ]; then
@@ -1556,7 +1556,7 @@ iu_codeedit() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "CodeEdit" "$LATEST_CE")"
             CE_URL="https://github.com/CodeEditApp/CodeEdit/releases/download/${LATEST_CE_TAG}/CodeEdit.dmg"
             TEMP_DMG="$(make_temp_dmg CodeEdit)"
-            if curl -L --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL" 2>/dev/null; then
+            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL"; then
                 CE_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$CE_MOUNT" ]; then
                     if [ -d "$CE_MOUNT/CodeEdit.app" ]; then
@@ -1793,7 +1793,7 @@ iu_ledger() {
         VER=$(app_version "$LEDGER_APP")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_APP" "$LEDGER_NAME" "$VER")"
 
-        LEDGER_YML=$(curl -s --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml" 2>/dev/null)
+        LEDGER_YML=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
         LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
         LEDGER_RELATION="$(internet_version_relation "$LATEST_LEDGER" "$VER")"
 
@@ -1816,7 +1816,7 @@ iu_ledger() {
             fi
             LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
-            if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL" 2>/dev/null; then
+            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL"; then
                 LEDGER_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$LEDGER_MOUNT" ]; then
                     if [ -d "$LEDGER_MOUNT/Ledger Live.app" ] || [ -d "$LEDGER_MOUNT/Ledger Wallet.app" ]; then
@@ -1871,7 +1871,7 @@ iu_trezor_suite() {
         # Monorepo: trezor-suite publishes both suite (desktop) and connect (library)
         # releases. /releases/latest may return a connect release. Filter to desktop-only
         # tags matching v?NN.N.N (no slashes, no connect prefix).
-        LATEST_TS_TAG=$(curl -s --max-time 20 --retry 3 --retry-delay 2 \
+        LATEST_TS_TAG=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 \
             -H "User-Agent: macos-updates-toolkit" \
             ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} \
             "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" 2>/dev/null \
@@ -1903,7 +1903,7 @@ except Exception:
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_ARM" "Trezor Suite" "$LATEST_TS")"
             TS_URL="https://github.com/trezor/trezor-suite/releases/download/${LATEST_TS_TAG}/Trezor-Suite-${LATEST_TS}-mac-arm64.dmg"
             TEMP_DMG="$(make_temp_dmg TrezorSuite)"
-            if curl -L --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL" 2>/dev/null; then
+            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL"; then
                 TS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$TS_MOUNT" ]; then
                     if [ -d "$TS_MOUNT/Trezor Suite.app" ]; then

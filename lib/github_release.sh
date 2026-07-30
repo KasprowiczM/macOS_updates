@@ -8,7 +8,7 @@ github_latest_tag() {
     if [ -n "${GITHUB_TOKEN:-}" ]; then
         auth_header="-H"
     fi
-    result=$(curl -s --max-time 20 --retry 3 --retry-delay 2 \
+    result=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 \
         -H "User-Agent: macos-updates-toolkit" \
         ${auth_header:+"$auth_header"} ${auth_header:+"Authorization: Bearer $GITHUB_TOKEN"} \
         "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \

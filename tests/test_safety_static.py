@@ -857,6 +857,25 @@ class StaticShellSafetyTests(unittest.TestCase):
                     msg=f"Leaf script {script_name} lacks soft exit code reference (MAC_UPDATE_SOFT_EXIT / SOFT_FAIL / INTERNET_SOFT_EXIT)",
                 )
 
+    def test_curl_invocations_use_fail_flag_and_download_error_is_soft(self) -> None:
+        """Every curl invocation in lib/internet_app_updates.sh must include -f or --fail,
+        and L_INTERNET_STATUS_DOWNLOAD_ERROR must be in the soft case (exit 10), not hard case.
+        """
+        script_text = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
+        for line_no, line in enumerate(script_text.splitlines(), 1):
+            if "curl " in line:
+                self.assertTrue(
+                    "-f" in line or "--fail" in line,
+                    msg=f"curl call on line {line_no} of lib/internet_app_updates.sh lacks -f or --fail: {line.strip()}",
+                )
+
+        orchestrator_text = (REPO_ROOT / "update_internet_apps.sh").read_text(encoding="utf-8")
+        hard_block = orchestrator_text.split("INTERNET_HARD_FAIL=1")[0].rsplit("case ", 1)[-1]
+        soft_block = orchestrator_text.split("INTERNET_SOFT_FAIL=1")[0].rsplit("case ", 1)[-1]
+
+        self.assertIn("L_INTERNET_STATUS_DOWNLOAD_ERROR", soft_block, msg="DOWNLOAD_ERROR must be in soft case")
+        self.assertNotIn("L_INTERNET_STATUS_DOWNLOAD_ERROR", hard_block, msg="DOWNLOAD_ERROR must not be in hard case")
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
