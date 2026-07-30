@@ -6,7 +6,7 @@
 
 > **v1.0.21** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13+**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
-**Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
+**Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 

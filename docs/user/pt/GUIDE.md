@@ -1,6 +1,6 @@
 # Guia do utilizador (Português)
 
-**Versão:** 1.0.20 · **Apple Silicon, macOS 13+**
+**Versão:** 1.0.21 · **Apple Silicon, macOS 13+**
 
 ## O que faz
 
