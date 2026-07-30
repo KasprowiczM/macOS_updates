@@ -391,6 +391,78 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Final Deliverable Summary
+
+| Task | Finding ID | Status | Commit | Title / Description |
+|---|---|---|---|---|
+| R1 | N1 | done | `a702f1d` | Revert update_all.sh exit-code change & restore tests |
+| R2 | N2 | done | `9556cef` | Fix App Store Track 2 AppleScript payload |
+| R3 | N4 | done | `cff4b20` | Stop test suite from mutating developer home dir |
+| R4 | N3 | done | `b9a5197` | Restore hard-failure classification in update_npm_cli.sh |
+| R5 | H11 | done | `4165913` | Make shell-profile edits non-destructive |
+| R6 | H6 | done | `c4a3095` | Fix VS Code handler: official API, checksum, ditto |
+| R7 | H7 | done | `6f23f4a` | Verify Ledger Live sha512 checksum before mounting DMG |
+| R8 | N5 | done | `c883885` | Make ChatGPT Atlas registry row match its handler |
+| R9 | N6 | done | `71cfbbf` | Stop Atlas handler claiming ChatGPT/Codex bundle |
+| R10 | N7 | done | `c4c81db` | Make strip_ansi work on macOS BSD sed |
+| R11 | H8 | done | `6db9ce5` | Stop gating macOS update decision on untranslated strings |
+| R12 | H10 | done | `c455209` | Stop MAU deferral oscillation for hidden products |
+| R13 | M14 | done | `dc43512` | Untrack gitignored files and ship deny rules |
+| R14 | H4 | done | `dd33033` | Bring inline Python under quality gate in run_tests.sh |
+| R15 | M15 | done | `91d2823`, `e51c06c` | Deduplicate helpers & migrate silent launch handlers |
+| R16 | H9 | done | `0d9c52b` | Localise console messages (63 L_* keys added) |
+| R17 | M23, Perf 2-4 | done | `1435913` | Performance pass (registry cache, adaptive polling) |
+| R18 | M16, M18, M20, M21 | done | `fe22286` | Remaining Medium items (STATUS_FAILED, brew cleanup, n fallback, coverage) |
+| R19 | L1, L3, L4 | done | `376feef` | Remaining Low items (install --help, nested .app filter) |
+| R20 | Task R20 | done | `1a38e30` | Final verification & documentation sync |
+
+### Deliberate Exceptions & Skips
+- **R17d** (`internet_version_relation` awk port): Skipped per prompt instruction ("MauRegressionGuardTests depends on these - if you cannot preserve them exactly, SKIP R17d and say so") to preserve exact version key tuple comparison semantics across prerelease and numeric components without introducing subtle edge-case bugs.
+
+### Final Verification Results
+
+#### 1. `bash run_tests.sh` Output
+```
+── 1/4  bash -n on all .sh
+  ✅ all bash scripts parse
+── 2/4  python3 -m py_compile on all .py and inline heredocs
+  ✅ all python modules compile
+  ✅ all inline heredoc python blocks compile
+── 3/4  python3 -m unittest discover tests
+........................................................................................................................
+----------------------------------------------------------------------
+Ran 120 tests in 33.067s
+
+OK
+safe
+  ✅ test suite passed
+── 4/4  scripts/scan_secrets.sh
+── gitleaks detect (tracked git content) ──
+5:33PM INF 57 commits scanned.
+5:33PM INF scanned ~1454143 bytes (1.45 MB) in 272ms
+5:33PM INF no leaks found
+  OK gitleaks
+Secret scan passed
+  ✅ secret scan passed
+
+╔══════════════════════════╗
+║   ALL CHECKS PASSED ✅   ║
+╚══════════════════════════╝
+```
+
+#### 2. `shellcheck --severity=warning` Output
+```
+shellcheck --severity=warning update_all.sh update_appstore.sh update_brew.sh update_npm_cli.sh update_internet_apps.sh install.sh lib/proc.sh lib/internet_app_updates.sh lib/internet_registry.sh lib/internet_apps.sh
+(exited 0 with 0 warnings)
+```
+
+#### 3. `git ls-files -z | xargs -0 git check-ignore --no-index -v` Output
+```
+exit=1
+```
+(No tracked files are gitignored)
+
+
 
 
 
