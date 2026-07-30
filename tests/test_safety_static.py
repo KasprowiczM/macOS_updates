@@ -541,8 +541,8 @@ class StaticShellSafetyTests(unittest.TestCase):
         )
         self.assertNotIn("hdiutil attach", handlers)
         self.assertNotIn("/Volumes/", handlers)
-        self.assertEqual(handlers.count('mount_verified_dmg "$TEMP_DMG"'), 6)
-        self.assertEqual(handlers.count("detach_verified_dmg"), 6)
+        self.assertEqual(handlers.count('mount_verified_dmg "$TEMP_DMG"'), 5)
+        self.assertEqual(handlers.count("detach_verified_dmg"), 5)
 
     def test_microsoft_updates_are_verified_and_teams_is_hybrid(self) -> None:
         handlers = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(
@@ -882,6 +882,24 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('run_with_timeout "$GUI_TIMEOUT" osascript', text)
         self.assertIn("SOFT_FAIL=1", text)
         self.assertIn("Track 2 (App Store GUI) timed out or failed", text)
+
+    def test_task_8_edge_cases_handling(self) -> None:
+        """Assert iu_firefox_developer_edition, iu_chatgpt_atlas, and iu_keepassxc edge cases."""
+        script_text = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
+
+        # 8a: Firefox Dev sets UNKNOWN_VERSION if version parse is ?
+        ff_block = script_text.split("iu_firefox_developer_edition() {")[1].split("iu_")[0]
+        self.assertIn('STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"', ff_block)
+
+        # 8b: ChatGPT Atlas uses silent_launch_app
+        atlas_block = script_text.split("iu_chatgpt_atlas() {")[1].split("iu_")[0]
+        self.assertIn('silent_launch_app "$ATLAS_NAME"', atlas_block)
+        self.assertIn('STATUS_ATLAS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"', atlas_block)
+
+        # 8c: KeePassXC defaults KPX_ARCH safely
+        kpx_block = script_text.split("iu_keepassxc() {")[1].split("iu_")[0]
+        self.assertIn('KPX_ARCH="x86_64"', kpx_block)
+        self.assertIn('[ "$KPX_UNAME" = "arm64" ] && KPX_ARCH="arm64"', kpx_block)
 
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""

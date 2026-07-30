@@ -48,3 +48,10 @@ What changed: Wrapped Track 2 osascript execution in run_with_timeout using MAC_
 Why: Finding H6 - AppleScript GUI automation could hang indefinitely on custom themes or high contrast settings.
 Tests: test_appstore_track2_gui_wrapped_in_timeout (run_tests.sh passed 101 tests)
 Deviations: none
+
+## Task 8 - Fix edge cases in Firefox Dev, ChatGPT Atlas, and KeePassXC handlers
+Files: lib/internet_app_updates.sh, tests/test_safety_static.py
+What changed: Set STATUS_FIREFOX to UNKNOWN_VERSION when application.ini returns ? in iu_firefox_developer_edition. Updated iu_chatgpt_atlas to use silent_launch_app because OpenAI retired public Sparkle feeds. Added safe default for KPX_ARCH in iu_keepassxc when uname -m returns non-standard values. Added test_task_8_edge_cases_handling to test_safety_static.py.
+Why: Findings H13, H14, H15 - Edge-case version parsing and retired appcast URLs caused unhandled errors or broken download URLs.
+Tests: test_task_8_edge_cases_handling (run_tests.sh passed 102 tests)
+Deviations: none
