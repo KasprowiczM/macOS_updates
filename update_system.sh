@@ -79,7 +79,7 @@ echo ""
 print_header "$L_SYSTEM_UPDATES_CHECK"
 
 UPDATES_EXIT=0
-UPDATES=$(softwareupdate -l 2>&1) || UPDATES_EXIT=$?
+UPDATES=$(LANG=C LC_ALL=C softwareupdate -l 2>&1) || UPDATES_EXIT=$?
 echo "$UPDATES"
 
 if [ "$UPDATES_EXIT" -ne 0 ]; then

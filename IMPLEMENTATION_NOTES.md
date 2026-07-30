@@ -258,6 +258,20 @@ ARB
 Tests: test_brew_outputs_use_ansi_stripping — run_tests.sh: 118 passed
 Deviations: none
 
+## Task R11 - Stop gating the macOS update decision on untranslated English strings
+Files: update_system.sh, update_appstore.sh
+What changed: Updated `update_system.sh` to execute `softwareupdate -l` with `LANG=C LC_ALL=C` so output is deterministically formatted in C locale. Updated `update_appstore.sh` Accessibility probe to check for AppleScript error code `-1743` (`errAEEventNotPermitted`) and removed the overly broad bare token `access`.
+Why: Finding H8
+ACCEPTANCE CHECK command: grep -c 'LC_ALL=C softwareupdate' update_system.sh ; grep -c '1743' update_appstore.sh
+ACCEPTANCE CHECK output:
+```
+1
+1
+```
+Tests: run_tests.sh: 118 passed
+Deviations: none
+
+
 
 
 

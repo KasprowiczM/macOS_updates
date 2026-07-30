@@ -310,7 +310,7 @@ print_step "$L_AX_PERMISSION_CHECK"
 
 AX_TEST=$(osascript -e 'tell application "System Events" to return name of first process whose frontmost is true' 2>&1)
 
-if echo "$AX_TEST" | grep -qi "not allowed\|assistive\|accessibility\|access"; then
+if echo "$AX_TEST" | grep -qi "-1743\|not allowed\|assistive\|accessibility\|not authorized"; then
     echo ""
     print_error "$L_AX_PERMISSION_DENIED"
     echo ""
