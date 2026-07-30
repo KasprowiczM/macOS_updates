@@ -28,7 +28,7 @@ MAC_UPDATE_REPO="${MAC_UPDATE_REPO:-https://github.com/KasprowiczM/macOS_updates
 MAC_UPDATE_DIR="${MAC_UPDATE_DIR:-$HOME/Dev_Env/macOS_updates}"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    echo "macOS Updates v1.0.21 — Automated update system (Bash 3.2+ & Python pure-function modules in lib/python/)"
+    echo "macOS Updates v1.0.21 — Automated update system (Bash 3.2+ with a Python 3 backend in dev_sync/ and inline pipeline helpers)"
     echo "Usage: bash install.sh [--help]"
     exit 0
 fi

@@ -521,6 +521,21 @@ i18n/lang_pt.sh 653
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task T5 - Correct install.sh --help architecture claim
+Files: install.sh
+What changed: Updated `install.sh --help` output string to accurately describe the repository's current architecture ("Bash 3.2+ with a Python 3 backend in dev_sync/ and inline pipeline helpers") instead of referencing non-existent `lib/python/`.
+Why: Documentation accuracy
+ACCEPTANCE CHECK command: bash install.sh --help | head -3 ; ls -d lib/python 2>/dev/null || echo "lib/python absent (expected)"
+ACCEPTANCE CHECK output:
+```
+macOS Updates v1.0.21 — Automated update system (Bash 3.2+ with a Python 3 backend in dev_sync/ and inline pipeline helpers)
+Usage: bash install.sh [--help]
+lib/python absent (expected)
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 
