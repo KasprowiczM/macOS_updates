@@ -27,7 +27,7 @@ shellcheck --severity=warning $(find . -name '*.sh' ! -path './.git/*' -print)  
 ## Non-negotiable rules
 
 1. `softwareupdate` install paths **must** include `-R`
-2. `mas upgrade` **must** use `sudo` (CVE-2025-43411)
+2. `mas upgrade` **must** use `sudo` (macOS 15.7.2+/14.8.2+/26.1+ entitlement change, see https://github.com/orgs/Homebrew/discussions/6550)
 3. All `update_*.sh` orchestrators **must** use `set -o pipefail`
 4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests)
 5. Use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"` — no hardcoded user paths

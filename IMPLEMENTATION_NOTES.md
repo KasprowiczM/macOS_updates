@@ -612,6 +612,23 @@ safe
 Tests: TestDevSyncRedact — run_tests.sh: 121 passed
 Deviations: none
 
+## Task T12 - M17: correct mas rationale and version gate
+Files: CLAUDE.md, CONTRIBUTING.md, docs/agents/critical_rules.md, README.md, GEMINI.md, update_appstore.sh
+What changed: Replaced outdated CVE-2025-43411 references across all documentation files with the accurate macOS 15.7.2+/14.8.2+/26.1+ entitlement change rationale (citing Homebrew discussion 6550). Raised `update_appstore.sh` version gate to require `mas >= 4.1` using major and minor version checks. Added `# TODO(M17):` comment at `sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade` invocation.
+Why: Finding M17
+ACCEPTANCE CHECK command: grep -rc 'CVE-2025-43411' CLAUDE.md CONTRIBUTING.md docs/agents/critical_rules.md README.md ; grep -c 'TODO(M17)' update_appstore.sh
+ACCEPTANCE CHECK output:
+```
+CLAUDE.md:0
+CONTRIBUTING.md:0
+docs/agents/critical_rules.md:0
+README.md:0
+1
+```
+Tests: run_tests.sh: 121 passed
+Deviations: none
+
+
 
 
 
