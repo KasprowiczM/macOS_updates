@@ -628,6 +628,27 @@ README.md:0
 Tests: run_tests.sh: 121 passed
 Deviations: none
 
+## Task T13 - Decide on the unrequested PATH change
+Files: update_npm_cli.sh, docs/agents/architecture.md
+What changed: Chose option (b): retained Homebrew paths (`/usr/local/bin`, `/opt/homebrew/bin`) as appended low-priority fallback lookup paths in `expand_node_manager_paths` in `update_npm_cli.sh`, added inline documentation explaining their fallback status, and updated `docs/agents/architecture.md` with an architectural exception note.
+Why: Finding T13
+ACCEPTANCE CHECK command: grep -n -A3 'expand_node_manager_paths' update_npm_cli.sh | head -12
+ACCEPTANCE CHECK output:
+```
+205:expand_node_manager_paths() {
+206-    # Homebrew paths (/usr/local/bin, /opt/homebrew/bin) are appended at the end of PATH as
+207-    # fallback lookup locations for system node managers, without overriding managed toolchain paths.
+208-    local node_dir
+--
+238:    expand_node_manager_paths
+239-    hash -r 2>/dev/null || true
+240-
+241-    profile="$(find_shell_profile)"
+```
+Tests: run_tests.sh: 121 passed
+Deviations: none
+
+
 
 
 

@@ -5,7 +5,7 @@
 - **No hardcoded paths** — always `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`
 - **Apple Silicon + macOS 13+ only** — `lib/platform.sh` exits on non-arm64 or an older system before setup/update mutations
 - **Homebrew prefix:** `/opt/homebrew` (arm64)
-- **Native CLI toolchain:** keep npm global binaries outside Homebrew, under user-space paths managed by `update_npm_cli.sh`
+- **Native CLI toolchain:** keep npm global binaries outside Homebrew, under user-space paths managed by `update_npm_cli.sh` (Note: `/usr/local/bin` and `/opt/homebrew/bin` are appended to `PATH` as low-priority fallback lookup paths for system node managers, without overriding user-space toolchain paths)
 - **Internet-app bundle replacement:** `copy_verified_app` validates bundle ID/signing team, uses a unique session mountpoint, quits the running app, copies with `ditto` to staging, retains the original during the swap, and restores it if post-swap validation fails. Status reporting is honest — `LAUNCHED_UNVERIFIED` / `LAUNCH_FAILED` / `CURRENT` / `UPDATED`, never an unconditional "checked".
 - **Version detection:** `app_version()` reads `CFBundleShortVersionString`, then `CFBundleVersion`, then falls back to `mdls -name kMDItemVersion` (covers iOS/iPadOS apps on Apple Silicon that have no `Contents/Info` plist).
 
