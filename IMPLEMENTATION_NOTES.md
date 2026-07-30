@@ -55,3 +55,10 @@ What changed: Set STATUS_FIREFOX to UNKNOWN_VERSION when application.ini returns
 Why: Findings H13, H14, H15 - Edge-case version parsing and retired appcast URLs caused unhandled errors or broken download URLs.
 Tests: test_task_8_edge_cases_handling (run_tests.sh passed 102 tests)
 Deviations: none
+
+## Task 9 - Add awk fallback to Node version detection in update_npm_cli.sh
+Files: update_npm_cli.sh, tests/test_safety_static.py
+What changed: Added an awk-based fallback JSON parser in detect_latest_node_version if python3 parsing returns empty. Ensured SOFT_FAIL=1 is set if both fail. Added test_detect_latest_node_version_contains_python_and_awk_fallback to test_safety_static.py.
+Why: Finding H5 - Lack of a fallback parser in Node version detection caused false failures in environments where python3 inline execution failed.
+Tests: test_detect_latest_node_version_contains_python_and_awk_fallback (run_tests.sh passed 103 tests)
+Deviations: none

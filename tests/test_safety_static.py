@@ -901,6 +901,14 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('KPX_ARCH="x86_64"', kpx_block)
         self.assertIn('[ "$KPX_UNAME" = "arm64" ] && KPX_ARCH="arm64"', kpx_block)
 
+    def test_detect_latest_node_version_contains_python_and_awk_fallback(self) -> None:
+        """detect_latest_node_version must contain both python3 and awk fallback parser."""
+        text = self.read_script("update_npm_cli.sh")
+        fn_block = text.split("detect_latest_node_version() {")[1].split("install_node_tarball")[0]
+        self.assertIn("python3", fn_block)
+        self.assertIn("awk", fn_block)
+        self.assertIn('SOFT_FAIL=1', fn_block)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
