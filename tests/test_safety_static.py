@@ -876,6 +876,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("L_INTERNET_STATUS_DOWNLOAD_ERROR", soft_block, msg="DOWNLOAD_ERROR must be in soft case")
         self.assertNotIn("L_INTERNET_STATUS_DOWNLOAD_ERROR", hard_block, msg="DOWNLOAD_ERROR must not be in hard case")
 
+    def test_appstore_track2_gui_wrapped_in_timeout(self) -> None:
+        """Track 2 AppleScript GUI invocation must be wrapped in run_with_timeout and set SOFT_FAIL=1 on failure."""
+        text = self.read_script("update_appstore.sh")
+        self.assertIn('run_with_timeout "$GUI_TIMEOUT" osascript', text)
+        self.assertIn("SOFT_FAIL=1", text)
+        self.assertIn("Track 2 (App Store GUI) timed out or failed", text)
+
     def test_leaf_script_behavioural_severity(self) -> None:
         """Behavioural tests exercising leaf orchestrators with mock-PATH tools."""
         with tempfile.TemporaryDirectory() as tmp:
