@@ -6,6 +6,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -197,6 +198,20 @@ class FullVerificationResult:
     content_not_checked: list[str]
 
 
+def _redact(text: str) -> str:
+    if not text:
+        return text
+    # Redact URL credentials: e.g. https://user:pass@host -> https://[REDACTED]@host
+    text = re.sub(r"([a-zA-Z0-9+.-]+://)[^/\s:@]+:[^/\s@]+@", r"\1[REDACTED]@", text)
+    # Redact secret tokens and keys
+    text = re.sub(
+        r"(?i)(_authToken|_auth|Authorization|npm_token|password|token|credentials)\s*[:=]\s*(\S+)",
+        r"\1=[REDACTED]",
+        text,
+    )
+    return text
+
+
 class Logger:
     def __init__(self, repo_root: Path, command_name: str, options: RunOptions):
         self.repo_root = repo_root
@@ -214,7 +229,7 @@ class Logger:
         self._fh.close()
 
     def log(self, message: str, *, always_stdout: bool = True) -> None:
-        line = message.rstrip("\n")
+        line = _redact(message.rstrip("\n"))
         self._fh.write(line + "\n")
         self._fh.flush()
         if always_stdout or self.options.verbose:
@@ -536,10 +551,12 @@ def run_command(
     )
     if check and completed.returncode != 0:
         joined = " ".join(shlex.quote(part) for part in command)
+        redacted_stdout = _redact(completed.stdout)
+        redacted_stderr = _redact(completed.stderr)
         raise DevSyncError(
             f"Command failed ({completed.returncode}): {joined}\n"
-            f"stdout:\n{completed.stdout}\n"
-            f"stderr:\n{completed.stderr}"
+            f"stdout:\n{redacted_stdout}\n"
+            f"stderr:\n{redacted_stderr}"
         )
     return completed
 

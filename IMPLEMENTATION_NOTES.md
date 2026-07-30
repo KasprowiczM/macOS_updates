@@ -597,6 +597,22 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task T11 - M22: redact secrets in dev_sync Python error paths
+Files: dev_sync/dev_sync_core.py, tests/test_safety_static.py
+What changed: Created `_redact()` helper in `dev_sync/dev_sync_core.py` to strip URL credentials and token parameters from text output. Applied `_redact()` in `Logger.log` and `run_command` error paths. Added `TestDevSyncRedact` unit test verifying credential redaction.
+Why: Finding M22
+ACCEPTANCE CHECK command: grep -c '_redact' dev_sync/dev_sync_core.py ; PYTHONPATH=dev_sync python3 -m unittest discover tests 2>&1 | tail -3
+ACCEPTANCE CHECK output:
+```
+4
+
+OK
+safe
+```
+Tests: TestDevSyncRedact — run_tests.sh: 121 passed
+Deviations: none
+
+
 
 
 
