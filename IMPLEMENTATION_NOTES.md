@@ -186,6 +186,19 @@ ACCEPTANCE CHECK output:
 Tests: test_leaf_script_behavioural_severity — run_tests.sh: 115 passed
 Deviations: none
 
+## Task R5 - Make shell-profile edits non-destructive
+Files: update_npm_cli.sh, tests/test_safety_static.py
+What changed: Updated `update_npm_cli.sh` profile helpers (`ensure_line_in_file`, `remove_line_from_file`, `remove_npmrc_prefix`) to resolve target symlinks via `resolve_target_file` before editing, write in-place via `cat "$tmpfile" > "$target"`, and record one timestamped backup per target path per run. Added unit test `test_remove_line_from_file_preserves_symlink` asserting symlink preservation and in-place editing of target contents.
+Why: Finding H11
+ACCEPTANCE CHECK command: grep -n 'mv "$tmpfile"' update_npm_cli.sh || echo "NO MV ONTO PROFILE"
+ACCEPTANCE CHECK output:
+```
+NO MV ONTO PROFILE
+```
+Tests: test_remove_line_from_file_preserves_symlink — run_tests.sh: 116 passed
+Deviations: none
+
+
 
 
 
