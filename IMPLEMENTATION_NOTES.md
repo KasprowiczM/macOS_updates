@@ -668,30 +668,115 @@ ACCEPTANCE CHECK output:
 1
 ```
 
-## Final Deliverables Summary (Tasks T1–T14)
+## Task P1 - Fix the hang (CRITICAL)
+Files: update_all.sh, tests/test_safety_static.py
+What changed:
+- P1a: Saved original stdout/stderr descriptors (`exec 3>&1 4>&2`) before the tee redirection in `update_all.sh`.
+- P1b: Restored original descriptors (`exec 1>&3 2>&4`) in `cleanup_session_dir` after writing diagnostics and JSON summary, right before `wait "$TEE_PID"`, allowing `tee` to receive EOF and exit cleanly without hanging.
+- P1c: Preserved M19 log capture functionality for session-dir snapshots written by the EXIT trap.
+- P1d: Added `test_update_all_does_not_hang_on_tee_wait` regression test in `tests/test_safety_static.py`.
+Why: Task P1 (Fix process deadlock in `update_all.sh` when `wait "$TEE_PID"` runs with open write FDs)
+ACCEPTANCE CHECK command:
+```bash
+bash -n update_all.sh && echo SYNTAX_OK
+grep -n 'exec 3>&1\|exec 1>&3\|TEE_PID' update_all.sh
+cd "$(mktemp -d)" && cp -r "$OLDPWD"/{update_all.sh,VERSION,lib,i18n} . && for s in update_appstore.sh update_npm_cli.sh update_brew.sh update_internet_apps.sh update_system.sh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$s"; chmod +x "$s"; done && MAC_LANG=en timeout 20 bash ./update_all.sh --yes --skip-prescan --skip-postupdate --skip-system >/dev/null 2>&1; echo "EXIT=$?"
+```
+ACCEPTANCE CHECK output:
+```
+SYNTAX_OK
+202:exec 3>&1 4>&2
+204:TEE_PID=$!
+256:    exec 1>&3 2>&4
+257:    [ -n "${TEE_PID:-}" ] && wait "$TEE_PID" 2>/dev/null || true
+EXIT=0
+```
+Tests: run_tests.sh: 127 passed
+Deviations: none
+
+## Task P2 - Get the suite green and honest
+Files: tests/test_safety_static.py
+What changed:
+- P2a: Confirmed `test_degraded_only_exits_zero` passes cleanly after P1.
+- P2b: Refactored `test_leaf_script_behavioural_severity` into 6 separate test methods (`test_leaf_script_severity_brew_doctor_warning`, `test_leaf_script_severity_brew_greedy_cask`, `test_leaf_script_severity_brew_upgrade_fail`, `test_leaf_script_severity_mas_outdated_fail`, `test_leaf_script_severity_npm_offline_curl`, `test_leaf_script_severity_npm_tarball_install_fail`), giving each subprocess call an explicit timeout.
+- P2c: Suite runtime improved and all tests pass deterministically. Total runtime line reported below.
+Why: Task P2
+ACCEPTANCE CHECK command: PYTHONPATH=dev_sync python3 -m unittest discover tests 2>&1 | tail -5
+ACCEPTANCE CHECK output:
+```
+----------------------------------------------------------------------
+Ran 127 tests in 44.905s
+
+OK
+safe
+```
+Tests: 127 tests passed (0 failures, 0 errors)
+Deviations: none
+
+## Task P3 - Two small leftovers
+Files: update_all.sh, IMPLEMENTATION_NOTES.md
+What changed:
+- P3a: Declared `## SKIPPED - R17d` disposition in `IMPLEMENTATION_NOTES.md` explaining why Python helper in `internet_version_relation` was retained.
+- P3b: Updated sudo guard in `update_all.sh` (~line 193) to use string comparison `[ "${MAC_UPDATE_SKIP_SYSTEM:-0}" != "1" ]` instead of arithmetic comparison.
+Why: Task P3
+ACCEPTANCE CHECK command: grep -n 'MAC_UPDATE_SKIP_SYSTEM' update_all.sh | head -3 ; grep -c 'SKIPPED - R17d\|awk' IMPLEMENTATION_NOTES.md
+ACCEPTANCE CHECK output:
+```
+193:if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" != "1" ] && [ -t 0 ]; then
+984:if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" = "1" ]; then
+10
+```
+Tests: run_tests.sh: 127 passed
+Deviations: none
+
+---
+
+## Final Release Deliverables Summary (Tasks P1–P3)
 
 | Task | Title | Finding / Topic | Status | Commit |
 |------|-------|-----------------|--------|--------|
-| **T1** | Add TODO(H5) markers | H5 | Done | `467ba33` |
-| **T2** | Fix tautological Atlas test | T2a | Done | `562ac7b` |
-| **T3** | Deduplicate print_* functions | UI helper cleanup | Done | `d25d6db` |
-| **T4** | Localize last Polish strings | Polish strings / i18n | Done | `8902fa0` |
-| **T5** | Correct install.sh --help text | Architecture docs | Done | `5112add` |
-| **T6** | Surface copy_verified_app failures | Failure diagnostics | Done | `245ef2b` |
-| **T7** | Wait for TEE_PID in cleanup | Log truncation | Done | `b26ca20` |
-| **T8** | Gate version map merge | Inventory logic | Done | `833ef7b` |
-| **T9** | Pre-authenticate sudo | Non-interactive runs | Done | `14a348a` |
-| **T10** | Dynamic Bun version resolution | M21 | Done | `e1d3801` |
-| **T11** | Redact secrets in dev_sync Python | M22 | Done | `7d47b74` |
-| **T12** | Correct mas rationale and gate | M17 | Done | `d78fa23` |
-| **T13** | Document PATH decision | Scope drift decision | Done | `8caa547` |
-| **T14** | Low items remediation | L24–L32 | Done | `32619b9` |
+| **P1** | Fix process deadlock in `update_all.sh` | Critical hang on `wait "$TEE_PID"` | Done | `a0f7890` |
+| **P2** | Get suite green & honest | Test suite refactoring / timeouts | Done | `a0f7890` |
+| **P3** | Two small leftovers | `SKIPPED - R17d` & sudo guard string comparison | Done | `a0f7890` / `407473f` |
 
-### Final Verification Results
-- `bash run_tests.sh`: **121 passed** (0 failures, 0 errors)
-- `gitleaks detect`: **0 secret leaks**
-- `bash -n *.sh`: **All shell scripts parse clean**
-- i18n Key Parity: **653 keys** across all 7 `lang_*.sh` files
+### Final Verification Results & Output
+
+```
+── 1/4  bash -n on all .sh
+  ✅ all bash scripts parse
+── 2/4  python3 -m py_compile on all .py and inline heredocs
+  ✅ all python modules compile
+  ✅ all inline heredoc python blocks compile
+── 3/4  python3 -m unittest discover tests
+...............................................................................................................................
+----------------------------------------------------------------------
+Ran 127 tests in 43.395s
+
+OK
+safe
+  ✅ test suite passed
+── 4/4  scripts/scan_secrets.sh
+── gitleaks detect (tracked git content) ──
+
+9:19PM INF 73 commits scanned.
+9:19PM INF scanned ~1482707 bytes (1.48 MB) in 316ms
+9:19PM INF no leaks found
+  OK gitleaks
+Secret scan passed
+  ✅ secret scan passed
+
+╔══════════════════════════╗
+║   ALL CHECKS PASSED ✅   ║
+╚══════════════════════════╝
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+```
+
+**Tested Shell Version**:
+`GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)`
+
+**Items Deliberately Not Done / Skipped**:
+- `R17d`: Porting `internet_version_relation` in `lib/internet_app_updates.sh` to pure `awk` was skipped per P3a option because the existing Python helper implementation is fully functional, passes all 127 unit tests (including `MauRegressionGuardTests` for prerelease version ordering and exact match semantics), and performance impact of ~20 inline Python invocations per update run is negligible.
+
 
 
 
