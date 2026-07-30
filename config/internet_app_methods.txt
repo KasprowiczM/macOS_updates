@@ -4,7 +4,7 @@
 Google Chrome|keystone|STATUS_CHROME
 Firefox Developer Edition|github_dmg|STATUS_FIREFOX
 Brave Browser|silent_launch|STATUS_BRAVE
-ChatGPT Atlas|github_dmg|STATUS_ATLAS
+ChatGPT Atlas|silent_launch|STATUS_ATLAS
 ChatGPT / Codex|silent_launch|STATUS_CHATGPT
 Claude|silent_launch|STATUS_CLAUDE_APP
 Comet|silent_launch|STATUS_COMET
