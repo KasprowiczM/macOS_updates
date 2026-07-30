@@ -365,6 +365,19 @@ ACCEPTANCE CHECK output:
 Tests: run_tests.sh: 120 passed
 Deviations: none
 
+## Task R19 - Address remaining Low items
+Files: install.sh, scripts/report_update_coverage.sh, update_all.sh
+What changed: Updated `install.sh` to handle `--help` flag with v1.0.21 architecture description. Filtered out nested `.app` bundles deeper than `/Applications/*.app` in `scripts/report_update_coverage.sh` so internal sub-bundles do not bloat coverage stats. Ensured consistent step header error state reporting in `update_all.sh`.
+Why: Findings L1, L3, L4
+ACCEPTANCE CHECK command: bash install.sh --help | grep -i '1\.0\.21' ; git status --porcelain
+ACCEPTANCE CHECK output:
+```
+macOS Updates v1.0.21 — Automated update system (Bash 3.2+ & Python pure-function modules in lib/python/)
+```
+Tests: run_tests.sh: 120 passed
+Deviations: none
+
+
 
 
 

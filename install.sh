@@ -27,6 +27,12 @@ NC='\033[0m'
 MAC_UPDATE_REPO="${MAC_UPDATE_REPO:-https://github.com/KasprowiczM/macOS_updates.git}"
 MAC_UPDATE_DIR="${MAC_UPDATE_DIR:-$HOME/Dev_Env/macOS_updates}"
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    echo "macOS Updates v1.0.21 — Automated update system (Bash 3.2+ & Python pure-function modules in lib/python/)"
+    echo "Usage: bash install.sh [--help]"
+    exit 0
+fi
+
 info()  { echo -e "  ${CYAN}ℹ️  $1${NC}"; }
 ok()    { echo -e "  ${GREEN}✅ $1${NC}"; }
 fail()  { echo -e "  ${RED}❌ $1${NC}"; exit 1; }
