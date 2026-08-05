@@ -1568,6 +1568,25 @@ class StaticShellSafetyTests(unittest.TestCase):
             msg="Settle-loop must read apps from config/internet_app_methods.txt",
         )
 
+    def test_brew_cask_entries_are_validated(self) -> None:
+        """Assert update_internet_apps.sh validates brew_cask config entries against installed casks."""
+        text = self.read_script("update_internet_apps.sh")
+        self.assertIn("L_INTERNET_STATUS_CASK_MISSING", text)
+        self.assertIn("internet_cask_name_for_app", text)
+
+    def test_version_history_is_read_back(self) -> None:
+        """Assert version_history.tsv is read back by internet_get_app_days_unchanged."""
+        text = self.read_script("update_internet_apps.sh")
+        lib_text = (REPO_ROOT / "lib" / "internet_apps.sh").read_text(encoding="utf-8")
+        self.assertIn("version_history.tsv", text)
+        self.assertIn("internet_get_app_days_unchanged", lib_text)
+
+    def test_noninteractive_skips_gui_track(self) -> None:
+        """Assert update_appstore.sh skips GUI track when MAC_UPDATE_NONINTERACTIVE=1."""
+        text = self.read_script("update_appstore.sh")
+        self.assertIn("L_APPSTORE_NONINTERACTIVE_SKIPPED", text)
+        self.assertIn("MAC_UPDATE_NONINTERACTIVE", text)
+
 
 class InternetLibParserTests(unittest.TestCase):
     """Tests for lib/internet_apps.sh, internet_registry.sh, internet_handlers.sh,

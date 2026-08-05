@@ -23,6 +23,107 @@ internet_apps_load_config() {
     return 0
 }
 
+internet_cask_name_for_app() {
+    local app="$1"
+    case "$app" in
+        "Brave Browser")          echo "brave-browser" ;;
+        "Claude")                 echo "claude" ;;
+        "Comet")                  echo "comet" ;;
+        "Perplexity")             echo "perplexity" ;;
+        "Antigravity")            echo "antigravity" ;;
+        "Antigravity IDE")        echo "antigravity-ide" ;;
+        "LM Studio")              echo "lm-studio" ;;
+        "Cursor")                 echo "cursor" ;;
+        "Obsidian")               echo "obsidian" ;;
+        "ProtonVPN")              echo "protonvpn" ;;
+        "Proton Mail")            echo "proton-mail" ;;
+        "zoom.us")                echo "zoom" ;;
+        "MEGAsync")               echo "megasync" ;;
+        "Proton Drive")           echo "proton-drive" ;;
+        "Warp")                   echo "warp" ;;
+        "AppCleaner")             echo "appcleaner" ;;
+        "Spotify")                echo "spotify" ;;
+        "CapCut")                 echo "capcut" ;;
+        "Inkscape")               echo "inkscape" ;;
+        *)                        echo "$app" | tr '[:upper:] ' '[:lower:]-' | sed 's/[^a-z0-9-]//g' ;;
+    esac
+}
+
+internet_get_app_days_unchanged() {
+    local app_name="$1"
+    local history_file="${SCRIPT_DIR}/logs/version_history.tsv"
+    [ -f "$history_file" ] || { echo "0"; return; }
+
+    python3 - "$app_name" "$history_file" <<'PYEOF'
+import sys, datetime
+
+app_target = sys.argv[1]
+tsv_path = sys.argv[2]
+
+entries = []
+try:
+    with open(tsv_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            parts = line.strip().split('\t')
+            if len(parts) >= 3 and parts[1] == app_target:
+                try:
+                    dt = datetime.datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S")
+                    entries.append((dt, parts[2]))
+                except ValueError:
+                    pass
+except Exception:
+    print("0")
+    sys.exit(0)
+
+if not entries:
+    print("0")
+    sys.exit(0)
+
+entries.sort(key=lambda x: x[0])
+latest_ver = entries[-1][1]
+start_dt = entries[-1][0]
+for dt, ver in reversed(entries):
+    if ver == latest_ver:
+        start_dt = dt
+    else:
+        break
+
+days = (datetime.datetime.utcnow() - start_dt).days
+print(max(0, days))
+PYEOF
+}
+
+internet_rotate_version_history() {
+    local history_file="${SCRIPT_DIR}/logs/version_history.tsv"
+    [ -f "$history_file" ] || return 0
+
+    python3 - "$history_file" <<'PYEOF'
+import sys, datetime
+
+tsv_path = sys.argv[1]
+cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=365)
+keep = []
+
+try:
+    with open(tsv_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            parts = line.strip().split('\t')
+            if len(parts) >= 1:
+                try:
+                    dt = datetime.datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S")
+                    if dt >= cutoff:
+                        keep.append(line)
+                except ValueError:
+                    keep.append(line)
+    if len(keep) > 5000:
+        keep = keep[-5000:]
+    with open(tsv_path, 'w', encoding='utf-8') as f:
+        f.writelines(keep)
+except Exception:
+    pass
+PYEOF
+}
+
 internet_app_path() {
     local app_name="$1" candidate bundle_id
     case "$app_name" in

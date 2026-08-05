@@ -28,6 +28,14 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 - **GitHub tags:** strip the leading `v` with `sed 's/^v//'` (never `tr -d 'v'`, which deletes every `v`) before comparing with `app_version()`.
 - **iOS/iPadOS apps on Apple Silicon** (UniFi, WiFiman, …): no `Contents/Info` plist — `app_version()` falls back to `mdls -name kMDItemVersion`.
 
+## 5. Cask Adoption & Validation Requirement
+- **Config `brew_cask` requires live adoption:** Setting `brew_cask` in `config/internet_app_methods.txt` requires executing `brew install --cask --adopt <slug>`.
+- **Validation Interlock:** `update_internet_apps.sh` validates `brew_cask` entries against `brew list --cask --versions` mapped via `internet_cask_name_for_app`. Missing casks produce `L_INTERNET_STATUS_CASK_MISSING` soft warning.
+
+## 6. Internet Handlers & Status Contract
+- Handlers in `lib/internet_handlers.sh` pass status via `INTERNET_LAST_STATUS` global variable.
+- Handlers must NEVER output status constants via `echo` on stdout. Format strings use `internet_msg` helper.
+
 ## 5. Internet app update methods
 
 | Method | Apps |

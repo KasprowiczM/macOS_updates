@@ -15,7 +15,11 @@
 | `update_brew.sh` | `brew upgrade` + cleanup + doctor |
 | `dev_sync/*.sh` | Export/import/verify private files to/from cloud storage |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
-| `scripts/scaffold_internet_app.sh` | Boilerplate for new internet-app handlers |
+| `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
+| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule |
+| `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
+| `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
+| `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 
