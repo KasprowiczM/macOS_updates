@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.21** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13+**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.2.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13+**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -22,6 +22,15 @@ See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 
 ---
 
+## Additional Features & Tooling
+
+- **Touch ID for sudo:** `bash scripts/setup_touchid_sudo.sh` configures per-machine Touch ID sudo authentication (`/etc/pam.d/sudo_local`). Note: per-machine configuration, not tracked in git.
+- **LaunchAgent Scheduling:** `bash scripts/install_launchagent.sh --day 1 --hour 9` installs a weekly background update schedule. *Background runs use non-TTY non-interactive mode (`--non-interactive` / `MAC_UPDATE_NONINTERACTIVE=1`), executing Homebrew, npm CLI, and internet apps while safely skipping interactive App Store and macOS restart steps.*
+- **Environment Flags:** `MAC_UPDATE_NONINTERACTIVE=1` (skip interactive prompts), `MAC_UPDATE_STALE_DAYS=45` (unverified app stale threshold), `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (sudo keep-alive control).
+- **Methods:** `brew_cask` (Homebrew cask adoption with live validation interlock), `sparkle_appcast` (verified Sparkle XML appcast remote version checking).
+
+---
+
 ## What this does
 
 `update_all.sh` runs seven steps:
@@ -31,8 +40,8 @@ See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 | 0 | **Prescan** — discover installed apps → update `APPLICATIONS.md` |
 | 1 | **App Store** — Track 1: `sudo mas upgrade`; Track 2: AppleScript GUI for iPad apps |
 | 2 | **Native CLI + npm** — Node, Bun, global npm CLIs |
-| 3 | **Homebrew** — formulae and casks (`--greedy`) + cleanup and health check |
-| 4 | **Internet apps** — verified direct handlers, vendor CLIs and honest update triggers |
+| 3 | **Homebrew** — formulae and casks (`brew_cask` + downgrade protection) + cleanup and health check |
+| 4 | **Internet apps** — verified direct handlers, `sparkle_appcast`, vendor CLIs and honest update triggers |
 | 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
 | 6 | **macOS (final)** — `softwareupdate -ia -R`; skipped when any earlier step failed |
 

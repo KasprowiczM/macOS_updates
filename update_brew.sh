@@ -32,6 +32,7 @@ mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/lib/ui.sh"
 . "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
+. "$SCRIPT_DIR/lib/internet_apps.sh"
 mac_update_severity_init
 
 cleanup_brew() {
@@ -232,16 +233,40 @@ EOF
     fi
 fi
 
-# ============================================================
-# KROK 4: AKTUALIZACJA CASKS (APLIKACJE GUI)
-# ============================================================
-print_header "$L_BREW_CASKS_UPGRADE"
+# Guard against cask downgrades (when cask formula version < installed app version)
+UPGRADEABLE_CASKS=""
+if [ -n "$OUTDATED_CASKS" ]; then
+    for cask in $(echo "$OUTDATED_CASKS" | awk '{print $1}'); do
+        cask_info=$(brew info --cask "$cask" 2>/dev/null | head -1)
+        cask_ver=$(echo "$cask_info" | awk '{print $3}')
+        cask_app_path="/Applications/$cask.app"
+        if [ ! -d "$cask_app_path" ]; then
+            cask_app_path=$(find "/opt/homebrew/Caskroom/$cask" -maxdepth 3 -name "*.app" 2>/dev/null | head -1)
+        fi
+        if [ -n "$cask_app_path" ] && [ -d "$cask_app_path" ]; then
+            installed_ver=$(app_version "$cask_app_path")
+            if [ -n "$installed_ver" ] && [ -n "$cask_ver" ]; then
+                rel=$(internet_version_relation "$cask_ver" "$installed_ver" 2>/dev/null || echo "same")
+                if [ "$rel" = "older" ]; then
+                    print_warn "$(internet_msg "$L_BREW_CASK_WOULD_DOWNGRADE_FMT" "$cask" "$cask_ver" "$installed_ver")"
+                    SOFT_FAIL=1
+                    continue
+                fi
+            fi
+        fi
+        UPGRADEABLE_CASKS="$UPGRADEABLE_CASKS $cask"
+    done
+fi
 
-if brew upgrade --cask --greedy; then
-    print_ok "$L_BREW_CASKS_OK"
+if [ -n "$UPGRADEABLE_CASKS" ]; then
+    if brew upgrade --cask $UPGRADEABLE_CASKS; then
+        print_ok "$L_BREW_CASKS_OK"
+    else
+        print_warn "$L_BREW_CASKS_WARN"
+        HARD_FAIL=1
+    fi
 else
-    print_warn "$L_BREW_CASKS_WARN"
-    HARD_FAIL=1
+    print_ok "$L_BREW_CASKS_OK"
 fi
 fi
 

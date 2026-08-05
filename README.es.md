@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.21** — Orquestador de actualizaciones de un solo comando para **Macs con Apple Silicon y macOS 13+**. Coordina actualizaciones verificadas y activadores internos informados con honestidad — **solo para software ya instalado**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube a través de [`dev_sync/`](dev_sync/README.md).
+> **v1.2.0** — Orquestador de actualizaciones de un solo comando listo para producción en **Macs con Apple Silicon y macOS 13+**. Coordina actualizaciones verificadas para software instalado. **Multilingüe** (7 idiomas). Capa privada opcional en la nube a través de [`dev_sync/`](dev_sync/README.md).
 
 **Repositorio público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Lanzamiento público: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 

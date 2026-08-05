@@ -1,6 +1,6 @@
 # macOS Updates
 
-Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–26, 7 languages, v**1.1.1**, multi-cloud private overlay via `dev_sync/`.
+Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–26, 7 languages, v**1.2.0**, multi-cloud private overlay via `dev_sync/`.
 
 ## Quick Commands
 

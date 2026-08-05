@@ -1169,7 +1169,10 @@ iu_microsoft_365() {
                     # which is what makes the next re-evaluation possible.
                     MAU_HELD="$(mau_active_office_deferrals)"
                     if [ -n "$MAU_HELD" ]; then
+                        MAU_CH="$(mau_current_channel)"
                         print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_HOLDING_FMT" "$MAU_HELD")"
+                        print_info "$(internet_msg "$L_INTERNET_MAU_CHANNEL_FMT" "$MAU_CH")"
+                        print_info "$L_INTERNET_MAU_CHANNEL_HINT"
                         STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
                     else
                         print_ok "$L_INTERNET_MS_CURRENT"

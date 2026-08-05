@@ -4,6 +4,22 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.2.0] — 2026-08-05
+
+Major reliability, non-interactive background execution, and inventory safety release.
+
+### Fixed
+- **Sudo Pre-Authentication & Background Runs (P1):** Resolved missing sudo pre-authentication for Step 1 (`sudo mas upgrade`). Separated `_needs_sudo` pre-auth logic to check both Step 1 and Step 6. In non-TTY background sessions (launchd/cron), `update_appstore.sh` gracefully skips Track 1 with `$L_APPSTORE_NO_SUDO_SKIPPED` soft status (10) instead of failing.
+- **Inventory Deduplication (P2):** Updated `build_inventory.sh` and prescan script in `update_all.sh` to remove adopted Homebrew casks from GRUPA 3 so they live exclusively in Section 4c. Added static safety test `test_no_app_listed_in_both_group3_and_casks`.
+- **Cask Downgrade Protection (P3):** Added global downgrade guard in `update_brew.sh` using `internet_version_relation`. If Homebrew cask formula version is older than installed app version (e.g. Comet or Proton Mail), upgrade is safely skipped with `L_BREW_CASK_WOULD_DOWNGRADE_FMT` soft warning. Added test `test_brew_upgrade_guards_against_downgrade`.
+- **Microsoft AutoUpdate Channel Diagnostics (P4):** Implemented `mau_current_channel()` helper. When MAU package holdback occurs, `update_internet_apps.sh` reports detected MAU channel (`External`, `Preview`, `Beta`, `Current`) and actionable remediation hints.
+- **Documentation Parity (P5):** Updated all 7 `README*.md` files (`en, pl, de, es, fr, it, pt`) and `docs/agents/exit_codes.md` with Touch ID, launchd non-TTY behaviors, non-interactive flags, and new methods.
+
+### Known Technical Debt
+- **Stage E Refactor:** `lib/internet_app_updates.sh` refactoring deferred to future minor release to preserve verified handler stability.
+
+---
+
 ## [1.1.1] — 2026-08-05
 
 Production-hardening & verification release.
