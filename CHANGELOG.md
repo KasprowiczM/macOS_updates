@@ -4,6 +4,22 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.1.1] — 2026-08-05
+
+Production-hardening & verification release.
+
+### Fixed
+- **Desync & Verification Safety:** Implemented `internet_cask_name_for_app` slug mapping and live Homebrew cask verification check in `update_internet_apps.sh` with `L_INTERNET_STATUS_CASK_MISSING` warning.
+- **Non-Interactive GUI Safety:** Explicitly skip Track 2 App Store GUI automation when `MAC_UPDATE_NONINTERACTIVE=1` or non-TTY session.
+- **Format String Safety:** Replaced raw `printf "$L_..."` with `internet_msg` across `lib/internet_handlers.sh`.
+- **LaunchAgent Argument Hygiene:** Added `--help` and `--day` (1-7) / `--hour` (0-23) range validation in `scripts/install_launchagent.sh`.
+
+### Changed
+- **Sparkle Coverage:** Expanded `sparkle_appcast` to `Remote Desktop Manager` and updated `scripts/report_update_coverage.sh` to classify Sparkle appcasts as verified direct updaters.
+- **Version History & Rotation:** Activated `version_history.tsv` read-back, stale days warning (`MAC_UPDATE_STALE_DAYS`), and automated 365-day rotation.
+
+---
+
 ## [1.1.0] — 2026-08-05
 
 Major automation, verification, and bugfix release.

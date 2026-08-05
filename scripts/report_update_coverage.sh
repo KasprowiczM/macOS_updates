@@ -224,7 +224,7 @@ CLASS_TEXT = {
     },
 }
 
-DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli"}
+DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"}
 TRIGGER_METHODS = {"silent_launch", "mau_fallback_self_update"}
 EXTERNAL_METHODS = {"brew_cask", "appstore_gui"}
 

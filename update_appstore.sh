@@ -278,6 +278,13 @@ fi
 # TRACK 2: App Store GUI automation (iPad apps and others)
 # ============================================================
 print_header "$L_TOR_2_HEADER"
+
+if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ] || [ ! -t 0 ]; then
+    print_info "$L_APPSTORE_NONINTERACTIVE_SKIPPED"
+    print_header "$L_SCRIPT_2_COMPLETE"
+    exit 0
+fi
+
 print_info "$L_TOR_2_IPAD_NOTE"
 print_info "$L_TOR_2_SOLUTION"
 echo ""

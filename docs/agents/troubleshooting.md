@@ -8,6 +8,10 @@
 | macOS update not applied after reboot | `softwareupdate -ia -R` — never `sudo reboot` |
 | macOS step was skipped | An earlier step failed; inspect the summary/log, fix it, then rerun. macOS runs last to avoid rebooting a partial session. |
 | macOS update step exits after declining restart | Rerun and accept the framework-managed restart (`-R`) or use System Settings; never replace it with a plain reboot. |
+| Touch ID for sudo not working | `bash scripts/setup_touchid_sudo.sh` (per-machine setup; survives OS updates) |
+| Sudo prompt during long update_all run | `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (default: keep-alive refreshes sudo every 50s) |
+| LaunchAgent scheduling | `bash scripts/install_launchagent.sh --day 1 --hour 9` |
+| `CASK_MISSING` warning | `config/internet_app_methods.txt` has `brew_cask` but app is not in `brew list --cask`; run `brew install --cask --adopt <slug>` or change method to `silent_launch` |
 | `mas upgrade` fails | `sudo mas upgrade` (CVE-2025-43411) |
 | iPad apps "not allowed" error | System Settings → Privacy → Accessibility → add terminal |
 | Wrong language | Edit `.mac_update_prefs` → `MAC_LANG=en` |

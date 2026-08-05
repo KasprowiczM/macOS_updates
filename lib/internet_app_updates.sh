@@ -1655,7 +1655,7 @@ except Exception:
 }
 
 iu_remote_desktop_manager() {
-    internet_dispatch_silent_launch "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager" "https://devolutions.net/remote-desktop-manager/release-notes/mac/" "$(internet_msg "$L_INTERNET_UPDATE_NOTIFY_LAUNCH" "Remote Desktop Manager")"
+    internet_dispatch_sparkle_appcast "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager"
 }
 
     # ── 34. IPMIVIEW (Supermicro) ────────────────────────────────

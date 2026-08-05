@@ -157,9 +157,9 @@ internet_handler_sparkle_check() {
         local rel
         rel="$(internet_version_relation "$remote_ver" "$local_ver")"
         if [ "$rel" = "newer" ]; then
-            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
         else
-            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
         fi
     fi
 

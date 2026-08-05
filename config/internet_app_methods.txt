@@ -39,7 +39,7 @@ Spotify|brew_cask|STATUS_SPOTIFY
 CapCut|brew_cask|STATUS_CAPCUT
 Ledger Live|github_dmg|STATUS_LEDGER
 Trezor Suite|github_dmg|STATUS_TREZOR
-Remote Desktop Manager|silent_launch|STATUS_RDMANAGER
+Remote Desktop Manager|sparkle_appcast|STATUS_RDMANAGER
 IPMIView|manual|STATUS_IPMIVIEW
 Inkscape|brew_cask|STATUS_INKSCAPE
 DJI Assistant 2|manual|STATUS_DJI

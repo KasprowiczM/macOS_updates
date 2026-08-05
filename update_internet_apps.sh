@@ -551,8 +551,39 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
             done < "$SCRIPT_DIR/config/internet_app_methods.txt"
             printf "%s\t%s\t%s\t%s\n" "$TS" "$_h_app" "$_h_ver" "$_h_method" >> "$HISTORY_FILE"
         done < "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
+        internet_rotate_version_history
     fi
 fi
+
+# ── Stale Days Warning for Unverified Apps ──
+STALE_LIMIT="${MAC_UPDATE_STALE_DAYS:-45}"
+while IFS='|' read -r _s_app _s_meth _s_var; do
+    case "$_s_app" in '#'*|'') continue ;; esac
+    _s_meth="$(echo "$_s_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    _s_var="$(echo "$_s_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [ "$_s_meth" = "silent_launch" ]; then
+        _s_app_name="$(echo "$_s_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        _s_days="$(internet_get_app_days_unchanged "$_s_app_name")"
+        if [ "$_s_days" -gt "$STALE_LIMIT" ]; then
+            eval "${_s_var}=\"\$(internet_msg \"\$L_INTERNET_STALE_WARNING_FMT\" \"$_s_days\" \"$STALE_LIMIT\")\""
+        fi
+    fi
+done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+# ── Validate brew_cask entries exist in Homebrew ──
+_installed_casks="$(brew list --cask --versions 2>/dev/null || true)"
+while IFS='|' read -r _v_app _v_meth _v_var; do
+    case "$_v_app" in '#'*|'') continue ;; esac
+    _v_meth="$(echo "$_v_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    _v_var="$(echo "$_v_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [ "$_v_meth" = "brew_cask" ]; then
+        _v_app_name="$(echo "$_v_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        _v_cask="$(internet_cask_name_for_app "$_v_app_name")"
+        if ! echo "$_installed_casks" | grep -qi "^${_v_cask}[[:space:]]"; then
+            eval "${_v_var}=\"\$L_INTERNET_STATUS_CASK_MISSING\""
+        fi
+    fi
+done < "$SCRIPT_DIR/config/internet_app_methods.txt"
 
 # ============================================================
 # PODSUMOWANIE
@@ -680,6 +711,7 @@ do
         "$L_INTERNET_STATUS_MAU_QUARANTINED"|\
         "$L_INTERNET_STATUS_MAU_OPENED"|\
         "$L_INTERNET_STATUS_UNKNOWN_VERSION"|\
+        "$L_INTERNET_STATUS_CASK_MISSING"|\
         "$L_INTERNET_STATUS_LAUNCH_FAILED")
             INTERNET_SOFT_FAIL=1
             ;;
