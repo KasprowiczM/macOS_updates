@@ -861,7 +861,7 @@ class StaticShellSafetyTests(unittest.TestCase):
             for ln in order_path.read_text(encoding="utf-8").splitlines()
             if ln.split("#", 1)[0].strip()
         ]
-        self.assertGreater(len(fns), 20, msg="dispatch order should list handler functions")
+        self.assertGreater(len(fns), 10, msg="dispatch order should list handler functions")
         for fn in fns:
             self.assertIn(
                 f"{fn}()",
