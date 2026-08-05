@@ -20,10 +20,16 @@ Options:
       --skip-doctor              Skip brew doctor in update_brew.sh
       --treat-appstore-ax-as-warning
                                  Treat App Store exit 2 (Accessibility) as warning
+      --non-interactive          Non-interactive mode (for launchd / cron)
+      --notify                   Send macOS desktop notification on completion
 
 Environment (also set by flags):
   MAC_UPDATE_DRY_RUN=1
   MAC_UPDATE_SKIP_*=1
+  MAC_UPDATE_NO_SUDO_KEEPALIVE=1
+  MAC_UPDATE_NONINTERACTIVE=1
+  MAC_UPDATE_NOTIFY=1
+  MAC_UPDATE_STALE_DAYS=45
 EOF
 }
 
@@ -43,6 +49,8 @@ mac_update_parse_cli() {
             --skip-postupdate) export MAC_UPDATE_SKIP_POSTUPDATE=1 ;;
             --skip-doctor) export MAC_UPDATE_SKIP_DOCTOR=1 ;;
             --treat-appstore-ax-as-warning) export MAC_UPDATE_TREAT_APPSTORE_AX_AS_WARNING=1 ;;
+            --non-interactive) export MAC_UPDATE_NONINTERACTIVE=1; export MAC_UPDATE_YES=1 ;;
+            --notify) export MAC_UPDATE_NOTIFY=1 ;;
             --) shift; break ;;
             -*) echo "Unknown option: $1" >&2; mac_update_cli_usage >&2; exit 2 ;;
             *) break ;;

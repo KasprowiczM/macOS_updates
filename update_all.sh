@@ -189,6 +189,13 @@ fi
 
 print_info "Run log: $LOG_FILE"
 
+# Tip if Touch ID for sudo is not enabled
+if [ -t 0 ] && [ -x "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" ]; then
+    if ! "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" --check >/dev/null 2>&1; then
+        print_info "Tip: Touch ID for sudo is not enabled. Run 'bash scripts/setup_touchid_sudo.sh' for fingerprint sudo."
+    fi
+fi
+
 # Pre-authenticate sudo credentials for step 6 before tee swallows prompt FD
 if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" != "1" ] && [ -t 0 ]; then
     # BUG-4 fix: only suppress stderr for JSON summary mode; interactive users
@@ -1814,5 +1821,15 @@ Duration:     ${MINUTES}m ${DURATION_SECS}s
 EOS
 )
 ui_summary_table "$_ui_summary"
+
+if [ "${MAC_UPDATE_NOTIFY:-0}" = "1" ] || [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ]; then
+    if command -v osascript >/dev/null 2>&1; then
+        _notif_status="SUCCESS"
+        [ "$DEGRADED" -ne 0 ] && _notif_status="WARNINGS"
+        [ "$OVERALL_EXIT" -ne 0 ] && _notif_status="ERRORS"
+        _notif_body="Duration: ${MINUTES}m ${DURATION_SECS}s. Status: ${_notif_status}"
+        osascript -e "display notification \"${_notif_body}\" with title \"macOS Updates\" subtitle \"${_summary_msg}\"" 2>/dev/null || true
+    fi
+fi
 
 exit "$OVERALL_EXIT"
