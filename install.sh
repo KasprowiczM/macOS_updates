@@ -106,6 +106,11 @@ info "$L_INSTALLER_RUNNING_SETUP"
 export MAC_UPDATE_NONINTERACTIVE=1
 bash "$MAC_UPDATE_DIR/setup.sh" || fail "$L_INSTALLER_SETUP_FAILED"
 
+if [ -x "$MAC_UPDATE_DIR/scripts/setup_touchid_sudo.sh" ]; then
+    info "Configuring Touch ID for sudo..."
+    bash "$MAC_UPDATE_DIR/scripts/setup_touchid_sudo.sh" || true
+fi
+
 if [ "${MAC_UPDATE_SKIP_INVENTORY:-0}" != "1" ]; then
     info "$L_INSTALLER_BUILDING_INVENTORY"
     bash "$MAC_UPDATE_DIR/build_inventory.sh" -y || fail "$L_INSTALLER_INVENTORY_FAILED"
