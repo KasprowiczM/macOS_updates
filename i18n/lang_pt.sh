@@ -318,6 +318,7 @@ L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT="⚠️  Atualização disponível: %s �
 L_INTERNET_STATUS_CASK_MISSING="⚠️  A configuração indica brew_cask mas o cask não está instalado"
 L_INTERNET_SPARKLE_FEED_FOUND="Feed Sparkle encontrado: %s"
 L_INTERNET_SPARKLE_FEED_MISSING="Nenhum URL do feed Sparkle encontrado"
+L_INTERNET_NO_FEED_FALLBACK="Sem feed de versões para %s — a depender do atualizador integrado"
 L_INTERNET_UNCHANGED_DAYS_FMT="sem alterações há %d dias"
 L_INTERNET_STALE_WARNING_FMT="⚠️  Sem alterações há %d dias (limite: %d)"
 L_INTERNET_SECTION_BROWSERS="🌐 NAVEGADORES"

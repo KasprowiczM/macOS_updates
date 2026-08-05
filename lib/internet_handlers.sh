@@ -9,6 +9,18 @@
 
 INTERNET_LAST_STATUS=""
 
+# INTERNET_LAST_VERIFIED — 1 only when the handler actually compared a remote
+# feed version against the installed one and wrote a version-bearing status
+# (L_INTERNET_STATUS_CURRENT_FMT / L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT).
+# Anything else (no feed, feed unreachable, unparseable feed) leaves it 0 so a
+# caller can never present an unverified check as verified.
+INTERNET_LAST_VERIFIED=0
+
+# INTERNET_LAST_LAUNCH_OK — 1 when the handler's trailing silent_launch_app
+# succeeded. Lets a caller downgrade an unverified result to the honest
+# "launched (unverified)" / "launch failed" pair without launching twice.
+INTERNET_LAST_LAUNCH_OK=0
+
 internet_handler_app_installed() {
     local app_path="$1"
     [ -n "$app_path" ] && [ -d "$app_path" ]
@@ -21,17 +33,39 @@ internet_handler_silent_launch() {
     local app_path="$4"
     local ver
     ver="$(app_version "$app_path")"
+    INTERNET_LAST_VERIFIED=0
     print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
     if silent_launch_app "$launch_target"; then
+        INTERNET_LAST_LAUNCH_OK=1
         if [ -n "$verify_hint" ]; then
             print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
         fi
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
     else
+        INTERNET_LAST_LAUNCH_OK=0
         print_warn "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display") — failed"
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
     fi
+}
+
+# internet_feed_source — does this bundle expose a machine-readable version
+# feed? Echoes "sparkle" or "electron" and returns 0; returns 1 when neither
+# exists. Read-only: it never fetches, launches, or mutates anything.
+internet_feed_source() {
+    local app_path="$1"
+    local feed_url
+    [ -n "$app_path" ] && [ -d "$app_path" ] || return 1
+    feed_url="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
+    if [ -n "$feed_url" ]; then
+        echo "sparkle"
+        return 0
+    fi
+    if [ -f "$app_path/Contents/Resources/app-update.yml" ]; then
+        echo "electron"
+        return 0
+    fi
+    return 1
 }
 
 internet_handler_manual() {
@@ -68,34 +102,59 @@ internet_handler_fail_scan() {
     return 0
 }
 
-# Google Keystone (Omaha) — Chrome, Google Drive
+# Google Keystone (Omaha) — Chrome and Google Drive ONLY.
+# The agent is a Google-product updater: it reads its own ticket store and does
+# nothing at all for a non-Google bundle. Never register a third-party app as
+# `keystone` — running the agent for it would report a check that never
+# happened (see Comet, fixed 2026-08-05).
+#
+# The status now follows the agent's exit code. It used to be hardcoded to
+# L_INTERNET_STATUS_CHECKED_CLI on every path, so a missing agent or a failed
+# run still printed "✅ Checked via CLI".
 internet_handler_keystone() {
     local app_label="$1"
     local launch_name="$2"
     local verify_hint="$3"
     local keytone_label="$4"
     KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
+    INTERNET_LAST_VERIFIED=0
     if [ -f "$KEYSTONE_AGENT" ]; then
         if [ "$keytone_label" = "drive" ]; then
             print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
         else
             print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
         fi
-        "$KEYSTONE_AGENT" --runMode ondemand 2>/dev/null &
-        sleep 2
-        print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "$app_label")"
+        if run_with_timeout 180 "$KEYSTONE_AGENT" --runMode ondemand >/dev/null 2>&1; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "$app_label")"
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_CHECKED_CLI"
+        else
+            print_warn "$L_INTERNET_STATUS_LAUNCH_FAILED"
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
     else
         print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$launch_name")"
         if silent_launch_app "$launch_name"; then
+            INTERNET_LAST_LAUNCH_OK=1
             if [ -n "$verify_hint" ]; then
                 print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
             fi
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            INTERNET_LAST_LAUNCH_OK=0
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     fi
-    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_CHECKED_CLI"
 }
 
-# Standard silent-launch block with optional extra info line
+# Standard silent-launch block with optional extra info line.
+#
+# Opportunistic verification: an app whose only documented update path is its
+# own updater may still publish a machine-readable version feed (Sparkle
+# SUFeedURL, or electron-updater Contents/Resources/app-update.yml). When one
+# exists this reads it and reports the real comparison; when it does not — or
+# the feed cannot be read — it degrades to the historical launch-and-report
+# behaviour. It NEVER installs or replaces a bundle: the app's own updater
+# still does all the installing.
 internet_dispatch_silent_launch() {
     local header="$1"
     local app_display="$2"
@@ -109,7 +168,25 @@ internet_dispatch_silent_launch() {
         APP_PATH="/Applications/${app_display}.app"
     fi
     if [ -d "$APP_PATH" ]; then
-        internet_handler_silent_launch "$app_display" "$launch_target" "$verify_hint" "$APP_PATH"
+        INTERNET_LAST_VERIFIED=0
+        INTERNET_LAST_LAUNCH_OK=0
+        if internet_feed_source "$APP_PATH" >/dev/null 2>&1; then
+            internet_handler_vendor_latest "$app_display" "$APP_PATH" "$launch_target"
+            if [ "$INTERNET_LAST_VERIFIED" -ne 1 ]; then
+                # A feed exists but yielded no comparable version (unreachable,
+                # or a shape this parser does not understand). Claim only what
+                # actually happened — the launch — so the severity of this step
+                # is unchanged from the pre-verification behaviour.
+                if [ "$INTERNET_LAST_LAUNCH_OK" -eq 1 ]; then
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+                else
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+                fi
+            fi
+        else
+            print_info "$(internet_msg "$L_INTERNET_NO_FEED_FALLBACK" "$app_display")"
+            internet_handler_silent_launch "$app_display" "$launch_target" "$verify_hint" "$APP_PATH"
+        fi
         if [ -n "$extra_info" ]; then
             print_info "$extra_info"
         fi
@@ -126,6 +203,7 @@ internet_handler_sparkle_check() {
     local launch_target="${3:-$app_display}"
 
     local feed_url
+    INTERNET_LAST_VERIFIED=0
     feed_url="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
     if [ -z "$feed_url" ]; then
         print_warn "$L_INTERNET_SPARKLE_FEED_MISSING"
@@ -167,10 +245,15 @@ internet_handler_sparkle_check() {
         else
             INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
         fi
+        INTERNET_LAST_VERIFIED=1
     fi
 
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
-    silent_launch_app "$launch_target" || true
+    if silent_launch_app "$launch_target"; then
+        INTERNET_LAST_LAUNCH_OK=1
+    else
+        INTERNET_LAST_LAUNCH_OK=0
+    fi
 }
 
 internet_dispatch_sparkle_appcast() {
@@ -191,7 +274,10 @@ internet_dispatch_sparkle_appcast() {
     fi
 }
 
-# Vendor latest version verification handler
+# Vendor feed verification handler — the single feed-discovery implementation.
+# Reached from internet_dispatch_silent_launch for any app that turns out to
+# publish a feed (internet_feed_source). It only reads a feed, compares
+# versions and reports; installing stays with the app's own updater.
 internet_handler_vendor_latest() {
     local app_display="$1"
     local app_path="$2"
@@ -200,6 +286,7 @@ internet_handler_vendor_latest() {
 
     local local_ver
     local_ver="$(app_version "$app_path")"
+    INTERNET_LAST_VERIFIED=0
     print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$local_ver")"
 
     local remote_ver=""
@@ -250,28 +337,14 @@ internet_handler_vendor_latest() {
         else
             INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
         fi
+        INTERNET_LAST_VERIFIED=1
     fi
 
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
-    silent_launch_app "$launch_target" || true
-}
-
-internet_dispatch_vendor_latest() {
-    local header="$1"
-    local app_display="$2"
-    local status_var="$3"
-    local launch_target="$4"
-    local feed_url_override="${5:-}"
-    print_header "$header"
-    APP_PATH="$(capture_app_path "$app_display")"
-    if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-        APP_PATH="/Applications/${app_display}.app"
-    fi
-    if [ -d "$APP_PATH" ]; then
-        internet_handler_vendor_latest "$app_display" "$APP_PATH" "$launch_target" "$feed_url_override"
-        internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+    if silent_launch_app "$launch_target"; then
+        INTERNET_LAST_LAUNCH_OK=1
     else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
+        INTERNET_LAST_LAUNCH_OK=0
     fi
 }
 

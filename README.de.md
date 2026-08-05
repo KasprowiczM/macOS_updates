@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.3.0** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–26**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.3.1** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–26**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
 
 **Öffentliches Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -38,7 +38,30 @@ Siehe [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.m
 
 ---
 
-## Funktionen & Umgebungsvariablen in v1.3.0
+## Einrichtung pro Rechner (kommt **nicht** mit `git pull`)
+
+Zwei Dinge liegen außerhalb des Repositorys und müssen daher einmal **auf jedem Mac**
+eingerichtet werden. Klonen oder Pullen auf einem zweiten Rechner bringt sie nicht mit —
+das ist die häufigste Verwechslung in diesem Projekt.
+
+| Schritt | Befehl | Warum nicht in Git |
+|---------|--------|--------------------|
+| Touch ID für `sudo` | `bash scripts/setup_touchid_sudo.sh` | Schreibt `/etc/pam.d/sudo_local` — root-eigene, rechnerlokale Datei |
+| Wöchentlicher Hintergrundlauf | `bash scripts/install_launchagent.sh --day 1 --hour 9` | Schreibt `~/Library/LaunchAgents/…plist` — pro Benutzer und Rechner |
+
+`setup_touchid_sudo.sh` fasst `/etc/sudoers` nie an und gewährt niemals passwortloses `sudo`.
+
+**Der geplante Hintergrundlauf installiert weder macOS- noch App-Store-Updates.** Beide
+erfordern eine Benutzerauthentifizierung — auf Apple Silicon verlangt `softwareupdate`
+Volume-Owner-Anmeldedaten. Führen Sie `bash update_all.sh` interaktiv aus, wenn Sie diese
+Updates einspielen möchten.
+
+**sudo-Kontrakt (v1.3.1):** höchstens eine Abfrage pro Lauf; **nie** ohne steuerndes TTY
+(stattdessen wird `MAC_UPDATE_NO_SUDO=1` exportiert); nie bei `--dry-run`.
+
+---
+
+## Funktionen & Umgebungsvariablen in v1.3.1
 
 - **Touch ID / Sudo Pre-Authorization**: Erkennt Touch ID `pam_tid.so` und hält Sudo-Sitzungen aktiv.
 - **Hintergrund & LaunchAgent Support**: Unterstützt `MAC_UPDATE_NO_SUDO=1` für unbewachte Hintergrundausführungen.

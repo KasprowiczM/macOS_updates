@@ -315,6 +315,7 @@ L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT="⚠️  Dostępna aktualizacja: %s → %
 L_INTERNET_STATUS_CASK_MISSING="⚠️  Config mówi brew_cask, ale cask nie jest zainstalowany"
 L_INTERNET_SPARKLE_FEED_FOUND="Znaleziono kanał Sparkle: %s"
 L_INTERNET_SPARKLE_FEED_MISSING="Brak adresu kanału Sparkle"
+L_INTERNET_NO_FEED_FALLBACK="Brak kanału wersji dla %s — poleganie na wbudowanym updaterze"
 L_INTERNET_UNCHANGED_DAYS_FMT="bez zmian od %d dni"
 L_INTERNET_STALE_WARNING_FMT="⚠️  Bez zmian od %d dni (limit: %d)"
 L_INTERNET_SECTION_BROWSERS="🌐 PRZEGLĄDARKI"

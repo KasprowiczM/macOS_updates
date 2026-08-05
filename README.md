@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.2.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13+**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.3.1** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–26**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -22,12 +22,112 @@ See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 
 ---
 
-## Additional Features & Tooling
+## Per-machine bootstrap (does **not** arrive with `git pull`)
 
-- **Touch ID for sudo:** `bash scripts/setup_touchid_sudo.sh` configures per-machine Touch ID sudo authentication (`/etc/pam.d/sudo_local`). Note: per-machine configuration, not tracked in git.
-- **LaunchAgent Scheduling:** `bash scripts/install_launchagent.sh --day 1 --hour 9` installs a weekly background update schedule. *Background runs use non-TTY non-interactive mode (`--non-interactive` / `MAC_UPDATE_NONINTERACTIVE=1`), executing Homebrew, npm CLI, and internet apps while safely skipping interactive App Store and macOS restart steps.*
-- **Environment Flags:** `MAC_UPDATE_NONINTERACTIVE=1` (skip interactive prompts), `MAC_UPDATE_STALE_DAYS=45` (unverified app stale threshold), `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (sudo keep-alive control).
-- **Methods:** `brew_cask` (Homebrew cask adoption with live validation interlock), `sparkle_appcast` (verified Sparkle XML appcast remote version checking).
+Two things live outside the repository and therefore have to be set up once **on
+every Mac**. Cloning or pulling the repo on a second machine does not bring them
+along — this is the single most common point of confusion in this project.
+
+| Step | Command | Why it cannot be in git |
+|------|---------|-------------------------|
+| Touch ID for `sudo` | `bash scripts/setup_touchid_sudo.sh` | Writes `/etc/pam.d/sudo_local` — a root-owned, machine-local file outside the repo |
+| Weekly background run | `bash scripts/install_launchagent.sh --day 1 --hour 9` | Writes `~/Library/LaunchAgents/com.<user>.macos-updates.plist` — per-user, per-machine |
+
+```bash
+bash scripts/setup_touchid_sudo.sh --check      # report only, writes nothing
+bash scripts/setup_touchid_sudo.sh              # install / repair
+bash scripts/setup_touchid_sudo.sh --uninstall
+
+bash scripts/install_launchagent.sh --check
+bash scripts/install_launchagent.sh --uninstall
+```
+
+`setup_touchid_sudo.sh` never touches `/etc/sudoers` and never grants
+passwordless `sudo`. On macOS 14+ it uses `/etc/pam.d/sudo_local`, which survives
+OS updates; on macOS 13 it patches `/etc/pam.d/sudo`, which macOS updates wipe —
+re-run it after a major upgrade.
+
+### What the scheduled background run does and does not do
+
+The LaunchAgent runs `update_all.sh -y --skip-system` with
+`MAC_UPDATE_NONINTERACTIVE=1` and `MAC_UPDATE_NOTIFY=1`.
+
+- **Runs:** Homebrew, native CLI + npm, internet apps, inventory/history.
+- **Does not run macOS system updates** — `--skip-system` is deliberate. On Apple
+  Silicon `softwareupdate` needs **volume-owner credentials**, which cannot be
+  supplied from an unattended launchd job, and the step may restart the Mac.
+- **Does not run App Store updates** — `sudo mas upgrade` needs a password, and
+  the Track 2 AppleScript path drives the App Store GUI. Both are skipped in a
+  non-TTY session and reported as a soft warning (exit `10`), never as a failure.
+
+Both therefore remain interactive, on purpose. Run `bash update_all.sh` yourself
+when you want App Store and macOS updates applied.
+
+---
+
+## Command-line flags
+
+`lib/cli.sh` is the authoritative list; `bash update_all.sh --help` prints it.
+
+| Flag | Effect |
+|------|--------|
+| `-y`, `--yes` | Skip the confirmation prompt |
+| `-h`, `--help` | Show usage and exit `0` |
+| `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
+| `--json-summary` | Print a JSON result object on stdout after the run |
+| `--non-interactive` | Non-interactive mode for launchd / cron (also implies `-y`) |
+| `--notify` | Post a macOS notification when the run finishes |
+| `--treat-appstore-ax-as-warning` | Treat App Store exit `2` (missing Accessibility) as a warning |
+| `--skip-prescan` | Skip step 0 (`APPLICATIONS.md` prescan) |
+| `--skip-appstore` | Skip step 1 (App Store) |
+| `--skip-npm` | Skip step 2 (native CLI + npm) |
+| `--skip-brew` | Skip step 3 (Homebrew) |
+| `--skip-internet` | Skip step 4 (internet apps) |
+| `--skip-postupdate` | Skip step 5 (`APPLICATIONS.md` / `UPDATES.md` history) |
+| `--skip-system` | Skip step 6 (macOS system update) |
+| `--skip-doctor` | Skip `brew doctor` inside `update_brew.sh` |
+
+An unknown `-…` option exits `2` after printing usage.
+
+## Environment variables
+
+Every flag has an equivalent variable; these are the ones with no flag.
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `MAC_UPDATE_NONINTERACTIVE` | `0` | Never prompt; skips App Store Track 2 GUI automation |
+| `MAC_UPDATE_NOTIFY` | `0` | Desktop notification on completion (also implied by non-interactive) |
+| `MAC_UPDATE_NO_SUDO` | *set automatically* | Exported by `update_all.sh` when there is no TTY; child scripts then skip root-only tracks instead of failing |
+| `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | Set to `1` to disable the background `sudo` timestamp refresher |
+| `MAC_UPDATE_STALE_DAYS` | `45` | Days after which an unverified app is reported as stale |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Run logs retained in `logs/` |
+| `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `10` | Pause that lets a launched vendor updater rewrite `Info.plist` (`0` disables, clamped to 120) |
+| `MAC_UPDATE_MAS_CHECK_TIMEOUT` | `120` | Timeout for `mas outdated` |
+| `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` | `1800` | Timeout for `sudo mas upgrade` |
+| `MAC_UPDATE_MAU_DEFERRAL_DAYS` | `7` | Microsoft AutoUpdate quarantine window (clamped to Microsoft's 1–28) |
+| `MAC_UPDATE_MAU_KEEP_DEFERRALS` | `0` | Set to `1` to make the toolkit never touch MAU deferral preferences |
+| `MAC_UPDATE_LANG` / `MAC_LANG` | from `.mac_update_prefs` | UI language (`en pl es it pt de fr`) |
+
+## sudo and Touch ID — the contract
+
+Rewritten in v1.3.1. `update_all.sh` has **exactly one** interactive `sudo` call
+site, and it is governed by three conditions:
+
+1. **At most once per run.** A single `sudo -v` before the log redirect, then a
+   background keep-alive refreshes the timestamp every 50 s so a long run never
+   prompts a second time. The keep-alive is started at most once and is killed by
+   the cleanup trap on every exit path, including `INT`/`TERM` — it can no longer
+   be orphaned.
+2. **Never without a controlling TTY.** If stdin is not a terminal — IDE task
+   runner, agent shell, launchd, cron — the toolkit does **not** call `sudo -v`.
+   A bare `sudo -v` there escalates to the GUI askpass/Touch ID dialog, which is
+   what made every command appear to demand elevation. Instead
+   `MAC_UPDATE_NO_SUDO=1` is exported, root-only steps are skipped, and the run
+   reports a soft warning.
+3. **Never during `--dry-run`.** A preview must not ask for credentials.
+
+`sudo` is also not requested at all when neither step 1 (App Store) nor step 6
+(macOS) is going to run, e.g. `bash update_all.sh --skip-appstore --skip-system`.
 
 ---
 

@@ -51,7 +51,6 @@ METHOD_LABELS = {
         "appstore_gui": "App Store GUI (iPad app)",
         "manual": "manual only",
         "sparkle_appcast": "Sparkle appcast verified",
-        "vendor_latest": "vendor feed version verified",
     },
     "pl": {
         "keystone": "Google Keystone",
@@ -64,7 +63,6 @@ METHOD_LABELS = {
         "appstore_gui": "GUI App Store (aplikacja iPad)",
         "manual": "wyłącznie ręcznie",
         "sparkle_appcast": "weryfikacja Sparkle appcast",
-        "vendor_latest": "weryfikacja z feedu producenta",
     },
     "de": {
         "keystone": "Google Keystone",
@@ -77,7 +75,6 @@ METHOD_LABELS = {
         "appstore_gui": "App-Store-GUI (iPad-App)",
         "manual": "nur manuell",
         "sparkle_appcast": "Sparkle Appcast verifiziert",
-        "vendor_latest": "Hersteller-Feed verifiziert",
     },
     "fr": {
         "keystone": "Google Keystone",
@@ -90,7 +87,6 @@ METHOD_LABELS = {
         "appstore_gui": "interface App Store (app iPad)",
         "manual": "manuel uniquement",
         "sparkle_appcast": "vérifié par Sparkle appcast",
-        "vendor_latest": "vérifié par flux éditeur",
     },
     "es": {
         "keystone": "Google Keystone",
@@ -103,7 +99,6 @@ METHOD_LABELS = {
         "appstore_gui": "interfaz de App Store (app iPad)",
         "manual": "solo manual",
         "sparkle_appcast": "verificado por Sparkle appcast",
-        "vendor_latest": "verificado por feed del proveedor",
     },
     "it": {
         "keystone": "Google Keystone",
@@ -116,7 +111,6 @@ METHOD_LABELS = {
         "appstore_gui": "GUI App Store (app iPad)",
         "manual": "solo manuale",
         "sparkle_appcast": "verificato da Sparkle appcast",
-        "vendor_latest": "verificato da feed produttore",
     },
     "pt": {
         "keystone": "Google Keystone",
@@ -129,7 +123,6 @@ METHOD_LABELS = {
         "appstore_gui": "interface da App Store (app iPad)",
         "manual": "apenas manual",
         "sparkle_appcast": "verificado por Sparkle appcast",
-        "vendor_latest": "verificado por feed do fabricante",
     },
 }
 
@@ -231,7 +224,11 @@ CLASS_TEXT = {
     },
 }
 
-DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast", "vendor_latest"}
+# Every entry here is claimed as "verified/direct" in the report, so each one
+# must (a) be used by at least one row of config/internet_app_methods.txt and
+# (b) be backed by a handler that performs a real remote check. Guarded by
+# tests/test_safety_static.py::test_direct_methods_are_used_and_verify.
+DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"}
 TRIGGER_METHODS = {"silent_launch", "mau_fallback_self_update"}
 EXTERNAL_METHODS = {"brew_cask", "appstore_gui"}
 

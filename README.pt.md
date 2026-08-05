@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.3.0** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–26**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
+> **v1.3.1** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–26**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
 
 **Repositório público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -38,7 +38,29 @@ O `update_all.sh` executa sete passos:
 
 ---
 
-## Funcionalidades e variáveis de ambiente na v1.3.0
+## Configuração por máquina (**não** chega com `git pull`)
+
+Dois elementos vivem fora do repositório e por isso têm de ser configurados uma vez **em cada
+Mac**. Clonar ou fazer pull numa segunda máquina não os transfere — é a confusão mais comum
+neste projeto.
+
+| Passo | Comando | Porque não pode estar no Git |
+|-------|---------|------------------------------|
+| Touch ID para `sudo` | `bash scripts/setup_touchid_sudo.sh` | Escreve `/etc/pam.d/sudo_local` — ficheiro pertencente ao root, local à máquina |
+| Execução semanal em segundo plano | `bash scripts/install_launchagent.sh --day 1 --hour 9` | Escreve `~/Library/LaunchAgents/…plist` — por utilizador e máquina |
+
+`setup_touchid_sudo.sh` nunca toca em `/etc/sudoers` nem concede `sudo` sem palavra-passe.
+
+**A execução agendada não instala atualizações do macOS nem da App Store.** Ambas exigem
+autenticação do utilizador — em Apple Silicon o `softwareupdate` exige credenciais de
+proprietário do volume. Execute `bash update_all.sh` de forma interativa para as aplicar.
+
+**Contrato do sudo (v1.3.1):** no máximo um pedido por execução; **nunca** sem um TTY de
+controlo (é exportada `MAC_UPDATE_NO_SUDO=1` em vez disso); nunca com `--dry-run`.
+
+---
+
+## Funcionalidades e variáveis de ambiente na v1.3.1
 
 - **Pré-autorização Sudo / Touch ID**: Deteta `pam_tid.so` e mantém a sessão sudo ativa.
 - **Suporte LaunchAgent e Execução em Segundo Plano**: Suporta `MAC_UPDATE_NO_SUDO=1` para execuções não supervisionadas.

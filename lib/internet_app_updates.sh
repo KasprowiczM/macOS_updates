@@ -219,10 +219,14 @@ iu_claude() {
     internet_dispatch_silent_launch "🟣 Claude" "Claude" "STATUS_CLAUDE_APP" "Claude" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
 }
 
+# Comet is Perplexity's Chromium browser and ships its own updater — it is NOT
+# a Google product, so the Google Keystone agent it used to run could never
+# update it. That path still reported "✅ Checked via CLI", which hid a
+# genuinely unverified app. It now goes through the opportunistic
+# silent_launch path: verified when Comet exposes a feed, honestly
+# "⏳ Launched (unverified)" when it does not.
 iu_comet() {
-    print_header "☄️  Comet (Perplexity AI)"
-    internet_handler_keystone "Comet" "Comet" "$L_INTERNET_HINT_COMET" "comet"
-    internet_handler_set_status "STATUS_COMET" "$INTERNET_LAST_STATUS"
+    internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
 }
 
 iu_antigravity() {
