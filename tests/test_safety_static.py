@@ -1498,6 +1498,75 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIsNone(re.search(r"bash\s+.*dev-sync-import", text))
         self.assertIn("build_inventory.sh", text)
         self.assertIn("Never import private overlay on fresh install", text)
+    def test_internet_handlers_do_not_echo_status_in_command_substitution(self) -> None:
+        """BUG-1 regression: internet_handlers.sh must not capture handler output
+        via command substitution — that pollutes the status variable with UI text.
+        """
+        text = (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
+        self.assertNotIn(
+            '="$(internet_handler_',
+            text,
+            msg="Found command substitution capturing internet_handler_* output — "
+            "this causes stdout pollution (BUG-1). Use INTERNET_LAST_STATUS global.",
+        )
+
+    def test_internet_handlers_set_last_status_global(self) -> None:
+        """BUG-1 regression: all status-setting handler functions must use the
+        INTERNET_LAST_STATUS global, never echo status on stdout.
+        """
+        text = (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
+        # Each handler function that sets a status must use the global
+        for fn_name in ("internet_handler_silent_launch", "internet_handler_manual", "internet_handler_keystone"):
+            fn_match = re.search(rf"{fn_name}\(\)\s*\{{(.*?)\n\}}", text, re.DOTALL)
+            self.assertIsNotNone(fn_match, msg=f"{fn_name} not found")
+            body = fn_match.group(1)
+            self.assertIn(
+                "INTERNET_LAST_STATUS=",
+                body,
+                msg=f"{fn_name} must set INTERNET_LAST_STATUS",
+            )
+            # Must not echo any L_INTERNET_STATUS_* constant on stdout
+            for line in body.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("echo ") and "L_INTERNET_STATUS_" in stripped:
+                    self.fail(
+                        f"{fn_name} echoes a status constant on stdout: {stripped!r}"
+                    )
+
+    def test_update_all_has_sudo_keepalive(self) -> None:
+        """BUG-3 regression: update_all.sh must start a sudo keep-alive subprocess
+        and kill it in cleanup_session_dir().
+        """
+        text = self.read_script("update_all.sh")
+        self.assertIn("SUDO_KEEPALIVE_PID", text)
+        self.assertIn("sudo -n true", text)
+        # Must kill in cleanup
+        cleanup_start = text.index("cleanup_session_dir()")
+        cleanup_body = text[cleanup_start:text.index("trap cleanup_session_dir EXIT")]
+        self.assertIn(
+            'kill "$SUDO_KEEPALIVE_PID"',
+            cleanup_body,
+            msg="cleanup_session_dir must kill the sudo keep-alive process",
+        )
+
+    def test_settle_list_generated_from_config(self) -> None:
+        """BUG-2 regression: update_internet_apps.sh must not contain a hardcoded
+        list of 19 STATUS_* variables in the settle-loop — it must read from config.
+        """
+        text = self.read_script("update_internet_apps.sh")
+        # The old hardcoded pattern: for status_var in STATUS_BRAVE STATUS_CLAUDE_APP ...
+        self.assertNotIn(
+            "for status_var in STATUS_",
+            text,
+            msg="Found hardcoded STATUS_* list in settle-loop — must be config-driven",
+        )
+        # Must read from config/internet_app_methods.txt
+        settle_section = text[text.index("Snapshot PO"):]
+        self.assertIn(
+            "internet_app_methods.txt",
+            settle_section,
+            msg="Settle-loop must read apps from config/internet_app_methods.txt",
+        )
 
 
 class InternetLibParserTests(unittest.TestCase):

@@ -191,8 +191,31 @@ print_info "Run log: $LOG_FILE"
 
 # Pre-authenticate sudo credentials for step 6 before tee swallows prompt FD
 if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" != "1" ] && [ -t 0 ]; then
-    if ! sudo -v 2>/dev/null; then
-        print_warn "sudo pre-authentication failed or skipped; step 6 may prompt interactively later."
+    # BUG-4 fix: only suppress stderr for JSON summary mode; interactive users
+    # need to see PAM error messages when sudo fails.
+    if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
+        if ! sudo -v 2>/dev/null; then
+            print_warn "sudo pre-authentication failed or skipped; step 6 may prompt interactively later."
+        fi
+    else
+        if ! sudo -v; then
+            print_warn "sudo pre-authentication failed or skipped; step 6 may prompt interactively later."
+        fi
+    fi
+fi
+
+# BUG-3 fix: keep the sudo timestamp warm for the whole run. Without this, a
+# 15+ minute run outlives the default 5-minute timestamp_timeout and step 6
+# re-prompts. The subprocess self-terminates when sudo -n true fails (e.g.
+# manual sudo -k or process kill).
+# Controlled by: MAC_UPDATE_NO_SUDO_KEEPALIVE=1 to disable.
+SUDO_KEEPALIVE_PID=""
+if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] \
+   && [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" != "1" ] \
+   && [ -t 0 ]; then
+    if sudo -n true 2>/dev/null; then
+        ( while true; do sudo -n true 2>/dev/null || exit; sleep 50; done ) &
+        SUDO_KEEPALIVE_PID=$!
     fi
 fi
 
@@ -204,6 +227,13 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 TEE_PID=$!
 
 cleanup_session_dir() {
+    # Kill sudo keep-alive first (BUG-3 fix) — must run on all exit paths
+    # including INT/TERM to prevent orphaned sudo refresh processes.
+    if [ -n "${SUDO_KEEPALIVE_PID:-}" ]; then
+        kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+        wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+        SUDO_KEEPALIVE_PID=""
+    fi
     if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
         python3 - <<'PYJSON' 2>/dev/null || true
 import json, os
