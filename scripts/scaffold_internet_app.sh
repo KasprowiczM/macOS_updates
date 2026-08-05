@@ -30,16 +30,8 @@ cat <<EOF
 # 3. Add STATUS init in update_internet_apps.sh:
 #    ${STATUS_VAR}="\$L_INTERNET_STATUS_SKIPPED"
 #
-# 4. Implement iu_* handler in lib/internet_app_updates.sh and add to
-#    config/internet_dispatch_order.txt
-#
-# 5. Handler block (edit paths/URLs as needed):
-
-print_header "$APP_NAME"
-APP_PATH="\$(capture_app_path "$APP_NAME")"
-if [ -n "\$APP_PATH" ] && [ -d "\$APP_PATH" ]; then
-    VER=\$(app_version "\$APP_PATH")
-    print_info "\$(internet_msg "\$L_INTERNET_INSTALLED_VERSION" "\$VER")"
+# 4. If method is custom (not generic handler), add iu_* handler to
+#    lib/internet_app_updates.sh and entry to config/internet_dispatch_order.txt
 EOF
 
 case "$METHOD" in
