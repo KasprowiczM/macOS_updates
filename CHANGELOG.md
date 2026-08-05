@@ -4,6 +4,24 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.1.0] — 2026-08-05
+
+Major automation, verification, and bugfix release.
+
+### Fixed
+- **BUG-1 (stdout pollution):** Refactored handler functions in `lib/internet_handlers.sh` to pass status via `INTERNET_LAST_STATUS` global variable instead of stdout `echo`. Prevents UI text from polluting status variables.
+- **BUG-1b & BUG-2 (settle-loop):** Fixed `STATUS_PROTON_MAIL` and `STATUS_PROTON_DRIVE` typos and unblocked settle-loop by dynamically reading `silent_launch` apps from `config/internet_app_methods.txt`.
+- **BUG-3 (sudo keep-alive):** Added background sudo keep-alive process in `update_all.sh` refreshing credentials every 50s, preventing re-authentication prompts during long runs.
+- **BUG-4 (sudo -v stderr):** Only suppress stderr when `MAC_UPDATE_JSON_SUMMARY=1` so interactive PAM messages are visible.
+
+### Added
+- **Homebrew Cask Migration (Faza 2):** Migrated 18 internet applications to Homebrew Cask (`brew install --cask --adopt`), reducing `silent_launch` apps from 24 down to 6.
+- **Sparkle Appcast Verification (Faza 3):** Added `internet_handler_sparkle_check` to query Sparkle `SUFeedURL` directly for remote version verification.
+- **Update Feed Scanner (Faza 3):** Added `scripts/scan_update_feeds.sh` to detect Sparkle/Electron/Keystone frameworks.
+- **Version History TSV (Faza 3):** Automated version tracking in `logs/version_history.tsv` (chmod 600).
+- **Touch ID Onboarding & Verification (Faza 4):** Integrated `scripts/setup_touchid_sudo.sh` into `install.sh` and `update_all.sh`.
+- **LaunchAgent Scheduling (Faza 4):** Added `scripts/install_launchagent.sh` for weekly non-interactive launchd updates with desktop notifications (`osascript`).
+
 ---
 
 ## [1.0.21] — 2026-07-30
