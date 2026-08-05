@@ -118,3 +118,70 @@ internet_dispatch_silent_launch() {
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
     fi
 }
+
+# Sparkle Appcast verification handler
+internet_handler_sparkle_check() {
+    local app_display="$1"
+    local app_path="$2"
+    local launch_target="${3:-$app_display}"
+
+    local feed_url
+    feed_url="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
+    if [ -z "$feed_url" ]; then
+        print_warn "$L_INTERNET_SPARKLE_FEED_MISSING"
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
+        return
+    fi
+    print_info "$(internet_msg "$L_INTERNET_SPARKLE_FEED_FOUND" "$feed_url")"
+
+    local xml
+    xml="$(curl -fsSL --max-time 15 --retry 2 "$feed_url" 2>/dev/null || true)"
+    if [ -z "$xml" ]; then
+        print_warn "$L_INTERNET_STATUS_OFFLINE"
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_OFFLINE"
+        return
+    fi
+
+    local remote_ver
+    remote_ver="$(echo "$xml" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
+    if [ -z "$remote_ver" ]; then
+        remote_ver="$(echo "$xml" | grep -o 'sparkle:version="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
+    fi
+
+    local local_ver
+    local_ver="$(app_version "$app_path")"
+
+    if [ -z "$remote_ver" ]; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+    else
+        local rel
+        rel="$(internet_version_relation "$remote_ver" "$local_ver")"
+        if [ "$rel" = "newer" ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
+        else
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
+        fi
+    fi
+
+    print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
+    silent_launch_app "$launch_target" || true
+}
+
+internet_dispatch_sparkle_appcast() {
+    local header="$1"
+    local app_display="$2"
+    local status_var="$3"
+    local launch_target="$4"
+    print_header "$header"
+    APP_PATH="$(capture_app_path "$app_display")"
+    if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+        APP_PATH="/Applications/${app_display}.app"
+    fi
+    if [ -d "$APP_PATH" ]; then
+        internet_handler_sparkle_check "$app_display" "$APP_PATH" "$launch_target"
+        internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
+    fi
+}
+

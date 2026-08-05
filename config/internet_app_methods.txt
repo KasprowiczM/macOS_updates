@@ -1,10 +1,10 @@
 # Canonical update method per internet app (config/internet_apps.txt order)
 # Format: AppName|method|STATUS_VAR
-# Methods: keystone | github_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual
+# Methods: keystone | github_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual | sparkle_appcast
 Google Chrome|keystone|STATUS_CHROME
 Firefox Developer Edition|github_dmg|STATUS_FIREFOX
 Brave Browser|brew_cask|STATUS_BRAVE
-ChatGPT Atlas|silent_launch|STATUS_ATLAS
+ChatGPT Atlas|sparkle_appcast|STATUS_ATLAS
 ChatGPT / Codex|silent_launch|STATUS_CHATGPT
 Claude|brew_cask|STATUS_CLAUDE_APP
 Comet|brew_cask|STATUS_COMET
