@@ -981,10 +981,10 @@ class StaticShellSafetyTests(unittest.TestCase):
         ff_block = script_text.split("iu_firefox_developer_edition() {")[1].split("iu_")[0]
         self.assertIn('STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"', ff_block)
 
-        # 8b: ChatGPT Atlas uses silent_launch_app
+        # 8b: ChatGPT Atlas uses internet_handler_sparkle_check
         atlas_block = script_text.split("iu_chatgpt_atlas() {")[1].split("iu_")[0]
-        self.assertIn('silent_launch_app "$ATLAS_NAME"', atlas_block)
-        self.assertIn('STATUS_ATLAS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"', atlas_block)
+        self.assertIn('internet_handler_sparkle_check "ChatGPT Atlas"', atlas_block)
+        self.assertIn('STATUS_ATLAS="$INTERNET_LAST_STATUS"', atlas_block)
 
         # 8c: KeePassXC defaults KPX_ARCH safely
         kpx_block = script_text.split("iu_keepassxc() {")[1].split("iu_")[0]
@@ -2041,6 +2041,7 @@ class I18nCompletenessTests(unittest.TestCase):
             "L_INTERNET_STATUS_LAUNCHED_UNVERIFIED",
             "L_INTERNET_STATUS_MANUAL_UPDATE",
             "L_INTERNET_STATUS_SKIPPED",
+            "L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT",
         }
 
         for key in all_status_keys:
