@@ -90,7 +90,7 @@ if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
     HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula || true
     echo ""
     echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
-    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy || true
+    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy-auto-updates || true
     print_info "[DRY-RUN] Would run: brew update, brew upgrade, cleanup, doctor"
     exit 0
 fi
@@ -128,8 +128,8 @@ fi
 
 echo ""
 echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
-if ! OUTDATED_CASKS=$(brew outdated --cask --greedy 2>&1); then
-    print_warn "brew outdated --cask --greedy failed; update state is unknown."
+if ! OUTDATED_CASKS=$(brew outdated --cask --greedy-auto-updates 2>&1); then
+    print_warn "brew outdated --cask --greedy-auto-updates failed; update state is unknown."
     [ -n "$OUTDATED_CASKS" ] && printf '%s\n' "$OUTDATED_CASKS"
     SOFT_FAIL=1
     exit "$(mac_update_severity_exit_code)"
@@ -237,17 +237,46 @@ fi
 UPGRADEABLE_CASKS=""
 if [ -n "$OUTDATED_CASKS" ]; then
     for cask in $(echo "$OUTDATED_CASKS" | awk '{print $1}'); do
-        cask_info=$(brew info --cask "$cask" 2>/dev/null | head -1)
-        cask_ver=$(echo "$cask_info" | awk '{print $3}')
-        cask_app_path="/Applications/$cask.app"
+        cask_json=$(brew info --json=v2 --cask "$cask" 2>/dev/null || true)
+        cask_ver=""
+        cask_app_name=""
+        if [ -n "$cask_json" ]; then
+            parsed=$(python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    c = d["casks"][0]
+    v = c.get("version", "")
+    app = ""
+    for art in c.get("artifacts", []):
+        if isinstance(art, dict) and "app" in art:
+            apps = art["app"]
+            app = apps[0] if isinstance(apps, list) and apps else (apps if isinstance(apps, str) else "")
+            break
+    print(f"{v}|{app}")
+except Exception:
+    pass
+' <<< "$cask_json" 2>/dev/null || true)
+            cask_ver=$(echo "$parsed" | cut -d'|' -f1)
+            cask_app_name=$(echo "$parsed" | cut -d'|' -f2)
+        fi
+
+        cask_app_path=""
+        if [ -n "$cask_app_name" ]; then
+            cask_app_path="/Applications/$cask_app_name"
+        fi
+        if [ -z "$cask_app_path" ] || [ ! -d "$cask_app_path" ]; then
+            cask_app_path="/Applications/$cask.app"
+        fi
         if [ ! -d "$cask_app_path" ]; then
             cask_app_path=$(find "/opt/homebrew/Caskroom/$cask" -maxdepth 3 -name "*.app" 2>/dev/null | head -1)
         fi
+
         if [ -n "$cask_app_path" ] && [ -d "$cask_app_path" ]; then
             installed_ver=$(app_version "$cask_app_path")
             if [ -n "$installed_ver" ] && [ -n "$cask_ver" ]; then
-                rel=$(internet_version_relation "$cask_ver" "$installed_ver" 2>/dev/null || echo "same")
-                if [ "$rel" = "older" ]; then
+                rel=$(internet_version_relation "$installed_ver" "$cask_ver" 2>/dev/null || echo "same")
+                if [ "$rel" = "newer" ]; then
                     print_warn "$(internet_msg "$L_BREW_CASK_WOULD_DOWNGRADE_FMT" "$cask" "$cask_ver" "$installed_ver")"
                     SOFT_FAIL=1
                     continue
@@ -282,8 +311,8 @@ elif [ -n "$REMAINING_FORMULAE" ]; then
     printf '%s\n' "$REMAINING_FORMULAE"
     HARD_FAIL=1
 fi
-if ! REMAINING_CASKS=$(brew outdated --cask --greedy 2>&1 | strip_ansi); then
-    print_warn "Final brew outdated --cask --greedy verification failed."
+if ! REMAINING_CASKS=$(brew outdated --cask --greedy-auto-updates 2>&1 | strip_ansi); then
+    print_warn "Final brew outdated --cask --greedy-auto-updates verification failed."
     [ -n "$REMAINING_CASKS" ] && printf '%s\n' "$REMAINING_CASKS"
     SOFT_FAIL=1
 elif [ -n "$REMAINING_CASKS" ]; then

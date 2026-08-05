@@ -145,7 +145,13 @@ internet_handler_sparkle_check() {
     local remote_ver
     remote_ver="$(echo "$xml" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
     if [ -z "$remote_ver" ]; then
+        remote_ver="$(echo "$xml" | sed -n 's/.*<sparkle:shortVersionString>\([^<]*\)<\/sparkle:shortVersionString>.*/\1/p' | head -1 || true)"
+    fi
+    if [ -z "$remote_ver" ]; then
         remote_ver="$(echo "$xml" | grep -o 'sparkle:version="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
+    fi
+    if [ -z "$remote_ver" ]; then
+        remote_ver="$(echo "$xml" | sed -n 's/.*<sparkle:version>\([^<]*\)<\/sparkle:version>.*/\1/p' | head -1 || true)"
     fi
 
     local local_ver
@@ -179,6 +185,90 @@ internet_dispatch_sparkle_appcast() {
     fi
     if [ -d "$APP_PATH" ]; then
         internet_handler_sparkle_check "$app_display" "$APP_PATH" "$launch_target"
+        internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
+    fi
+}
+
+# Vendor latest version verification handler
+internet_handler_vendor_latest() {
+    local app_display="$1"
+    local app_path="$2"
+    local launch_target="${3:-$app_display}"
+    local feed_url_override="${4:-}"
+
+    local local_ver
+    local_ver="$(app_version "$app_path")"
+    print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$local_ver")"
+
+    local remote_ver=""
+    local feed_url=""
+
+    # 1. Try Sparkle SUFeedURL from Info.plist
+    feed_url="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
+    if [ -n "$feed_url" ]; then
+        internet_handler_sparkle_check "$app_display" "$app_path" "$launch_target"
+        return
+    fi
+
+    # 2. Try electron-updater (Contents/Resources/app-update.yml)
+    local app_update_yml="$app_path/Contents/Resources/app-update.yml"
+    if [ -f "$app_update_yml" ]; then
+        local base_url
+        base_url="$(grep -E '^url:' "$app_update_yml" | head -1 | cut -d':' -f2- | tr -d ' "')"
+        if [ -n "$base_url" ]; then
+            base_url="${base_url%/}"
+            local manifest_yml
+            manifest_yml="$(curl -fsSL --max-time 15 --retry 2 "${base_url}/latest-mac.yml" 2>/dev/null || curl -fsSL --max-time 15 --retry 2 "${base_url}/latest.yml" 2>/dev/null || true)"
+            if [ -n "$manifest_yml" ]; then
+                remote_ver="$(echo "$manifest_yml" | grep -E '^version:' | head -1 | cut -d':' -f2 | tr -d ' "')"
+            fi
+        fi
+    fi
+
+    # 3. Try custom feed_url override
+    if [ -z "$remote_ver" ] && [ -n "$feed_url_override" ]; then
+        local body
+        body="$(curl -fsSL --max-time 15 --retry 2 "$feed_url_override" 2>/dev/null || true)"
+        if [ -n "$body" ]; then
+            remote_ver="$(echo "$body" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
+            [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | sed -n 's/.*<sparkle:shortVersionString>\([^<]*\)<\/sparkle:shortVersionString>.*/\1/p' | head -1 || true)"
+            [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | grep -E '^version:' | head -1 | cut -d':' -f2 | tr -d ' "')"
+            [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | grep -o '"version": "[^"]*"' | head -1 | cut -d'"' -f4 || true)"
+        fi
+    fi
+
+    if [ -z "$remote_ver" ]; then
+        print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+    else
+        local rel
+        rel="$(internet_version_relation "$remote_ver" "$local_ver")"
+        if [ "$rel" = "newer" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
+        else
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
+        fi
+    fi
+
+    print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
+    silent_launch_app "$launch_target" || true
+}
+
+internet_dispatch_vendor_latest() {
+    local header="$1"
+    local app_display="$2"
+    local status_var="$3"
+    local launch_target="$4"
+    local feed_url_override="${5:-}"
+    print_header "$header"
+    APP_PATH="$(capture_app_path "$app_display")"
+    if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+        APP_PATH="/Applications/${app_display}.app"
+    fi
+    if [ -d "$APP_PATH" ]; then
+        internet_handler_vendor_latest "$app_display" "$APP_PATH" "$launch_target" "$feed_url_override"
         internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"

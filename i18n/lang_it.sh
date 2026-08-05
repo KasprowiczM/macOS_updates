@@ -272,6 +272,9 @@ L_SYSTEM_SCRIPT_DONE="✅ SCRIPT 1 COMPLETATO CON SUCCESSO"
 
 # ── update_all.sh — messaggi aggiuntivi ───────────────────────
 L_ALL_RESULT_SKIPPED="saltato"
+L_ALL_SUDO_NO_TTY="Nessun TTY disponibile — sudo non verrà richiesto; i passaggi che richiedono root (App Store, macOS) vengono saltati"
+L_ALL_TOUCHID_HINT="Suggerimento: Touch ID per sudo non è attivo. Esegui 'bash scripts/setup_touchid_sudo.sh' per usare l'impronta digitale."
+L_ALL_SUDO_PREAUTH_FAILED="Preautenticazione sudo fallita o saltata; i passaggi che richiedono root potrebbero non essere eseguiti"
 L_ALL_RESULT_WARN="avvisi"
 L_ALL_SESSION_DIR_MSG="Directory di sessione:"
 L_ALL_STEP0="PASSO 0/6: Scansione applicazioni installate"
@@ -388,6 +391,7 @@ L_INTERNET_MS_INSTALLING_SCOPED_FMT="Installazione aggiornamenti Microsoft (msup
 L_INTERNET_MS_STILL_PENDING="Gli aggiornamenti Microsoft sono ancora in sospeso dopo il passaggio di installazione:"
 L_INTERNET_MS_REGRESSION_FMT="%s: Microsoft offre %s ma %s è installato — quel pacchetto non può essere installato"
 L_INTERNET_MS_REGRESSION_NOTE="Regressione del pacchetto upstream: macOS rifiuta un componente più vecchio dell'app installata. Trattenuto finché Microsoft non corregge il feed."
+L_INTERNET_MS_CHANNEL_DIAG_FMT="Canale Microsoft AutoUpdate: %s (installato: %s, offerto: %s). Soluzione: 1. Allinea canale MAU nelle preferenze, o 2. Reinstalla il pacchetto Office."
 L_INTERNET_MS_DEFERRALS_FOUND_FMT="Trovati differimenti di Microsoft AutoUpdate: %s"
 L_INTERNET_MS_DEFERRALS_KEPT="Mantenimento dei differimenti di Microsoft AutoUpdate (MAC_UPDATE_MAU_KEEP_DEFERRALS=1)"
 L_INTERNET_MS_DEFERRALS_BACKUP_FMT="Preferenze di Microsoft AutoUpdate salvate in: %s"

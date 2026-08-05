@@ -4,6 +4,42 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.3.1] — 2026-08-05
+
+Release v1.3.1 implementing the `vendor_latest` update verification handler, fixing non-TTY sudo acquisition prompts, correcting update coverage metrics, and resolving version detection issues for Claude Desktop and ChatGPT Atlas.
+
+### Added
+- **`vendor_latest` Handler & Feed Support (G1):** Implemented `internet_handler_vendor_latest` in `lib/internet_handlers.sh` to check remote versions via Sparkle appcasts, `app-update.yml`, or feed URL overrides without bundle mutation. Extended `lib/internet_registry.sh` to support optional 4-column `feed_url` format in `config/internet_app_methods.txt`.
+- **System Guard & Behavioral Tests (G1.4):** Added `test_every_config_method_has_a_handler` static test ensuring every config method has a handler implementation, plus behavioral tests `test_vendor_latest_handler_exists_and_sets_status`, `test_vendor_latest_detects_newer_remote`, and `test_vendor_latest_reports_current_when_equal`.
+- **i18n Translations (G1.3):** Added `vendor_latest` labels across all 7 supported languages (`en`, `pl`, `de`, `fr`, `es`, `it`, `pt`) in `scripts/report_update_coverage.sh`.
+
+### Fixed
+- **Non-TTY Sudo Prompt Fix:** Resolved sudo / Touch ID prompts in non-interactive IDE environments in `update_all.sh` by exporting `MAC_UPDATE_NO_SUDO=1` and preventing orphaned keep-alive background processes.
+- **Claude Desktop Path Resolution (G3.1):** Corrected `iu_claude` in `lib/internet_app_updates.sh` from `Claude Desktop` to `Claude` so `app_version` correctly locates `/Applications/Claude.app`.
+- **ChatGPT Atlas Sparkle XML Tag Parser (G3.2):** Enhanced `internet_handler_sparkle_check` in `lib/internet_handlers.sh` to extract versions from XML element tags (`<sparkle:shortVersionString>`) as well as XML attributes.
+- **Coverage Metric Accuracy (G2):** Corrected `scripts/report_update_coverage.sh` to accurately map verified updaters based on active feed availability.
+
+---
+
+## [1.3.0] — 2026-08-05
+
+Production release introducing the `vendor_latest` update method, fixing the cask downgrade guard, eliminating inventory duplication with normalized matching, and enhancing Microsoft AutoUpdate channel diagnostics.
+
+### Added
+- **`vendor_latest` Update Method:** Established `vendor_latest` category for fast-moving applications (Cursor, Warp, Antigravity, Antigravity IDE, Comet, Proton Mail, Proton Drive, Claude Desktop, ChatGPT). Unlinked these 9 apps from Homebrew cask management via `brew uninstall --cask --force` while keeping application bundles in `/Applications` 100% intact.
+- **Behavioral Behavioral Test Suite:** Added behavioral unit tests in `tests/test_safety_static.py` (`test_version_relation_detects_downgrade`, `test_no_app_listed_in_both_group3_and_casks` with normalized matching).
+
+### Fixed
+- **Cask Downgrade Guard Fix (F1):** Fixed dead logic in `update_brew.sh`. Uses `brew info --json=v2 --cask` to accurately parse versions and artifact `.app` paths. Inverted version relation logic (`rel == "newer"`) to reliably block Homebrew cask downgrades when local installed app version is higher than Homebrew cask.
+- **Inventory Deduplication Fix (F3):** Updated `build_inventory.sh` and `scripts/fix_inventory_dedup.py` to remove Homebrew casks from GRUPA 3 using normalized string matching (lowercase, punctuation stripped). Filled `desc` fields for all Homebrew casks from the Homebrew API. Verified 0 normalized overlap between GRUPA 3 and Section 4c.
+- **Greedy Cask Flag Optimization:** Switched `update_brew.sh` cask outdated checks to `--greedy-auto-updates` to eliminate unnecessary 1.4 GB re-downloads for `:latest` casks.
+- **Enhanced MAU Diagnostics (F4):** Enhanced Microsoft AutoUpdate diagnostics to report active channel name (`External`), installed build, offered build, stale history warning (>45 days), and actionable remediation hints across all 7 supported languages.
+
+### Changed
+- **Documentation Parity (F5):** Substantively updated all 5 non-PL/EN `README*.md` files (`de, es, fr, it, pt`) with Touch ID, LaunchAgent background execution, environment variables, update methods, and coverage tables.
+
+---
+
 ## [1.2.0] — 2026-08-05
 
 Major reliability, non-interactive background execution, and inventory safety release.

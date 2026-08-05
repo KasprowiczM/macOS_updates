@@ -189,60 +189,60 @@ fi
 
 print_info "Run log: $LOG_FILE"
 
-# Tip if Touch ID for sudo is not enabled
-if [ -t 0 ] && [ -x "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" ]; then
-    if ! "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" --check >/dev/null 2>&1; then
-        print_info "Tip: Touch ID for sudo is not enabled. Run 'bash scripts/setup_touchid_sudo.sh' for fingerprint sudo."
-    fi
-fi
+# ============================================================
+# SUDO ACQUISITION — single decision point
+# ============================================================
+# Contract (2026-08-05 fix — "IDE prompted for Touch ID on every command"):
+#
+#   Exactly ONE place in this script may call an interactive `sudo`. It runs
+#   at most once per invocation, and ONLY when all of the following hold:
+#     1. a step that genuinely needs root will actually run (step 1 or step 6)
+#     2. this is not a dry run (a preview must never ask for credentials)
+#     3. stdin is a real TTY
+#
+#   Without a TTY we do NOT attempt `sudo -v`. A bare `sudo -v` in a non-TTY
+#   context (IDE task runner, agent shell, launchd) escalates to the GUI
+#   askpass/Touch ID dialog, which is why every command appeared to require
+#   elevation. Instead we export MAC_UPDATE_NO_SUDO=1 so the child scripts
+#   skip their root-only tracks and report soft (10) rather than failing.
+#
+#   Do NOT add a second sudo call anywhere. Do NOT reset SUDO_KEEPALIVE_PID
+#   after the keep-alive has started — that orphans the refresher process and
+#   leaves it running after the script exits.
+SUDO_KEEPALIVE_PID=""
 
-# Pre-authenticate sudo credentials for step 1 and 6 before tee swallows prompt FD
-# Either one alone justifies pre-authentication.
 _needs_sudo=0
 [ "${MAC_UPDATE_SKIP_APPSTORE:-0}" != "1" ] && _needs_sudo=1
 [ "${MAC_UPDATE_SKIP_SYSTEM:-0}"   != "1" ] && _needs_sudo=1
+[ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && _needs_sudo=0
 
-if [ "$_needs_sudo" -eq 1 ]; then
-    if [ -t 0 ]; then
-        if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
-            if ! sudo -v 2>/dev/null; then
-                print_warn "sudo pre-authentication failed or skipped; steps requiring sudo may prompt interactively later."
-            fi
-        else
-            if ! sudo -v; then
-                print_warn "sudo pre-authentication failed or skipped; steps requiring sudo may prompt interactively later."
-            fi
-        fi
-
-        # Background sudo keep-alive process (BUG-3 fix): refreshes timestamp
-        # every 50s so long runs (>15 mins) never prompt interactively mid-run.
-        if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ]; then
-            (
-                while true; do
-                    sudo -n true 2>/dev/null || exit 0
-                    sleep 50
-                done
-            ) &
-            SUDO_KEEPALIVE_PID=$!
-        fi
-    else
-        if ! sudo -v; then
-            print_warn "sudo pre-authentication failed or skipped; step 6 may prompt interactively later."
-        fi
-    fi
+if [ "$_needs_sudo" -eq 1 ] && [ ! -t 0 ]; then
+    # No controlling terminal: never prompt. Tell the children to skip the
+    # root-only tracks instead of failing on a password they cannot supply.
+    export MAC_UPDATE_NO_SUDO=1
+    print_info "$L_ALL_SUDO_NO_TTY"
+    _needs_sudo=0
 fi
 
-# BUG-3 fix: keep the sudo timestamp warm for the whole run. Without this, a
-# 15+ minute run outlives the default 5-minute timestamp_timeout and step 6
-# re-prompts. The subprocess self-terminates when sudo -n true fails (e.g.
-# manual sudo -k or process kill).
-# Controlled by: MAC_UPDATE_NO_SUDO_KEEPALIVE=1 to disable.
-SUDO_KEEPALIVE_PID=""
-if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] \
-   && [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" != "1" ] \
-   && [ -t 0 ]; then
+if [ "$_needs_sudo" -eq 1 ]; then
+    # Touch ID hint only where a prompt can actually appear.
+    if [ -x "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" ] \
+       && ! "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" --check >/dev/null 2>&1; then
+        print_info "$L_ALL_TOUCHID_HINT"
+    fi
+
     if sudo -n true 2>/dev/null; then
-        ( while true; do sudo -n true 2>/dev/null || exit; sleep 50; done ) &
+        : # timestamp already warm — do not prompt again
+    elif [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
+        sudo -v 2>/dev/null || print_warn "$L_ALL_SUDO_PREAUTH_FAILED"
+    else
+        sudo -v || print_warn "$L_ALL_SUDO_PREAUTH_FAILED"
+    fi
+
+    # Keep the timestamp warm for the whole run. Started at most once; the PID
+    # is killed in cleanup_session_dir() on every exit path including INT/TERM.
+    if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] && sudo -n true 2>/dev/null; then
+        ( while true; do sudo -n true 2>/dev/null || exit 0; sleep 50; done ) &
         SUDO_KEEPALIVE_PID=$!
     fi
 fi
@@ -590,14 +590,28 @@ SYSTEM_APP_FRAGMENTS = [
     'Service', 'Daemon', 'XPC', 'Feedback', 'Handler',
 ]
 
+def norm_name(s):
+    return re.sub(r'[-_ .]', '', s.lower().strip())
+
+md_norm_set = set()
+for line in content.splitlines():
+    parts = [p.strip() for p in line.split('|')]
+    if len(parts) >= 2 and parts[1]:
+        clean = re.sub(r'^\*\*(.*?)\*\*$', r'\1', parts[1].strip()).strip()
+        if clean and clean not in ('Nazwa', 'Nazwa aplikacji', 'Pakiet', '---') and not clean.startswith('-'):
+            md_norm_set.add(norm_name(clean))
+            for norm_alias, aliases in APP_ALIASES.items():
+                alias_norms = [norm_name(a) for a in aliases] + [norm_name(norm_alias)]
+                if norm_name(clean) in alias_norms:
+                    md_norm_set.update(alias_norms)
+
 for app in installed_apps:
     # Pomijaj pomocnicze komponenty aplikacji
     if any(frag.lower() in app.lower() for frag in SYSTEM_APP_FRAGMENTS):
         continue
     if app in SKIP_DISCOVERY_APPS:
         continue
-    # Szukaj nazwy apki TYLKO w sekcjach GRUPA 1-3 (nie Homebrew)
-    if not row_exists(grupo_1_3_content, app):
+    if norm_name(app) not in md_norm_set:
         new_apps.append(app)
 
 if new_apps:
@@ -834,7 +848,8 @@ new_apps_file = os.path.join(session_dir, 'new_apps.txt')
 if os.path.exists(new_apps_file):
     with open(new_apps_file) as f:
         new_app_names = [l.strip() for l in f if l.strip()]
-    # Collect names already handled via brew or mas
+    def norm_name(s):
+        return re.sub(r'[-_ .]', '', s.lower().strip())
     handled = set()
     for fname in [new_formula_file, new_cask_file]:
         if os.path.exists(fname):
@@ -842,15 +857,15 @@ if os.path.exists(new_apps_file):
                 for line in f:
                     parts = line.strip().split()
                     if parts:
-                        handled.add(parts[0].lower())
+                        handled.add(norm_name(parts[0]))
     if os.path.exists(new_mas_file):
         with open(new_mas_file) as f:
             for line in f:
                 parts = line.strip().split(None, 1)
                 if len(parts) > 1:
                     name_ver = parts[1].split('(')[0].strip()
-                    handled.add(name_ver.lower())
-    unhandled = [a for a in new_app_names if a.lower() not in handled]
+                    handled.add(norm_name(name_ver))
+    unhandled = [a for a in new_app_names if norm_name(a) not in handled]
     if unhandled:
         new_rows = ''
         for app in unhandled:
@@ -908,24 +923,32 @@ if os.path.exists(new_apps_file):
 # Deduplicate: Remove any apps from GRUPA 3 that are listed in Section 4c (Homebrew Casks)
 casks_4c_match = re.search(r'### 4c\. Casks.*?\n((?:\| [^\n]+\|\n)+)', content, re.DOTALL)
 if casks_4c_match:
+    def norm_name(s):
+        return re.sub(r'[-_ .]', '', s.lower().strip())
     cask_rows = casks_4c_match.group(1).splitlines()
-    cask_names = set()
+    cask_norm_set = set()
     for row in cask_rows:
         parts = [p.strip() for p in row.split('|')]
         if len(parts) >= 2 and parts[1] and parts[1] != 'Pakiet':
-            cask_names.add(parts[1])
-            for norm, aliases in APP_ALIASES.items():
-                if parts[1] in aliases or parts[1] == norm:
-                    cask_names.add(norm)
-                    cask_names.update(aliases)
+            cask_norm_set.add(norm_name(parts[1]))
+            for norm_alias, aliases in APP_ALIASES.items():
+                alias_norms = [norm_name(a) for a in aliases] + [norm_name(norm_alias)]
+                if norm_name(parts[1]) in alias_norms:
+                    cask_norm_set.update(alias_norms)
     
     grupa3_match = re.search(r'(## GRUPA 3.*?\n)(.*?)(?=## GRUPA 4)', content, re.DOTALL)
     if grupa3_match:
         g3_body = grupa3_match.group(2)
-        new_g3_body = g3_body
-        for cname in cask_names:
-            pattern = r'^\|\s*(?:\*\*)?' + re.escape(cname) + r'(?:\*\*)?\s*\|[^\n]*\n?'
-            new_g3_body = re.sub(pattern, '', new_g3_body, flags=re.MULTILINE | re.IGNORECASE)
+        new_g3_lines = []
+        for line in g3_body.splitlines(True):
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) >= 2 and parts[1]:
+                clean_name = re.sub(r'^\*\*(.*?)\*\*$', r'\1', parts[1].strip()).strip()
+                if clean_name not in ('Nazwa', 'Nazwa aplikacji', '---') and not clean_name.startswith('-'):
+                    if norm_name(clean_name) in cask_norm_set:
+                        continue
+            new_g3_lines.append(line)
+        new_g3_body = ''.join(new_g3_lines)
         if new_g3_body != g3_body:
             content = content[:grupa3_match.start(2)] + new_g3_body + content[grupa3_match.end(2):]
             changes_made = True

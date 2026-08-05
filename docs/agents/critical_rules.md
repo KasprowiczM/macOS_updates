@@ -47,7 +47,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 | Vendor self-updater + MAU fallback | Microsoft Teams normally owns its cadence; MAU may recover a failed Teams updater |
 | Docker CLI | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
-| Homebrew cask --greedy | Inkscape |
+| Homebrew cask --greedy-auto-updates | Brave, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
 | Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT Atlas, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian, Ascendo |
 | Hybrid self-update + MAU fallback | Teams (`TEAMS21` is accepted only when surfaced by MAU and is verified by a final `msupdate --list`) |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |

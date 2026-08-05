@@ -247,6 +247,9 @@ L_SYSTEM_SCRIPT_DONE="✅ SCRIPT 1 TERMINÉ AVEC SUCCÈS"
 
 # ── update_all.sh — messages supplémentaires ──────────────────
 L_ALL_RESULT_SKIPPED="ignoré"
+L_ALL_SUDO_NO_TTY="Aucun TTY disponible — sudo ne sera pas demandé ; les étapes nécessitant root (App Store, macOS) sont ignorées"
+L_ALL_TOUCHID_HINT="Astuce : Touch ID pour sudo n'est pas activé. Lancez 'bash scripts/setup_touchid_sudo.sh' pour utiliser votre empreinte digitale."
+L_ALL_SUDO_PREAUTH_FAILED="La préauthentification sudo a échoué ou a été ignorée ; les étapes nécessitant root pourraient ne pas s'exécuter"
 L_ALL_RESULT_WARN="avertissements"
 L_ALL_SESSION_DIR_MSG="Répertoire de session :"
 L_ALL_STEP0="ÉTAPE 0/6 : Analyse des applications installées"
@@ -363,6 +366,7 @@ L_INTERNET_MS_INSTALLING_SCOPED_FMT="Installation des mises à jour Microsoft (m
 L_INTERNET_MS_STILL_PENDING="Les mises à jour Microsoft sont toujours en attente après la passe d'installation :"
 L_INTERNET_MS_REGRESSION_FMT="%s : Microsoft propose %s mais %s est installé — ce paquet ne peut pas être installé"
 L_INTERNET_MS_REGRESSION_NOTE="Régression de paquet en amont : macOS refuse un composant plus ancien que l'application installée. Retenu jusqu'à ce que Microsoft corrige le flux."
+L_INTERNET_MS_CHANNEL_DIAG_FMT="Canal Microsoft AutoUpdate : %s (installé : %s, proposé : %s). Solution : 1. Aligner le canal MAU dans les préférences, ou 2. Réinstaller la suite Office."
 L_INTERNET_MS_DEFERRALS_FOUND_FMT="Report de Microsoft AutoUpdate trouvé : %s"
 L_INTERNET_MS_DEFERRALS_KEPT="Maintien des reports de Microsoft AutoUpdate (MAC_UPDATE_MAU_KEEP_DEFERRALS=1)"
 L_INTERNET_MS_DEFERRALS_BACKUP_FMT="Préférences de Microsoft AutoUpdate sauvegardées dans : %s"
