@@ -1,35 +1,35 @@
 iu_google_chrome
 iu_firefox_developer_edition
-iu_brave_browser
+# Brave Browser — migrated to Homebrew cask 2026-08-05
 iu_chatgpt_atlas
 iu_chatgpt
-iu_claude
-iu_comet
-iu_antigravity
-iu_antigravity_ide
+# Claude — migrated to Homebrew cask 2026-08-05
+# Comet — migrated to Homebrew cask 2026-08-05
+# Antigravity — migrated to Homebrew cask 2026-08-05
+# Antigravity IDE — migrated to Homebrew cask 2026-08-05
 iu_gemini
-iu_lm_studio
-iu_perplexity_desktop
+# LM Studio — migrated to Homebrew cask 2026-08-05
+# Perplexity — migrated to Homebrew cask 2026-08-05
 iu_opencode_desktop
-iu_protonvpn
+# ProtonVPN — migrated to Homebrew cask 2026-08-05
 iu_keepassxc
-iu_proton_mail
-iu_zoom
+# Proton Mail — migrated to Homebrew cask 2026-08-05
+# zoom.us — migrated to Homebrew cask 2026-08-05
 iu_google_drive
-iu_megasync
-iu_proton_drive
+# MEGAsync — migrated to Homebrew cask 2026-08-05
+# Proton Drive — migrated to Homebrew cask 2026-08-05
 iu_microsoft_365
 iu_microsoft_teams
 iu_visual_studio_code
 iu_codeedit
 iu_docker_desktop
-iu_warp
-iu_cursor
+# Warp — migrated to Homebrew cask 2026-08-05
+# Cursor — migrated to Homebrew cask 2026-08-05
 iu_ascendo
-iu_appcleaner
-iu_obsidian
-iu_spotify
-iu_capcut
+# AppCleaner — migrated to Homebrew cask 2026-08-05
+# Obsidian — migrated to Homebrew cask 2026-08-05
+# Spotify — migrated to Homebrew cask 2026-08-05
+# CapCut — migrated to Homebrew cask 2026-08-05
 iu_ledger
 iu_trezor_suite
 iu_remote_desktop_manager

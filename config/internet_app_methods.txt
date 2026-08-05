@@ -3,27 +3,27 @@
 # Methods: keystone | github_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual
 Google Chrome|keystone|STATUS_CHROME
 Firefox Developer Edition|github_dmg|STATUS_FIREFOX
-Brave Browser|silent_launch|STATUS_BRAVE
+Brave Browser|brew_cask|STATUS_BRAVE
 ChatGPT Atlas|silent_launch|STATUS_ATLAS
 ChatGPT / Codex|silent_launch|STATUS_CHATGPT
-Claude|silent_launch|STATUS_CLAUDE_APP
-Comet|silent_launch|STATUS_COMET
+Claude|brew_cask|STATUS_CLAUDE_APP
+Comet|brew_cask|STATUS_COMET
 Gemini|silent_launch|STATUS_GEMINI
-Perplexity|silent_launch|STATUS_PERPLEXITY
-Antigravity|silent_launch|STATUS_ANTIGRAVITY
-Antigravity IDE|silent_launch|STATUS_ANTIGRAVITY_IDE
-LM Studio|silent_launch|STATUS_LMSTUDIO
+Perplexity|brew_cask|STATUS_PERPLEXITY
+Antigravity|brew_cask|STATUS_ANTIGRAVITY
+Antigravity IDE|brew_cask|STATUS_ANTIGRAVITY_IDE
+LM Studio|brew_cask|STATUS_LMSTUDIO
 OpenCode|silent_launch|STATUS_OPENCODE
-Cursor|silent_launch|STATUS_CURSOR
+Cursor|brew_cask|STATUS_CURSOR
 Ascendo|silent_launch|STATUS_ASCENDO
-Obsidian|silent_launch|STATUS_OBSIDIAN
-ProtonVPN|silent_launch|STATUS_PROTONVPN
+Obsidian|brew_cask|STATUS_OBSIDIAN
+ProtonVPN|brew_cask|STATUS_PROTONVPN
 KeePassXC|github_dmg|STATUS_KEEPASSXC
-Proton Mail|silent_launch|STATUS_PROTONMAIL
-zoom.us|silent_launch|STATUS_ZOOM
+Proton Mail|brew_cask|STATUS_PROTONMAIL
+zoom.us|brew_cask|STATUS_ZOOM
 Google Drive|keystone|STATUS_GOOGLEDRIVE
-MEGAsync|silent_launch|STATUS_MEGASYNC
-Proton Drive|silent_launch|STATUS_PROTONDRIVE
+MEGAsync|brew_cask|STATUS_MEGASYNC
+Proton Drive|brew_cask|STATUS_PROTONDRIVE
 Microsoft Excel|msupdate|STATUS_MICROSOFT
 Microsoft Word|msupdate|STATUS_MICROSOFT
 Microsoft Outlook|msupdate|STATUS_MICROSOFT
@@ -31,12 +31,12 @@ Microsoft PowerPoint|msupdate|STATUS_MICROSOFT
 Microsoft OneNote|msupdate|STATUS_MICROSOFT
 Microsoft Teams|mau_fallback_self_update|STATUS_TEAMS
 Visual Studio Code|github_dmg|STATUS_VSCODE
-Warp|silent_launch|STATUS_WARP
+Warp|brew_cask|STATUS_WARP
 CodeEdit|github_dmg|STATUS_CODEEDIT
 Docker Desktop|docker_cli|STATUS_DOCKER
-AppCleaner|silent_launch|STATUS_APPCLEANER
-Spotify|silent_launch|STATUS_SPOTIFY
-CapCut|silent_launch|STATUS_CAPCUT
+AppCleaner|brew_cask|STATUS_APPCLEANER
+Spotify|brew_cask|STATUS_SPOTIFY
+CapCut|brew_cask|STATUS_CAPCUT
 Ledger Live|github_dmg|STATUS_LEDGER
 Trezor Suite|github_dmg|STATUS_TREZOR
 Remote Desktop Manager|silent_launch|STATUS_RDMANAGER
