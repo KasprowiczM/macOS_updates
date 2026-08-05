@@ -185,28 +185,10 @@ iu_brave_browser() {
 
 iu_chatgpt_atlas() {
     print_header "🔵 ChatGPT Atlas"
-    ATLAS_APP=""
-    ATLAS_NAME="ChatGPT Atlas"
-    for apath in "/Applications/ChatGPT Atlas.app" "/Applications/Atlas.app" "/Applications/ChatGPT.app"; do
-        if [ -d "$apath" ]; then
-            if [ "$(defaults read "$apath/Contents/Info" CFBundleIdentifier 2>/dev/null)" = "com.openai.codex" ]; then
-                continue
-            fi
-            ATLAS_APP="$apath"
-            ATLAS_NAME="$(basename "$apath" .app)"
-            break
-        fi
-    done
-    if [ -n "$ATLAS_APP" ]; then
-        VER=$(app_version "$ATLAS_APP")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        if silent_launch_app "$ATLAS_NAME"; then
-            print_info "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$ATLAS_NAME")"
-            STATUS_ATLAS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            print_warn "$L_INTERNET_STATUS_LAUNCH_FAILED"
-            STATUS_ATLAS="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
+    ATLAS_APP="$(internet_app_path "ChatGPT Atlas" 2>/dev/null || true)"
+    if [ -n "$ATLAS_APP" ] && [ -d "$ATLAS_APP" ]; then
+        internet_handler_sparkle_check "ChatGPT Atlas" "$ATLAS_APP" "$(basename "$ATLAS_APP" .app)"
+        STATUS_ATLAS="$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT Atlas")"
         STATUS_ATLAS="$L_INTERNET_STATUS_NO_DESKTOP_APP"

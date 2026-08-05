@@ -529,6 +529,29 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     fi
     capture_internet_app_versions "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
     print_ok "$(internet_msg "$L_INTERNET_SNAPSHOTS_SAVED" "$MAC_UPDATE_SESSION_DIR")"
+
+    # ── Version History Persistence (TSV) ──────────────────────
+    HISTORY_FILE="$SCRIPT_DIR/logs/version_history.tsv"
+    if [ -f "$MAC_UPDATE_SESSION_DIR/internet_after.txt" ]; then
+        mkdir -p "$SCRIPT_DIR/logs"
+        [ -f "$HISTORY_FILE" ] || touch "$HISTORY_FILE"
+        chmod 600 "$HISTORY_FILE" 2>/dev/null || true
+
+        TS="$(date -u +"%Y-%m-%d %H:%M:%S")"
+        while IFS='|' read -r _h_app _h_ver; do
+            [ -n "$_h_app" ] || continue
+            _h_method="unknown"
+            while IFS='|' read -r _m_app _m_meth _; do
+                case "$_m_app" in '#'*|'') continue ;; esac
+                _m_app="$(echo "$_m_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                if [ "$_m_app" = "$_h_app" ]; then
+                    _h_method="$(echo "$_m_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                    break
+                fi
+            done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+            printf "%s\t%s\t%s\t%s\n" "$TS" "$_h_app" "$_h_ver" "$_h_method" >> "$HISTORY_FILE"
+        done < "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
+    fi
 fi
 
 # ============================================================

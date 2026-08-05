@@ -312,6 +312,11 @@ L_INTERNET_STATUS_MAU_MISSING="⚠️  Microsoft AutoUpdate not installed"
 # Static by contract: update_internet_apps.sh matches this string exactly to
 # classify the step as a soft warning. Adding a %s would silently break that.
 L_INTERNET_STATUS_MAU_QUARANTINED="⚠️  Held back — upstream package regression"
+L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT="⚠️  Update available: %s → %s"
+L_INTERNET_SPARKLE_FEED_FOUND="Found Sparkle feed: %s"
+L_INTERNET_SPARKLE_FEED_MISSING="No Sparkle feed URL found"
+L_INTERNET_UNCHANGED_DAYS_FMT="unchanged for %d days"
+L_INTERNET_STALE_WARNING_FMT="⚠️  Unchanged for %d days (limit: %d)"
 L_INTERNET_SECTION_BROWSERS="🌐 BROWSERS"
 L_INTERNET_SECTION_AI="🤖 AI APPLICATIONS"
 L_INTERNET_SECTION_VPN="🛡️  VPN & SECURITY"

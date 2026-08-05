@@ -50,6 +50,7 @@ METHOD_LABELS = {
         "brew_cask": "Homebrew cask",
         "appstore_gui": "App Store GUI (iPad app)",
         "manual": "manual only",
+        "sparkle_appcast": "Sparkle appcast verified",
     },
     "pl": {
         "keystone": "Google Keystone",
@@ -61,6 +62,7 @@ METHOD_LABELS = {
         "brew_cask": "Homebrew cask",
         "appstore_gui": "GUI App Store (aplikacja iPad)",
         "manual": "wyłącznie ręcznie",
+        "sparkle_appcast": "weryfikacja Sparkle appcast",
     },
     "de": {
         "keystone": "Google Keystone",
@@ -72,6 +74,7 @@ METHOD_LABELS = {
         "brew_cask": "Homebrew Cask",
         "appstore_gui": "App-Store-GUI (iPad-App)",
         "manual": "nur manuell",
+        "sparkle_appcast": "Sparkle Appcast verifiziert",
     },
     "fr": {
         "keystone": "Google Keystone",
@@ -83,6 +86,7 @@ METHOD_LABELS = {
         "brew_cask": "Cask Homebrew",
         "appstore_gui": "interface App Store (app iPad)",
         "manual": "manuel uniquement",
+        "sparkle_appcast": "vérifié par Sparkle appcast",
     },
     "es": {
         "keystone": "Google Keystone",
@@ -94,6 +98,7 @@ METHOD_LABELS = {
         "brew_cask": "Cask de Homebrew",
         "appstore_gui": "interfaz de App Store (app iPad)",
         "manual": "solo manual",
+        "sparkle_appcast": "verificado por Sparkle appcast",
     },
     "it": {
         "keystone": "Google Keystone",
@@ -105,6 +110,7 @@ METHOD_LABELS = {
         "brew_cask": "Cask Homebrew",
         "appstore_gui": "GUI App Store (app iPad)",
         "manual": "solo manuale",
+        "sparkle_appcast": "verificato da Sparkle appcast",
     },
     "pt": {
         "keystone": "Google Keystone",
@@ -116,6 +122,7 @@ METHOD_LABELS = {
         "brew_cask": "Cask do Homebrew",
         "appstore_gui": "interface da App Store (app iPad)",
         "manual": "apenas manual",
+        "sparkle_appcast": "verificado por Sparkle appcast",
     },
 }
 
