@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.2.0** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13+**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+> **v1.3.1** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–26**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
 
 **Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Zmiany: [CHANGELOG.md](CHANGELOG.md)
 
@@ -22,12 +22,96 @@ Zobacz [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.
 
 ---
 
-## Dodatkowe funkcje i narzędzia
+## Konfiguracja per-maszyna (**nie** przychodzi z `git pull`)
 
-- **Touch ID dla sudo:** `bash scripts/setup_touchid_sudo.sh` konfiguruje uwierzytelnianie Touch ID dla sudo (`/etc/pam.d/sudo_local`). Konfiguracja per-maszyna.
-- **Harmonogram LaunchAgent:** `bash scripts/install_launchagent.sh --day 1 --hour 9` instaluje cotygodniowy harmonogram aktualizacji w tle. *Uruchomienia w tle używają trybu nieinteraktywnego (`--non-interactive` / `MAC_UPDATE_NONINTERACTIVE=1`), wykonując Homebrew, npm CLI i aplikacje internetowe oraz bezpiecznie pomijając interaktywne kroki App Store i restart macOS.*
-- **Flagi i zmienne:** `MAC_UPDATE_NONINTERACTIVE=1` (pomijanie promptów), `MAC_UPDATE_STALE_DAYS=45` (próg dawności niezweryfikowanych aplikacji), `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (kontrola sudo keep-alive).
-- **Nowe metody:** `brew_cask` (adopcja casków Homebrew z weryfikacją na żywo), `sparkle_appcast` (zdalna weryfikacja wersji z feedów XML Sparkle).
+Dwie rzeczy żyją poza repozytorium i dlatego trzeba je ustawić raz **na każdym
+Macu**. Sklonowanie albo pobranie repo na drugiej maszynie ich nie przeniesie —
+to najczęstsze źródło nieporozumień w tym projekcie.
+
+| Krok | Komenda | Dlaczego nie może być w gicie |
+|------|---------|-------------------------------|
+| Touch ID dla `sudo` | `bash scripts/setup_touchid_sudo.sh` | Zapisuje `/etc/pam.d/sudo_local` — plik należący do roota, lokalny dla maszyny, poza repozytorium |
+| Cotygodniowy run w tle | `bash scripts/install_launchagent.sh --day 1 --hour 9` | Zapisuje `~/Library/LaunchAgents/com.<user>.macos-updates.plist` — per-użytkownik, per-maszyna |
+
+```bash
+bash scripts/setup_touchid_sudo.sh --check      # tylko raport, nic nie zapisuje
+bash scripts/setup_touchid_sudo.sh              # instalacja / naprawa
+bash scripts/setup_touchid_sudo.sh --uninstall
+
+bash scripts/install_launchagent.sh --check
+bash scripts/install_launchagent.sh --uninstall
+```
+
+`setup_touchid_sudo.sh` nigdy nie dotyka `/etc/sudoers` i nigdy nie nadaje `sudo`
+bez hasła. Na macOS 14+ używa `/etc/pam.d/sudo_local`, który przeżywa
+aktualizacje systemu; na macOS 13 patchuje `/etc/pam.d/sudo`, który aktualizacje
+macOS nadpisują — uruchom skrypt ponownie po dużej aktualizacji.
+
+### Co run w tle robi, a czego nie robi
+
+LaunchAgent uruchamia `update_all.sh -y --skip-system` ze zmiennymi
+`MAC_UPDATE_NONINTERACTIVE=1` i `MAC_UPDATE_NOTIFY=1`.
+
+- **Wykonuje:** Homebrew, natywne CLI + npm, aplikacje internetowe, inwentarz i historię.
+- **Nie aktualizuje systemu macOS** — `--skip-system` jest celowe. Na Apple Silicon
+  `softwareupdate` wymaga **poświadczeń właściciela woluminu**, których nie da się
+  podać z zadania launchd, a krok może zrestartować Maca.
+- **Nie aktualizuje App Store** — `sudo mas upgrade` wymaga hasła, a ścieżka TOR 2
+  steruje interfejsem App Store przez AppleScript. Oba są pomijane w sesji bez TTY
+  i raportowane jako ostrzeżenie miękkie (kod `10`), nigdy jako błąd.
+
+Oba pozostają więc interaktywne — celowo. Uruchom `bash update_all.sh` ręcznie,
+gdy chcesz zainstalować aktualizacje App Store i macOS.
+
+---
+
+## sudo i Touch ID — kontrakt
+
+Przepisany w v1.3.1. `update_all.sh` ma **dokładnie jedno** miejsce wywołania
+interaktywnego `sudo`, obwarowane trzema warunkami:
+
+1. **Najwyżej raz na uruchomienie.** Pojedyncze `sudo -v` przed przekierowaniem
+   logu, potem proces w tle odświeża znacznik co 50 s, więc długi run nigdy nie
+   pyta drugi raz. Keep-alive startuje najwyżej raz i jest ubijany przez pułapkę
+   sprzątającą na każdej ścieżce wyjścia, łącznie z `INT`/`TERM` — nie może już
+   zostać osierocony.
+2. **Nigdy bez terminala sterującego.** Jeśli `stdin` nie jest terminalem — task
+   runner IDE, powłoka agenta, launchd, cron — skrypt **nie** wywołuje `sudo -v`.
+   Gołe `sudo -v` bez TTY eskaluje do graficznego okna askpass / Touch ID; to był
+   powód, dla którego każda komenda uruchamiana z IDE wyglądała na wymagającą
+   podniesienia uprawnień. Zamiast tego eksportowana jest zmienna
+   `MAC_UPDATE_NO_SUDO=1`, a kroki wymagające roota są pomijane i raportowane
+   miękko.
+3. **Nigdy przy `--dry-run`.** Podgląd nie prosi o poświadczenia.
+
+Jeżeli `sudo` nadal pyta o hasło zamiast o palec, sprawdź
+[docs/agents/troubleshooting.md](docs/agents/troubleshooting.md) — sekcja Touch ID.
+
+---
+
+## Metody aktualizacji
+
+| Metoda | Weryfikacja wersji zdalnej | Zastosowanie |
+|--------|---------------------------|--------------|
+| `github_dmg` | ✅ pełna, z weryfikacją podpisu i Team ID | Firefox Dev, KeePassXC, VS Code, CodeEdit, Ledger, Trezor |
+| `sparkle_appcast` | ✅ z appcastu Sparkle | ChatGPT Atlas, Proton Drive, Remote Desktop Manager |
+| `brew_cask` | ✅ przez Homebrew, z zabezpieczeniem przed cofnięciem wersji | Brave, Obsidian, Spotify, ProtonVPN, zoom i inne |
+| `msupdate` | ✅ przez Microsoft AutoUpdate | Word, Excel, PowerPoint, Outlook, OneNote |
+| `docker_cli` | ✅ przez `docker desktop update` | Docker Desktop |
+| `keystone` | ⚠️ wyzwalacz Google Omaha | wyłącznie Google Chrome i Google Drive |
+| `silent_launch` | ⚠️ oportunistyczna — patrz niżej | aplikacje z własnym updaterem |
+| `appstore_gui` | ⚠️ AppleScript | aplikacje iPadOS na Apple Silicon |
+| `manual` | ❌ brak | IPMIView, DJI Assistant 2 |
+
+**Oportunistyczna weryfikacja (`silent_launch`):** aplikacja, której jedyną
+udokumentowaną drogą aktualizacji jest własny updater, może mimo to publikować
+maszynowo czytelny feed wersji. Skrypt najpierw szuka `SUFeedURL` w `Info.plist`
+(Sparkle), potem `Contents/Resources/app-update.yml` (electron-updater). Gdy feed
+odpowie — raportuje prawdziwe porównanie (`✅ Aktualny (x)` /
+`⚠️ Dostępna aktualizacja: x → y`). Gdy feedu nie ma albo nie da się go sparsować
+— schodzi do uczciwego `⏳ Uruchomiony (niezweryfikowany)` zamiast twierdzić, że
+sprawdził coś, czego nie sprawdził. **Weryfikacja nigdy nie podmienia aplikacji** —
+instalacją nadal zajmuje się updater producenta.
 
 ---
 

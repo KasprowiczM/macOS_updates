@@ -28,7 +28,8 @@ Load only when relevant to your task:
 
 - @docs/agents/scripts.md — script list, update_all.sh step order, migration_setup.sh phases 0a-16, dev sync commands, new Mac setup, adding internet apps
 - @docs/agents/architecture.md — Bash 3.2 constraints, session dir, Python inline heredocs, i18n, Homebrew prefix detection, cloud sync
-- @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (CVE-2025-43411), App Store two-track, version detection, update methods per app, APPLICATIONS.md structure
+- @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (macOS 15.7.2+/14.8.2+/26.1+ entitlement change), App Store two-track, version detection, update methods per app, APPLICATIONS.md structure
+- @docs/agents/exit_codes.md — the 0 / 10 / 1 severity contract and which failures defer the macOS system update
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
 - @docs/agents/mcp_setup.md — MCP server absolute path requirement, PATH env fix
 - @docs/agents/handoff.md — how to create handoff files between sessions
@@ -42,10 +43,13 @@ Load only when relevant to your task:
 ## Non-Negotiable Rules
 
 1. **`softwareupdate` MUST have `-R`** — without it, macOS updates download but never apply.
-2. **`mas upgrade` MUST have `sudo`** — CVE-2025-43411 (Sequoia).
+2. **`mas upgrade` MUST have `sudo`** — macOS 15.7.2+/14.8.2+/26.1+ entitlement change (https://github.com/orgs/Homebrew/discussions/6550).
 3. **Bash 3.2 only** — no `declare -A`, `mapfile`, `readarray`.
 4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests); `dev_sync/` and `scripts/fix_mcp_configs.py` are the existing Python backend/tools.
 5. **No hardcoded paths** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`.
+6. **All `update_*.sh` orchestrators must `set -o pipefail`** — and must **not** `set -e`; the orchestrator has to run every step even on partial failure.
+7. **A config method name is only valid if a handler exists** — every method in `config/internet_app_methods.txt` needs an `internet_handler_*` / `iu_*` implementation. `tests/test_safety_static.py` enforces this.
+8. **Never call interactive `sudo` without a TTY** — see `docs/agents/critical_rules.md`.
 
 ---
 

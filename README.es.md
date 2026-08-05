@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.3.0** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–26**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
+> **v1.3.1** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–26**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
 
 **Repositorio público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -38,7 +38,29 @@ Consulte [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTAL
 
 ---
 
-## Características y variables de entorno en v1.3.0
+## Configuración por equipo (**no** llega con `git pull`)
+
+Dos elementos viven fuera del repositorio y por tanto deben configurarse una vez **en cada
+Mac**. Clonar o hacer pull en una segunda máquina no los traslada — es la confusión más
+frecuente en este proyecto.
+
+| Paso | Comando | Por qué no puede estar en Git |
+|------|---------|-------------------------------|
+| Touch ID para `sudo` | `bash scripts/setup_touchid_sudo.sh` | Escribe `/etc/pam.d/sudo_local` — archivo propiedad de root, local al equipo |
+| Ejecución semanal en segundo plano | `bash scripts/install_launchagent.sh --day 1 --hour 9` | Escribe `~/Library/LaunchAgents/…plist` — por usuario y equipo |
+
+`setup_touchid_sudo.sh` nunca toca `/etc/sudoers` ni concede `sudo` sin contraseña.
+
+**La ejecución programada no instala actualizaciones de macOS ni de la App Store.** Ambas
+requieren autenticación del usuario — en Apple Silicon `softwareupdate` exige credenciales
+de propietario del volumen. Ejecute `bash update_all.sh` de forma interactiva para aplicarlas.
+
+**Contrato de sudo (v1.3.1):** como máximo una solicitud por ejecución; **nunca** sin un TTY
+de control (en su lugar se exporta `MAC_UPDATE_NO_SUDO=1`); nunca con `--dry-run`.
+
+---
+
+## Características y variables de entorno en v1.3.1
 
 - **Preautorización Sudo / Touch ID**: Detecta `pam_tid.so` y mantiene viva la sesión de sudo.
 - **Soporte para LaunchAgent y tareas en segundo plano**: Admite `MAC_UPDATE_NO_SUDO=1` para ejecuciones desatendidas.

@@ -1,13 +1,17 @@
 # Canonical update method per internet app (config/internet_apps.txt order)
 # Format: AppName|method|STATUS_VAR[|feed_url]
-# Methods: keystone | github_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual | sparkle_appcast | vendor_latest
+# Methods: keystone | github_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual | sparkle_appcast
+# keystone is for Google products ONLY (the agent updates nothing else).
+# silent_launch opportunistically verifies against a Sparkle/electron-updater
+# feed when the bundle exposes one, and reports "launched (unverified)" when it
+# does not — there is no separate vendor_latest method.
 Google Chrome|keystone|STATUS_CHROME
 Firefox Developer Edition|github_dmg|STATUS_FIREFOX
 Brave Browser|brew_cask|STATUS_BRAVE
 ChatGPT Atlas|sparkle_appcast|STATUS_ATLAS
 ChatGPT / Codex|silent_launch|STATUS_CHATGPT
 Claude|silent_launch|STATUS_CLAUDE_APP
-Comet|keystone|STATUS_COMET
+Comet|silent_launch|STATUS_COMET
 Gemini|silent_launch|STATUS_GEMINI
 Perplexity|brew_cask|STATUS_PERPLEXITY
 Antigravity|silent_launch|STATUS_ANTIGRAVITY

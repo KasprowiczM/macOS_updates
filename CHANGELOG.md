@@ -6,18 +6,70 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [1.3.1] — 2026-08-05
 
-Release v1.3.1 implementing the `vendor_latest` update verification handler, fixing non-TTY sudo acquisition prompts, correcting update coverage metrics, and resolving version detection issues for Claude Desktop and ChatGPT Atlas.
+Production release. Closes the verification gap for self-updating applications, removes
+two classes of false reporting, and makes unattended and IDE-hosted runs stop asking for
+credentials they do not need.
 
 ### Added
-- **`vendor_latest` Handler & Feed Support (G1):** Implemented `internet_handler_vendor_latest` in `lib/internet_handlers.sh` to check remote versions via Sparkle appcasts, `app-update.yml`, or feed URL overrides without bundle mutation. Extended `lib/internet_registry.sh` to support optional 4-column `feed_url` format in `config/internet_app_methods.txt`.
-- **System Guard & Behavioral Tests (G1.4):** Added `test_every_config_method_has_a_handler` static test ensuring every config method has a handler implementation, plus behavioral tests `test_vendor_latest_handler_exists_and_sets_status`, `test_vendor_latest_detects_newer_remote`, and `test_vendor_latest_reports_current_when_equal`.
-- **i18n Translations (G1.3):** Added `vendor_latest` labels across all 7 supported languages (`en`, `pl`, `de`, `fr`, `es`, `it`, `pt`) in `scripts/report_update_coverage.sh`.
+
+- **Opportunistic feed verification for self-updating apps.** An app whose only documented
+  update path is its own updater may still publish a machine-readable version feed. The
+  `silent_launch` dispatcher now probes for one — Sparkle `SUFeedURL` in `Info.plist`, then
+  electron-updater `Contents/Resources/app-update.yml` — and when a feed answers, reports a
+  real comparison (`Up to date (x)` / `Update available: x → y`) instead of
+  `Launched (unverified)`. When no feed exists, or it cannot be parsed, the status degrades
+  to the historical launch-and-report behaviour rather than claiming a check that did not
+  happen. Verification never installs or replaces a bundle — the app's own updater still
+  does all installing.
+- **`internet_handler_vendor_latest()`** in `lib/internet_handlers.sh` — the shared feed
+  reader behind the above, with a 15 s timeout and two retries.
+- **`test_every_config_method_has_a_handler`** — a systemic guard asserting that every
+  method name appearing in `config/internet_app_methods.txt` resolves to a real handler.
+  This makes it impossible to ship a config label with no implementation behind it, which
+  had happened twice before.
+- **Behavioural sudo tests** — `test_sudo_is_never_attempted_without_a_tty`,
+  `test_sudo_is_acquired_at_exactly_one_place`, `test_dry_run_never_requests_sudo`,
+  `test_sudo_keepalive_pid_is_not_reset_after_start`. Each fails if the corresponding
+  guarantee is removed.
 
 ### Fixed
-- **Non-TTY Sudo Prompt Fix:** Resolved sudo / Touch ID prompts in non-interactive IDE environments in `update_all.sh` by exporting `MAC_UPDATE_NO_SUDO=1` and preventing orphaned keep-alive background processes.
-- **Claude Desktop Path Resolution (G3.1):** Corrected `iu_claude` in `lib/internet_app_updates.sh` from `Claude Desktop` to `Claude` so `app_version` correctly locates `/Applications/Claude.app`.
-- **ChatGPT Atlas Sparkle XML Tag Parser (G3.2):** Enhanced `internet_handler_sparkle_check` in `lib/internet_handlers.sh` to extract versions from XML element tags (`<sparkle:shortVersionString>`) as well as XML attributes.
-- **Coverage Metric Accuracy (G2):** Corrected `scripts/report_update_coverage.sh` to accurately map verified updaters based on active feed availability.
+
+- **Comet reported a verified status for a check that never ran.** It was classified as
+  `keystone`, but Google Keystone only serves Google products; the agent was invoked and
+  the run reported `✅ Checked via CLI` while nothing had verified Comet. Reclassified, and
+  the remaining `keystone` entries audited down to Google Chrome and Google Drive.
+- **sudo prompted on every invocation from an IDE or agent shell.** `update_all.sh` called a
+  bare `sudo -v` on the branch taken when stdin is not a TTY, which escalates to the GUI
+  askpass / Touch ID dialog. Without a controlling terminal the toolkit now requests nothing,
+  exports `MAC_UPDATE_NO_SUDO=1`, and the child steps skip their root-only tracks and report
+  soft (10) instead of failing.
+- **`--dry-run` asked for credentials.** A preview now never requests sudo.
+- **The sudo keep-alive was orphaned once per run.** `SUDO_KEEPALIVE_PID` was reset to empty
+  *after* the refresher had started, so `cleanup_session_dir()` killed the wrong PID and the
+  process outlived the script. Acquisition is now a single block: initialised before start,
+  started exactly once, killed on every exit path including `INT`/`TERM`.
+- **A warm sudo timestamp no longer triggers a second prompt** — `sudo -n true` is checked
+  before prompting.
+- **Coverage metric counted unverified methods as verified.** `scripts/report_update_coverage.sh`
+  no longer advertises a method in `DIRECT_METHODS` that cannot compare a remote version.
+- **Claude Desktop** — `iu_claude` looked for `Claude Desktop`; corrected to `Claude` so
+  `app_version` resolves `/Applications/Claude.app`.
+- **ChatGPT Atlas** — `internet_handler_sparkle_check` now reads
+  `<sparkle:shortVersionString>` as an element as well as an attribute.
+
+### Changed
+
+- Development artefacts (ultra reviews, implementation reports and prompts) moved out of the
+  repository root into `docs/reviews/`. The root now contains only product files.
+
+### Known debt
+
+- `lib/internet_app_updates.sh` is ~86 KB across 36 per-app handler functions. The
+  config-driven registry now exists alongside it; collapsing those handlers into generic
+  config-driven ones is deferred to a later release.
+- macOS system updates on Apple Silicon require volume-owner credentials, so scheduled
+  background runs deliberately pass `--skip-system` and do not install macOS or App Store
+  updates. Both remain available in interactive runs.
 
 ---
 
