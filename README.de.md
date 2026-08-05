@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.21** — Produktionsbereiter Ein-Befehl-Orchestrator für **Apple-Silicon-Macs mit macOS 13+**. Er koordiniert verifizierte Paketupdates und ehrlich gemeldete Update-Auslöser — **nur für bereits installierte Software**. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.2.0** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13+**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
 
 **Öffentliches Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 

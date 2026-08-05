@@ -244,7 +244,10 @@ fi
 if [ -z "$NATIVE_OUTDATED" ]; then
     print_ok "$L_APPSTORE_NO_UPDATES — sudo mas upgrade skipped"
 else
-    if sudo -v; then
+    if [ "${MAC_UPDATE_NO_SUDO:-0}" = "1" ] || { [ ! -t 0 ] && ! sudo -n true 2>/dev/null; }; then
+        print_info "$L_APPSTORE_NO_SUDO_SKIPPED"
+        SOFT_FAIL=1
+    elif sudo -v; then
         # TODO(M17): Test whether mas 4.1+ can be invoked without outer sudo on real hardware (see https://github.com/orgs/Homebrew/discussions/6550)
         MAS_TOR1_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
             sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade 2>&1)

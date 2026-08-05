@@ -1587,6 +1587,47 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("L_APPSTORE_NONINTERACTIVE_SKIPPED", text)
         self.assertIn("MAC_UPDATE_NONINTERACTIVE", text)
 
+    def test_sudo_preauth_covers_appstore_step(self) -> None:
+        """P1.4 regression: update_all.sh pre-authenticates sudo when App Store step is active."""
+        text = self.read_script("update_all.sh")
+        self.assertIn("MAC_UPDATE_SKIP_APPSTORE", text)
+        self.assertIn("_needs_sudo", text)
+
+    def test_appstore_skips_track1_without_tty(self) -> None:
+        """P1.4 regression: update_appstore.sh skips Track 1 with soft status without TTY or MAC_UPDATE_NO_SUDO."""
+        text = self.read_script("update_appstore.sh")
+        self.assertIn("L_APPSTORE_NO_SUDO_SKIPPED", text)
+        self.assertIn("MAC_UPDATE_NO_SUDO", text)
+
+    def test_no_app_listed_in_both_group3_and_casks(self) -> None:
+        """P2.4 regression: assert APPLICATIONS.md has zero overlap between GRUPA 3 and Section 4c Casks."""
+        app_md_path = os.path.join(REPO_ROOT, "APPLICATIONS.md")
+        if not os.path.exists(app_md_path):
+            self.skipTest("APPLICATIONS.md not found")
+        with open(app_md_path, encoding="utf-8") as f:
+            content = f.read()
+
+        g3_match = re.search(r'## GRUPA 3.*?(?=## GRUPA 4)', content, re.DOTALL)
+        g3_text = g3_match.group(0) if g3_match else ""
+
+        c4c_match = re.search(r'### 4c\. Casks.*?(?=### 4d|## Podsumowanie|$)', content, re.DOTALL)
+        c4c_text = c4c_match.group(0) if c4c_match else ""
+
+        g3_apps = set(re.findall(r'^\|\s*(?:\*\*)?([^|*]+?)(?:\*\*)?\s*\|', g3_text, re.MULTILINE))
+        c4c_apps = set(re.findall(r'^\|\s*(?:\*\*)?([^|*]+?)(?:\*\*)?\s*\|', c4c_text, re.MULTILINE))
+
+        g3_apps = {a.strip() for a in g3_apps if a.strip() not in ('Nazwa', 'Nazwa aplikacji', '---') and not a.strip().startswith('-')}
+        c4c_apps = {a.strip() for a in c4c_apps if a.strip() not in ('Pakiet', '---') and not a.strip().startswith('-')}
+
+        intersection = g3_apps.intersection(c4c_apps)
+        self.assertEqual(intersection, set(), f"Apps listed in both GRUPA 3 and Section 4c: {intersection}")
+
+    def test_brew_upgrade_guards_against_downgrade(self) -> None:
+        """P3.3 regression: update_brew.sh includes cask downgrade guard using internet_version_relation."""
+        text = self.read_script("update_brew.sh")
+        self.assertIn("L_BREW_CASK_WOULD_DOWNGRADE_FMT", text)
+        self.assertIn("internet_version_relation", text)
+
 
 class InternetLibParserTests(unittest.TestCase):
     """Tests for lib/internet_apps.sh, internet_registry.sh, internet_handlers.sh,

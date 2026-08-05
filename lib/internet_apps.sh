@@ -239,3 +239,11 @@ internet_capture_versions() {
         fi
     done
 }
+
+mau_current_channel() {
+    local ch=""
+    ch="$(defaults read /Library/Preferences/com.microsoft.autoupdate2 ChannelName 2>/dev/null)"
+    [ -z "$ch" ] && ch="$(defaults read com.microsoft.autoupdate2 ChannelName 2>/dev/null)"
+    [ -z "$ch" ] && ch="$("/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate" --config 2>/dev/null | awk -F': *' '/ChannelName/{print $2; exit}')"
+    printf '%s' "${ch:-unknown}"
+}

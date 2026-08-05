@@ -196,13 +196,34 @@ if [ -t 0 ] && [ -x "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" ]; then
     fi
 fi
 
-# Pre-authenticate sudo credentials for step 6 before tee swallows prompt FD
-if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" != "1" ] && [ -t 0 ]; then
-    # BUG-4 fix: only suppress stderr for JSON summary mode; interactive users
-    # need to see PAM error messages when sudo fails.
-    if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
-        if ! sudo -v 2>/dev/null; then
-            print_warn "sudo pre-authentication failed or skipped; step 6 may prompt interactively later."
+# Pre-authenticate sudo credentials for step 1 and 6 before tee swallows prompt FD
+# Either one alone justifies pre-authentication.
+_needs_sudo=0
+[ "${MAC_UPDATE_SKIP_APPSTORE:-0}" != "1" ] && _needs_sudo=1
+[ "${MAC_UPDATE_SKIP_SYSTEM:-0}"   != "1" ] && _needs_sudo=1
+
+if [ "$_needs_sudo" -eq 1 ]; then
+    if [ -t 0 ]; then
+        if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
+            if ! sudo -v 2>/dev/null; then
+                print_warn "sudo pre-authentication failed or skipped; steps requiring sudo may prompt interactively later."
+            fi
+        else
+            if ! sudo -v; then
+                print_warn "sudo pre-authentication failed or skipped; steps requiring sudo may prompt interactively later."
+            fi
+        fi
+
+        # Background sudo keep-alive process (BUG-3 fix): refreshes timestamp
+        # every 50s so long runs (>15 mins) never prompt interactively mid-run.
+        if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ]; then
+            (
+                while true; do
+                    sudo -n true 2>/dev/null || exit 0
+                    sleep 50
+                done
+            ) &
+            SUDO_KEEPALIVE_PID=$!
         fi
     else
         if ! sudo -v; then
@@ -883,6 +904,31 @@ if os.path.exists(new_apps_file):
                     content = content.rstrip() + "\n\n" + new_section
                     changes_made = True
                     print(f"  ⚠️  {os.environ.get('L_PRESCAN_FALLBACK_ANCHOR_NEW_END', 'Used fallback anchor (append at end) for new applications')}")
+
+# Deduplicate: Remove any apps from GRUPA 3 that are listed in Section 4c (Homebrew Casks)
+casks_4c_match = re.search(r'### 4c\. Casks.*?\n((?:\| [^\n]+\|\n)+)', content, re.DOTALL)
+if casks_4c_match:
+    cask_rows = casks_4c_match.group(1).splitlines()
+    cask_names = set()
+    for row in cask_rows:
+        parts = [p.strip() for p in row.split('|')]
+        if len(parts) >= 2 and parts[1] and parts[1] != 'Pakiet':
+            cask_names.add(parts[1])
+            for norm, aliases in APP_ALIASES.items():
+                if parts[1] in aliases or parts[1] == norm:
+                    cask_names.add(norm)
+                    cask_names.update(aliases)
+    
+    grupa3_match = re.search(r'(## GRUPA 3.*?\n)(.*?)(?=## GRUPA 4)', content, re.DOTALL)
+    if grupa3_match:
+        g3_body = grupa3_match.group(2)
+        new_g3_body = g3_body
+        for cname in cask_names:
+            pattern = r'^\|\s*(?:\*\*)?' + re.escape(cname) + r'(?:\*\*)?\s*\|[^\n]*\n?'
+            new_g3_body = re.sub(pattern, '', new_g3_body, flags=re.MULTILINE | re.IGNORECASE)
+        if new_g3_body != g3_body:
+            content = content[:grupa3_match.start(2)] + new_g3_body + content[grupa3_match.end(2):]
+            changes_made = True
 
 # Update the analysis date
 today = datetime.now().strftime('%Y-%m-%d')

@@ -8,7 +8,7 @@
 | `update_appstore.sh` | `0` | TRACK 1 and/or TRACK 2 succeeded |
 | `update_appstore.sh` | `1` | mas upgrade hard failure |
 | `update_appstore.sh` | `2` | Accessibility permission missing (TRACK 2 blocked) |
-| `update_appstore.sh` | `10` | Soft/degraded warning (snapshots, query failed, background GUI install) |
+| `update_appstore.sh` | `10` | Soft/degraded warning (snapshots, non-TTY sudo skipped, background GUI install) |
 | Leaf `update_*.sh` | `0` | Step completed cleanly (or dry-run preview) |
 | Leaf `update_*.sh` | `10` | Soft/degraded failure (query failed, network unreachable, cosmetic; non-blocking) |
 | Leaf `update_*.sh` | `1` | Hard failure (package/install operation broke mid-transaction; blocking) |

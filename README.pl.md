@@ -4,9 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.0.21** — Gotowy do produkcji jednokomendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13+**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwie raportowane wyzwalanie aktualizatorów aplikacji — **wyłącznie dla oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka w chmurze przez [`dev_sync/`](dev_sync/README.md).
+> **v1.2.0** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13+**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
 
-**Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
+**Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Zmiany: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
@@ -16,29 +16,38 @@
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/KasprowiczM/macOS_updates/main/install.sh)"
 ```
 
-Instalator klonuje repozytorium, prosi o wybór **języka** (polski dostępny z 7 opcji), instaluje zależności, buduje **Twój** plik `APPLICATIONS.md` na podstawie aplikacji już obecnych na Twoim Macu i wyświetla, które aplikacje mogą zostać zaktualizowane. Nigdy nie importuje aplikacji od innych użytkowników ani nie instaluje nowych aplikacji.
+Instalator klonuje repozytorium, pyta o **język** (angielskie menu, 7 wersji językowych), instaluje zależności, buduje **Twój** plik `APPLICATIONS.md` na podstawie aplikacji obecnych na tym Macu i wyświetla podsumowanie wspieranych programów.
 
 Zobacz [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 
 ---
 
-## Co to robi
+## Dodatkowe funkcje i narzędzia
 
-`update_all.sh` uruchamia siedem kroków:
+- **Touch ID dla sudo:** `bash scripts/setup_touchid_sudo.sh` konfiguruje uwierzytelnianie Touch ID dla sudo (`/etc/pam.d/sudo_local`). Konfiguracja per-maszyna.
+- **Harmonogram LaunchAgent:** `bash scripts/install_launchagent.sh --day 1 --hour 9` instaluje cotygodniowy harmonogram aktualizacji w tle. *Uruchomienia w tle używają trybu nieinteraktywnego (`--non-interactive` / `MAC_UPDATE_NONINTERACTIVE=1`), wykonując Homebrew, npm CLI i aplikacje internetowe oraz bezpiecznie pomijając interaktywne kroki App Store i restart macOS.*
+- **Flagi i zmienne:** `MAC_UPDATE_NONINTERACTIVE=1` (pomijanie promptów), `MAC_UPDATE_STALE_DAYS=45` (próg dawności niezweryfikowanych aplikacji), `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (kontrola sudo keep-alive).
+- **Nowe metody:** `brew_cask` (adopcja casków Homebrew z weryfikacją na żywo), `sparkle_appcast` (zdalna weryfikacja wersji z feedów XML Sparkle).
 
-| Krok | Akcja |
-|------|--------|
-| 0 | **Skan wstępny** — wykrywa zainstalowane aplikacje → aktualizuje `APPLICATIONS.md` |
-| 1 | **App Store** — Track 1: `sudo mas upgrade`; Track 2: AppleScript GUI dla aplikacji iPad |
-| 2 | **Narzędzia CLI (Native + npm)** — Node, Bun, globalne narzędzia npm |
-| 3 | **Homebrew** — formuły i caski (`--greedy`) + czyszczenie i kontrola stanu |
-| 4 | **Aplikacje internetowe** — zweryfikowane handlery, CLI producentów i uczciwe wyzwalanie aktualizatorów |
-| 5 | **Postupdate/historia** — odświeża `APPLICATIONS.md`, atomowo dopisuje `UPDATES.md` |
-| 6 | **macOS (na końcu)** — `softwareupdate -ia -R`; pomijany, gdy wcześniejszy krok zawiódł |
+---
+
+## Co robi ten system
+
+`update_all.sh` wykonuje siedem kroków:
+
+| Krok | Działanie |
+|------|-----------|
+| 0 | **Prescan** — wykryj zainstalowane aplikacje → zaktualizuj `APPLICATIONS.md` |
+| 1 | **App Store** — Tor 1: `sudo mas upgrade`; Tor 2: AppleScript GUI dla aplikacji iPad |
+| 2 | **Natywne CLI + npm** — Node, Bun, globalne pakiety npm CLI |
+| 3 | **Homebrew** — formulae i caski (`brew_cask` + ochrona przed downgrade'em) + cleanup i doctor |
+| 4 | **Aplikacje z Internetu** — zweryfikowane handlery, `sparkle_appcast`, CLI i uczciwe wywołania updaterów |
+| 5 | **Postupdate/historia** — odśwież `APPLICATIONS.md`, dopisz do `UPDATES.md` |
+| 6 | **macOS (końcowy)** — `softwareupdate -ia -R`; pomijany gdy wcześniejszy krok zawiódł |
 
 **Ważne:** Aktualizacje dotyczą wyłącznie oprogramowania już zainstalowanego na Twoim Macu. Końcowy krok macOS może uruchomić komputer ponownie, dlatego działa ostatni i zawsze zachowuje wymagane `-R`. Zgłaszane są braki obsługiwanych aplikacji, ale nie są one instalowane.
 
-Raport pokrycia rozróżnia: **verified direct** — skrypt potwierdził ścieżkę pakietu/wersji; **triggered-unverified** — uruchomił aplikację, lecz nie może potwierdzić zakończenia aktualizacji producenta; **externally managed** — cyklem zarządza producent lub App Store; **manual** — potrzebna jest akcja użytkownika; **unknown** — brak zarejestrowanej metody. Inkscape jest obsługiwany jako cask Homebrew, UniFi/WiFiman/Picsart przez App Store Track 2, Office przez `msupdate`, a Teams przez własny updater z obserwowanym, weryfikowanym fallbackiem MAU `TEAMS21`, gdy Microsoft go oferuje. Ręczne pozostają tylko IPMIView i DJI Assistant 2.
+Raport pokrycia rozróżnia: **verified direct** — skrypt potwierdził ścieżkę pakietu/wersji; **triggered-unverified** — uruchomił aplikację, lecz nie może potwierdzić zakończenia aktualizacji producenta; **externally managed** — cyklem zarządza producent lub App Store; **manual** — potrzebna jest akcja użytkownika; **unknown** — brak zarejestrowanej metody. Inkscape jest obsługiwany jako cask Homebrew, UniFi/WiFiman/Picsart przez App Store Track 2, Office przez `msupdate`, a Teams przez własny updater z obserwowowanym, weryfikowanym fallbackiem MAU `TEAMS21`, gdy Microsoft go oferuje. Ręczne pozostają tylko IPMIView i DJI Assistant 2.
 
 ```bash
 bash scripts/report_update_coverage.sh   # raport pokrycia aplikacji
