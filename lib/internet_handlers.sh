@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # lib/internet_handlers.sh — shared internet app update handlers (Bash 3.2+)
 # Requires: i18n loaded, internet_i18n.sh, silent_launch_app, app_version, copy_verified_app
+#
+# Handlers communicate status via INTERNET_LAST_STATUS global — NEVER via
+# stdout echo. This prevents UI output (print_info/print_step/print_warn)
+# from polluting the status when called inside command substitution.
+# See: BUG-1 fix (2026-08-05).
+
+INTERNET_LAST_STATUS=""
 
 internet_handler_app_installed() {
     local app_path="$1"
@@ -20,10 +27,10 @@ internet_handler_silent_launch() {
         if [ -n "$verify_hint" ]; then
             print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
         fi
-        echo "$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
     else
         print_warn "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display") — failed"
-        echo "$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
     fi
 }
 
@@ -36,7 +43,7 @@ internet_handler_manual() {
     print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
     print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "$app_display")"
     print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "$download_url")"
-    echo "$L_INTERNET_STATUS_MANUAL_UPDATE"
+    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANUAL_UPDATE"
 }
 
 internet_handler_set_status() {
@@ -85,7 +92,7 @@ internet_handler_keystone() {
             fi
         fi
     fi
-    echo "$L_INTERNET_STATUS_CHECKED_CLI"
+    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_CHECKED_CLI"
 }
 
 # Standard silent-launch block with optional extra info line
@@ -102,12 +109,11 @@ internet_dispatch_silent_launch() {
         APP_PATH="/Applications/${app_display}.app"
     fi
     if [ -d "$APP_PATH" ]; then
-        local st
-        st="$(internet_handler_silent_launch "$app_display" "$launch_target" "$verify_hint" "$APP_PATH")"
+        internet_handler_silent_launch "$app_display" "$launch_target" "$verify_hint" "$APP_PATH"
         if [ -n "$extra_info" ]; then
             print_info "$extra_info"
         fi
-        internet_handler_set_status "$status_var" "$st"
+        internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
     fi
