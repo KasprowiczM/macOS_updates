@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.2.0** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13+**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.3.0** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–26**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
 
 **Öffentliches Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -31,18 +31,26 @@ Siehe [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.m
 | 0 | **Vorab-Scan** — findet installierte Apps → aktualisiert `APPLICATIONS.md` |
 | 1 | **App Store** — Track 1: `sudo mas upgrade`; Track 2: AppleScript-GUI für iPad-Apps |
 | 2 | **Native CLI + npm** — Node, Bun, globale npm-Tools |
-| 3 | **Homebrew** — Formeln und Casks (`--greedy`) + Bereinigung |
-| 4 | **Internet-Apps** — verifizierte Handler, Hersteller-CLIs und ehrliche Update-Auslöser |
+| 3 | **Homebrew** — Formeln und Casks (`--greedy-auto-updates`) + Downgrade-Schutz |
+| 4 | **Internet-Apps** — verifizierte Handler, `vendor_latest`, Sparkle Appcast & direkte Updates |
 | 5 | **Post-Update/Verlauf** — aktualisiert Inventar und Verlauf atomar |
 | 6 | **macOS (zuletzt)** — `softwareupdate -ia -R`; entfällt bei einem früheren Fehler |
 
-**Wichtig:** Updates wirken sich nur auf Software aus, die bereits auf Ihrem Mac installiert ist. Unterstützte, aber fehlende Apps werden gemeldet, nicht installiert.
+---
 
-Der Abdeckungsbericht unterscheidet **verified direct**, **triggered-unverified**, **externally managed**, **manual** und **unknown**. Ein stiller App-Start bestätigt keine fertige Aktualisierung. Inkscape läuft über Homebrew Cask; UniFi, WiFiman und Picsart über App Store Track 2; Office über `msupdate`; Teams über den eigenen Updater mit beobachtetem, verifiziertem MAU-Fallback `TEAMS21`, wenn Microsoft ihn anbietet. Nur IPMIView und DJI Assistant 2 bleiben manuell.
+## Funktionen & Umgebungsvariablen in v1.3.0
+
+- **Touch ID / Sudo Pre-Authorization**: Erkennt Touch ID `pam_tid.so` und hält Sudo-Sitzungen aktiv.
+- **Hintergrund & LaunchAgent Support**: Unterstützt `MAC_UPDATE_NO_SUDO=1` für unbewachte Hintergrundausführungen.
+- **`vendor_latest` Methode**: Verhindert Homebrew Cask Downgrades für schnell aktualisierte Apps (Cursor, Warp, Antigravity, Proton Mail, Proton Drive, Claude, Comet, ChatGPT).
+- **Steuerungs-Flags**:
+  - `MAC_UPDATE_YES=1` (`-y`) — Nicht-interaktive Bestätigung aller Schritte.
+  - `MAC_UPDATE_SKIP_SYSTEM=1` (`--skip-system`) — Überspringt macOS Systemupdates.
+  - `MAC_UPDATE_NONINTERACTIVE=1` — Unterdrückt interaktive Dialoge.
 
 ```bash
-bash scripts/report_update_coverage.sh   # Abdeckungsbericht
-bash build_inventory.sh                  # APPLICATIONS.md neu erstellen
+# Beispiel für automatisierten Hintergrund-Run:
+MAC_UPDATE_NONINTERACTIVE=1 bash update_all.sh -y --skip-system
 ```
 
 ---
@@ -63,16 +71,6 @@ bash build_inventory.sh
 bash update_all.sh
 ```
 
-### Eigentümer (GitHub + Cloud-Schicht)
-
-```bash
-git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
-cd ~/Dev_Env/macOS_updates
-bash migration_setup.sh
-bash dev_sync/dev-sync-import.sh
-bash update_all.sh
-```
-
 ---
 
 ## Dokumentation
@@ -90,5 +88,5 @@ bash update_all.sh
 ## Wichtige technische Hinweise
 
 - **`softwareupdate` muss `-R` verwenden** — andernfalls werden Updates heruntergeladen, aber nie angewendet.
-- **`mas upgrade` muss `sudo` verwenden** unter macOS 26.x (CVE-2025-43411).
+- **`mas upgrade` muss `sudo` verwenden** unter macOS 14.8+/15.7+/26.x (CVE-2025-43411).
 - **Bash 3.2+** überall — keine `declare -A`, `mapfile` oder `readarray`.

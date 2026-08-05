@@ -271,6 +271,9 @@ L_SYSTEM_SCRIPT_DONE="✅ SCRIPT 1 COMPLETED SUCCESSFULLY"
 
 # ── update_all.sh — additional strings ────────────────────────
 L_ALL_RESULT_SKIPPED="skipped"
+L_ALL_SUDO_NO_TTY="No TTY available — sudo will not be requested; root-only steps (App Store, macOS) are skipped"
+L_ALL_TOUCHID_HINT="Tip: Touch ID for sudo is not enabled. Run 'bash scripts/setup_touchid_sudo.sh' to use your fingerprint."
+L_ALL_SUDO_PREAUTH_FAILED="sudo pre-authentication failed or was skipped; steps requiring root may not run"
 L_ALL_RESULT_WARN="warnings"
 L_ALL_SESSION_DIR_MSG="Session directory:"
 L_ALL_STEP0="STEP 0/6: Scanning installed applications"
@@ -390,6 +393,7 @@ L_INTERNET_MS_INSTALLING_SCOPED_FMT="Installing Microsoft updates (msupdate --in
 L_INTERNET_MS_STILL_PENDING="Microsoft updates are still pending after the install pass:"
 L_INTERNET_MS_REGRESSION_FMT="%s: Microsoft offers %s but %s is installed — that package cannot install"
 L_INTERNET_MS_REGRESSION_NOTE="Upstream package regression: macOS refuses a component older than the installed app. Held back until Microsoft corrects the feed."
+L_INTERNET_MS_CHANNEL_DIAG_FMT="Microsoft AutoUpdate channel: %s (installed: %s, offered: %s). Remediation: 1. Align MAU channel in preferences, or 2. Reinstall Office package matching channel."
 L_INTERNET_MS_DEFERRALS_FOUND_FMT="Microsoft AutoUpdate deferrals found: %s"
 L_INTERNET_MS_DEFERRALS_KEPT="Keeping Microsoft AutoUpdate deferrals (MAC_UPDATE_MAU_KEEP_DEFERRALS=1)"
 L_INTERNET_MS_DEFERRALS_BACKUP_FMT="Microsoft AutoUpdate preferences backed up to: %s"

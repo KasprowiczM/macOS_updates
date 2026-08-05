@@ -14,6 +14,7 @@ internet_registry_load() {
     INTERNET_METHOD_APPS=()
     INTERNET_METHOD_TYPES=()
     INTERNET_METHOD_STATUS=()
+    INTERNET_METHOD_FEEDS=()
     cfg="$(_internet_methods_config_path)"
     [ -f "$cfg" ] || return 1
     while IFS= read -r line || [ -n "$line" ]; do
@@ -21,25 +22,37 @@ internet_registry_load() {
         line="${line#"${line%%[![:space:]]*}"}"
         line="${line%"${line##*[![:space:]]}"}"
         [ -n "$line" ] || continue
-        # Validate: exactly 3 pipe-delimited fields (AppName|method|STATUS_VAR)
+        # Validate: 3 or 4 pipe-delimited fields (AppName|method|STATUS_VAR[|feed_url])
         case "$line" in
-            *\|*\|*\|*)
-                echo "internet_registry_load: malformed row (more than 3 fields): $line" >&2
+            *\|*\|*\|*\|*)
+                echo "internet_registry_load: malformed row (more than 4 fields): $line" >&2
                 continue
                 ;;
+            *\|*\|*\|*) ;;
             *\|*\|*) ;;
             *)
-                echo "internet_registry_load: malformed row (need 3 fields): $line" >&2
+                echo "internet_registry_load: malformed row (need 3 or 4 fields): $line" >&2
                 continue
                 ;;
         esac
         app="${line%%|*}"
         line="${line#*|}"
         method="${line%%|*}"
-        status="${line#*|}"
+        line="${line#*|}"
+        case "$line" in
+            *\|*)
+                status="${line%%|*}"
+                feed_url="${line#*|}"
+                ;;
+            *)
+                status="$line"
+                feed_url=""
+                ;;
+        esac
         INTERNET_METHOD_APPS+=("$app")
         INTERNET_METHOD_TYPES+=("$method")
         INTERNET_METHOD_STATUS+=("$status")
+        INTERNET_METHOD_FEEDS+=("$feed_url")
     done < "$cfg"
     _INTERNET_REGISTRY_LOADED=1
     return 0

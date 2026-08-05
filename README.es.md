@@ -4,69 +4,63 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.2.0** — Orquestador de actualizaciones de un solo comando listo para producción en **Macs con Apple Silicon y macOS 13+**. Coordina actualizaciones verificadas para software instalado. **Multilingüe** (7 idiomas). Capa privada opcional en la nube a través de [`dev_sync/`](dev_sync/README.md).
+> **v1.3.0** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–26**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
 
-**Repositorio público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Lanzamiento público: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
+**Repositorio público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
 ---
 
-## Instalación de una línea (nuevos usuarios)
+## Instalación en una sola línea (nuevos usuarios)
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/KasprowiczM/macOS_updates/main/install.sh)"
 ```
 
-El instalador clona el repositorio, solicita el **idioma** (español entre los 7 disponibles), instala las dependencias, construye **tu** archivo `APPLICATIONS.md` a partir de las aplicaciones ya presentes en tu Mac, e imprime qué aplicaciones pueden actualizarse. Nunca importa el inventario de otro usuario ni instala aplicaciones por ti.
+El instalador clona el repositorio, solicita la **selección de idioma** (español disponible), instala dependencias, genera su archivo `APPLICATIONS.md` basado en las aplicaciones instaladas en su Mac y muestra qué aplicaciones pueden actualizarse.
 
-Ver [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
+Consulte [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 
 ---
 
-## ¿Qué hace esto?
+## Qué hace esta herramienta
 
 `update_all.sh` ejecuta siete pasos:
 
 | Paso | Acción |
 |------|--------|
-| 0 | **Escaneo previo** — descubre aplicaciones instaladas → actualiza `APPLICATIONS.md` |
-| 1 | **App Store** — Track 1: `sudo mas upgrade`; Track 2: GUI AppleScript para apps iPad |
-| 2 | **CLI Nativos + npm** — Node, Bun, herramientas globales de npm |
-| 3 | **Homebrew** — fórmulas y casks (`--greedy`) + limpieza |
-| 4 | **Aplicaciones de internet** — handlers verificados, CLI del proveedor y activadores honestos |
-| 5 | **Post-actualización/historial** — inventario e historial atómicos |
-| 6 | **macOS (al final)** — `softwareupdate -ia -R`; se omite si falló un paso anterior |
+| 0 | **Escaneo previo** — detecta aplicaciones instaladas → actualiza `APPLICATIONS.md` |
+| 1 | **App Store** — Pista 1: `sudo mas upgrade`; Pista 2: GUI AppleScript para apps de iPad |
+| 2 | **CLI nativa + npm** — Node, Bun, herramientas globales npm |
+| 3 | **Homebrew** — Fórmulas y Casks (`--greedy-auto-updates`) + protección contra downgrades |
+| 4 | **Aplicaciones de Internet** — controladores verificados, `vendor_latest`, Sparkle Appcast |
+| 5 | **Post-actualización/Historial** — actualiza inventario e historial de forma atómica |
+| 6 | **macOS (final)** — `softwareupdate -ia -R`; se omite si ocurre un error previo |
 
-**Importante:** Las actualizaciones solo modifican el software que ya está instalado en tu Mac. Las aplicaciones soportadas pero ausentes se reportan, no se instalan.
+---
 
-La cobertura distingue **verified direct**, **triggered-unverified**, **externally managed**, **manual** y **unknown**; iniciar una app no confirma que terminó su actualización. Inkscape usa Homebrew Cask; UniFi, WiFiman y Picsart usan App Store Track 2; Office usa `msupdate`; Teams usa su actualizador propio con un fallback MAU `TEAMS21` observado y verificado cuando Microsoft lo ofrece. Solo IPMIView y DJI Assistant 2 quedan manuales.
+## Características y variables de entorno en v1.3.0
+
+- **Preautorización Sudo / Touch ID**: Detecta `pam_tid.so` y mantiene viva la sesión de sudo.
+- **Soporte para LaunchAgent y tareas en segundo plano**: Admite `MAC_UPDATE_NO_SUDO=1` para ejecuciones desatendidas.
+- **Método `vendor_latest`**: Evita degradaciones de Homebrew Cask para apps de actualización rápida (Cursor, Warp, Antigravity, Proton Mail, Proton Drive, Claude, Comet, ChatGPT).
+- **Variables de control**:
+  - `MAC_UPDATE_YES=1` (`-y`) — Confirmación no interactiva de todos los pasos.
+  - `MAC_UPDATE_SKIP_SYSTEM=1` (`--skip-system`) — Omite las actualizaciones del sistema macOS.
+  - `MAC_UPDATE_NONINTERACTIVE=1` — Suprime diálogos interactivos.
 
 ```bash
-bash scripts/report_update_coverage.sh   # reporte de cobertura
-bash build_inventory.sh                  # reconstruir APPLICATIONS.md
+# Ejemplo de ejecución automatizada en segundo plano:
+MAC_UPDATE_NONINTERACTIVE=1 bash update_all.sh -y --skip-system
 ```
 
 ---
 
-## Requisitos
+## Inicio rápido
 
-| Herramienta | ¿Instalación automática? |
-|------|----------------|
-| Mac con Apple Silicon (arm64) | — |
-| macOS 13 Ventura o superior | — |
-| Herramientas de línea de comandos de Xcode | ✅ `setup.sh` / `install.sh` |
-| Homebrew | ✅ |
-| `mas` (CLI para la App Store) | ✅ |
-| Python 3 | ✅ (a través de Homebrew si falta) |
-| `rclone` (opcional) | ✅ si se elige como proveedor de nube |
-
----
-
-## Inicio Rápido
-
-### Usuario nuevo (sin nube)
+### Nuevo usuario (sin nube)
 
 ```bash
-# Opción A — una línea (recomendada)
+# Opción A — una línea (recomendado)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/KasprowiczM/macOS_updates/main/install.sh)"
 
 # Opción B — manual
@@ -77,32 +71,22 @@ bash build_inventory.sh
 bash update_all.sh
 ```
 
-### Propietario (GitHub + capa en la nube)
-
-```bash
-git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
-cd ~/Dev_Env/macOS_updates
-bash migration_setup.sh
-bash dev_sync/dev-sync-import.sh
-bash update_all.sh
-```
-
 ---
 
 ## Documentación
 
-| Audiencia | Comienza aquí |
-|----------|------------|
+| Audiencia | Comenzar aquí |
+|-----------|---------------|
 | Usuarios | [docs/user/es/QUICK_START.md](docs/user/es/QUICK_START.md) |
-| Instalar / Desinstalar | [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md) |
+| Instalación / Desinstalación | [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md) |
 | Desarrolladores | [docs/agents/scripts.md](docs/agents/scripts.md) |
-| Sincronización dev sync | [dev_sync/README.md](dev_sync/README.md) |
-| Contexto AI | `AGENTS.md` |
+| Sincronización en la nube | [dev_sync/README.md](dev_sync/README.md) |
+| Contexto IA | `AGENTS.md` |
 
 ---
 
-## Notas Técnicas Críticas
+## Notas técnicas críticas
 
-- **`softwareupdate` debe usar `-R`** — de lo contrario, las actualizaciones se descargan pero nunca se aplican.
-- **`mas upgrade` debe usar `sudo`** en macOS 26.x (CVE-2025-43411).
-- **Bash 3.2+** en su totalidad — nada de `declare -A`, `mapfile`, `readarray`.
+- **`softwareupdate` DEBE usar `-R`** — de lo contrario las actualizaciones se descargan pero nunca se aplican.
+- **`mas upgrade` DEBE usar `sudo`** en macOS 14.8+/15.7+/26.x (CVE-2025-43411).
+- **Bash 3.2+** en todo el proyecto — sin `declare -A`, `mapfile` o `readarray`.

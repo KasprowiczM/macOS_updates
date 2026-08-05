@@ -216,11 +216,13 @@ iu_chatgpt() {
 }
 
 iu_claude() {
-    internet_dispatch_silent_launch "🟣 Claude" "Claude Desktop" "STATUS_CLAUDE_APP" "Claude" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
+    internet_dispatch_silent_launch "🟣 Claude" "Claude" "STATUS_CLAUDE_APP" "Claude" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
 }
 
 iu_comet() {
-    internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
+    print_header "☄️  Comet (Perplexity AI)"
+    internet_handler_keystone "Comet" "Comet" "$L_INTERNET_HINT_COMET" "comet"
+    internet_handler_set_status "STATUS_COMET" "$INTERNET_LAST_STATUS"
 }
 
 iu_antigravity() {
@@ -466,12 +468,11 @@ iu_megasync() {
 }
 
 iu_proton_drive() {
-    internet_dispatch_silent_launch "🔵 Proton Drive" "Proton Drive" "STATUS_PROTONDRIVE" "Proton Drive" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Drive")"
+    internet_dispatch_sparkle_appcast "🔵 Proton Drive" "Proton Drive" "STATUS_PROTONDRIVE" "Proton Drive"
+}
     # ============================================================
     # ██ SEKCJA 6: MICROSOFT 365
     # ============================================================
-
-}
 
 # ── Microsoft AutoUpdate (msupdate) helpers ───────────────────
 # msupdate draws a carriage-return progress spinner with ANSI erase-line
@@ -1085,12 +1086,20 @@ iu_microsoft_365() {
                     MAU_REGRESSED_IDS="$(printf '%s\n' "$MAU_REGRESSED" \
                         | awk 'NF { print $1 }' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
                     if [ -n "$MAU_REGRESSED_IDS" ]; then
+                        _mau_chan="$(mau_current_channel)"
+                        _mau_stale_limit="${MAC_UPDATE_STALE_DAYS:-45}"
+                        _mau_days_unchanged="$(internet_get_app_days_unchanged "Microsoft Word")"
                         printf '%s\n' "$MAU_REGRESSED" | while read -r r_id r_offered r_installed; do
-                            [ -n "$r_id" ] && print_warn "$(internet_msg \
-                                "$L_INTERNET_MS_REGRESSION_FMT" "$r_id" "$r_offered" "$r_installed")"
+                            [ -n "$r_id" ] || continue
+                            print_warn "$(internet_msg "$L_INTERNET_MS_REGRESSION_FMT" "$r_id" "$r_offered" "$r_installed")"
+                            print_warn "$(internet_msg "$L_INTERNET_MS_CHANNEL_DIAG_FMT" "$_mau_chan" "$r_installed" "$r_offered")"
                         done
-                        print_info "$L_INTERNET_MS_REGRESSION_NOTE"
-                        internet_diag_log "MAU upstream package regression (offered <= installed): $(printf '%s\n' "$MAU_REGRESSED" | tr '\n' ';')"
+                        if [ "$_mau_days_unchanged" -gt "$_mau_stale_limit" ]; then
+                            print_warn "$(internet_msg "$L_INTERNET_STALE_WARNING_FMT" "$_mau_days_unchanged" "$_mau_stale_limit")"
+                        else
+                            print_info "$L_INTERNET_MS_REGRESSION_NOTE"
+                        fi
+                        internet_diag_log "MAU upstream package regression (channel=$_mau_chan, offered <= installed): $(printf '%s\n' "$MAU_REGRESSED" | tr '\n' ';')"
                     fi
                     mau_reconcile_deferrals "$MAU_REGRESSED_IDS" "$MAU_PENDING_IDS" || true
 

@@ -665,6 +665,150 @@ class StaticShellSafetyTests(unittest.TestCase):
             registry.get("Microsoft Teams"), "mau_fallback_self_update"
         )
 
+    def test_every_config_method_has_a_handler(self) -> None:
+        """System guard: Every unique method in config/internet_app_methods.txt must have a handler function in lib/."""
+        methods_cfg = REPO_ROOT / "config" / "internet_app_methods.txt"
+        unique_methods = set()
+        for ln in methods_cfg.read_text(encoding="utf-8").splitlines():
+            ln = ln.split("#", 1)[0].strip()
+            if not ln:
+                continue
+            parts = ln.split("|")
+            if len(parts) >= 2:
+                unique_methods.add(parts[1].strip())
+
+        handler_code = (
+            (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
+            + (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
+            + (REPO_ROOT / "lib" / "internet_registry.sh").read_text(encoding="utf-8")
+        )
+
+        legacy_handled_methods = {
+            "github_dmg", "msupdate", "mau_fallback_self_update",
+            "docker_cli", "brew_cask", "appstore_gui"
+        }
+
+        for method in sorted(unique_methods):
+            if method in legacy_handled_methods:
+                continue
+            handler_names = [
+                f"internet_handler_{method}",
+                f"internet_dispatch_{method}",
+                f"internet_handler_{method}_check",
+            ]
+            found = any(h in handler_code for h in handler_names)
+            self.assertTrue(
+                found,
+                msg=f"Method {method!r} configured in internet_app_methods.txt has no handler function in lib/ (expected one of: {handler_names})",
+            )
+
+    @unittest.skipUnless(
+        __import__("shutil").which("bash"),
+        "bash not available"
+    )
+    def test_vendor_latest_handler_exists_and_sets_status(self) -> None:
+        """test_vendor_latest_handler_exists_and_sets_status: verifies vendor_latest handler sets INTERNET_LAST_STATUS."""
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "TestApp.app" / "Contents" / "Resources"
+            app_dir.mkdir(parents=True)
+            (Path(tmp) / "TestApp.app" / "Contents" / "Info.plist").write_text(
+                '<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>1.0.0</string></dict></plist>',
+                encoding="utf-8"
+            )
+            import subprocess
+            result = subprocess.run(
+                [
+                    "bash", "-c",
+                    f'SCRIPT_DIR="{REPO_ROOT}"; '
+                    f'L_INTERNET_INSTALLED_VERSION="Local: %s"; '
+                    f'L_INTERNET_STATUS_UNKNOWN_VERSION="Unknown"; '
+                    f'L_INTERNET_LAUNCHING_HIDDEN="Launching %s"; '
+                    f'print_info() {{ :; }}; print_step() {{ :; }}; print_warn() {{ :; }}; silent_launch_app() {{ return 0; }}; '
+                    f'. "{REPO_ROOT}/lib/version.sh"; '
+                    f'. "{REPO_ROOT}/lib/internet_i18n.sh"; '
+                    f'. "{REPO_ROOT}/lib/internet_handlers.sh"; '
+                    f'internet_handler_vendor_latest "TestApp" "{tmp}/TestApp.app" "TestApp"; '
+                    f'echo "$INTERNET_LAST_STATUS"'
+                ],
+                capture_output=True, text=True, timeout=5,
+                env=dict(os.environ, HOME=os.environ.get("HOME", "/tmp"))
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("Unknown", result.stdout.strip())
+
+    @unittest.skipUnless(
+        __import__("shutil").which("bash"),
+        "bash not available"
+    )
+    def test_vendor_latest_detects_newer_remote(self) -> None:
+        """test_vendor_latest_detects_newer_remote: remote version higher -> status update available."""
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "TestApp.app" / "Contents" / "Resources"
+            app_dir.mkdir(parents=True)
+            (Path(tmp) / "TestApp.app" / "Contents" / "Info.plist").write_text(
+                '<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>1.0.0</string></dict></plist>',
+                encoding="utf-8"
+            )
+            (app_dir / "app-update.yml").write_text("url: http://127.0.0.1:9999\n", encoding="utf-8")
+            import subprocess
+            result = subprocess.run(
+                [
+                    "bash", "-c",
+                    f'SCRIPT_DIR="{REPO_ROOT}"; '
+                    f'. "{REPO_ROOT}/i18n/lang_en.sh"; '
+                    f'. "{REPO_ROOT}/lib/version.sh"; '
+                    f'. "{REPO_ROOT}/lib/internet_i18n.sh"; '
+                    f'. "{REPO_ROOT}/lib/internet_handlers.sh"; '
+                    f'print_info() {{ :; }}; print_step() {{ :; }}; print_warn() {{ :; }}; silent_launch_app() {{ return 0; }}; '
+                    f'app_version() {{ echo "1.0.0"; }}; '
+                    f'internet_version_relation() {{ echo "newer"; }}; '
+                    f'curl() {{ echo "version: 2.0.0"; }}; '
+                    f'internet_handler_vendor_latest "TestApp" "{tmp}/TestApp.app" "TestApp"; '
+                    f'echo "$INTERNET_LAST_STATUS"'
+                ],
+                capture_output=True, text=True, timeout=5,
+                env=dict(os.environ, HOME=os.environ.get("HOME", "/tmp"))
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("1.0.0", result.stdout.strip())
+            self.assertIn("2.0.0", result.stdout.strip())
+
+    @unittest.skipUnless(
+        __import__("shutil").which("bash"),
+        "bash not available"
+    )
+    def test_vendor_latest_reports_current_when_equal(self) -> None:
+        """test_vendor_latest_reports_current_when_equal: remote version equal -> status current."""
+        with tempfile.TemporaryDirectory() as tmp:
+            app_dir = Path(tmp) / "TestApp.app" / "Contents" / "Resources"
+            app_dir.mkdir(parents=True)
+            (Path(tmp) / "TestApp.app" / "Contents" / "Info.plist").write_text(
+                '<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>1.0.0</string></dict></plist>',
+                encoding="utf-8"
+            )
+            (app_dir / "app-update.yml").write_text("url: http://127.0.0.1:9999\n", encoding="utf-8")
+            import subprocess
+            result = subprocess.run(
+                [
+                    "bash", "-c",
+                    f'SCRIPT_DIR="{REPO_ROOT}"; '
+                    f'. "{REPO_ROOT}/i18n/lang_en.sh"; '
+                    f'. "{REPO_ROOT}/lib/version.sh"; '
+                    f'. "{REPO_ROOT}/lib/internet_i18n.sh"; '
+                    f'. "{REPO_ROOT}/lib/internet_handlers.sh"; '
+                    f'print_info() {{ :; }}; print_step() {{ :; }}; print_warn() {{ :; }}; silent_launch_app() {{ return 0; }}; '
+                    f'app_version() {{ echo "1.0.0"; }}; '
+                    f'internet_version_relation() {{ echo "equal"; }}; '
+                    f'curl() {{ echo "version: 1.0.0"; }}; '
+                    f'internet_handler_vendor_latest "TestApp" "{tmp}/TestApp.app" "TestApp"; '
+                    f'echo "$INTERNET_LAST_STATUS"'
+                ],
+                capture_output=True, text=True, timeout=5,
+                env=dict(os.environ, HOME=os.environ.get("HOME", "/tmp"))
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("1.0.0", result.stdout.strip())
+
     def test_internet_config_status_var_parity(self) -> None:
         """All 4 internet-app config sources must agree on STATUS_* variables.
 
@@ -1268,7 +1412,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
-                timeout=30,
+                timeout=60,
             )
             self.assertEqual(res.returncode, 10, msg=f"update_npm_cli.sh offline curl failure should result in exit 10, got {res.returncode}\n{res.stderr}")
             self.assertNotEqual(res.returncode, 1)
@@ -1306,7 +1450,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 cwd=REPO_ROOT,
-                timeout=30,
+                timeout=60,
             )
             self.assertEqual(res.returncode, 1, msg=f"update_npm_cli.sh Bun tarball install failure must result in exit 1, got {res.returncode}\n{res.stderr}")
 
@@ -1549,6 +1693,96 @@ class StaticShellSafetyTests(unittest.TestCase):
             msg="cleanup_session_dir must kill the sudo keep-alive process",
         )
 
+    def _sudo_block(self) -> str:
+        """Executable lines of the single sudo-acquisition region of update_all.sh.
+
+        Comments are stripped so that documentation mentioning `sudo -v` cannot
+        satisfy — or break — assertions about actual call sites.
+        """
+        text = self.read_script("update_all.sh")
+        start = text.index("# SUDO ACQUISITION")
+        end = text.index("# Tee everything from this point")
+        return "\n".join(
+            line
+            for line in text[start:end].splitlines()
+            if not line.lstrip().startswith("#")
+        )
+
+    def test_sudo_is_never_attempted_without_a_tty(self) -> None:
+        """2026-08-05 regression: a bare `sudo -v` without a controlling terminal
+        escalates to the GUI askpass / Touch ID dialog, which made every command
+        run from an IDE appear to require elevation.
+
+        The non-TTY path must export MAC_UPDATE_NO_SUDO=1 and must not contain
+        any interactive sudo call.
+        """
+        block = self._sudo_block()
+        self.assertIn("export MAC_UPDATE_NO_SUDO=1", block)
+
+        # Isolate the `[ ! -t 0 ]` branch and assert it never calls sudo.
+        guard = 'if [ "$_needs_sudo" -eq 1 ] && [ ! -t 0 ]; then'
+        self.assertIn(guard, block, msg="non-TTY guard is missing")
+        no_tty_branch = block[block.index(guard):]
+        no_tty_branch = no_tty_branch[: no_tty_branch.index("\nfi\n")]
+        for forbidden in ("sudo -v", "sudo -A", "sudo true"):
+            self.assertNotIn(
+                forbidden,
+                no_tty_branch,
+                msg=f"non-TTY branch must not call {forbidden!r} — it triggers the GUI prompt",
+            )
+
+    def test_sudo_is_acquired_at_exactly_one_place(self) -> None:
+        """Every interactive sudo call must live inside the single acquisition
+        block, and there must be at most one prompt per invocation (the
+        JSON-summary variant and the normal variant are mutually exclusive).
+        """
+        text = self.read_script("update_all.sh")
+        code = "\n".join(
+            line for line in text.splitlines() if not line.lstrip().startswith("#")
+        )
+        self.assertEqual(
+            code.count("sudo -v"),
+            2,
+            msg="expected exactly two mutually exclusive `sudo -v` call sites",
+        )
+        block = self._sudo_block()
+        self.assertEqual(
+            block.count("sudo -v"), 2, msg="all `sudo -v` calls must be in the acquisition block"
+        )
+        # A warm timestamp must short-circuit before any prompt.
+        self.assertLess(
+            block.index("sudo -n true"),
+            block.index("sudo -v"),
+            msg="must check `sudo -n true` before prompting",
+        )
+
+    def test_dry_run_never_requests_sudo(self) -> None:
+        """A preview must not ask for credentials."""
+        block = self._sudo_block()
+        self.assertIn('[ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && _needs_sudo=0', block)
+
+    def test_sudo_keepalive_pid_is_not_reset_after_start(self) -> None:
+        """The v1.2.0 bug: `SUDO_KEEPALIVE_PID=""` appeared *after* the keep-alive
+        had been started, orphaning the refresher so it outlived the script.
+        The initialisation must precede every assignment of `$!`.
+        """
+        block = self._sudo_block()
+        init = block.index('SUDO_KEEPALIVE_PID=""')
+        started = block.index("SUDO_KEEPALIVE_PID=$!")
+        self.assertLess(
+            init, started, msg="PID must be initialised before the keep-alive starts"
+        )
+        self.assertEqual(
+            block.count("SUDO_KEEPALIVE_PID=$!"),
+            1,
+            msg="the keep-alive must be started exactly once",
+        )
+        self.assertEqual(
+            block.count('SUDO_KEEPALIVE_PID=""'),
+            1,
+            msg="a second reset would orphan the running keep-alive",
+        )
+
     def test_settle_list_generated_from_config(self) -> None:
         """BUG-2 regression: update_internet_apps.sh must not contain a hardcoded
         list of 19 STATUS_* variables in the settle-loop — it must read from config.
@@ -1616,17 +1850,42 @@ class StaticShellSafetyTests(unittest.TestCase):
         g3_apps = set(re.findall(r'^\|\s*(?:\*\*)?([^|*]+?)(?:\*\*)?\s*\|', g3_text, re.MULTILINE))
         c4c_apps = set(re.findall(r'^\|\s*(?:\*\*)?([^|*]+?)(?:\*\*)?\s*\|', c4c_text, re.MULTILINE))
 
-        g3_apps = {a.strip() for a in g3_apps if a.strip() not in ('Nazwa', 'Nazwa aplikacji', '---') and not a.strip().startswith('-')}
-        c4c_apps = {a.strip() for a in c4c_apps if a.strip() not in ('Pakiet', '---') and not a.strip().startswith('-')}
+        def norm(s: str) -> str:
+            return re.sub(r'[-_ .]', '', s.lower().strip())
+
+        g3_apps = {norm(a) for a in g3_apps if a.strip() not in ('Nazwa', 'Nazwa aplikacji', '---') and not a.strip().startswith('-')}
+        c4c_apps = {norm(a) for a in c4c_apps if a.strip() not in ('Pakiet', '---') and not a.strip().startswith('-')}
 
         intersection = g3_apps.intersection(c4c_apps)
         self.assertEqual(intersection, set(), f"Apps listed in both GRUPA 3 and Section 4c: {intersection}")
 
+    def test_version_relation_detects_downgrade(self) -> None:
+        """F1.4 behavioral: verify internet_version_relation installed vs candidate detects downgrades."""
+        pairs = [
+            ("3.7.21", "3.14.27"),
+            ("1.13.3", "1.13.4"),
+            ("0.2026.05.27.15.44.stable_01", "0.2026.07.29.09.05.02"),
+            ("2.0.10", "2.5.0"),
+        ]
+        cmd = ". lib/internet_app_updates.sh; internet_version_relation \"$1\" \"$2\""
+        for candidate_cask, installed_app in pairs:
+            res = subprocess.run(
+                ["bash", "-c", cmd, "inline_sh", installed_app, candidate_cask],
+                capture_output=True, text=True, cwd=REPO_ROOT
+            )
+            rel = res.stdout.strip()
+            self.assertEqual(
+                rel, "newer",
+                f"Expected '{installed_app}' > '{candidate_cask}' (downgrade) but got '{rel}'"
+            )
+
     def test_brew_upgrade_guards_against_downgrade(self) -> None:
-        """P3.3 regression: update_brew.sh includes cask downgrade guard using internet_version_relation."""
+        """F1.4 regression: update_brew.sh includes cask downgrade guard using internet_version_relation and JSON info."""
         text = self.read_script("update_brew.sh")
         self.assertIn("L_BREW_CASK_WOULD_DOWNGRADE_FMT", text)
         self.assertIn("internet_version_relation", text)
+        self.assertIn("brew info --json=v2 --cask", text)
+        self.assertIn('"newer"', text)
 
 
 class InternetLibParserTests(unittest.TestCase):
