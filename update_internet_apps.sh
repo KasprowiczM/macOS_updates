@@ -17,7 +17,7 @@ set -o pipefail
 #   CHMURA:           Google Drive, MEGAsync, Proton Drive
 #   MICROSOFT 365:    Word, Excel, PowerPoint, Outlook, OneNote (via msupdate)
 #   TEAMS:            built-in updater + observed MAU fallback (TEAMS21)
-#   DEV TOOLS:        VS Code, CodeEdit, Docker Desktop, Warp, Cursor, Ascendo
+#   DEV TOOLS:        VS Code, CodeEdit, Docker Desktop, Warp, Cursor
 #   PRODUKTYWNOŚĆ:    AppCleaner, Obsidian
 #   MULTIMEDIA:       Spotify
 #   KRYPTO:           Ledger Live/Wallet, Trezor Suite
@@ -54,6 +54,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/internet_handlers.sh"
 . "$SCRIPT_DIR/lib/github_release.sh"
 . "$SCRIPT_DIR/lib/internet_i18n.sh"
+. "$SCRIPT_DIR/lib/version.sh"
 . "$SCRIPT_DIR/lib/platform.sh"
 
 mac_update_require_supported_platform || exit 1
@@ -352,20 +353,6 @@ silent_launch_app() {
     return 0
 }
 
-# ── Pomocnik: wersja aplikacji ──────────────────────────────
-app_version() {
-    local app_path="$1" v=""
-    v=$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
-        || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null)
-    if [ -z "$v" ]; then
-        # Fallback for iOS/iPadOS apps on Apple Silicon (wrapped bundles, no
-        # Contents/Info plist) and any odd bundle — read Spotlight metadata.
-        v=$(mdls -name kMDItemVersion -raw "$app_path" 2>/dev/null)
-        [ "$v" = "(null)" ] && v=""
-    fi
-    [ -n "$v" ] && echo "$v" || echo "$L_INTERNET_VERSION_UNKNOWN"
-}
-
 capture_app_path() {
     internet_app_path "$1"
 }
@@ -428,7 +415,6 @@ STATUS_CODEEDIT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_DOCKER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_WARP="$L_INTERNET_STATUS_SKIPPED"
 STATUS_CURSOR="$L_INTERNET_STATUS_SKIPPED"
-STATUS_ASCENDO="$L_INTERNET_STATUS_SKIPPED"
 STATUS_APPCLEANER="→ managed by Homebrew (update_brew.sh)"
 STATUS_OBSIDIAN="→ managed by Homebrew (update_brew.sh)"
 STATUS_SPOTIFY="→ managed by Homebrew (update_brew.sh)"
@@ -636,7 +622,6 @@ printf "  %-32s %s\n" "CodeEdit:"                 "$STATUS_CODEEDIT"
 printf "  %-32s %s\n" "Docker Desktop:"           "$STATUS_DOCKER"
 printf "  %-32s %s\n" "Warp:"                     "$STATUS_WARP"
 printf "  %-32s %s\n" "Cursor:"                   "$STATUS_CURSOR"
-printf "  %-32s %s\n" "Ascendo:"                  "$STATUS_ASCENDO"
 echo ""
 
 echo -e "  ${BOLD}$L_INTERNET_SECTION_PRODUCTIVITY${NC}"
@@ -677,7 +662,7 @@ for status in \
     "$STATUS_ANTIGRAVITY" "$STATUS_ANTIGRAVITY_IDE" "$STATUS_LMSTUDIO" "$STATUS_OPENCODE" \
     "$STATUS_PROTONVPN" "$STATUS_KEEPASSXC" "$STATUS_PROTONMAIL" "$STATUS_ZOOM" \
     "$STATUS_GOOGLEDRIVE" "$STATUS_MEGASYNC" "$STATUS_PROTONDRIVE" "$STATUS_MICROSOFT" "$STATUS_TEAMS" \
-    "$STATUS_VSCODE" "$STATUS_CODEEDIT" "$STATUS_DOCKER" "$STATUS_WARP" "$STATUS_CURSOR" "$STATUS_ASCENDO" \
+    "$STATUS_VSCODE" "$STATUS_CODEEDIT" "$STATUS_DOCKER" "$STATUS_WARP" "$STATUS_CURSOR" \
     "$STATUS_APPCLEANER" "$STATUS_OBSIDIAN" "$STATUS_SPOTIFY" "$STATUS_CAPCUT" \
     "$STATUS_LEDGER" "$STATUS_TREZOR" \
     "$STATUS_RDMANAGER" "$STATUS_IPMIVIEW" "$STATUS_INKSCAPE" \

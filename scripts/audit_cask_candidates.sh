@@ -33,7 +33,6 @@ cask_for_app() {
         "Perplexity")                       echo "perplexity" ;;
         "Antigravity")                      echo "antigravity" ;;
         "Antigravity IDE")                  echo "antigravity-ide" ;;
-        "Ascendo")                          echo "ascendo" ;;
         "OpenCode")                         echo "opencode" ;;
         *)                                  echo "" ;;
     esac

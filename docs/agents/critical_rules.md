@@ -102,7 +102,7 @@ Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 | Docker CLI | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
 | Homebrew cask --greedy-auto-updates | Brave, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
-| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT Atlas, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian, Ascendo |
+| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT Atlas, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian |
 | Hybrid self-update + MAU fallback | Teams (`TEAMS21` is accepted only when surfaced by MAU and is verified by a final `msupdate --list`) |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
 | Manual only | IPMIView, DJI Assistant 2 |
@@ -185,8 +185,20 @@ The quarantine is now maintained by the toolkit instead of by hand:
   system update.
 - `MAC_UPDATE_MAU_KEEP_DEFERRALS=1` disables all deferral mutation; `--dry-run`
   reports the intended change without writing preferences.
+- `MAC_UPDATE_MAU_CLEAR_DEFERRALS=1` forces removal of active deferrals via
+  `defaults delete` to test feed recovery or clear stale quarantines.
 
-## 10. Step Severity Contract and Non-blocking Update Gating
+## 10. Centralized Version Normalization (`lib/version.sh`)
+
+- `app_version()` and `internet_version_relation()` must be sourced from `lib/version.sh` across all components (`update_brew.sh`, `update_internet_apps.sh`, `lib/internet_app_updates.sh`).
+- Never maintain duplicate or diverging implementations of `app_version()` or version comparison functions across scripts.
+
+## 11. Inventory Exclusions (`config/inventory_exclusions.txt`)
+
+- Apps listed in `config/inventory_exclusions.txt` (such as `Ascendo`, which was intentionally removed from the update pipeline on 2026-08-14) are excluded from `APPLICATIONS.md` discovery and inventory scans.
+- `lib/python/inventory.py:load_exclusions()` parses this file and filters matches during prescan.
+
+## 12. Step Severity Contract and Non-blocking Update Gating
 
 - Child `update_*.sh` scripts return exit codes adhering to the severity contract:
   - `0`: Clean execution without issues.

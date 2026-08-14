@@ -88,7 +88,8 @@ for dt, ver in reversed(entries):
     else:
         break
 
-days = (datetime.datetime.utcnow() - start_dt).days
+now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+days = (now - start_dt).days
 print(max(0, days))
 PYEOF
 }
@@ -101,7 +102,7 @@ internet_rotate_version_history() {
 import sys, datetime
 
 tsv_path = sys.argv[1]
-cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=365)
+cutoff = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=365)
 keep = []
 
 try:

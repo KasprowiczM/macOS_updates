@@ -13,6 +13,9 @@
 | `update_internet_apps.sh` | Installed internet apps (see `config/internet_apps.txt`): verified direct handlers, vendor CLIs and honestly reported in-app updater triggers |
 | `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `codex`, `opencode`) + self-updating `agy` |
 | `update_brew.sh` | `brew upgrade` + cleanup + doctor |
+| `lib/python/inventory.py` | Pure Python library for inventory normalization, exclusions, and prescan |
+| `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON |
+| `config/inventory_exclusions.txt` | Explicit list of apps to ignore during inventory scans (e.g. `Ascendo`) |
 | `dev_sync/*.sh` | Export/import/verify private files to/from cloud storage |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
 | `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
@@ -23,17 +26,17 @@
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 
-`update_all.sh` supports `--dry-run`, `--yes`, and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
+`update_all.sh` supports `--dry-run`, `--yes`, `--verify-only`, and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
 
 ## update_all.sh Step Order
 
 ```
-Step 0: prescan.py          — scan /Applications + ~/Applications + brew + mas → atomically update APPLICATIONS.md
+Step 0: prescan             — scan /Applications + ~/Applications + brew + mas → write installed_apps_scan.txt → atomically update APPLICATIONS.md
 Step 1: update_appstore.sh  — Track 1: sudo mas; Track 2: AppleScript GUI for iPad apps
 Step 2: update_npm_cli.sh   — native Node/Bun + npm global CLI migration/update + `agy update`
 Step 3: update_brew.sh      — Homebrew formulae/casks (--greedy) + cleanup + doctor
 Step 4: update_internet_apps.sh — installed internet apps; direct updates and honest triggers
-Step 5: postupdate.py       — atomically refresh APPLICATIONS.md and append UPDATES.md
+Step 5: postupdate.py       — capture fresh /Applications to installed_apps_after.txt → refresh APPLICATIONS.md and append UPDATES.md
 Step 6: update_system.sh    — macOS via softwareupdate -ia -R; last because it may restart
 ```
 

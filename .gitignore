@@ -13,9 +13,7 @@
 /dev_sync/dev_sync_logs/
 /dev_sync/dev_sync_quarantine/
 /logs/
-/__pycache__/
-/dev_sync/__pycache__/
-/i18n/__pycache__/
+__pycache__/
 *.pyc
 *.bak
 

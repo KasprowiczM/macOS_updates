@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.3.1** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–26**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.4.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–26**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -74,6 +74,7 @@ when you want App Store and macOS updates applied.
 | `-y`, `--yes` | Skip the confirmation prompt |
 | `-h`, `--help` | Show usage and exit `0` |
 | `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
+| `--verify-only` | Verify installed app versions against history without mutating |
 | `--json-summary` | Print a JSON result object on stdout after the run |
 | `--non-interactive` | Non-interactive mode for launchd / cron (also implies `-y`) |
 | `--notify` | Post a macOS notification when the run finishes |
@@ -105,12 +106,13 @@ Every flag has an equivalent variable; these are the ones with no flag.
 | `MAC_UPDATE_MAS_CHECK_TIMEOUT` | `120` | Timeout for `mas outdated` |
 | `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` | `1800` | Timeout for `sudo mas upgrade` |
 | `MAC_UPDATE_MAU_DEFERRAL_DAYS` | `7` | Microsoft AutoUpdate quarantine window (clamped to Microsoft's 1–28) |
+| `MAC_UPDATE_MAU_CLEAR_DEFERRALS` | `0` | Set to `1` to remove blocking MAU deferral keys via `defaults delete` |
 | `MAC_UPDATE_MAU_KEEP_DEFERRALS` | `0` | Set to `1` to make the toolkit never touch MAU deferral preferences |
 | `MAC_UPDATE_LANG` / `MAC_LANG` | from `.mac_update_prefs` | UI language (`en pl es it pt de fr`) |
 
 ## sudo and Touch ID — the contract
 
-Rewritten in v1.3.1. `update_all.sh` has **exactly one** interactive `sudo` call
+Rewritten in v1.3.1 / v1.4.0. `update_all.sh` has **exactly one** interactive `sudo` call
 site, and it is governed by three conditions:
 
 1. **At most once per run.** A single `sudo -v` before the log redirect, then a

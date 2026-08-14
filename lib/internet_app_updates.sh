@@ -2,43 +2,12 @@
 # lib/internet_app_updates.sh — per-app update handlers (sourced by update_internet_apps.sh)
 # Requires: helpers from update_internet_apps.sh (print_*, app_version, silent_launch_app, etc.)
 
-# Print "newer" only when the remote version is provably greater than the
-# installed version. "current" includes equality and a local version ahead of
-# the feed; "unknown" prevents replacement when either version is unparseable.
-internet_version_relation() {
-    python3 - "$1" "$2" <<'PYEOF'
-import re
-import sys
-
-
-def version_key(value):
-    match = re.search(r"\d+(?:\.\d+)*", value or "")
-    if not match:
-        return None
-    numbers = [int(part) for part in match.group(0).split(".")]
-    numbers = (numbers + [0] * 12)[:12]
-    suffix = (value[match.end():] or "").lower().split("+", 1)[0]
-    prerelease = suffix.lstrip("-._")
-    prerelease_rank = 4
-    for marker, rank in (("dev", 0), ("alpha", 1), ("a", 1), ("beta", 2), ("b", 2), ("rc", 3)):
-        if prerelease.startswith(marker):
-            prerelease_rank = rank
-            break
-    suffix_numbers = [int(part) for part in re.findall(r"\d+", suffix)]
-    suffix_numbers = (suffix_numbers + [0] * 4)[:4]
-    return tuple(numbers + [prerelease_rank] + suffix_numbers)
-
-
-remote = version_key(sys.argv[1])
-local = version_key(sys.argv[2])
-if remote is None or local is None:
-    print("unknown")
-elif remote > local:
-    print("newer")
-else:
-    print("current")
-PYEOF
-}
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$_LIB_DIR/version.sh" ]; then
+    . "$_LIB_DIR/version.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/version.sh" ]; then
+    . "$SCRIPT_DIR/lib/version.sh"
+fi
 
 GOOGLE_KEYSTONE_RAN=0
 GOOGLE_KEYSTONE_EXIT=1
@@ -1052,6 +1021,34 @@ iu_microsoft_365() {
             # Report the deferral state and clear version pins. The DeferralDays
             # quarantine is reconciled after the list, once the offer is known.
             mau_deferral_preflight || true
+
+            if [ "${MAC_UPDATE_MAU_CLEAR_DEFERRALS:-0}" = "1" ]; then
+                local _plist_def before_def _def_key _def_entry _after_def=""
+                _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
+                if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
+                    before_def="$(mau_deferral_state "$_plist_def")"
+                    rm -f "$_plist_def" 2>/dev/null || true
+                    if [ -n "$before_def" ]; then
+                        print_step "MAC_UPDATE_MAU_CLEAR_DEFERRALS=1: Clearing detected MAU deferrals..."
+                        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+                        for _def_entry in $before_def; do
+                            [ -n "$_def_entry" ] || continue
+                            _def_key="${_def_entry%%=*}"
+                            defaults delete com.microsoft.autoupdate2 "OptionalUpdatesDeferrals.$_def_key" 2>/dev/null || true
+                        done
+                        defaults delete com.microsoft.autoupdate2 "OptionalUpdatesDeferrals" 2>/dev/null || true
+
+                        _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
+                        if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
+                            _after_def="$(mau_deferral_state "$_plist_def")"
+                            rm -f "$_plist_def" 2>/dev/null || true
+                        fi
+                        print_ok "Cleared MAU deferrals (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
+                        internet_diag_log "MAU deferrals cleared by MAC_UPDATE_MAU_CLEAR_DEFERRALS=1 (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
+                    fi
+                fi
+            fi
+
             # Krok 1: sprawdź dostępne aktualizacje z limitem czasu MAU_CHECK_TIMEOUT
             print_step "$L_INTERNET_MS_CHECKING"
             MAU_LIST_EXIT=0
@@ -1448,10 +1445,6 @@ iu_warp() {
 
 iu_cursor() {
     internet_dispatch_silent_launch "⚡ Cursor" "Cursor" "STATUS_CURSOR" "Cursor" "Cursor → Cursor → Check for updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
-}
-
-iu_ascendo() {
-    internet_dispatch_silent_launch "📊 Ascendo" "Ascendo" "STATUS_ASCENDO" "Ascendo" "Ascendo → Check for updates"
 }
 
 iu_appcleaner() {

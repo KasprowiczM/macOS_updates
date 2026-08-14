@@ -1009,6 +1009,16 @@ SYSTEM_SKIP_FRAGMENTS = [
     'Service', 'Daemon', 'XPC', 'Feedback', 'Handler',
 ]
 SKIP_DISCOVERY_APPS = set(['Utilities'])
+_excl_cfg = os.path.join(script_dir, 'config', 'inventory_exclusions.txt')
+if os.path.isfile(_excl_cfg):
+    try:
+        with open(_excl_cfg, 'r', encoding='utf-8') as _ef:
+            for _line in _ef:
+                _line = _line.split('#', 1)[0].strip()
+                if _line:
+                    SKIP_DISCOVERY_APPS.add(_line)
+    except OSError:
+        pass
 for app in installed_all:
     if any(frag.lower() in app.lower() for frag in SYSTEM_SKIP_FRAGMENTS):
         continue
