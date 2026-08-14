@@ -550,9 +550,9 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("UPDATES.md history intentionally unchanged", text)
 
     def test_prescan_recognizes_formatted_inventory_cells(self) -> None:
-        text = self.read_script("update_all.sh")
-        self.assertIn(r'(?:\*\*)?(?:\s+[^|]+)?\s*\|', text)
-        self.assertIn("fields[1] == 'appstore_gui'", text)
+        inventory_py = (REPO_ROOT / "lib" / "python" / "inventory.py").read_text(encoding="utf-8")
+        self.assertIn(r'(?:\*\*)?(?:\s+[^|]+)?\s*\|', inventory_py)
+        self.assertIn("appstore_gui", inventory_py)
 
     def test_internet_dmg_handlers_use_session_mount_helper(self) -> None:
         handlers = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(
@@ -1887,6 +1887,31 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("brew info --json=v2 --cask", text)
         self.assertIn('"newer"', text)
 
+    def test_update_brew_sourced_functions_resolve(self) -> None:
+        """P0-1: assert update_brew.sh defines or sources all called helper functions."""
+        text = self.read_script("update_brew.sh")
+        self.assertIn("lib/version.sh", text)
+        self.assertIn("lib/internet_i18n.sh", text)
+
+        cmd = """
+        SCRIPT_DIR="."
+        . lib/platform.sh
+        . lib/cli.sh
+        . lib/ui.sh
+        . i18n/loader.sh
+        . lib/severity.sh
+        . lib/internet_apps.sh
+        . lib/version.sh
+        . lib/internet_i18n.sh
+        type app_version >/dev/null 2>&1 || exit 10
+        type internet_version_relation >/dev/null 2>&1 || exit 11
+        type internet_msg >/dev/null 2>&1 || exit 12
+        echo "OK"
+        """
+        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, cwd=REPO_ROOT)
+        self.assertEqual(res.returncode, 0, f"Helper functions not defined in update_brew.sh sourced scope: {res.stderr}")
+        self.assertEqual(res.stdout.strip(), "OK")
+
 
 class InternetLibParserTests(unittest.TestCase):
     """Tests for lib/internet_apps.sh, internet_registry.sh, internet_handlers.sh,
@@ -2536,5 +2561,107 @@ class TestDevSyncRedact(unittest.TestCase):
         self.assertIn("_authToken=[REDACTED]", _redact(raw_auth))
 
 
+class InventoryAndPipelineV14Tests(unittest.TestCase):
+    """Unit and static tests for v1.4.0 inventory, run summary, and exclusions."""
+
+    def test_inventory_norm_name(self) -> None:
+        from lib.python.inventory import norm_name
+        self.assertEqual(norm_name("Visual Studio Code"), "visualstudiocode")
+        self.assertEqual(norm_name("Firefox_Dev-Edition.app"), "firefoxdeveditionapp")
+        self.assertEqual(norm_name("  Docker Desktop  "), "dockerdesktop")
+
+    def test_inventory_exclusions_load(self) -> None:
+        from lib.python.inventory import load_exclusions
+        exclusions_path = REPO_ROOT / "config" / "inventory_exclusions.txt"
+        self.assertTrue(exclusions_path.exists(), "config/inventory_exclusions.txt must exist")
+        exclusions = load_exclusions(exclusions_path)
+        self.assertIn("Utilities", exclusions)
+        self.assertIn("Ascendo", exclusions)
+
+    def test_inventory_load_appstore_gui_apps(self) -> None:
+        from lib.python.inventory import load_appstore_gui_apps
+        methods_path = REPO_ROOT / "config" / "internet_app_methods.txt"
+        gui_apps = load_appstore_gui_apps(methods_path)
+        self.assertIsInstance(gui_apps, set)
+        self.assertIn("WiFiman", gui_apps)
+
+    def test_inventory_row_exists(self) -> None:
+        from lib.python.inventory import row_exists
+        sample_md = "| **Google Chrome** | 120.0 | https://google.com |\n| Visual Studio Code | 1.85 | https://code.visualstudio.com |\n"
+        self.assertTrue(row_exists(sample_md, "Google Chrome"))
+        self.assertTrue(row_exists(sample_md, "Visual Studio Code"))
+        self.assertTrue(row_exists(sample_md, "VS Code"))  # alias
+        self.assertFalse(row_exists(sample_md, "NonExistentApp"))
+
+    def test_run_summary_builder_and_writer(self) -> None:
+        import json
+        import tempfile
+        from lib.python.run_summary import build_run_summary, write_run_summary, determine_exit_class
+
+        self.assertEqual(determine_exit_class(0, 0), "clean")
+        self.assertEqual(determine_exit_class(0, 1), "warnings")
+        self.assertEqual(determine_exit_class(1, 0), "error")
+
+        step_results = {
+            "prescan": "OK",
+            "appstore": "OK",
+            "npmcli": "OK",
+            "brew": "OK",
+            "internet": "OK",
+            "postupdate": "OK",
+            "system": "OK",
+        }
+        summary = build_run_summary(
+            start_time=1700000000,
+            end_time=1700000120,
+            overall_exit=0,
+            degraded=0,
+            blocking_exit=0,
+            step_results=step_results,
+            flags={"dry_run": False},
+        )
+        self.assertEqual(summary["duration_seconds"], 120)
+        self.assertEqual(summary["duration_formatted"], "2m 0s")
+        self.assertEqual(summary["exit_class"], "clean")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = Path(tmpdir) / "run_summary_test.json"
+            written = write_run_summary(out_file, summary)
+            self.assertTrue(Path(written).exists())
+            with open(written, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            self.assertEqual(loaded["exit_code"], 0)
+            self.assertEqual(loaded["steps"]["prescan"], "OK")
+
+    def test_no_deprecated_datetime_utcnow_in_repo(self) -> None:
+        """Assert no occurrences of deprecated datetime.utcnow() in shell scripts or python."""
+        for path in REPO_ROOT.rglob("*.sh"):
+            content = path.read_text(encoding="utf-8", errors="ignore")
+            self.assertNotIn("datetime.utcnow()", content, f"Deprecated datetime.utcnow() found in {path}")
+        for path in (REPO_ROOT / "lib" / "python").glob("*.py"):
+            content = path.read_text(encoding="utf-8", errors="ignore")
+            self.assertNotIn("datetime.utcnow()", content, f"Deprecated datetime.utcnow() found in {path}")
+
+    def test_sudo_keepalive_traps_and_kills_sleep_pid(self) -> None:
+        """Assert sudo keepalive loop sets INT/TERM trap that kills child sleep."""
+        text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
+        self.assertIn("trap '[ -n \"$_macupd_sleep_pid\" ] && kill \"$_macupd_sleep_pid\" 2>/dev/null; exit 0' INT TERM", text)
+        self.assertIn("_macupd_sleep_pid=$!", text)
+        self.assertIn('wait "$_macupd_sleep_pid"', text)
+
+    def test_notification_only_when_explicitly_requested(self) -> None:
+        """Assert macOS notification fires only when MAC_UPDATE_NOTIFY=1, not noninteractive alone."""
+        text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
+        self.assertIn('if [ "${MAC_UPDATE_NOTIFY:-0}" = "1" ]; then', text)
+        self.assertNotIn('if [ "${MAC_UPDATE_NOTIFY:-0}" = "1" ] || [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ]; then', text)
+
+    def test_run_timestamp_is_exported_and_used(self) -> None:
+        """Assert RUN_TIMESTAMP is exported from LOG_TS for deterministic JSON filenames."""
+        text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
+        self.assertIn('export RUN_TIMESTAMP="$LOG_TS"', text)
+        self.assertIn('ts_str = os.environ.get("RUN_TIMESTAMP") or str(start_time)', text)
+
+
 if __name__ == "__main__":
     unittest.main()
+

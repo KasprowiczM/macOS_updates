@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.3.1** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–26**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
+> **v1.4.0** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–26**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
 
 **Repositorio público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -55,24 +55,26 @@ frecuente en este proyecto.
 requieren autenticación del usuario — en Apple Silicon `softwareupdate` exige credenciales
 de propietario del volumen. Ejecute `bash update_all.sh` de forma interactiva para aplicarlas.
 
-**Contrato de sudo (v1.3.1):** como máximo una solicitud por ejecución; **nunca** sin un TTY
+**Contrato de sudo (v1.3.1 / v1.4.0):** como máximo una solicitud por ejecución; **nunca** sin un TTY
 de control (en su lugar se exporta `MAC_UPDATE_NO_SUDO=1`); nunca con `--dry-run`.
 
 ---
 
-## Características y variables de entorno en v1.3.1
+## Características y variables de entorno en v1.4.0
 
 - **Preautorización Sudo / Touch ID**: Detecta `pam_tid.so` y mantiene viva la sesión de sudo.
 - **Soporte para LaunchAgent y tareas en segundo plano**: Admite `MAC_UPDATE_NO_SUDO=1` para ejecuciones desatendidas.
-- **Método `vendor_latest`**: Evita degradaciones de Homebrew Cask para apps de actualización rápida (Cursor, Warp, Antigravity, Proton Mail, Proton Drive, Claude, Comet, ChatGPT).
+- **`vendor_latest` y protección contra downgrades**: Evita degradaciones de Homebrew Cask para apps de actualización rápida.
 - **Variables de control**:
   - `MAC_UPDATE_YES=1` (`-y`) — Confirmación no interactiva de todos los pasos.
   - `MAC_UPDATE_SKIP_SYSTEM=1` (`--skip-system`) — Omite las actualizaciones del sistema macOS.
+  - `MAC_UPDATE_VERIFY_ONLY=1` (`--verify-only`) — Verifica las versiones de las apps instaladas contra el historial sin modificarlas.
   - `MAC_UPDATE_NONINTERACTIVE=1` — Suprime diálogos interactivos.
+  - `MAC_UPDATE_MAU_CLEAR_DEFERRALS=1` — Elimina claves de aplazamiento bloqueantes de MAU.
 
 ```bash
-# Ejemplo de ejecución automatizada en segundo plano:
-MAC_UPDATE_NONINTERACTIVE=1 bash update_all.sh -y --skip-system
+# Ejemplo de verificación de versiones sin actualizar:
+bash update_all.sh --verify-only
 ```
 
 ---

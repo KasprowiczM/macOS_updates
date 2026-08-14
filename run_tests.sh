@@ -44,7 +44,7 @@ done
 say "2/4  python3 -m py_compile on all .py and inline heredocs"
 # Only tracked project code belongs to the production test surface. Local
 # ignored scratch helpers must never make CI or a release check fail.
-PY_FILES="dev_sync/*.py scripts/*.py tests/*.py"
+PY_FILES="lib/python/*.py dev_sync/*.py scripts/*.py tests/*.py"
 if python3 -m py_compile $PY_FILES 2>&1; then
     ok "all python modules compile"
 else

@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.3.1** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–26**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.4.0** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–26**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
 
 **Öffentliches Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -56,24 +56,26 @@ erfordern eine Benutzerauthentifizierung — auf Apple Silicon verlangt `softwar
 Volume-Owner-Anmeldedaten. Führen Sie `bash update_all.sh` interaktiv aus, wenn Sie diese
 Updates einspielen möchten.
 
-**sudo-Kontrakt (v1.3.1):** höchstens eine Abfrage pro Lauf; **nie** ohne steuerndes TTY
+**sudo-Kontrakt (v1.3.1 / v1.4.0):** höchstens eine Abfrage pro Lauf; **nie** ohne steuerndes TTY
 (stattdessen wird `MAC_UPDATE_NO_SUDO=1` exportiert); nie bei `--dry-run`.
 
 ---
 
-## Funktionen & Umgebungsvariablen in v1.3.1
+## Funktionen & Umgebungsvariablen in v1.4.0
 
 - **Touch ID / Sudo Pre-Authorization**: Erkennt Touch ID `pam_tid.so` und hält Sudo-Sitzungen aktiv.
 - **Hintergrund & LaunchAgent Support**: Unterstützt `MAC_UPDATE_NO_SUDO=1` für unbewachte Hintergrundausführungen.
-- **`vendor_latest` Methode**: Verhindert Homebrew Cask Downgrades für schnell aktualisierte Apps (Cursor, Warp, Antigravity, Proton Mail, Proton Drive, Claude, Comet, ChatGPT).
+- **`vendor_latest` & Downgrade-Schutz**: Verhindert Homebrew Cask Downgrades für schnell aktualisierte Apps.
 - **Steuerungs-Flags**:
   - `MAC_UPDATE_YES=1` (`-y`) — Nicht-interaktive Bestätigung aller Schritte.
   - `MAC_UPDATE_SKIP_SYSTEM=1` (`--skip-system`) — Überspringt macOS Systemupdates.
+  - `MAC_UPDATE_VERIFY_ONLY=1` (`--verify-only`) — Überprüft Versionen installierter Apps anhand des Verlaufs ohne Änderungen.
   - `MAC_UPDATE_NONINTERACTIVE=1` — Unterdrückt interaktive Dialoge.
+  - `MAC_UPDATE_MAU_CLEAR_DEFERRALS=1` — Entfernt blockierende MAU-Aufschubschlüssel.
 
 ```bash
-# Beispiel für automatisierten Hintergrund-Run:
-MAC_UPDATE_NONINTERACTIVE=1 bash update_all.sh -y --skip-system
+# Beispiel für Versionsüberprüfung ohne Aktualisierung:
+bash update_all.sh --verify-only
 ```
 
 ---

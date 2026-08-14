@@ -33,6 +33,8 @@ mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
 . "$SCRIPT_DIR/lib/internet_apps.sh"
+. "$SCRIPT_DIR/lib/version.sh"
+. "$SCRIPT_DIR/lib/internet_i18n.sh"
 mac_update_severity_init
 
 cleanup_brew() {

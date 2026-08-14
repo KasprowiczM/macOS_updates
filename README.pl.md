@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.3.1** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–26**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+> **v1.4.0** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–26**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
 
 **Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Zmiany: [CHANGELOG.md](CHANGELOG.md)
 
@@ -65,9 +65,54 @@ gdy chcesz zainstalować aktualizacje App Store i macOS.
 
 ---
 
+## Flagi wiersza poleceń
+
+Autorytatywną listę definiuje `lib/cli.sh`; `bash update_all.sh --help` ją wyświetla.
+
+| Flaga | Działanie |
+|-------|-----------|
+| `-y`, `--yes` | Pomija pytanie o potwierdzenie |
+| `-h`, `--help` | Wyświetla pomoc i wychodzi z kodem `0` |
+| `--dry-run` | Podgląd każdego kroku, bez wprowadzania zmian, bez pytań o poświadczenia |
+| `--verify-only` | Weryfikuje wersje zainstalowanych aplikacji względem historii bez modyfikacji |
+| `--json-summary` | Wypisuje obiekt JSON z podsumowaniem na stdout po zakończeniu |
+| `--non-interactive` | Tryb nieinteraktywny dla launchd / cron (wymusza również `-y`) |
+| `--notify` | Wysyła powiadomienie systemowe macOS po zakończeniu |
+| `--treat-appstore-ax-as-warning` | Traktuje wyjście App Store `2` (brak uprawnień Dostępności) jako ostrzeżenie |
+| `--skip-prescan` | Pomija krok 0 (prescan `APPLICATIONS.md`) |
+| `--skip-appstore` | Pomija krok 1 (App Store) |
+| `--skip-npm` | Pomija krok 2 (natywne CLI + npm) |
+| `--skip-brew` | Pomija krok 3 (Homebrew) |
+| `--skip-internet` | Pomija krok 4 (aplikacje internetowe) |
+| `--skip-postupdate` | Pomija krok 5 (historia `APPLICATIONS.md` / `UPDATES.md`) |
+| `--skip-system` | Pomija krok 6 (aktualizacja systemu macOS) |
+| `--skip-doctor` | Pomija `brew doctor` w `update_brew.sh` |
+
+## Zmienne środowiskowe
+
+Każda flaga ma swój odpowiednik w postaci zmiennej; poniższe zmienne nie posiadają osobnych flag:
+
+| Zmienna | Wartość domyślna | Znaczenie |
+|---------|------------------|-----------|
+| `MAC_UPDATE_NONINTERACTIVE` | `0` | Brak zapytań; pomija automatyzację GUI App Store Track 2 |
+| `MAC_UPDATE_NOTIFY` | `0` | Powiadomienie na biurku po zakończeniu (włączane też w trybie nieinteraktywnym) |
+| `MAC_UPDATE_NO_SUDO` | *ustawiane automatycznie* | Eksportowane przez `update_all.sh` przy braku TTY; skrypty podrzędne pomijają kroki roota |
+| `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | Ustawienie na `1` wyłącza odświeżanie znacznika czasu `sudo` w tle |
+| `MAC_UPDATE_STALE_DAYS` | `45` | Liczba dni, po których niezweryfikowana aplikacja jest oznaczana jako przestarzała |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Liczba zachowywanych logów w `logs/` |
+| `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `10` | Pauza pozwalająca updaterowi przepisać `Info.plist` (`0` wyłącza, limit 120) |
+| `MAC_UPDATE_MAS_CHECK_TIMEOUT` | `120` | Limit czasu dla `mas outdated` |
+| `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` | `1800` | Limit czasu dla `sudo mas upgrade` |
+| `MAC_UPDATE_MAU_DEFERRAL_DAYS` | `7` | Okno kwarantanny Microsoft AutoUpdate (wartości Microsoftu: 1–28) |
+| `MAC_UPDATE_MAU_CLEAR_DEFERRALS` | `0` | Ustawienie na `1` usuwa blokujące klucze odroczeń MAU przez `defaults delete` |
+| `MAC_UPDATE_MAU_KEEP_DEFERRALS` | `0` | Ustawienie na `1` sprawia, że zestaw narzędzi nigdy nie modyfikuje preferencji MAU |
+| `MAC_UPDATE_LANG` / `MAC_LANG` | z `.mac_update_prefs` | Język interfejsu (`en pl es it pt de fr`) |
+
+---
+
 ## sudo i Touch ID — kontrakt
 
-Przepisany w v1.3.1. `update_all.sh` ma **dokładnie jedno** miejsce wywołania
+Przepisany w v1.3.1 / v1.4.0. `update_all.sh` ma **dokładnie jedno** miejsce wywołania
 interaktywnego `sudo`, obwarowane trzema warunkami:
 
 1. **Najwyżej raz na uruchomienie.** Pojedyncze `sudo -v` przed przekierowaniem

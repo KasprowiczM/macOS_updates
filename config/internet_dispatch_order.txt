@@ -25,7 +25,7 @@ iu_codeedit
 iu_docker_desktop
 iu_warp
 iu_cursor
-iu_ascendo
+# Ascendo — removed from the update pipeline 2026-08-14 (user request)
 # AppCleaner — migrated to Homebrew cask 2026-08-05
 # Obsidian — migrated to Homebrew cask 2026-08-05
 # Spotify — migrated to Homebrew cask 2026-08-05

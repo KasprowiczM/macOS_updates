@@ -4,6 +4,26 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.4.0] — 2026-08-14
+
+Major quality, observability, and architecture release based on the comprehensive August 2026 review.
+
+### Added
+
+- **`lib/version.sh` shared version utilities.** Canonical `app_version()` (with `CFBundleShortVersionString` → `CFBundleVersion` → `mdls` fallback) and `internet_version_relation()` now live in a single shared library sourced across `update_brew.sh`, `update_internet_apps.sh`, and `lib/internet_app_updates.sh`.
+- **`lib/python/inventory.py` & `lib/python/run_summary.py`.** Pure-function Python modules for app normalization, bundle discovery, version detection, exclusions loading, and structured JSON run summary generation (strictly complying with AGENTS.md rule 4).
+- **`config/inventory_exclusions.txt`.** Dedicated exclusion list allowing specific installed apps (such as `Ascendo` or `Utilities`) to be excluded from prescan discovery and auto-insertion into `APPLICATIONS.md`.
+- **`--verify-only` mode.** Re-verifies installed application versions against `logs/version_history.tsv` without performing any system mutations; emits a formatted verification table and exits 0 (clean) or 10 (soft unverified).
+- **Machine-readable JSON run report.** Generates structured run summary at `logs/run_summary_<timestamp>.json` and updates `logs/run_summary_latest.json`.
+- **Gated Microsoft AutoUpdate remediation (`MAC_UPDATE_MAU_CLEAR_DEFERRALS=1`).** Safely clears blocking MAU update deferrals via `defaults delete com.microsoft.autoupdate2` when explicitly requested.
+
+### Fixed
+
+- **Dead cask downgrade guard in `update_brew.sh`.** Sourced `lib/version.sh` and `lib/internet_i18n.sh`, ensuring `app_version()` and `internet_version_relation()` are always available and active during Homebrew cask upgrades.
+- **`installed_apps_after.txt` snapshot semantics.** Prescan now writes to `installed_apps_scan.txt`, while Step 5 captures a fresh post-update snapshot to `installed_apps_after.txt` (or copies in `--inventory-only` mode).
+- **Deprecated `datetime.utcnow()` warnings.** Replaced all instances in `lib/internet_apps.sh` with timezone-aware `datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)`.
+- **Repository hygiene.** Moved large history archive to `scratch/` and cleaned local temporary artifacts.
+
 ## [1.3.1] — 2026-08-05
 
 Production release. Closes the verification gap for self-updating applications, removes

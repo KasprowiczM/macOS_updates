@@ -152,6 +152,7 @@ LOGS_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOGS_DIR" 2>/dev/null || true
 chmod 700 "$LOGS_DIR" 2>/dev/null || true
 LOG_TS="$(date +%Y%m%d_%H%M%S)"
+export RUN_TIMESTAMP="$LOG_TS"
 LOG_FILE="$LOGS_DIR/update_all_${LOG_TS}.log"
 MAX_LOGS="${MAC_UPDATE_MAX_LOGS:-30}"
 case "$MAX_LOGS" in
@@ -242,7 +243,16 @@ if [ "$_needs_sudo" -eq 1 ]; then
     # Keep the timestamp warm for the whole run. Started at most once; the PID
     # is killed in cleanup_session_dir() on every exit path including INT/TERM.
     if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] && sudo -n true 2>/dev/null; then
-        ( while true; do sudo -n true 2>/dev/null || exit 0; sleep 50; done ) &
+        (
+            _macupd_sleep_pid=""
+            trap '[ -n "$_macupd_sleep_pid" ] && kill "$_macupd_sleep_pid" 2>/dev/null; exit 0' INT TERM
+            while true; do
+                sudo -n true 2>/dev/null || exit 0
+                sleep 50 &
+                _macupd_sleep_pid=$!
+                wait "$_macupd_sleep_pid" 2>/dev/null || exit 0
+            done
+        ) &
         SUDO_KEEPALIVE_PID=$!
     fi
 fi
@@ -376,6 +386,81 @@ BLOCKING_EXIT=0
 DEGRADED=0
 
 # ============================================================
+# VERIFY-ONLY MODE (--verify-only)
+# ============================================================
+if [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
+    ui_step_header 0 0 "Verification of Installed Application Versions (--verify-only)"
+    print_info "Capturing current application versions..."
+    if ! internet_capture_versions "$SESSION_DIR/internet_verify.txt"; then
+        print_error "Failed to capture current application versions"
+        exit 1
+    fi
+
+    python3 -c '
+import os, sys
+
+script_dir = sys.argv[1]
+session_dir = sys.argv[2]
+history_file = os.path.join(script_dir, "logs", "version_history.tsv")
+verify_file = os.path.join(session_dir, "internet_verify.txt")
+
+current = {}
+if os.path.isfile(verify_file):
+    with open(verify_file, "r", encoding="utf-8") as f:
+        for line in f:
+            if "|" in line:
+                name, ver = line.strip().split("|", 1)
+                current[name] = ver
+
+history = {}
+if os.path.isfile(history_file):
+    with open(history_file, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = line.strip().split("\t")
+            if len(parts) >= 3:
+                history[parts[1]] = parts[2]
+
+header_app = "Application"
+header_rec = "Recorded Version"
+header_cur = "Current Version"
+dash_char = "-"
+
+print("\n" + "=" * 70)
+print(f"{header_app:<30} | {header_rec:<18} | {header_cur:<18}")
+print("-" * 70)
+
+unverified = 0
+for app, curr_ver in sorted(current.items()):
+    hist_ver = history.get(app, dash_char)
+    if curr_ver == "?" or curr_ver == "unknown":
+        status = "⏳ unverified"
+        unverified += 1
+    elif hist_ver != dash_char and hist_ver != curr_ver:
+        status = f"🚀 updated ({hist_ver} -> {curr_ver})"
+    else:
+        status = f"✅ verified ({curr_ver})"
+    print(f"{app:<30} | {hist_ver:<18} | {curr_ver:<18} | {status}")
+
+print("=" * 70)
+print(f"Total checked: {len(current)} | Unverified: {unverified}")
+if unverified > 0:
+    sys.exit(10)
+sys.exit(0)
+' "$SCRIPT_DIR" "$SESSION_DIR"
+    _verify_rc=$?
+    if [ "$_verify_rc" -eq 10 ]; then
+        print_warn "Verification completed with soft unverified apps (exit 10)"
+        exit 10
+    elif [ "$_verify_rc" -ne 0 ]; then
+        print_error "Verification failed (exit 1)"
+        exit 1
+    else
+        print_ok "All application versions verified successfully"
+        exit 0
+    fi
+fi
+
+# ============================================================
 # STEP 0: Scan new applications
 # ============================================================
 ui_master_progress 0 6
@@ -387,7 +472,6 @@ elif mac_update_dry_run_msg "prescan.py (APPLICATIONS.md scan)"; then
 else
 ui_step_header 0 6 "$L_ALL_STEP0"
 
-# TODO(H4): Recommended follow-up is extracting pure functions (row_exists, installed_app_version, 4a/4c/4d table-insertion helpers, version_for_table_row, expand_internet_versions) into lib/python/, which requires a real APPLICATIONS.md test fixture.
 # Write the pre-scan Python script to session dir
 cat > "$SESSION_DIR/prescan.py" << 'PYEOF'
 import os
@@ -398,6 +482,19 @@ import tempfile
 
 script_dir = sys.argv[1]
 session_dir = sys.argv[2]
+
+sys.path.insert(0, os.path.join(script_dir, 'lib', 'python'))
+from inventory import (
+    APP_ALIASES,
+    SYSTEM_APP_FRAGMENTS,
+    norm_name,
+    load_exclusions,
+    load_appstore_gui_apps,
+    row_exists,
+    app_exists,
+    installed_app_version,
+    scan_installed_app_paths,
+)
 
 programy_md_path = os.path.join(script_dir, 'APPLICATIONS.md')
 
@@ -473,61 +570,8 @@ def read_md():
 content = read_md()
 any_new_found = False
 
-APP_ALIASES = {
-    'OpenCode': ['OpenCode', 'opencode', 'Opencode', 'opencode Desktop'],
-    'Ledger Live': ['Ledger Live', 'Ledger Wallet'],
-    'Docker': ['Docker', 'Docker Desktop'],
-    'Docker Desktop': ['Docker', 'Docker Desktop'],
-    'ChatGPT / Codex': ['ChatGPT / Codex', 'ChatGPT', 'Codex', 'Codex Desktop (OpenAI)'],
-    'ChatGPT': ['ChatGPT', 'ChatGPT / Codex', 'Codex', 'Codex Desktop (OpenAI)'],
-    'Codex': ['Codex', 'ChatGPT', 'ChatGPT / Codex', 'Codex Desktop (OpenAI)'],
-    'Comet': ['Comet', 'Comet (Perplexity Browser)'],
-    'Perplexity': ['Perplexity', 'Perplexity Desktop'],
-    'zoom.us': ['zoom.us', 'Zoom'],
-    'Visual Studio Code': ['Visual Studio Code', 'VS Code'],
-    'Brave Browser': ['Brave Browser', 'Brave'],
-    'Firefox Developer Edition': ['Firefox Developer Edition', 'Firefox Dev Edition'],
-    'Keynote Creator Studio': ['Keynote Creator Studio', 'Keynote'],
-    'Numbers Creator Studio': ['Numbers Creator Studio', 'Numbers'],
-    'Pages Creator Studio': ['Pages Creator Studio', 'Pages'],
-}
-
-SKIP_DISCOVERY_APPS = set(['Utilities'])
-# Apps explicitly delegated to App Store GUI Track 2 are already covered by
-# the registry even though iPad-on-Mac inventory entries are not normal mas
-# rows. Do not report them as new internet downloads on every prescan.
-methods_path = os.path.join(script_dir, 'config', 'internet_app_methods.txt')
-try:
-    with open(methods_path, encoding='utf-8') as methods_handle:
-        for raw in methods_handle:
-            raw = raw.split('#', 1)[0].strip()
-            if not raw:
-                continue
-            fields = raw.split('|')
-            if len(fields) >= 2 and fields[1] == 'appstore_gui':
-                SKIP_DISCOVERY_APPS.add(fields[0])
-except OSError:
-    pass
-
-def row_exists(table_content, name):
-    for candidate in APP_ALIASES.get(name, [name]):
-        # Inventory cells may bold iPad apps or append a marker such as 🆕.
-        # Match the exact start of the first cell while allowing that formatting.
-        pattern = (
-            r'^\|\s*(?:\*\*)?' + re.escape(candidate)
-            + r'(?:\*\*)?(?:\s+[^|]+)?\s*\|'
-        )
-        if re.search(pattern, table_content, re.MULTILINE) is not None:
-            return True
-    return False
-
-def app_exists(name):
-    candidates = APP_ALIASES.get(name, [name])
-    for candidate in candidates:
-        for applications_dir in ('/Applications', os.path.expanduser('~/Applications')):
-            if os.path.exists(os.path.join(applications_dir, candidate + '.app')):
-                return True
-    return False
+SKIP_DISCOVERY_APPS = load_exclusions(os.path.join(script_dir, 'config', 'inventory_exclusions.txt'))
+SKIP_DISCOVERY_APPS.update(load_appstore_gui_apps(os.path.join(script_dir, 'config', 'internet_app_methods.txt')))
 
 print("  Skanowanie /Applications...")
 
@@ -538,60 +582,16 @@ print("  Skanowanie /Applications...")
 grupo_1_3_match = re.search(r'^(.*?)(?=^## GRUPA 4)', content, re.DOTALL | re.MULTILINE)
 grupo_1_3_content = grupo_1_3_match.group(1) if grupo_1_3_match else content
 
-installed_app_paths = {}
-for applications_dir in ('/Applications', os.path.expanduser('~/Applications')):
-    try:
-        for item in os.listdir(applications_dir):
-            if item.endswith('.app'):
-                installed_app_paths.setdefault(item[:-4], os.path.join(applications_dir, item))
-    except Exception:
-        pass
-
-installed_apps = sorted(
-    name for name in installed_app_paths
-    if '|' not in name and not any(ord(char) < 32 or ord(char) == 127 for char in name)
-)
+installed_app_paths, installed_apps = scan_installed_app_paths()
 new_apps = []
-
-def installed_app_version(app_path):
-    for key in ('CFBundleShortVersionString', 'CFBundleVersion'):
-        try:
-            result = subprocess.run(
-                ['defaults', 'read', os.path.join(app_path, 'Contents', 'Info'), key],
-                capture_output=True, text=True, timeout=5,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
-        except Exception:
-            pass
-    try:
-        result = subprocess.run(
-            ['mdls', '-name', 'kMDItemVersion', '-raw', app_path],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip() not in ('', '(null)'):
-            return result.stdout.strip()
-    except Exception:
-        pass
-    return '?'
 
 # Always persist a current installed-app snapshot for the post-scan inventory
 # refresh. The session directory is private and removed by the orchestrator.
-with open(os.path.join(session_dir, 'installed_apps_after.txt'), 'w', encoding='utf-8') as handle:
+with open(os.path.join(session_dir, 'installed_apps_scan.txt'), 'w', encoding='utf-8') as handle:
     for app in installed_apps:
         if '|' in app or '\n' in app or '\r' in app:
             continue
         handle.write(f"{app}|{installed_app_version(installed_app_paths[app])}\n")
-
-# Aplikacje systemowe Apple — zawsze obecne w GRUPIE 1, pomiń fałszywe wpisy
-SYSTEM_APP_FRAGMENTS = [
-    'Installer', 'Uninstaller', 'Helper', 'Agent', 'Updater',
-    'Shim', 'Launcher', 'Framework', 'Plugin', 'Extension',
-    'Service', 'Daemon', 'XPC', 'Feedback', 'Handler',
-]
-
-def norm_name(s):
-    return re.sub(r'[-_ .]', '', s.lower().strip())
 
 md_norm_set = set()
 for line in content.splitlines():
@@ -986,6 +986,9 @@ if python3 "$SESSION_DIR/prescan.py" "$SCRIPT_DIR" "$SESSION_DIR"; then
     RESULT_SCAN="$L_STATUS_OK"
     if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
         print_info "Capturing current versions for the inventory refresh..."
+        if [ -f "$SESSION_DIR/installed_apps_scan.txt" ]; then
+            cp "$SESSION_DIR/installed_apps_scan.txt" "$SESSION_DIR/installed_apps_after.txt"
+        fi
         if ! internet_capture_versions "$SESSION_DIR/internet_before.txt"; then
             print_error "Could not capture installed internet-app versions"
             RESULT_SCAN="$L_ALL_RESULT_WARN"
@@ -1257,7 +1260,20 @@ if mac_update_dry_run_msg "postupdate.py (APPLICATIONS.md / UPDATES.md)"; then
     RESULT_MD="[DRY-RUN] skipped"
 else
 
-# TODO(H4): Recommended follow-up is extracting pure functions (row_exists, installed_app_version, 4a/4c/4d table-insertion helpers, version_for_table_row, expand_internet_versions) into lib/python/, which requires a real APPLICATIONS.md test fixture.
+    # Fresh snapshot of /Applications after updates have run (P1-2)
+    python3 -c '
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "lib", "python"))
+from inventory import scan_installed_app_paths, installed_app_version
+session_dir = sys.argv[2]
+installed_app_paths, installed_apps = scan_installed_app_paths()
+with open(os.path.join(session_dir, "installed_apps_after.txt"), "w", encoding="utf-8") as handle:
+    for app in installed_apps:
+        if "|" in app or "\n" in app or "\r" in app:
+            continue
+        handle.write(f"{app}|{installed_app_version(installed_app_paths[app])}\n")
+' "$SCRIPT_DIR" "$SESSION_DIR" 2>/dev/null || true
+
 # Write the post-update Python script
 cat > "$SESSION_DIR/postupdate.py" << 'PYEOF'
 import os
@@ -1877,6 +1893,59 @@ export MAC_UPDATE_RESULT_NPMCLI="$RESULT_NPMCLI"
 export MAC_UPDATE_RESULT_BREW="$RESULT_BREW"
 export MAC_UPDATE_RESULT_MD="$RESULT_MD"
 export MAC_UPDATE_LOG_FILE="$LOG_FILE"
+export RUN_TIMESTAMP="${RUN_TIMESTAMP:-$LOG_TS}"
+
+python3 -c '
+import json, os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "lib", "python"))
+from run_summary import build_run_summary, write_run_summary
+
+script_dir = sys.argv[1]
+session_dir = sys.argv[2]
+start_time = int(sys.argv[3])
+end_time = int(sys.argv[4])
+overall_exit = int(sys.argv[5])
+degraded = int(sys.argv[6])
+blocking_exit = int(sys.argv[7])
+
+step_results = {
+    "prescan": sys.argv[8],
+    "appstore": sys.argv[9],
+    "npmcli": sys.argv[10],
+    "brew": sys.argv[11],
+    "internet": sys.argv[12],
+    "postupdate": sys.argv[13],
+    "system": sys.argv[14],
+}
+
+flags = {
+    "dry_run": os.environ.get("MAC_UPDATE_DRY_RUN") == "1",
+    "inventory_only": os.environ.get("MAC_UPDATE_INVENTORY_ONLY") == "1",
+    "noninteractive": os.environ.get("MAC_UPDATE_NONINTERACTIVE") == "1",
+}
+
+summary = build_run_summary(
+    start_time=start_time,
+    end_time=end_time,
+    overall_exit=overall_exit,
+    degraded=degraded,
+    blocking_exit=blocking_exit,
+    step_results=step_results,
+    flags=flags,
+    session_dir=session_dir,
+)
+
+logs_dir = os.path.join(script_dir, "logs")
+ts_str = os.environ.get("RUN_TIMESTAMP") or str(start_time)
+out_file = os.path.join(logs_dir, f"run_summary_{ts_str}.json")
+write_run_summary(out_file, summary)
+latest_file = os.path.join(logs_dir, "run_summary_latest.json")
+write_run_summary(latest_file, summary)
+
+if os.environ.get("MAC_UPDATE_JSON_SUMMARY") == "1":
+    print(json.dumps(summary, indent=2))
+' "$SCRIPT_DIR" "$SESSION_DIR" "$START_TIME" "$END_TIME" "$OVERALL_EXIT" "$DEGRADED" "$BLOCKING_EXIT" \
+  "$RESULT_SCAN" "$RESULT_APPSTORE" "$RESULT_NPMCLI" "$RESULT_BREW" "$RESULT_INTERNET" "$RESULT_MD" "$RESULT_SYSTEM" 2>/dev/null || true
 
 _ui_summary=$(cat <<EOS
 0. Scan:      $RESULT_SCAN
@@ -1891,7 +1960,7 @@ EOS
 )
 ui_summary_table "$_ui_summary"
 
-if [ "${MAC_UPDATE_NOTIFY:-0}" = "1" ] || [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ]; then
+if [ "${MAC_UPDATE_NOTIFY:-0}" = "1" ]; then
     if command -v osascript >/dev/null 2>&1; then
         _notif_status="SUCCESS"
         [ "$DEGRADED" -ne 0 ] && _notif_status="WARNINGS"
