@@ -789,7 +789,8 @@ if [ $PYTHON3_OK -eq 1 ]; then
     # Zapisz listę brew formulae (jeśli brew dostępny)
     if command -v brew &>/dev/null; then
         brew list --formula --versions 2>/dev/null > "$SCAN_SESSION_DIR/brew_formulae.txt" || true
-        brew list --cask --versions 2>/dev/null > "$SCAN_SESSION_DIR/brew_casks.txt" || true
+        . "$SCRIPT_DIR/lib/brew.sh"
+        brew_cask_versions > "$SCAN_SESSION_DIR/brew_casks.txt" 2>/dev/null || true
     fi
 
     # Zapisz listę mas apps (jeśli mas dostępny)

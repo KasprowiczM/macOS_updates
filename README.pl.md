@@ -139,7 +139,7 @@ Jeżeli `sudo` nadal pyta o hasło zamiast o palec, sprawdź
 | Metoda | Weryfikacja wersji zdalnej | Zastosowanie |
 |--------|---------------------------|--------------|
 | `github_dmg` | ✅ pełna, z weryfikacją podpisu i Team ID | Firefox Dev, KeePassXC, VS Code, CodeEdit, Ledger, Trezor |
-| `sparkle_appcast` | ✅ z appcastu Sparkle | ChatGPT Atlas, Proton Drive, Remote Desktop Manager |
+| `sparkle_appcast` | ✅ z appcastu Sparkle | Proton Drive, Remote Desktop Manager |
 | `brew_cask` | ✅ przez Homebrew, z zabezpieczeniem przed cofnięciem wersji | Brave, Obsidian, Spotify, ProtonVPN, zoom i inne |
 | `msupdate` | ✅ przez Microsoft AutoUpdate | Word, Excel, PowerPoint, Outlook, OneNote |
 | `docker_cli` | ✅ przez `docker desktop update` | Docker Desktop |
@@ -231,7 +231,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Wersja pakietu (1.0.21)
+├── VERSION                     # Wersja pakietu (1.4.1)
 ├── install.sh                  # Jednolinijkowy instalator
 ├── uninstall.sh                # Usuwa sklonowane pliki (zachowuje Homebrew/aplikacje)
 ├── setup.sh                    # Konfiguracja pierwszego uruchomienia (bez chmury)

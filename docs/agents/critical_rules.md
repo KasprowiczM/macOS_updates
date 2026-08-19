@@ -30,7 +30,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 
 ## 5. Cask Adoption & Validation Requirement
 - **Config `brew_cask` requires live adoption:** Setting `brew_cask` in `config/internet_app_methods.txt` requires executing `brew install --cask --adopt <slug>`.
-- **Validation Interlock:** `update_internet_apps.sh` validates `brew_cask` entries against `brew list --cask --versions` mapped via `internet_cask_name_for_app`. Missing casks produce `L_INTERNET_STATUS_CASK_MISSING` soft warning.
+- **Validation Interlock:** `update_internet_apps.sh` validates `brew_cask` entries against `brew_cask_versions` (`lib/brew.sh`) mapped via `internet_cask_name_for_app`. Never call `brew list --cask --versions` directly — it regressed upstream on 2026-08-19 and silently returned nothing. Missing casks produce `L_INTERNET_STATUS_CASK_MISSING` soft warning.
 
 ## 6. Internet Handlers & Status Contract
 - Handlers in `lib/internet_handlers.sh` pass status via `INTERNET_LAST_STATUS` global variable.
@@ -102,7 +102,7 @@ Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 | Docker CLI | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
 | Homebrew cask --greedy-auto-updates | Brave, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
-| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT Atlas, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian |
+| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian |
 | Hybrid self-update + MAU fallback | Teams (`TEAMS21` is accepted only when surfaced by MAU and is verified by a final `msupdate --list`) |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
 | Manual only | IPMIView, DJI Assistant 2 |
