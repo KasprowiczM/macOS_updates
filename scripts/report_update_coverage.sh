@@ -240,10 +240,6 @@ TARGET_ALIASES = {
         "names": [],
         "bundle_ids": ["com.openai.codex"],
     },
-    "ChatGPT Atlas": {
-        "names": ["ChatGPT Atlas", "Atlas"],
-        "bundle_ids": ["com.openai.atlas"],
-    },
     "Docker Desktop": {
         "names": ["Docker Desktop", "Docker"],
         "bundle_ids": ["com.docker.docker"],

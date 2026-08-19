@@ -204,7 +204,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Package version (1.0.21)
+├── VERSION                     # Package version (1.4.0)
 ├── install.sh                  # One-line installer entrypoint
 ├── uninstall.sh                # Remove clone (keeps Homebrew/apps)
 ├── setup.sh                    # First-run setup (no cloud)

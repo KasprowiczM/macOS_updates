@@ -7,7 +7,7 @@
 - **Homebrew prefix:** `/opt/homebrew` (arm64)
 - **Native CLI toolchain:** keep npm global binaries outside Homebrew, under user-space paths managed by `update_npm_cli.sh` (Note: `/usr/local/bin` and `/opt/homebrew/bin` are appended to `PATH` as low-priority fallback lookup paths for system node managers, without overriding user-space toolchain paths)
 - **Internet-app handler contract:** Handlers in `lib/internet_handlers.sh` pass status via `INTERNET_LAST_STATUS` global variable, NEVER returning status via stdout `echo` (which contaminates status when called inside command substitution). Format strings use `internet_msg` rather than raw `printf`.
-- **Cask validation interlock:** Entries marked as `brew_cask` in `config/internet_app_methods.txt` are mapped to Homebrew cask names via `internet_cask_name_for_app` and validated against `brew list --cask`. Missing casks produce `L_INTERNET_STATUS_CASK_MISSING` soft warning.
+- **Cask validation interlock:** Entries marked as `brew_cask` in `config/internet_app_methods.txt` are mapped to Homebrew cask names via `internet_cask_name_for_app` and validated against `brew_cask_versions` (`lib/brew.sh`), never a raw `brew list --cask --versions`. Missing casks produce `L_INTERNET_STATUS_CASK_MISSING` soft warning.
 - **Version detection:** `app_version()` reads `CFBundleShortVersionString`, then `CFBundleVersion`, then falls back to `mdls -name kMDItemVersion` (covers iOS/iPadOS apps on Apple Silicon that have no `Contents/Info` plist).
 
 ## Python

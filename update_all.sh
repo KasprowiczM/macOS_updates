@@ -37,6 +37,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
 . "$SCRIPT_DIR/lib/internet_apps.sh"
+. "$SCRIPT_DIR/lib/brew.sh"
 . "$SCRIPT_DIR/lib/platform.sh"
 . "$SCRIPT_DIR/lib/version.sh"
 
@@ -655,9 +656,27 @@ except Exception as e:
 # ── 3. Skanowanie Homebrew casks ─────────────────────────────
 print("\n  Skanowanie Homebrew casks...")
 try:
+    # `brew list --cask --versions` regressed upstream (Cask::CaskLoader,
+    # brew 6.0.18-48-gad5738c). Fall back to names + Caskroom layout so the
+    # prescan never silently reports "no casks installed".
     result = subprocess.run(['brew', 'list', '--cask', '--versions'],
                             capture_output=True, text=True, timeout=60)
     cask_lines = [l.strip() for l in result.stdout.strip().split('\n') if l.strip()]
+    if not cask_lines:
+        names = subprocess.run(['brew', 'list', '--cask'],
+                               capture_output=True, text=True, timeout=60)
+        prefix = subprocess.run(['brew', '--prefix'],
+                                capture_output=True, text=True, timeout=30).stdout.strip() or '/opt/homebrew'
+        for token in [l.strip() for l in names.stdout.strip().split('\n') if l.strip()]:
+            room = os.path.join(prefix, 'Caskroom', token)
+            ver = '?'
+            try:
+                vers = [d for d in os.listdir(room) if not d.startswith('.')]
+                if vers:
+                    ver = sorted(vers, key=lambda d: os.path.getmtime(os.path.join(room, d)))[-1]
+            except OSError:
+                pass
+            cask_lines.append(f'{token} {ver}')
     new_casks = []
     for line in cask_lines:
         parts = line.split()
@@ -997,8 +1016,8 @@ if python3 "$SESSION_DIR/prescan.py" "$SCRIPT_DIR" "$SESSION_DIR"; then
             cp "$SESSION_DIR/internet_before.txt" "$SESSION_DIR/internet_after.txt"
         fi
         if command -v brew >/dev/null 2>&1; then
-            if brew list --formula --versions > "$SESSION_DIR/brew_formulae_after.txt" 2>/dev/null \
-                && brew list --cask --versions > "$SESSION_DIR/brew_casks_after.txt" 2>/dev/null; then
+            if brew_formula_versions > "$SESSION_DIR/brew_formulae_after.txt" 2>/dev/null \
+                && brew_cask_versions > "$SESSION_DIR/brew_casks_after.txt" 2>/dev/null; then
                 cp "$SESSION_DIR/brew_formulae_after.txt" "$SESSION_DIR/brew_formulae_before.txt"
                 cp "$SESSION_DIR/brew_casks_after.txt" "$SESSION_DIR/brew_casks_before.txt"
             else

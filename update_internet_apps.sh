@@ -9,7 +9,7 @@ set -o pipefail
 # Kompatybilność: bash 3.2+ (macOS domyślny shell, Apple Silicon arm64)
 #
 # Aplikacje objęte skryptem:
-#   PRZEGLĄDARKI:     Google Chrome, Firefox Dev Edition, Brave, ChatGPT Atlas
+#   PRZEGLĄDARKI:     Google Chrome, Firefox Dev Edition, Brave
 #   AI:               ChatGPT, Claude, Gemini, Comet, Perplexity Desktop,
 #                     Antigravity, Antigravity IDE, LM Studio, Codex, OpenCode Desktop
 #   VPN/BEZP.:        ProtonVPN, KeePassXC
@@ -50,6 +50,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ── Shared libraries ─────────────────────────────────────────
 . "$SCRIPT_DIR/lib/internet_apps.sh"
+. "$SCRIPT_DIR/lib/brew.sh"
 . "$SCRIPT_DIR/lib/internet_registry.sh"
 . "$SCRIPT_DIR/lib/internet_handlers.sh"
 . "$SCRIPT_DIR/lib/github_release.sh"
@@ -392,7 +393,6 @@ echo ""
 STATUS_CHROME="$L_INTERNET_STATUS_SKIPPED"
 STATUS_FIREFOX="$L_INTERNET_STATUS_SKIPPED"
 STATUS_BRAVE="→ managed by Homebrew (update_brew.sh)"
-STATUS_ATLAS="$L_INTERNET_STATUS_SKIPPED"
 STATUS_CHATGPT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_CLAUDE_APP="$L_INTERNET_STATUS_SKIPPED"
 STATUS_GEMINI="$L_INTERNET_STATUS_SKIPPED"
@@ -557,7 +557,7 @@ while IFS='|' read -r _s_app _s_meth _s_var; do
 done < "$SCRIPT_DIR/config/internet_app_methods.txt"
 
 # ── Validate brew_cask entries exist in Homebrew ──
-_installed_casks="$(brew list --cask --versions 2>/dev/null || true)"
+_installed_casks="$(brew_cask_versions 2>/dev/null || true)"
 while IFS='|' read -r _v_app _v_meth _v_var; do
     case "$_v_app" in '#'*|'') continue ;; esac
     _v_meth="$(echo "$_v_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
@@ -580,7 +580,6 @@ echo -e "  ${BOLD}$L_INTERNET_SECTION_BROWSERS${NC}"
 printf "  %-32s %s\n" "Google Chrome:"            "$STATUS_CHROME"
 printf "  %-32s %s\n" "Firefox Dev Edition:"      "$STATUS_FIREFOX"
 printf "  %-32s %s\n" "Brave Browser:"            "$STATUS_BRAVE"
-printf "  %-32s %s\n" "ChatGPT Atlas:"            "$STATUS_ATLAS"
 echo ""
 
 echo -e "  ${BOLD}$L_INTERNET_SECTION_AI${NC}"
@@ -657,7 +656,7 @@ print_info "$L_INTERNET_CHECKED_NOTE"
 print_info "$L_INTERNET_INSTRUCTIONS"
 
 for status in \
-    "$STATUS_CHROME" "$STATUS_FIREFOX" "$STATUS_BRAVE" "$STATUS_ATLAS" \
+    "$STATUS_CHROME" "$STATUS_FIREFOX" "$STATUS_BRAVE" \
     "$STATUS_CHATGPT" "$STATUS_CLAUDE_APP" "$STATUS_GEMINI" "$STATUS_COMET" "$STATUS_PERPLEXITY" \
     "$STATUS_ANTIGRAVITY" "$STATUS_ANTIGRAVITY_IDE" "$STATUS_LMSTUDIO" "$STATUS_OPENCODE" \
     "$STATUS_PROTONVPN" "$STATUS_KEEPASSXC" "$STATUS_PROTONMAIL" "$STATUS_ZOOM" \
