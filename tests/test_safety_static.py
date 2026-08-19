@@ -1118,17 +1118,12 @@ class StaticShellSafetyTests(unittest.TestCase):
                     self.assertNotIn("<<", combined, msg=f"Piped heredoc found near run_with_timeout in {file_path.name}:{idx + 1}")
 
     def test_task_8_edge_cases_handling(self) -> None:
-        """Assert iu_firefox_developer_edition, iu_chatgpt_atlas, and iu_keepassxc edge cases."""
+        """Assert iu_firefox_developer_edition and iu_keepassxc edge cases."""
         script_text = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
 
         # 8a: Firefox Dev sets UNKNOWN_VERSION if version parse is ?
         ff_block = script_text.split("iu_firefox_developer_edition() {")[1].split("iu_")[0]
         self.assertIn('STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"', ff_block)
-
-        # 8b: ChatGPT Atlas uses internet_handler_sparkle_check
-        atlas_block = script_text.split("iu_chatgpt_atlas() {")[1].split("iu_")[0]
-        self.assertIn('internet_handler_sparkle_check "ChatGPT Atlas"', atlas_block)
-        self.assertIn('STATUS_ATLAS="$INTERNET_LAST_STATUS"', atlas_block)
 
         # 8c: KeePassXC defaults KPX_ARCH safely
         kpx_block = script_text.split("iu_keepassxc() {")[1].split("iu_")[0]
@@ -1181,7 +1176,10 @@ class StaticShellSafetyTests(unittest.TestCase):
         """update_brew.sh must define strip_ansi and pipe brew outputs through it."""
         text = self.read_script("update_brew.sh")
         self.assertIn("strip_ansi() {", text)
-        self.assertIn("brew outdated --formula 2>&1 | strip_ansi", text)
+        # `brew outdated` goes through lib/brew.sh (which keeps stderr OUT of the
+        # captured value — see test_brew_outdated_never_merges_stderr_into_value)
+        # and is still ANSI-stripped on the way to the caller.
+        self.assertIn("brew_outdated_formulae | strip_ansi", text)
         self.assertIn("brew doctor 2>&1 | strip_ansi", text)
 
         script = (
@@ -1501,33 +1499,32 @@ class StaticShellSafetyTests(unittest.TestCase):
             self.assertIn("export FOO=1", new_content)
             self.assertIn("export BAR=3", new_content)
 
-    @unittest.skipUnless(
-        __import__("shutil").which("bash"),
-        "bash not available"
-    )
-    def test_chatgpt_atlas_ignores_codex_bundle(self) -> None:
-        """iu_chatgpt_atlas must not select /Applications/ChatGPT.app if bundle ID is com.openai.codex."""
-        script = (
-            f'SCRIPT_DIR="{REPO_ROOT}"\n'
-            f'print_header() {{ :; }}\n'
-            f'print_info() {{ :; }}\n'
-            f'print_step() {{ :; }}\n'
-            f'internet_msg() {{ echo "$2"; }}\n'
-            f'defaults() {{ echo "com.openai.codex"; }}\n'
-            f'app_version() {{ echo "1.0"; }}\n'
-            f'silent_launch_app() {{ return 0; }}\n'
-            f'. "{REPO_ROOT}/lib/internet_app_updates.sh"\n'
-            f'iu_chatgpt_atlas\n'
-            f'echo "ATLAS_APP=$ATLAS_APP"\n'
-        )
-        res = subprocess.run(
-            ["bash", "-c", script],
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=REPO_ROOT,
-        )
-        self.assertEqual(res.stdout.strip(), "ATLAS_APP=")
+    def test_chatgpt_atlas_fully_removed(self) -> None:
+        """ChatGPT Atlas was uninstalled 2026-08-19; no live surface may reference it.
+
+        A half-removed app is worse than a present one: the config would keep
+        declaring a status variable that no handler ever sets, and the summary
+        loop would evaluate an empty string against the failure constants.
+        """
+        live_files = [
+            REPO_ROOT / "config" / "internet_apps.txt",
+            REPO_ROOT / "config" / "internet_app_methods.txt",
+            REPO_ROOT / "lib" / "internet_apps.sh",
+            REPO_ROOT / "lib" / "internet_app_updates.sh",
+            REPO_ROOT / "update_internet_apps.sh",
+            REPO_ROOT / "scripts" / "report_update_coverage.sh",
+            REPO_ROOT / "scripts" / "audit_cask_candidates.sh",
+        ]
+        for path in live_files:
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("ChatGPT Atlas", text, msg=f"{path.name} still references ChatGPT Atlas")
+            self.assertNotIn("STATUS_ATLAS", text, msg=f"{path.name} still references STATUS_ATLAS")
+            self.assertNotIn("iu_chatgpt_atlas", text, msg=f"{path.name} still references iu_chatgpt_atlas")
+
+        # The dispatch order may keep a tombstone comment, but never a live call.
+        dispatch = (REPO_ROOT / "config" / "internet_dispatch_order.txt").read_text(encoding="utf-8")
+        for line in dispatch.splitlines():
+            self.assertNotEqual(line.strip(), "iu_chatgpt_atlas")
 
     def test_appstore_ax_probe_grep_handles_leading_dash(self) -> None:
         """The Accessibility probe must classify -1743 without grep eating it as options.
@@ -1878,6 +1875,146 @@ class StaticShellSafetyTests(unittest.TestCase):
                 rel, "newer",
                 f"Expected '{installed_app}' > '{candidate_cask}' (downgrade) but got '{rel}'"
             )
+
+    def test_no_raw_brew_cask_versions_call(self) -> None:
+        """2026-08-19: Homebrew broke `brew list --cask --versions`.
+
+        Failure mode observed on the new MacBook: brew 6.0.18-48-gad5738c raised
+        `uninitialized constant Cask::CaskLoader`, the post-update snapshot went
+        empty, and every brew_cask app in config/internet_app_methods.txt was
+        reported as "cask not installed" even though all 12 casks were present.
+        Every caller must go through lib/brew.sh so an upstream brew regression
+        cannot block the macOS security-update step again.
+        """
+        live_scripts = [
+            "update_brew.sh",
+            "update_internet_apps.sh",
+            "update_all.sh",
+            "migration_setup.sh",
+        ]
+        for name in live_scripts:
+            text = self.read_script(name)
+            for line in text.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                self.assertNotIn(
+                    "brew list --cask --versions", stripped,
+                    msg=f"{name} calls `brew list --cask --versions` directly; "
+                        f"use brew_cask_versions from lib/brew.sh",
+                )
+
+    def test_brew_lib_is_sourced_by_cask_consumers(self) -> None:
+        for name in ("update_brew.sh", "update_internet_apps.sh", "update_all.sh"):
+            self.assertIn("lib/brew.sh", self.read_script(name), msg=f"{name} does not source lib/brew.sh")
+
+    def test_brew_outdated_never_merges_stderr_into_value(self) -> None:
+        """2026-08-19 hard-failure regression.
+
+        `REMAINING_FORMULAE=$(brew outdated --formula 2>&1 | strip_ansi)` captured
+        brew's progress chatter ("==> Downloading Homebrew API data") as if it
+        were outstanding formulae, set HARD_FAIL=1, and made update_all.sh skip
+        the macOS system update on a machine where nothing was actually wrong.
+        """
+        text = self.read_script("update_brew.sh")
+        self.assertNotIn("brew outdated --formula 2>&1", text)
+        self.assertNotIn("brew outdated --cask --greedy-auto-updates 2>&1", text)
+        self.assertIn("brew_outdated_formulae", text)
+        self.assertIn("brew_outdated_casks", text)
+
+    def test_brew_lib_helpers_exist_and_filter_progress_lines(self) -> None:
+        lib_text = (REPO_ROOT / "lib" / "brew.sh").read_text(encoding="utf-8")
+        for fn in ("brew_cask_versions", "brew_formula_versions",
+                   "brew_outdated_formulae", "brew_outdated_casks"):
+            self.assertIn(f"{fn}()", lib_text)
+        # Progress chatter must be dropped, not returned to the caller.
+        self.assertIn("grep -v '^==>'", lib_text)
+        # The Caskroom fallback is the whole point of the file.
+        self.assertIn("Caskroom", lib_text)
+
+    def test_self_update_pins_npm_prefix(self) -> None:
+        """`codex update` shells out to a bare `npm install -g`.
+
+        npm's configured prefix here is the *node* prefix, which loses to
+        NPM_GLOBAL_BIN on PATH — an unpinned self-update installs a shadowed
+        copy, reports success, and leaves the stale binary winning.
+        """
+        text = self.read_script("update_npm_cli.sh")
+        self_update_block = text.split('elif [ "$method" = "self-update" ]; then')[1].split("done <")[0]
+        self.assertIn("npm_config_prefix", self_update_block)
+        self.assertIn("NPM_GLOBAL_PREFIX", self_update_block)
+
+    def test_native_self_update_clis_configured(self) -> None:
+        """claude / codex / agy must update through their own updaters, not npm -g."""
+        manifest = (REPO_ROOT / "config" / "npm_global_clis.txt").read_text(encoding="utf-8")
+        rows = {}
+        for line in manifest.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|")
+            rows[parts[0]] = parts
+        for display, command in (("claude-code", "claude"), ("codex-cli", "codex"), ("agy-cli", "agy")):
+            self.assertIn(display, rows, msg=f"{display} missing from npm_global_clis.txt")
+            self.assertEqual(rows[display][2], "self-update", msg=f"{display} must use self-update")
+            self.assertEqual(rows[display][4], command, msg=f"{display} must invoke `{command} update`")
+
+    def test_managed_toolchain_wins_path_by_default(self) -> None:
+        """The managed prefix must win PATH unless the user opts out explicitly.
+
+        2026-08-19 split-brain regression: `ensure_toolchain_paths` handed
+        Node/npm to nvm whenever ~/.nvm/nvm.sh merely existed, so the shell
+        resolved node/npm/claude/codex from the nvm prefix while this script
+        kept updating an unreferenced parallel copy. update_all.sh reported
+        every CLI green while the terminal ran node v24.13.0 against a
+        "freshly updated" v26.7.0.
+        """
+        text = self.read_script("update_npm_cli.sh")
+        block = text.split("ensure_toolchain_paths() {")[1].split("\nnormalize_semver()")[0]
+        self.assertIn("MAC_UPDATE_NVM_OWNS_NODE", block)
+        # The nvm hand-off must be gated on the opt-in, never on mere presence.
+        self.assertNotIn('if [ -s "$HOME/.nvm/nvm.sh" ]; then', block)
+        # The default branch must still export the managed prefix ahead of $PATH.
+        self.assertIn('export PATH=\\"$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\\$PATH\\"', block)
+
+    def test_profile_backups_are_rotated_and_locked_down(self) -> None:
+        """A profile backup is a frozen copy of whatever secrets the profile held.
+
+        2026-08-19: 36 un-rotated ~/.zshrc.macupd-backup-* files existed, every
+        one of them carrying a plaintext GitHub PAT, long after anyone would
+        think to look there.
+        """
+        text = self.read_script("update_npm_cli.sh")
+        self.assertIn("prune_profile_backups", text)
+        backup_fn = text.split("declare_profile_backup() {")[1].split("\nensure_line_in_file()")[0]
+        self.assertIn('chmod 600 "$backup_path"', backup_fn)
+        self.assertIn("prune_profile_backups", backup_fn)
+        self.assertIn("MAC_UPDATE_MAX_PROFILE_BACKUPS", text)
+
+    def test_secret_scan_profile_advisory_is_never_fatal(self) -> None:
+        """The dotfile advisory must not be able to fail CI, which has no profiles."""
+        text = (REPO_ROOT / "scripts" / "scan_secrets.sh").read_text(encoding="utf-8")
+        self.assertIn("MAC_UPDATE_SKIP_PROFILE_SCAN", text)
+        advisory = text.split('if [ "${MAC_UPDATE_SKIP_PROFILE_SCAN:-0}" != "1" ]; then')[1].split('\nif [ "$FAIL" -ne 0 ]')[0]
+        self.assertNotIn("FAIL=1", advisory)
+
+    def test_mau_empty_list_still_clears_stale_version_pins(self) -> None:
+        """DeferralVersions pins must be able to clear when msupdate --list is empty.
+
+        2026-08-19 deadlock: an active DeferralDays quarantine hides its
+        products from `msupdate --list`, so MAU_COUNT is 0 and
+        mau_reconcile_deferrals (the only caller of mau_clean_stale_deferrals)
+        never ran. DeferralVersions.TEAMS21 stayed pinned at the installed
+        Teams build, capping the maximum version MAU would ever offer, and the
+        run reported "vendor package error" on every single execution forever.
+        """
+        text = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
+        empty_branch = text.split("MAU_HELD=\"$(mau_active_office_deferrals)\"")[0]
+        # The reconcile call must appear before the held-quarantine report.
+        self.assertIn('mau_reconcile_deferrals "" ""', empty_branch)
+        # And the stale version pins must not be gated on the released-day list.
+        clean_fn = text.split("mau_clean_stale_deferrals() {")[1].split("\n}")[0]
+        self.assertIn("for id in $MAU_STALE_DEFERRAL_VERSION_IDS; do", clean_fn)
 
     def test_brew_upgrade_guards_against_downgrade(self) -> None:
         """F1.4 regression: update_brew.sh includes cask downgrade guard using internet_version_relation and JSON info."""

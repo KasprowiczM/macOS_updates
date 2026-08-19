@@ -13,6 +13,7 @@
 | `update_internet_apps.sh` | Installed internet apps (see `config/internet_apps.txt`): verified direct handlers, vendor CLIs and honestly reported in-app updater triggers |
 | `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `codex`, `opencode`) + self-updating `agy` |
 | `update_brew.sh` | `brew upgrade` + cleanup + doctor |
+| `lib/brew.sh` | Resilient Homebrew queries: `brew_cask_versions`, `brew_formula_versions`, `brew_outdated_formulae`, `brew_outdated_casks` |
 | `lib/python/inventory.py` | Pure Python library for inventory normalization, exclusions, and prescan |
 | `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON |
 | `config/inventory_exclusions.txt` | Explicit list of apps to ignore during inventory scans (e.g. `Ascendo`) |

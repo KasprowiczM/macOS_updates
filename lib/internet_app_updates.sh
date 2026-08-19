@@ -150,20 +150,6 @@ iu_brave_browser() {
     internet_dispatch_silent_launch "🦁 Brave Browser" "Brave Browser" "STATUS_BRAVE" "Brave Browser" "$L_INTERNET_HINT_BRAVE"
 }
 
-    # ── 4b. CHATGPT ATLAS (Sparkle appcast + DMG) ────────────────
-
-iu_chatgpt_atlas() {
-    print_header "🔵 ChatGPT Atlas"
-    ATLAS_APP="$(internet_app_path "ChatGPT Atlas" 2>/dev/null || true)"
-    if [ -n "$ATLAS_APP" ] && [ -d "$ATLAS_APP" ]; then
-        internet_handler_sparkle_check "ChatGPT Atlas" "$ATLAS_APP" "$(basename "$ATLAS_APP" .app)"
-        STATUS_ATLAS="$INTERNET_LAST_STATUS"
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT Atlas")"
-        STATUS_ATLAS="$L_INTERNET_STATUS_NO_DESKTOP_APP"
-    fi
-}
-
 iu_chatgpt() {
     print_header "🤖 ChatGPT / Codex (OpenAI)"
     OPENAI_APP="$(internet_app_path "ChatGPT / Codex" 2>/dev/null || true)"
@@ -1177,6 +1163,19 @@ iu_microsoft_365() {
                     # short version is newer than what is installed. Until then
                     # it lapses on its own after MAC_UPDATE_MAU_DEFERRAL_DAYS,
                     # which is what makes the next re-evaluation possible.
+                    # Break the quarantine deadlock. A DeferralVersions pin
+                    # caps the MAXIMUM version MAU will ever offer, so a pin at
+                    # the installed build (TEAMS21=26213.1006.5011.1671 on the
+                    # 2026-08-19 machine) blocks that product forever — and it
+                    # can never clear itself, because mau_reconcile_deferrals
+                    # only ran when msupdate --list was non-empty, while an
+                    # active DeferralDays quarantine is exactly what makes the
+                    # list empty. Reconcile with an empty offer set: that
+                    # releases no Office DeferralDays entry (release stays
+                    # empty when nothing is offered) but does drop the stale
+                    # version pins, which are unconditionally wrong.
+                    mau_reconcile_deferrals "" "" || true
+
                     MAU_HELD="$(mau_active_office_deferrals)"
                     if [ -n "$MAU_HELD" ]; then
                         MAU_CH="$(mau_current_channel)"

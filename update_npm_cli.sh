@@ -147,10 +147,39 @@ declare_profile_backup() {
         ts="$(date +%Y%m%d%H%M%S)"
         backup_path="${real_target}.macupd-backup-${ts}"
         if cp "$real_target" "$backup_path" 2>/dev/null; then
+            chmod 600 "$backup_path" 2>/dev/null || true
             print_info "Kopia zapasowa profilu: $backup_path"
             eval "_MACUPD_BACKED_UP_${backup_key}=1"
+            prune_profile_backups "$real_target"
         fi
     fi
+}
+
+# Keep only the newest MAC_UPDATE_MAX_PROFILE_BACKUPS copies (default 5).
+# Every run used to leave one behind forever; on the 2026-08-19 machine that
+# was 36 copies of ~/.zshrc, each carrying whatever secrets the live profile
+# happened to hold at the time. An un-rotated backup is a secret with a long
+# tail — rotate it like the run logs.
+prune_profile_backups() {
+    local real_target="$1"
+    local keep="${MAC_UPDATE_MAX_PROFILE_BACKUPS:-5}"
+    case "$keep" in
+        ''|*[!0-9]*) keep=5 ;;
+    esac
+    [ "$keep" -lt 1 ] && keep=1
+
+    local total
+    # shellcheck disable=SC2012  # our own backup names: <profile>.macupd-backup-<14 digits>
+    total="$(ls -1t "${real_target}".macupd-backup-* 2>/dev/null | wc -l | tr -d ' ')"
+    [ -n "$total" ] || return 0
+    [ "$total" -le "$keep" ] && return 0
+
+    # shellcheck disable=SC2012
+    ls -1t "${real_target}".macupd-backup-* 2>/dev/null \
+        | tail -n +"$((keep + 1))" \
+        | while IFS= read -r stale; do
+            [ -n "$stale" ] && rm -f "$stale" 2>/dev/null || true
+        done
 }
 
 ensure_line_in_file() {
@@ -249,7 +278,17 @@ ensure_toolchain_paths() {
     remove_line_from_file "$profile" "export PATH=\"$LOCAL_BIN:$BUN_BIN:\$PATH\"" || return 1
     remove_line_from_file "$profile" "[ -n \"\$NVM_BIN\" ] && export PATH=\"\$NVM_BIN:\$PATH\"" || return 1
     ensure_line_in_file "$profile" "" || return 1
-    if [ -s "$HOME/.nvm/nvm.sh" ]; then
+
+    # Opt-in escape hatch. Historically this branch was taken automatically
+    # whenever ~/.nvm/nvm.sh existed, which produced a split-brain toolchain:
+    # the interactive shell resolved node/npm/claude/codex from the nvm prefix
+    # while this script kept updating a parallel copy under
+    # ~/.local/share/mac-update that nothing on PATH pointed at. On the
+    # 2026-08-19 machine that meant node v24.13.0 in the terminal against
+    # v26.7.0 "successfully updated", and the same gap for npm, pnpm, codex and
+    # opencode. The managed prefix now wins by default; set
+    # MAC_UPDATE_NVM_OWNS_NODE=1 to hand Node/npm back to nvm deliberately.
+    if [ "${MAC_UPDATE_NVM_OWNS_NODE:-0}" = "1" ] && [ -s "$HOME/.nvm/nvm.sh" ]; then
         ensure_line_in_file "$profile" "# Managed by macOS Updates — Bun only (nvm owns Node/npm)" || return 1
         ensure_line_in_file "$profile" "export BUN_INSTALL=\"$BUN_HOME\"" || return 1
         ensure_line_in_file "$profile" "export PATH=\"$LOCAL_BIN:$BUN_BIN:\$PATH\"" || return 1
@@ -765,9 +804,20 @@ install_latest_npm_packages() {
         elif [ "$method" = "self-update" ]; then
             if command_path="$(resolve_command_path "$command_name")"; then
                 print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "${command_name}")"
-                if run_quiet_with_error_log \
-                    "${command_name} update" \
-                    run_with_timeout 300 "$command_path" update; then
+                # Some vendor self-updaters (codex, claude) shell out to
+                # `npm install -g` internally. npm's configured prefix on this
+                # machine is the *node* prefix, which sits AFTER
+                # NPM_GLOBAL_BIN on PATH — an unpinned self-update would write
+                # a fresh copy there, report success, and leave the stale
+                # binary still winning `command -v`. Pin the prefix and the
+                # PATH for the child only (subshell), so the managed prefix is
+                # the one that actually gets upgraded.
+                if ( export npm_config_prefix="$NPM_GLOBAL_PREFIX"
+                     export NPM_CONFIG_PREFIX="$NPM_GLOBAL_PREFIX"
+                     export PATH="$NPM_GLOBAL_BIN:$N_PREFIX/bin:$PATH"
+                     run_quiet_with_error_log \
+                        "${command_name} update" \
+                        run_with_timeout 300 "$command_path" update ); then
                     command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
                 else

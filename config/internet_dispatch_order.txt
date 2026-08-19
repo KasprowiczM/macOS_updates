@@ -1,7 +1,7 @@
 iu_google_chrome
 iu_firefox_developer_edition
 # Brave Browser — migrated to Homebrew cask 2026-08-05
-iu_chatgpt_atlas
+# ChatGPT Atlas — uninstalled by the user 2026-08-19 (browser discontinued); removed from the pipeline
 iu_chatgpt
 iu_claude
 iu_comet

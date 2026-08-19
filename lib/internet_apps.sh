@@ -149,16 +149,6 @@ internet_app_path() {
             done
             return 1
             ;;
-        "ChatGPT Atlas")
-            for candidate in \
-                "/Applications/ChatGPT Atlas.app" \
-                "${HOME}/Applications/ChatGPT Atlas.app" \
-                "/Applications/Atlas.app" \
-                "${HOME}/Applications/Atlas.app"
-            do
-                [ -d "$candidate" ] && echo "$candidate" && return 0
-            done
-            ;;
         "OpenCode")
             for candidate in \
                 "/Applications/OpenCode.app" \

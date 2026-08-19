@@ -28,7 +28,7 @@ cask_for_app() {
         "zoom.us")                          echo "zoom" ;;
         "Remote Desktop Manager")           echo "devolutions-remote-desktop-manager" ;;
         "Comet")                            echo "comet" ;;
-        "ChatGPT / Codex"|"ChatGPT Atlas")  echo "chatgpt" ;;
+        "ChatGPT / Codex")                  echo "chatgpt" ;;
         "Gemini")                           echo "gemini" ;;
         "Perplexity")                       echo "perplexity" ;;
         "Antigravity")                      echo "antigravity" ;;

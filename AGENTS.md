@@ -12,7 +12,7 @@ This repository is owned by the `KasprowiczM` GitHub Free account. Private repos
 - Public-repository standard runners may be free, but the same anti-waste rules still apply.
 
 
-Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–26, 7 languages, v**1.4.0**, multi-cloud private overlay via `dev_sync/`.
+Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–26, 7 languages, v**1.4.1**, multi-cloud private overlay via `dev_sync/`.
 
 ## Quick Commands
 
