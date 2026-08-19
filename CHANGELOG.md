@@ -4,6 +4,35 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.4.1] — 2026-08-19
+
+Post-migration hardening release. First full run on a new MacBook (macOS 26.6.2, Homebrew
+6.0.18-48-gad5738c) exited 1 and deferred the macOS system update; none of the three causes
+were real breakage.
+
+### Fixed
+
+- **False hard failure: "Formulae still outdated after upgrade".** `REMAINING_FORMULAE=$(brew outdated --formula 2>&1 | strip_ansi)` merged brew's stderr progress chatter (`==> Downloading Homebrew API data`, `✔︎ JSON API packages...jws.json`) into the captured value. A non-empty value meant "still outdated" → `HARD_FAIL=1` → `BLOCKING_EXIT=1` → step 6 (macOS security updates) skipped on a machine where every formula was current. All four `brew outdated` capture sites now route through `brew_outdated_formulae` / `brew_outdated_casks` in `lib/brew.sh`, which keep stderr out of the value and drop progress lines.
+- **Upstream Homebrew regression `uninitialized constant Cask::CaskLoader`.** `brew list --cask --versions` broke in brew commit `ad5738cd77`; `brew update` pulled it mid-run. The post-update cask snapshot failed, and `update_internet_apps.sh` reported all 11 `brew_cask` apps as "cask not installed" while all 12 casks were in fact present. New `brew_cask_versions()` falls back to `brew list --cask` plus the `$(brew --prefix)/Caskroom/<token>/<version>` layout.
+- **Split-brain Node/CLI toolchain.** `ensure_toolchain_paths` handed Node/npm ownership to nvm whenever `~/.nvm/nvm.sh` merely existed, while still installing global CLIs into `~/.local/share/mac-update/`. Nothing on the interactive `PATH` pointed there, so the pipeline reported green against copies the user never ran (terminal node v24.13.0 vs "updated" v26.7.0; npm 11.13.0 vs 12.0.2; codex 0.147.0 vs 0.148.0; opencode 1.17.18 vs 1.18.18). The managed prefix now wins by default; set `MAC_UPDATE_NVM_OWNS_NODE=1` to opt back into the old behaviour.
+- **"SCRIPT 4 COMPLETED SUCCESSFULLY" banner printed above a non-zero exit** in `update_brew.sh`, and soft warnings were reported with the same red error text as hard failures.
+- **Missing markdown table headers in `APPLICATIONS.md`.** 14 GRUPA 3 tables had a separator row with no header row above it, so they did not render as tables.
+
+### Changed
+
+- **`claude-code` and `codex-cli` now update through their own updaters** (`claude update`, `codex update`) instead of `npm install -g @latest`, joining `agy-cli`. Self-updaters that shell out to a bare `npm install -g` are run with `npm_config_prefix` pinned to the managed prefix — without it, `codex update` silently installed into the *node* prefix, which loses to `NPM_GLOBAL_BIN` on `PATH`, reporting success while the stale binary kept winning `command -v`.
+- **Profile backups are rotated and mode-600.** `declare_profile_backup` kept one copy of `~/.zshrc` per run forever; 36 had accumulated, each a frozen copy of whatever secrets the live profile held. Keeps the newest `MAC_UPDATE_MAX_PROFILE_BACKUPS` (default 5).
+- **`scripts/scan_secrets.sh` gained a local, advisory-only dotfile scan.** gitleaks only sees tracked git content, so a plaintext credential in `~/.zshrc` / `~/.zshenv` was invisible to the whole test suite. Never fatal; skip with `MAC_UPDATE_SKIP_PROFILE_SCAN=1`.
+
+### Removed
+
+- **ChatGPT Atlas.** Uninstalled by the user (browser discontinued). Purged from `config/internet_apps.txt`, `config/internet_app_methods.txt`, `config/internet_dispatch_order.txt`, `lib/internet_apps.sh`, `lib/internet_app_updates.sh` (`iu_chatgpt_atlas`), `update_internet_apps.sh` (`STATUS_ATLAS`), `scripts/report_update_coverage.sh`, `scripts/audit_cask_candidates.sh`, `APPLICATIONS.md` and `UPDATES.md`. A regression test asserts no live surface references it.
+
+### Added
+
+- **`lib/brew.sh`** — resilient Homebrew query helpers (`brew_cask_versions`, `brew_formula_versions`, `brew_outdated_formulae`, `brew_outdated_casks`), so a single upstream `brew` bug can never block the macOS security-update step again.
+- **7 new regression tests** in `tests/test_safety_static.py` covering every fix above (167 total, all green).
+
 ## [1.4.0] — 2026-08-14
 
 Major quality, observability, and architecture release based on the comprehensive August 2026 review.

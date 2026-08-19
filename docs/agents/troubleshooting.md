@@ -11,7 +11,10 @@
 | Touch ID for sudo not working | `bash scripts/setup_touchid_sudo.sh` (per-machine setup; survives OS updates) |
 | Sudo prompt during long update_all run | `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (default: keep-alive refreshes sudo every 50s) |
 | LaunchAgent scheduling | `bash scripts/install_launchagent.sh --day 1 --hour 9` |
-| `CASK_MISSING` warning | `config/internet_app_methods.txt` has `brew_cask` but app is not in `brew list --cask`; run `brew install --cask --adopt <slug>` or change method to `silent_launch` |
+| `CASK_MISSING` warning | `config/internet_app_methods.txt` has `brew_cask` but app is not in `brew list --cask`; run `brew install --cask --adopt <slug>` or change method to `silent_launch`. If **every** `brew_cask` app reports missing at once, the cask query itself broke — see the row below, not your config |
+| `Error: uninitialized constant Cask::CaskLoader` | Upstream Homebrew bug in `brew list --cask --versions` (seen on 6.0.18-48-gad5738c). Handled: all callers go through `brew_cask_versions` in `lib/brew.sh`, which falls back to `brew list --cask` + the Caskroom layout. Never add a raw `brew list --cask --versions` back — `test_no_raw_brew_cask_versions_call` enforces this |
+| "Formulae still outdated after upgrade" with no formulae listed under it | `brew outdated` progress chatter got captured as the value. Fixed in v1.4.1 via `brew_outdated_formulae`; if it reappears, check that no caller reintroduced `2>&1` on a `brew outdated` capture |
+| `update_all.sh` reports CLIs green but your terminal has older versions | Split-brain toolchain: something (usually nvm) sits ahead of `~/.local/share/mac-update/{npm-global,node}/bin` on `PATH`. Run `bash update_npm_cli.sh` to rewrite the profile block, open a new shell, and confirm with `command -v node npm claude codex` |
 | `mas upgrade` fails | `sudo mas upgrade` (CVE-2025-43411) |
 | iPad apps "not allowed" error | System Settings → Privacy → Accessibility → add terminal |
 | Wrong language | Edit `.mac_update_prefs` → `MAC_LANG=en` |

@@ -3,7 +3,6 @@
 Google Chrome
 Firefox Developer Edition
 Brave Browser
-ChatGPT Atlas
 ChatGPT / Codex
 Claude
 Comet

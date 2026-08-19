@@ -33,6 +33,7 @@ mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
 . "$SCRIPT_DIR/lib/internet_apps.sh"
+. "$SCRIPT_DIR/lib/brew.sh"
 . "$SCRIPT_DIR/lib/version.sh"
 . "$SCRIPT_DIR/lib/internet_i18n.sh"
 mac_update_severity_init
@@ -77,7 +78,7 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
         print_warn "Could not save the pre-update formula snapshot."
         SOFT_FAIL=1
     fi
-    if ! brew list --cask --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_before.txt"; then
+    if ! brew_cask_versions | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_before.txt"; then
         print_warn "Could not save the pre-update cask snapshot."
         SOFT_FAIL=1
     fi
@@ -116,7 +117,7 @@ fi
 print_header "$L_BREW_OUTDATED"
 
 echo -e "${CYAN}$L_BREW_OUTDATED_LIST${NC}"
-if ! OUTDATED_FORMULAE=$(brew outdated --formula 2>&1); then
+if ! OUTDATED_FORMULAE=$(brew_outdated_formulae); then
     print_warn "brew outdated --formula failed; update state is unknown."
     [ -n "$OUTDATED_FORMULAE" ] && printf '%s\n' "$OUTDATED_FORMULAE"
     SOFT_FAIL=1
@@ -130,7 +131,7 @@ fi
 
 echo ""
 echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
-if ! OUTDATED_CASKS=$(brew outdated --cask --greedy-auto-updates 2>&1); then
+if ! OUTDATED_CASKS=$(brew_outdated_casks); then
     print_warn "brew outdated --cask --greedy-auto-updates failed; update state is unknown."
     [ -n "$OUTDATED_CASKS" ] && printf '%s\n' "$OUTDATED_CASKS"
     SOFT_FAIL=1
@@ -304,7 +305,7 @@ fi
 # A successful upgrade is not enough: query Homebrew again and fail if any
 # formula or greedy cask remains outdated, or if verification itself fails.
 print_header "$L_BREW_OUTDATED"
-if ! REMAINING_FORMULAE=$(brew outdated --formula 2>&1 | strip_ansi); then
+if ! REMAINING_FORMULAE=$(brew_outdated_formulae | strip_ansi); then
     print_warn "Final brew outdated --formula verification failed."
     [ -n "$REMAINING_FORMULAE" ] && printf '%s\n' "$REMAINING_FORMULAE"
     SOFT_FAIL=1
@@ -313,7 +314,7 @@ elif [ -n "$REMAINING_FORMULAE" ]; then
     printf '%s\n' "$REMAINING_FORMULAE"
     HARD_FAIL=1
 fi
-if ! REMAINING_CASKS=$(brew outdated --cask --greedy-auto-updates 2>&1 | strip_ansi); then
+if ! REMAINING_CASKS=$(brew_outdated_casks | strip_ansi); then
     print_warn "Final brew outdated --cask --greedy-auto-updates verification failed."
     [ -n "$REMAINING_CASKS" ] && printf '%s\n' "$REMAINING_CASKS"
     SOFT_FAIL=1
@@ -468,7 +469,7 @@ brew list --formula --versions 2>/dev/null | column -t || brew list --formula --
 
 echo ""
 echo -e "${CYAN}Casks:${NC}"
-brew list --cask --versions 2>/dev/null | column -t || brew list --cask --versions
+brew_cask_versions | column -t || brew_cask_versions
 
 # ── Snapshot wersji zainstalowanych pakietów PO aktualizacji ──
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
@@ -479,7 +480,7 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
         BREW_SNAPSHOT_OK=0
         SOFT_FAIL=1
     fi
-    if ! brew list --cask --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_after.txt"; then
+    if ! brew_cask_versions | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_after.txt"; then
         print_warn "Could not save the post-update cask snapshot."
         BREW_SNAPSHOT_OK=0
         SOFT_FAIL=1
@@ -489,12 +490,21 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     fi
 fi
 
-print_header "$L_BREW_SCRIPT_DONE"
 BREW_FINAL_EXIT="$(mac_update_severity_exit_code)"
 if [ "$BREW_FINAL_EXIT" -eq 0 ]; then
+    print_header "$L_BREW_SCRIPT_DONE"
     echo -e "  ${GREEN}$L_BREW_ALL_DONE${NC}"
 else
-    print_error "Homebrew finished with errors or soft warnings. Review output above."
+    # Never print the "COMPLETED SUCCESSFULLY" banner above a non-zero exit —
+    # the 2026-08-19 run log showed "SKRYPT 4 ZAKOŃCZONY POMYŚLNIE" directly
+    # above "Homebrew finished with errors", which sends the reader hunting in
+    # the wrong place.
+    print_header "🍺 Homebrew"
+    if [ "$BREW_FINAL_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
+        print_warn "Homebrew finished with soft warnings (non-blocking). Review output above."
+    else
+        print_error "Homebrew finished with errors. Review output above."
+    fi
 fi
 echo ""
 exit "$BREW_FINAL_EXIT"

@@ -1,6 +1,6 @@
 # Schnellstart (Deutsch)
 
-**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.0.21**
+**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.4.1**
 
 ## Einzeilige Installation
 
