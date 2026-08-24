@@ -1040,9 +1040,9 @@ def candidate_path(command):
     if not re.fullmatch(r'[A-Za-z0-9._+-]+', command):
         return None
     roots = [
+        os.path.join(home, '.local', 'bin'),
         os.path.join(home, '.local', 'share', 'mac-update', 'npm-global', 'bin'),
         os.path.join(home, '.local', 'share', 'mac-update', 'node', 'bin'),
-        os.path.join(home, '.local', 'bin'),
         os.path.join(home, '.bun', 'bin'),
     ]
     for root in roots:

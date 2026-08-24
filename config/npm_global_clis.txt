@@ -1,13 +1,15 @@
 # display_name|package_name|method|brew_formula|command
 # method: npm            → npm install -g <package>@latest into the managed prefix
 #         self-update    → run "<command> update" (the vendor's own updater)
+#         native-installer → run the vendor's official install script (standalone binary)
 #         native-node    → Node.js tarball install via n
 #         native-bun     → bun upgrade
 node|node|native-node|node|node
 npm|npm|npm||npm
 pnpm|pnpm|npm||pnpm
-claude-code|@anthropic-ai/claude-code|self-update||claude
-codex-cli|@openai/codex|self-update||codex
+claude-code|@anthropic-ai/claude-code|native-installer||claude
+codex-cli|@openai/codex|native-installer||codex
 opencode-cli|opencode-ai|npm|opencode|opencode
-agy-cli|agy|self-update||agy
+agy-cli|agy|native-installer||agy
+cursor-agent|cursor-agent|native-installer||agent
 bun|bun|native-bun|bun|bun
