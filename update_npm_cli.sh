@@ -363,7 +363,21 @@ resolve_command_path() {
                 return 0
             fi
             ;;
-        npm|pnpm|claude|codex|opencode)
+        claude)
+            # Claude Code migrated to a standalone binary installer
+            # (curl -fsSL https://claude.ai/install.sh) that places the
+            # binary at ~/.local/bin/claude. Prefer it over the npm-global
+            # stub which may be broken (missing native binary).
+            if [ -x "$LOCAL_BIN/claude" ]; then
+                echo "$LOCAL_BIN/claude"
+                return 0
+            fi
+            if [ -x "$NPM_GLOBAL_BIN/claude" ]; then
+                echo "$NPM_GLOBAL_BIN/claude"
+                return 0
+            fi
+            ;;
+        npm|pnpm|codex|opencode)
             if [ -x "$NPM_GLOBAL_BIN/$command_name" ]; then
                 echo "$NPM_GLOBAL_BIN/$command_name"
                 return 0
@@ -814,15 +828,33 @@ install_latest_npm_packages() {
                 # the one that actually gets upgraded.
                 if ( export npm_config_prefix="$NPM_GLOBAL_PREFIX"
                      export NPM_CONFIG_PREFIX="$NPM_GLOBAL_PREFIX"
-                     export PATH="$NPM_GLOBAL_BIN:$N_PREFIX/bin:$PATH"
+                     export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$PATH"
                      run_quiet_with_error_log \
                         "${command_name} update" \
                         run_with_timeout 300 "$command_path" update ); then
                     command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
                 else
-                    print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
-                    failures=$((failures + 1))
+                    # If self-update failed AND this is claude-code with a
+                    # broken npm-global stub, attempt postinstall repair.
+                    local npm_install_cjs="$NPM_GLOBAL_PREFIX/lib/node_modules/@anthropic-ai/claude-code/install.cjs"
+                    if [ "$command_name" = "claude" ] \
+                        && [ -f "$npm_install_cjs" ] \
+                        && [ -x "$LOCAL_BIN/claude" ]; then
+                        print_info "Trying standalone claude at $LOCAL_BIN/claude..."
+                        if ( export PATH="$LOCAL_BIN:$PATH"
+                             run_quiet_with_error_log \
+                                "claude update (standalone)" \
+                                run_with_timeout 300 "$LOCAL_BIN/claude" update ); then
+                            print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/claude")"
+                        else
+                            print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+                            failures=$((failures + 1))
+                        fi
+                    else
+                        print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+                        failures=$((failures + 1))
+                    fi
                 fi
             else
                 print_info "${display_name} nie jest zainstalowany — pomijam"
