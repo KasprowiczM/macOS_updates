@@ -345,6 +345,12 @@ detect_command_version() {
         codex-cli)
             version="$("$command_path" --version </dev/null 2>/dev/null | head -1 | awk '{print $NF}')"
             ;;
+        agy-cli)
+            version="$("$command_path" --version </dev/null 2>/dev/null | head -1)"
+            ;;
+        cursor-agent)
+            version="$("$command_path" --version </dev/null 2>/dev/null | head -1)"
+            ;;
         *)
             version="$("$command_path" --version </dev/null 2>/dev/null | head -1 | awk '{print $NF}')"
             ;;
@@ -364,20 +370,15 @@ resolve_command_path() {
             fi
             ;;
         claude)
-            # Claude Code migrated to a standalone binary installer
-            # (curl -fsSL https://claude.ai/install.sh) that places the
-            # binary at ~/.local/bin/claude. Prefer it over the npm-global
-            # stub which may be broken (missing native binary).
+            # Claude Code uses a standalone native installer
+            # (curl -fsSL https://claude.ai/install.sh | sh) that places
+            # the binary at ~/.local/bin/claude. No npm-global fallback.
             if [ -x "$LOCAL_BIN/claude" ]; then
                 echo "$LOCAL_BIN/claude"
                 return 0
             fi
-            if [ -x "$NPM_GLOBAL_BIN/claude" ]; then
-                echo "$NPM_GLOBAL_BIN/claude"
-                return 0
-            fi
             ;;
-        npm|pnpm|codex|opencode)
+        npm|pnpm|opencode)
             if [ -x "$NPM_GLOBAL_BIN/$command_name" ]; then
                 echo "$NPM_GLOBAL_BIN/$command_name"
                 return 0
@@ -389,9 +390,10 @@ resolve_command_path() {
                 return 0
             fi
             ;;
-        agy)
-            if [ -x "$LOCAL_BIN/agy" ]; then
-                echo "$LOCAL_BIN/agy"
+        codex|agy|agent)
+            # Standalone native binaries installed by vendor scripts
+            if [ -x "$LOCAL_BIN/$command_name" ]; then
+                echo "$LOCAL_BIN/$command_name"
                 return 0
             fi
             ;;
@@ -815,15 +817,35 @@ install_latest_npm_packages() {
                 print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                 failures=$((failures + 1))
             fi
+        elif [ "$method" = "native-installer" ]; then
+            # Standalone native installer — the vendor provides an install
+            # script that both installs AND updates the binary in ~/.local/bin.
+            local install_url=""
+            case "$command_name" in
+                claude) install_url="https://claude.ai/install.sh" ;;
+                codex)  install_url="https://chatgpt.com/codex/install.sh" ;;
+                agy)    install_url="https://antigravity.google/cli/install.sh" ;;
+                agent)  install_url="https://cursor.com/install" ;;
+            esac
+            if [ -n "$install_url" ]; then
+                print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
+                if run_quiet_with_error_log \
+                    "${command_name} native installer" \
+                    run_with_timeout 120 sh -c "curl -fsSL '$install_url' | sh"; then
+                    print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
+                else
+                    print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+                    failures=$((failures + 1))
+                fi
+            else
+                print_warn "${display_name}: native-installer method not implemented for ${command_name}"
+                failures=$((failures + 1))
+            fi
         elif [ "$method" = "self-update" ]; then
             if command_path="$(resolve_command_path "$command_name")"; then
                 print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "${command_name}")"
-                # Some vendor self-updaters (codex, claude) shell out to
-                # `npm install -g` internally. npm's configured prefix on this
-                # machine is the *node* prefix, which sits AFTER
-                # NPM_GLOBAL_BIN on PATH — an unpinned self-update would write
-                # a fresh copy there, report success, and leave the stale
-                # binary still winning `command -v`. Pin the prefix and the
+                # Some vendor self-updaters may shell out to
+                # `npm install -g` internally. Pin the prefix and the
                 # PATH for the child only (subshell), so the managed prefix is
                 # the one that actually gets upgraded.
                 if ( export npm_config_prefix="$NPM_GLOBAL_PREFIX"
@@ -835,26 +857,8 @@ install_latest_npm_packages() {
                     command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
                 else
-                    # If self-update failed AND this is claude-code with a
-                    # broken npm-global stub, attempt postinstall repair.
-                    local npm_install_cjs="$NPM_GLOBAL_PREFIX/lib/node_modules/@anthropic-ai/claude-code/install.cjs"
-                    if [ "$command_name" = "claude" ] \
-                        && [ -f "$npm_install_cjs" ] \
-                        && [ -x "$LOCAL_BIN/claude" ]; then
-                        print_info "Trying standalone claude at $LOCAL_BIN/claude..."
-                        if ( export PATH="$LOCAL_BIN:$PATH"
-                             run_quiet_with_error_log \
-                                "claude update (standalone)" \
-                                run_with_timeout 300 "$LOCAL_BIN/claude" update ); then
-                            print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/claude")"
-                        else
-                            print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
-                            failures=$((failures + 1))
-                        fi
-                    else
-                        print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
-                        failures=$((failures + 1))
-                    fi
+                    print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+                    failures=$((failures + 1))
                 fi
             else
                 print_info "${display_name} nie jest zainstalowany — pomijam"
