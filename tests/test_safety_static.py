@@ -1945,7 +1945,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("NPM_GLOBAL_PREFIX", self_update_block)
 
     def test_native_self_update_clis_configured(self) -> None:
-        """claude / codex / agy must update through their own updaters, not npm -g."""
+        """claude, codex, agy, and cursor-agent must use native-installer."""
         manifest = (REPO_ROOT / "config" / "npm_global_clis.txt").read_text(encoding="utf-8")
         rows = {}
         for line in manifest.splitlines():
@@ -1954,10 +1954,16 @@ class StaticShellSafetyTests(unittest.TestCase):
                 continue
             parts = line.split("|")
             rows[parts[0]] = parts
-        for display, command in (("claude-code", "claude"), ("codex-cli", "codex"), ("agy-cli", "agy")):
+        # All standalone CLIs must use their vendor's native install script
+        for display, command in (
+            ("claude-code", "claude"),
+            ("codex-cli", "codex"),
+            ("agy-cli", "agy"),
+            ("cursor-agent", "agent"),
+        ):
             self.assertIn(display, rows, msg=f"{display} missing from npm_global_clis.txt")
-            self.assertEqual(rows[display][2], "self-update", msg=f"{display} must use self-update")
-            self.assertEqual(rows[display][4], command, msg=f"{display} must invoke `{command} update`")
+            self.assertEqual(rows[display][2], "native-installer", msg=f"{display} must use native-installer")
+            self.assertEqual(rows[display][4], command, msg=f"{display} must invoke `{command}`")
 
     def test_managed_toolchain_wins_path_by_default(self) -> None:
         """The managed prefix must win PATH unless the user opts out explicitly.
