@@ -867,8 +867,8 @@ new_apps_file = os.path.join(session_dir, 'new_apps.txt')
 if os.path.exists(new_apps_file):
     with open(new_apps_file) as f:
         new_app_names = [l.strip() for l in f if l.strip()]
-    def norm_name(s):
-        return re.sub(r'[-_ .]', '', s.lower().strip())
+    # norm_name is imported from lib/python/inventory.py — do not shadow it:
+    # a local copy silently drifts from the canonical normalization rules.
     handled = set()
     for fname in [new_formula_file, new_cask_file]:
         if os.path.exists(fname):
@@ -942,8 +942,8 @@ if os.path.exists(new_apps_file):
 # Deduplicate: Remove any apps from GRUPA 3 that are listed in Section 4c (Homebrew Casks)
 casks_4c_match = re.search(r'### 4c\. Casks.*?\n((?:\| [^\n]+\|\n)+)', content, re.DOTALL)
 if casks_4c_match:
-    def norm_name(s):
-        return re.sub(r'[-_ .]', '', s.lower().strip())
+    # norm_name is imported from lib/python/inventory.py — do not shadow it:
+    # a local copy silently drifts from the canonical normalization rules.
     cask_rows = casks_4c_match.group(1).splitlines()
     cask_norm_set = set()
     for row in cask_rows:
