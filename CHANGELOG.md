@@ -4,6 +4,64 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.4.2] — 2026-08-26
+
+Run-log review release. The 2026-08-26 run exited 0 but `degraded: true`, with four of seven
+steps reporting warnings. None of the warnings were transient: every one of them was a defect
+that reproduced on every run and blocked a real update indefinitely.
+
+### Fixed
+
+- **`codex-cli` failed on every run (`exit=124`).** The vendor native installer defaults to
+  `CODEX_NON_INTERACTIVE=false` and asks `Start Codex now?` on `/dev/tty`, so redirecting stdin
+  could not help; the installer blocked until `run_with_timeout 120` killed it. `codex` had been
+  stuck at an old build while the step reported only a soft warning. Native installers now run
+  through `native_installer_env()` (which passes `CODEX_NON_INTERACTIVE=1`) with stdin detached,
+  and the hard backstop moved from 120s to `native_installer_timeout()` (default 360s) — the
+  vendor script alone allows 300s for the release download, so the old cap could kill a healthy
+  install. Verified live: `codex` updated 0.149.1 → 0.150.0 in under 45s.
+- **Ledger Live could never pass its checksum.** `latest-mac.yml` lists the `.zip` first and
+  repeats that entry's digest as the top-level `sha512:`; the handler took the *first* `sha512:`
+  in the document and compared it against the `.dmg` it downloads. The mismatch was structural,
+  not a corrupt download, so Ledger was pinned at 4.15.0 while 4.17.1 shipped. The DMG url and its
+  digest are now read from the same manifest entry. Verified by downloading 4.17.1 and checking
+  both digests: the DMG's matches, the ZIP's does not.
+- **`brave-browser` was skipped by the cask downgrade guard, permanently.** The guard compared the
+  app bundle's `CFBundleShortVersionString` (`151.1.93.138` — the Chromium major prefixed to
+  Brave's own version) against the cask version (`1.93.138.0`), read `151 > 1`, and concluded the
+  installed app was newer. The guard now prefers Homebrew's own recorded installed version, and
+  the bundle-version fallback goes through the new scheme-aware
+  `app_vs_package_version_relation()` in `lib/version.sh`, which realigns a vendor prefix before
+  comparing and reports `unknown` rather than inventing a downgrade out of incomparable numbers.
+- **Microsoft AutoUpdate deferral releases were reported without being verified.** The reconcile
+  step verified `armed` writes against the live domain but took `removed` on the strength of
+  `plutil -remove` exiting 0 against an exported copy. Three runs in a row printed
+  `✅ Released … DeferralVersions.TEAMS21` while the pin was still in
+  `com.microsoft.autoupdate2`. Removals are now measured against the live domain; a pin MAU
+  re-created is reported as still present (`L_INTERNET_MS_DEFERRALS_NOT_RELEASED_FMT`) and marks
+  the step soft-failed instead of being claimed as cleared.
+- **The prescan re-reported its own bookkeeping as new applications.** `norm_name()` did not strip
+  the `🆕` marker the toolkit appends when it adds an app to `APPLICATIONS.md`, so
+  `GarageBand 🆕` never matched the installed `GarageBand` again. Two inline copies of
+  `norm_name()` in `update_all.sh` shadowed the canonical one and reintroduced the old rules;
+  both are gone, and the canonical normalizer drops symbol, modifier and format characters.
+
+### Changed
+
+- **Antigravity no longer warns `⏭️ Nieznana wersja` on every run.** Its electron-updater endpoint
+  expects platform and arch parameters and answers 404 to `latest-mac.yml`, so there is no
+  manifest to parse and nothing wrong with the run. An unreachable manifest on an app that has a
+  feed is now reported as informational (`L_INTERNET_FEED_NOT_MACHINE_READABLE_FMT`); a feed that
+  responds but yields no version still warns.
+
+### Added
+
+- **`app_vs_package_version_relation()`** in `lib/version.sh` — scheme-aware version comparison for
+  package-manager records against application bundle versions.
+- **`tests/test_run_log_regressions_20260826.py`** — 19 regression tests, one group per root cause
+  above, including a check that every language file defines the three new i18n keys (189 tests
+  total, all green).
+
 ## [1.4.1] — 2026-08-19
 
 Post-migration hardening release. First full run on a new MacBook (macOS 26.6.2, Homebrew
