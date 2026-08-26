@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import unicodedata
 import subprocess
 from pathlib import Path
 
@@ -40,8 +41,20 @@ SYSTEM_APP_FRAGMENTS: list[str] = [
 
 
 def norm_name(s: str) -> str:
-    """Normalize application name for loose comparisons."""
-    return re.sub(r"[-_ .]", "", s.lower().strip())
+    """Normalize application name for loose comparisons.
+
+    Markers the toolkit itself writes into APPLICATIONS.md must not change a
+    name's identity. The prescan appends new applications to the "🆕" section
+    as e.g. "GarageBand 🆕"; leaving the emoji in the normalized form meant the
+    row never matched the installed "GarageBand" again, so every auto-appended
+    app was re-reported as new on every subsequent run. Drop symbol, modifier
+    and format characters (emoji and variation selectors) along with the
+    separators.
+    """
+    stripped = "".join(
+        ch for ch in s if unicodedata.category(ch) not in ("So", "Sk", "Cf")
+    )
+    return re.sub(r"[-_ .]", "", stripped.lower().strip())
 
 
 def load_exclusions(config_path: str | Path) -> set[str]:
