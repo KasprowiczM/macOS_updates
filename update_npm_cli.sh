@@ -781,6 +781,32 @@ ensure_latest_bun() {
     hash -r 2>/dev/null || true
 }
 
+# Non-interactive switches for vendor native installers. An installer that
+# waits on a prompt is indistinguishable from a hung download: both end as a
+# timeout kill, so the switch has to be passed, never worked around with a
+# longer timeout.
+native_installer_env() {
+    case "$1" in
+        codex) printf '%s' "CODEX_NON_INTERACTIVE=1" ;;
+        *)     printf '%s' "" ;;
+    esac
+}
+
+# Hard backstop for a native installer run. It must stay strictly above the
+# vendor script's own asset timeout (codex uses 300s for the release download),
+# otherwise a legitimately slow but healthy download is killed as a failure.
+native_installer_timeout() {
+    local raw="${MAC_UPDATE_NATIVE_INSTALLER_TIMEOUT:-360}"
+    case "$raw" in
+        ''|*[!0-9]*) echo 360; return 0 ;;
+    esac
+    if [ "$raw" -lt 60 ]; then
+        echo 360
+    else
+        echo "$raw"
+    fi
+}
+
 install_latest_npm_packages() {
     local active_npm="$N_PREFIX/bin/npm"
     local display_name
@@ -821,17 +847,27 @@ install_latest_npm_packages() {
             # Standalone native installer — the vendor provides an install
             # script that both installs AND updates the binary in ~/.local/bin.
             local install_url=""
+            local installer_env=""
             case "$command_name" in
                 claude) install_url="https://claude.ai/install.sh" ;;
                 codex)  install_url="https://chatgpt.com/codex/install.sh" ;;
                 agy)    install_url="https://antigravity.google/cli/install.sh" ;;
                 agent)  install_url="https://cursor.com/install" ;;
             esac
+            # Vendor installers that prompt on a tty must be told to stay
+            # silent. The codex installer opens /dev/tty directly ("Start Codex
+            # now?", "Uninstall the existing npm-managed Codex now?"), so
+            # redirecting stdin is not enough — only its documented
+            # CODEX_NON_INTERACTIVE switch skips the prompts. Without it the
+            # installer blocked until run_with_timeout killed it (exit 124) and
+            # codex-cli failed on every run.
+            installer_env="$(native_installer_env "$command_name")"
             if [ -n "$install_url" ]; then
                 print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
                 if run_quiet_with_error_log \
                     "${command_name} native installer" \
-                    run_with_timeout 120 sh -c "curl -fsSL '$install_url' | sh"; then
+                    run_with_timeout "$(native_installer_timeout)" \
+                    env $installer_env sh -c "curl -fsSL '$install_url' | sh" </dev/null; then
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
                 else
                     print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"

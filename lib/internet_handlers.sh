@@ -301,6 +301,7 @@ internet_handler_vendor_latest() {
 
     # 2. Try electron-updater (Contents/Resources/app-update.yml)
     local app_update_yml="$app_path/Contents/Resources/app-update.yml"
+    local feed_unreadable=0
     if [ -f "$app_update_yml" ]; then
         local base_url
         base_url="$(grep -E '^url:' "$app_update_yml" | head -1 | cut -d':' -f2- | tr -d ' "')"
@@ -310,6 +311,13 @@ internet_handler_vendor_latest() {
             manifest_yml="$(curl -fsSL --max-time 15 --retry 2 "${base_url}/latest-mac.yml" 2>/dev/null || curl -fsSL --max-time 15 --retry 2 "${base_url}/latest.yml" 2>/dev/null || true)"
             if [ -n "$manifest_yml" ]; then
                 remote_ver="$(echo "$manifest_yml" | grep -E '^version:' | head -1 | cut -d':' -f2 | tr -d ' "')"
+            else
+                # Not every electron-updater endpoint is a static manifest.
+                # Antigravity's hub answers 404 to latest-mac.yml and
+                # latest.yml because it expects platform and arch parameters,
+                # so there is nothing to parse and nothing wrong either. That
+                # is a fact about the feed, not a fault of this run.
+                feed_unreadable=1
             fi
         fi
     fi
@@ -327,7 +335,11 @@ internet_handler_vendor_latest() {
     fi
 
     if [ -z "$remote_ver" ]; then
-        print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        if [ "$feed_unreadable" -eq 1 ]; then
+            print_info "$(internet_msg "$L_INTERNET_FEED_NOT_MACHINE_READABLE_FMT" "$app_display")"
+        else
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        fi
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
     else
         local rel

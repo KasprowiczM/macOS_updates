@@ -243,6 +243,7 @@ if [ -n "$OUTDATED_CASKS" ]; then
         cask_json=$(brew info --json=v2 --cask "$cask" 2>/dev/null || true)
         cask_ver=""
         cask_app_name=""
+        cask_recorded_ver=""
         if [ -n "$cask_json" ]; then
             parsed=$(python3 -c '
 import json, sys
@@ -250,18 +251,31 @@ try:
     d = json.load(sys.stdin)
     c = d["casks"][0]
     v = c.get("version", "")
+    installed = c.get("installed") or ""
     app = ""
     for art in c.get("artifacts", []):
         if isinstance(art, dict) and "app" in art:
             apps = art["app"]
             app = apps[0] if isinstance(apps, list) and apps else (apps if isinstance(apps, str) else "")
             break
-    print(f"{v}|{app}")
+    print(f"{v}|{app}|{installed}")
 except Exception:
     pass
 ' <<< "$cask_json" 2>/dev/null || true)
             cask_ver=$(echo "$parsed" | cut -d'|' -f1)
             cask_app_name=$(echo "$parsed" | cut -d'|' -f2)
+            cask_recorded_ver=$(echo "$parsed" | cut -d'|' -f3)
+        fi
+
+        # Homebrew's own record of what it installed is the only like-for-like
+        # operand for the cask version. Prefer it; the bundle version is a
+        # fallback and may use a different scheme entirely.
+        if [ -n "$cask_recorded_ver" ] && [ -n "$cask_ver" ]; then
+            if [ "$(internet_version_relation "$cask_recorded_ver" "$cask_ver")" = "newer" ]; then
+                print_warn "$(internet_msg "$L_BREW_CASK_WOULD_DOWNGRADE_FMT" "$cask" "$cask_ver" "$cask_recorded_ver")"
+                SOFT_FAIL=1
+                continue
+            fi
         fi
 
         cask_app_path=""
@@ -278,11 +292,18 @@ except Exception:
         if [ -n "$cask_app_path" ] && [ -d "$cask_app_path" ]; then
             installed_ver=$(app_version "$cask_app_path")
             if [ -n "$installed_ver" ] && [ -n "$cask_ver" ]; then
-                rel=$(internet_version_relation "$installed_ver" "$cask_ver" 2>/dev/null || echo "same")
+                # Scheme-aware: a bundle version such as Brave's
+                # "151.1.93.138" carries the Chromium major in front of the
+                # cask's own "1.93.138.0". Comparing them digit by digit read
+                # the app as newer and skipped the upgrade on every run.
+                rel=$(app_vs_package_version_relation "$installed_ver" "$cask_ver" 2>/dev/null || echo "unknown")
                 if [ "$rel" = "newer" ]; then
                     print_warn "$(internet_msg "$L_BREW_CASK_WOULD_DOWNGRADE_FMT" "$cask" "$cask_ver" "$installed_ver")"
                     SOFT_FAIL=1
                     continue
+                fi
+                if [ "$rel" = "unknown" ]; then
+                    print_info "$(internet_msg "$L_BREW_CASK_VERSION_SCHEME_INFO_FMT" "$cask" "$installed_ver" "$cask_ver")"
                 fi
             fi
         fi

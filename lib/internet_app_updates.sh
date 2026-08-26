@@ -875,6 +875,7 @@ mau_reconcile_deferrals() {
     local regressed="$1"
     local offered="${2:-$1}"
     local plist backup release id armed removed days verify unverified=""
+    local container still_present="" verified_removed=""
     release=""
     for id in $MAU_OFFICE_DEFERRAL_IDS; do
         case " $offered " in
@@ -961,14 +962,37 @@ mau_reconcile_deferrals() {
                 unverified="$unverified $id"
             fi
         done
+        # Removals were reported as successful on the strength of `plutil
+        # -remove` exiting 0 against the exported copy. That says nothing about
+        # the live domain: Microsoft AutoUpdate re-creates a DeferralVersions
+        # pin it still considers its own, and the run reported the release as
+        # done anyway — three runs in a row claimed DeferralVersions.TEAMS21
+        # was cleared while it was still there. Measure the live domain and
+        # report only what it actually contains.
+        for entry in $removed; do
+            container="${entry%%.*}"
+            id="${entry#*.}"
+            if [ -n "$(mau_deferral_value "$verify" "$container" "$id")" ]; then
+                still_present="$still_present $entry"
+            else
+                verified_removed="$verified_removed $entry"
+            fi
+        done
         if [ -n "$unverified" ]; then
             print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT" "${unverified# }")"
             internet_diag_log "ERROR: MAU deferral write did not persist for:${unverified}"
             rm -f "$verify" 2>/dev/null || true
             return 1
         fi
+        removed="${verified_removed# }"
     fi
     rm -f "$verify" 2>/dev/null || true
+
+    if [ -n "$still_present" ]; then
+        print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_NOT_RELEASED_FMT" "${still_present# }")"
+        internet_diag_log "ERROR: MAU deferral release did not persist for:${still_present}"
+        SOFT_FAIL=1
+    fi
 
     [ -n "$armed" ] && print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_ARMED_FMT" "$armed" "$days")"
     [ -n "$removed" ] && print_ok "$(internet_msg "$L_INTERNET_MS_DEFERRALS_CLEARED_FMT" "$removed")"
@@ -1480,13 +1504,23 @@ iu_ledger() {
 
         LEDGER_YML=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
         LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
-        LEDGER_SHA512=$(python3 -c "
+        # electron-builder's latest-mac.yml lists the .zip first and repeats
+        # that entry's digest as the top-level `sha512:`. Taking the first
+        # sha512 in the document therefore paired the ZIP's digest with the DMG
+        # this handler downloads, so verification could never succeed and
+        # Ledger was blocked from updating on every run. Resolve the DMG url
+        # and its own digest together, from the same list entry.
+        LEDGER_ASSET=$(python3 -c "
 import sys, re
 yml = sys.stdin.read()
-match = re.search(r'sha512:\s*([A-Za-z0-9+/=]+)', yml)
-if match:
-    print(match.group(1).strip())
+entries = re.findall(r'-\s+url:\s*(\S+)\s*\n\s+sha512:\s*(\S+)', yml)
+for url, digest in entries:
+    if url.endswith('.dmg'):
+        print(url.strip() + '|' + digest.strip())
+        break
 " <<< "$LEDGER_YML" 2>/dev/null || true)
+        LEDGER_DMG_FILE=$(printf '%s' "$LEDGER_ASSET" | cut -d'|' -f1)
+        LEDGER_SHA512=$(printf '%s' "$LEDGER_ASSET" | cut -d'|' -f2)
         LEDGER_RELATION="$(internet_version_relation "$LATEST_LEDGER" "$VER")"
 
         if [ -z "$LATEST_LEDGER" ]; then
@@ -1501,10 +1535,14 @@ if match:
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_LEDGER" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "$LEDGER_NAME" "$LATEST_LEDGER")"
-            # Parse the actual DMG filename from the YAML 'files' list (skip ZIP, extract DMG only)
-            LEDGER_DMG_FILE=$(echo "$LEDGER_YML" | grep "^  *- url:.*\.dmg" | head -1 | sed 's|.*url: *||' | tr -d '[:space:]')
+            # LEDGER_DMG_FILE and LEDGER_SHA512 come from the same manifest
+            # entry above. Falling back to a guessed filename means there is no
+            # digest to check it against, so the checksum step is skipped
+            # rather than run against a mismatched digest.
             if [ -z "$LEDGER_DMG_FILE" ]; then
                 LEDGER_DMG_FILE="ledger-live-desktop-${LATEST_LEDGER}-mac.dmg"
+                LEDGER_SHA512=""
+                print_info "$(internet_msg "$L_INTERNET_FEED_NOT_MACHINE_READABLE_FMT" "Ledger Live")"
             fi
             LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
