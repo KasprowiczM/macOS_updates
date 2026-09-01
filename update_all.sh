@@ -1295,6 +1295,7 @@ with open(os.path.join(session_dir, "installed_apps_after.txt"), "w", encoding="
 
 # Write the post-update Python script
 cat > "$SESSION_DIR/postupdate.py" << 'PYEOF'
+import json
 import os
 import re
 import sys
@@ -1769,6 +1770,27 @@ print(f"     Native CLI + npm:                 {len(npm_cli_upgrades) + len(npm_
 print(f"     Zmiany wersji aplikacji inet.:    {len(internet_upgrades)}")
 print(f"     {os.environ.get('L_POSTUPDATE_TOTAL_VERSION_CHANGES', 'Total version changes: %s') % updated_count}")
 
+# Hand the same numbers to the machine-readable summary. build_run_summary has
+# always accepted a `counts` mapping and the caller never passed one, so every
+# run_summary_*.json ever written carried "counts": {} — 26 of them on this Mac.
+# Anything consuming the JSON (monitoring, the run-log review) had to re-parse
+# the human log to learn how many packages actually moved. These are the counts
+# already printed above, written once, from the step that computed them.
+_counts = {
+    "brew_formulae_upgraded": len(formula_upgrades),
+    "brew_casks_upgraded": len(cask_upgrades),
+    "brew_new_packages": len(formula_new) + len(cask_new),
+    "native_cli_npm_changed": len(npm_cli_upgrades) + len(npm_cli_new),
+    "internet_app_versions_changed": len(internet_upgrades),
+    "total_version_changes": updated_count,
+}
+try:
+    _counts_path = os.path.join(session_dir, "run_counts.json")
+    with open(_counts_path, "w", encoding="utf-8") as _cf:
+        json.dump(_counts, _cf)
+except Exception as _exc:  # never fail the run over a reporting side-file
+    print(f"  (run counts not recorded: {_exc})")
+
 PYEOF
 
 if python3 "$SESSION_DIR/postupdate.py" \
@@ -1943,7 +1965,20 @@ flags = {
     "noninteractive": os.environ.get("MAC_UPDATE_NONINTERACTIVE") == "1",
 }
 
+counts = {}
+counts_path = os.path.join(session_dir, "run_counts.json")
+try:
+    with open(counts_path, encoding="utf-8") as cf:
+        loaded = json.load(cf)
+    if isinstance(loaded, dict):
+        counts = {k: int(v) for k, v in loaded.items() if isinstance(v, int)}
+except (OSError, ValueError):
+    # Step 5 may have been skipped (--inventory-only) or failed before writing;
+    # an empty counts block is then the truthful answer, not a missing one.
+    counts = {}
+
 summary = build_run_summary(
+    counts=counts,
     start_time=start_time,
     end_time=end_time,
     overall_exit=overall_exit,

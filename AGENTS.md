@@ -12,7 +12,7 @@ This repository is owned by the `KasprowiczM` GitHub Free account. Private repos
 - Public-repository standard runners may be free, but the same anti-waste rules still apply.
 
 
-Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–26, 7 languages, v**1.4.1**, multi-cloud private overlay via `dev_sync/`.
+Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–26, 7 languages, v**1.4.3**, multi-cloud private overlay via `dev_sync/`.
 
 ## Quick Commands
 
@@ -55,7 +55,12 @@ Load only when relevant to your task:
 ## Non-Negotiable Rules
 
 1. **`softwareupdate` MUST have `-R`** — without it, macOS updates download but never apply.
-2. **`mas upgrade` MUST have `sudo`** — macOS 15.7.2+/14.8.2+/26.1+ entitlement change (https://github.com/orgs/Homebrew/discussions/6550).
+2. **`mas upgrade` MUST have `sudo` AND explicit app IDs** — the entitlement change on macOS
+   15.7.2+/14.8.2+/26.1+ (https://github.com/orgs/Homebrew/discussions/6550) still applies, but a
+   bare `mas upgrade` makes `mas` re-enumerate the outdated set in *root's* context rather than the
+   one the run measured. On 2026-09-01 that silently skipped WhatsApp while upgrading Copilot.
+   Pass the IDs from the pre-scan, then retry anything still outdated once in the invoking user's
+   session — App Store receipts belong to the user, not to root.
 3. **Bash 3.2 only** — no `declare -A`, `mapfile`, `readarray`.
 4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests); `dev_sync/` and `scripts/fix_mcp_configs.py` are the existing Python backend/tools.
 5. **No hardcoded paths** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`.

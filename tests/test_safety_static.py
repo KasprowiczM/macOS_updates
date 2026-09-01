@@ -2016,8 +2016,11 @@ class StaticShellSafetyTests(unittest.TestCase):
         """
         text = (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
         empty_branch = text.split("MAU_HELD=\"$(mau_active_office_deferrals)\"")[0]
-        # The reconcile call must appear before the held-quarantine report.
-        self.assertIn('mau_reconcile_deferrals "" ""', empty_branch)
+        # The reconcile call must appear before the held-quarantine report. The
+        # offer argument became the EXPIRED set on 2026-09-02: an empty offer
+        # set could never release a DeferralDays entry, which is what let the
+        # Office quarantine outlive its purpose by seven weeks.
+        self.assertIn('mau_reconcile_deferrals "" "$MAU_EXPIRED"', empty_branch)
         # And the stale version pins must not be gated on the released-day list.
         clean_fn = text.split("mau_clean_stale_deferrals() {")[1].split("\n}")[0]
         self.assertIn("for id in $MAU_STALE_DEFERRAL_VERSION_IDS; do", clean_fn)
