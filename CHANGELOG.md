@@ -4,6 +4,75 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.4.3] — 2026-09-02
+
+Run-log review release. The 2026-09-01 run exited 0 but `degraded: true`, and so had 20 of the
+last 26 runs. The warnings were not noise: one of them had been hiding a real Office update for
+seven weeks, another had been reporting a write it could not keep ten runs in a row, and a third
+had left a pending App Store update uninstalled while calling the step "unverified".
+
+### Fixed
+
+- **The Office quarantine could never release itself, and hid a real update for seven weeks.**
+  The five `DeferralDays` entries armed by the 2026-07-14 Office Preview regression were still
+  live on 2026-09-01. The release rule requires an offer whose short version is newer than what
+  is installed — but an armed `DeferralDays` entry hides its product from `msupdate --list`
+  entirely, so the evidence needed to release the quarantine was suppressed by the quarantine
+  itself. The code assumed the entry "lapses on its own after `MAC_UPDATE_MAU_DEFERRAL_DAYS`";
+  it does not — `DeferralDays` is a per-update delay that stays in the domain indefinitely.
+  Result: 20 consecutive runs reported "held by deferral", every run came back `degraded`, and
+  the toolkit stayed blind to Office while MAU's own daemon shipped 16.112 → 16.112.1 → 16.112.2
+  behind its back. Measured on 2026-09-02 with the quarantine lifted, the feed was offering
+  **16.112.3 against 16.112.2 installed** — an upgrade, quarantined for seven weeks.
+  A quarantine now carries an expiry the guard controls itself
+  (`MAC_UPDATE_MAU_QUARANTINE_MAX_DAYS`, default 14, clamped 1–90) recorded in
+  `~/.local/state/mac-update/mau_quarantine.tsv`. Past the window it is released so the next run
+  can see the feed again; if the offer is still a downgrade, `mau_regressed_entries` re-arms it
+  on that run. Re-arming deliberately does **not** restart the clock — that would reproduce the
+  original defect. An entry with no record counts as expired, because it predates the
+  bookkeeping. The expired set is passed as the offer argument of the *same* `mau_reconcile_deferrals`
+  call, never a second one: two export/import cycles in one run race each other through `cfprefsd`.
+- **`DeferralVersions.TEAMS21` was released ten times and re-created every time.** A pin *at* the
+  installed build is not a stale pin — it is Microsoft AutoUpdate's own bookkeeping for a product
+  that owns its update cadence. Every run rewrote the user's preference domain, reported a release
+  MAU undid within hours, and raised a health warning ("not the documented Major.Minor form") that
+  no operator could act on. A `DeferralVersions` pin is now released only when it is **strictly
+  older** than the installed build — that one genuinely caps the product forever — and the
+  Major.Minor health warning is suppressed when the value matches the installed build. The
+  installed build is read from MAU's own `AppVersions` register, the only like-for-like operand
+  for a value MAU wrote, with `CFBundleShortVersionString` as fallback.
+- **`sudo mas upgrade` silently skipped a pending App Store update.** TRACK 1 ran a bare
+  `mas upgrade`, which makes `mas` re-enumerate the outdated set itself — under `sudo` that
+  enumeration runs in root's context, not the one the run measured. On 2026-09-01 the pre-scan
+  listed Copilot **and** WhatsApp; the command upgraded Copilot, never mentioned WhatsApp, and the
+  step closed "unverified" with WhatsApp at 26.33.73 against 26.34.72 available. TRACK 1 now
+  passes the explicit IDs the pre-scan measured, and anything still outdated afterwards gets one
+  per-ID retry in the invoking user's session — App Store receipts and the signed-in Apple ID
+  belong to the user, not to root. Measured: the same `mas upgrade 310633997` that `sudo` skipped
+  completed as the user in three seconds.
+- **Every `run_summary_*.json` ever written carried `"counts": {}`.** `build_run_summary()` has
+  always accepted a counts mapping and the caller never passed one, so 26 consecutive summaries
+  shipped an empty block and anything consuming the JSON had to re-parse the human log to learn
+  how many packages moved. Step 5 now writes the numbers it already computes to
+  `run_counts.json` in the session dir, and the summary reads them.
+
+### Changed
+
+- Microsoft AutoUpdate channel moved from `Preview` to `Current` on the reference machine
+  (`defaults write com.microsoft.autoupdate2 ChannelName -string Current`). `Preview` while Office
+  is built for `Current` was the root cause of the 2026-07-14 package regression and therefore of
+  the whole quarantine; it had been an open decision since 2026-08-19. Note that this MAU build's
+  `msupdate --config` only *displays* configuration — it cannot set it.
+- `AGENTS.md` non-negotiable rule 2 narrowed: `mas upgrade` still runs under `sudo`, but with
+  explicit IDs and a user-session fallback rather than as a bare command.
+
+### Added
+
+- `tests/test_run_log_regressions_20260902.py` — 20 regression tests covering quarantine expiry
+  (including the "re-arming must not restart the clock" property), the TEAMS21 bookkeeping
+  distinction, TRACK 1 explicit IDs and its single user-session retry, and the run-summary counts.
+  209 tests total, green.
+
 ## [1.4.2] — 2026-08-26
 
 Run-log review release. The 2026-08-26 run exited 0 but `degraded: true`, with four of seven

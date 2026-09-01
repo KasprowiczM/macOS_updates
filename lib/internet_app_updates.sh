@@ -454,6 +454,14 @@ MAU_KNOWN_PRODUCT_IDS="MSau04 MSWD2019 XCEL2019 PPT32019 OPIM2019 ONMC2019 TEAMS
 MAU_OFFICE_DEFERRAL_IDS="MSWD2019 XCEL2019 PPT32019 OPIM2019 ONMC2019"
 # DeferralVersions pins the MAXIMUM version MAU will ever offer, so a pin at
 # the installed build blocks all future updates for that product.
+#
+# TEAMS21 is the one product where a pin AT the installed build is not a defect
+# but Microsoft AutoUpdate's own bookkeeping: Teams owns its update cadence and
+# MAU records the build it last saw. Ten consecutive runs (2026-07-28 .. 09-01)
+# released that pin and MAU re-created it within hours, so every run reported a
+# release it could not keep and a health warning it could not act on. A pin is
+# only released when it is STRICTLY OLDER than the installed build — that one is
+# genuinely stale and does block the product forever.
 MAU_STALE_DEFERRAL_VERSION_IDS="TEAMS21"
 
 # Turn raw msupdate output into clean logical lines: drop ANSI escape
@@ -622,6 +630,53 @@ mau_deferral_state() {
     done
 }
 
+# Installed build for a Microsoft product ID, read the way MAU itself records
+# it. AppVersions is Microsoft AutoUpdate's own register of what is installed,
+# so it is the only like-for-like operand for a DeferralVersions pin MAU wrote;
+# the bundle key is the fallback for a product MAU has not registered yet.
+# (Same principle as preferring `brew info --json=v2 -> installed` over a bundle
+# version — never compare a value to one written on a different scale.)
+mau_installed_build_for_id() {
+    local id="$1" app build
+    app="$(mau_app_path_for_id "$id")"
+    [ -n "$app" ] || return 0
+    build="$(mau_prefs_read_app_version "$app")"
+    [ -n "$build" ] || build="$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null)"
+    printf '%s' "$build"
+}
+
+# One entry of Microsoft AutoUpdate's AppVersions register, by bundle path.
+mau_prefs_read_app_version() {
+    defaults read com.microsoft.autoupdate2 AppVersions 2>/dev/null \
+        | awk -v app="\"$1\"" '
+            index($0, app) == 0 { next }
+            {
+                line = $0
+                sub(/^[^=]*=[[:space:]]*/, "", line)
+                gsub(/[";]/, "", line)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+                print line
+                exit
+            }'
+}
+
+# Deferral entries that actually hold a product back: every DeferralDays entry,
+# plus any DeferralVersions pin that is strictly older than the installed build.
+# A pin at the installed build is excluded — see mau_clean_stale_deferrals.
+mau_actionable_deferrals() {
+    local plist="$1" entry id value out=""
+    mau_deferral_entries "$plist" DeferralDays | while IFS= read -r entry; do
+        [ -n "$entry" ] && printf 'DeferralDays.%s\n' "$entry"
+    done
+    mau_deferral_entries "$plist" DeferralVersions | while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        id="${entry%%=*}"
+        value="${entry#*=}"
+        [ "$value" = "$(mau_installed_build_for_id "$id")" ] && continue
+        printf 'DeferralVersions.%s\n' "$entry"
+    done
+}
+
 # Permanent health check, not a one-off cleanup. Microsoft documents
 # DeferralDays as an integer in 1-28 and DeferralVersions as Major.Minor only;
 # anything else has undefined behaviour and silently blocks updates.
@@ -645,9 +700,17 @@ mau_deferral_health_warnings() {
         [ -n "$entry" ] || continue
         id="${entry%%=*}"
         value="${entry#*=}"
-        if ! printf '%s' "$value" | grep -q '^[0-9][0-9]*\.[0-9][0-9]*$'; then
-            echo "DeferralVersions.$id=$value is not the documented Major.Minor form"
+        if printf '%s' "$value" | grep -q '^[0-9][0-9]*\.[0-9][0-9]*$'; then
+            continue
         fi
+        # MAU writes the full installed build for products it only tracks
+        # (TEAMS21). That is MAU's own record, not a malformed policy value, and
+        # no amount of rewriting the domain changes it — so it is reported once
+        # as a fact, never as a warning the operator is expected to fix.
+        if [ "$value" = "$(mau_installed_build_for_id "$id")" ]; then
+            continue
+        fi
+        echo "DeferralVersions.$id=$value is not the documented Major.Minor form"
     done
 }
 
@@ -658,7 +721,7 @@ mau_deferral_health_warnings() {
 # products have earned their release, because a deferral is only stale once the
 # feed stops offering a downgrade for that product.
 mau_clean_stale_deferrals() {
-    local plist="$1" day_ids="$2" id container removed=""
+    local plist="$1" day_ids="$2" id container pin_value removed=""
     for id in $day_ids; do
         if [ -n "$(mau_deferral_value "$plist" DeferralDays "$id")" ] \
             && plutil -remove "OptionalUpdatesDeferrals.DeferralDays.$id" "$plist" >/dev/null 2>&1; then
@@ -666,8 +729,12 @@ mau_clean_stale_deferrals() {
         fi
     done
     for id in $MAU_STALE_DEFERRAL_VERSION_IDS; do
-        if [ -n "$(mau_deferral_value "$plist" DeferralVersions "$id")" ] \
-            && plutil -remove "OptionalUpdatesDeferrals.DeferralVersions.$id" "$plist" >/dev/null 2>&1; then
+        pin_value="$(mau_deferral_value "$plist" DeferralVersions "$id")"
+        [ -n "$pin_value" ] || continue
+        # A pin equal to the installed build is MAU's bookkeeping for a product
+        # that self-updates; removing it is a write MAU undoes within hours.
+        [ "$pin_value" = "$(mau_installed_build_for_id "$id")" ] && continue
+        if plutil -remove "OptionalUpdatesDeferrals.DeferralVersions.$id" "$plist" >/dev/null 2>&1; then
             removed="$removed DeferralVersions.$id"
         fi
     done
@@ -729,6 +796,7 @@ mau_app_path_for_id() {
         PPT32019) echo "/Applications/Microsoft PowerPoint.app" ;;
         OPIM2019) echo "/Applications/Microsoft Outlook.app" ;;
         ONMC2019) echo "/Applications/Microsoft OneNote.app" ;;
+        TEAMS21)  echo "/Applications/Microsoft Teams.app" ;;
     esac
 }
 
@@ -830,7 +898,17 @@ mau_deferral_preflight() {
         return 0
     fi
 
-    print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_FOUND_FMT" "$(printf '%s\n' "$before" | tr '\n' ' ')")"
+    # Split the report by what the operator can actually do about it. A
+    # DeferralDays quarantine, or a DeferralVersions pin strictly older than the
+    # installed build, holds a product back and deserves a warning. A pin AT the
+    # installed build is Microsoft AutoUpdate's own bookkeeping — MAU re-creates
+    # it within hours of every release, so reporting it as a warning produced a
+    # yellow line on every run that no one could ever clear.
+    if [ -n "$(mau_actionable_deferrals "$plist")" ]; then
+        print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_FOUND_FMT" "$(printf '%s\n' "$before" | tr '\n' ' ')")"
+    else
+        print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_FOUND_FMT" "$(printf '%s\n' "$before" | tr '\n' ' ')")"
+    fi
     internet_diag_log "MAU deferrals before cleanup: $(printf '%s\n' "$before" | tr '\n' ' ')"
     warnings="$(mau_deferral_health_warnings "$plist")"
     if [ -n "$warnings" ]; then
@@ -865,6 +943,97 @@ mau_deferral_days_value() {
     else
         echo "$raw"
     fi
+}
+
+# ── Quarantine expiry ─────────────────────────────────────────
+# An armed DeferralDays entry hides its product from `msupdate --list`, and the
+# release rule requires an offer that is newer than what is installed. Those two
+# facts form a deadlock: the quarantine suppresses the only evidence that could
+# release it. The code assumed the entry "lapses on its own after
+# MAC_UPDATE_MAU_DEFERRAL_DAYS" — it does not. DeferralDays is a per-update delay
+# that stays in the domain indefinitely, so the five Office entries armed on
+# 2026-07-14 were still there on 2026-09-01: 20 consecutive runs reported
+# "held by deferral", every run came back degraded, and the toolkit stayed blind
+# to Office while MAU's daemon shipped 16.112 -> 16.112.1 -> 16.112.2 behind its
+# back. Measured on 2026-09-02 with the quarantine lifted, the feed was offering
+# 16.112.3 against 16.112.2 installed — an upgrade, quarantined for seven weeks.
+#
+# The fix is an expiry the guard controls itself: a quarantine is released after
+# MAC_UPDATE_MAU_QUARANTINE_MAX_DAYS so the next run can see the feed again. If
+# the offer is still a downgrade, mau_regressed_entries re-arms it on that run.
+# Worst case is one re-evaluated download per product per fortnight; the previous
+# behaviour was a permanent blackout.
+mau_quarantine_state_file() {
+    printf '%s' "${MAC_UPDATE_MAU_STATE_FILE:-$HOME/.local/state/mac-update/mau_quarantine.tsv}"
+}
+
+mau_quarantine_max_days() {
+    local raw="${MAC_UPDATE_MAU_QUARANTINE_MAX_DAYS:-14}"
+    case "$raw" in
+        ''|*[!0-9]*) echo 14; return 0 ;;
+    esac
+    if [ "$raw" -lt 1 ] || [ "$raw" -gt 90 ]; then echo 14; else echo "$raw"; fi
+}
+
+# Record the arming time for IDs we have not seen before. An ID already on file
+# keeps its original timestamp — re-arming must not restart the clock, or the
+# quarantine would renew itself forever, which is the defect being fixed.
+mau_quarantine_note_armed() {
+    local ids="$1" file id now tmp
+    [ -n "$ids" ] || return 0
+    file="$(mau_quarantine_state_file)"
+    now="$(date +%s)"
+    mkdir -p "$(dirname "$file")" 2>/dev/null || return 0
+    [ -f "$file" ] || : > "$file"
+    for id in $ids; do
+        [ -n "$id" ] || continue
+        grep -q "^$id	" "$file" 2>/dev/null && continue
+        printf '%s\t%s\n' "$id" "$now" >> "$file"
+    done
+    return 0
+}
+
+# Drop IDs whose quarantine has been released, so a future re-arm starts a fresh
+# clock rather than inheriting an already-expired one.
+mau_quarantine_forget() {
+    local entries="$1" file ids id tmp
+    [ -n "$entries" ] || return 0
+    file="$(mau_quarantine_state_file)"
+    [ -f "$file" ] || return 0
+    ids=""
+    for id in $entries; do
+        case "$id" in
+            DeferralDays.*) ids="$ids ${id#DeferralDays.}" ;;
+        esac
+    done
+    [ -n "$ids" ] || return 0
+    tmp="$(mktemp "${TMPDIR:-/tmp}/mau-quar.XXXXXX")" || return 0
+    awk -v drop=" $ids " -F'\t' 'index(drop, " " $1 " ") == 0' "$file" > "$tmp" 2>/dev/null \
+        && mv "$tmp" "$file" 2>/dev/null
+    rm -f "$tmp" 2>/dev/null || true
+    return 0
+}
+
+# Office IDs whose live DeferralDays entry has outlived the expiry window.
+# An entry with no record at all is treated as expired: it predates this
+# bookkeeping, so it is by definition older than the window.
+mau_quarantine_expired_ids() {
+    local active file max cutoff now id armed out=""
+    active="$(mau_active_office_deferrals)"
+    [ -n "$active" ] || return 0
+    file="$(mau_quarantine_state_file)"
+    max="$(mau_quarantine_max_days)"
+    now="$(date +%s)"
+    cutoff=$(( now - max * 86400 ))
+    for id in $active; do
+        armed=""
+        [ -f "$file" ] && armed="$(awk -F'\t' -v k="$id" '$1 == k { print $2; exit }' "$file" 2>/dev/null)"
+        case "$armed" in
+            ''|*[!0-9]*) out="$out $id"; continue ;;
+        esac
+        [ "$armed" -lt "$cutoff" ] && out="$out $id"
+    done
+    printf '%s' "${out# }"
 }
 
 # Reconcile the Office quarantine with what the feed is actually offering:
@@ -993,6 +1162,12 @@ mau_reconcile_deferrals() {
         internet_diag_log "ERROR: MAU deferral release did not persist for:${still_present}"
         SOFT_FAIL=1
     fi
+
+    # Bookkeeping runs on the VERIFIED sets only: $armed and $removed have both
+    # been re-read from the live domain above, so the expiry clock can never be
+    # started or stopped by a write that did not land.
+    mau_quarantine_note_armed "$armed"
+    mau_quarantine_forget "$removed"
 
     [ -n "$armed" ] && print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_ARMED_FMT" "$armed" "$days")"
     [ -n "$removed" ] && print_ok "$(internet_msg "$L_INTERNET_MS_DEFERRALS_CLEARED_FMT" "$removed")"
@@ -1198,7 +1373,23 @@ iu_microsoft_365() {
                     # releases no Office DeferralDays entry (release stays
                     # empty when nothing is offered) but does drop the stale
                     # version pins, which are unconditionally wrong.
-                    mau_reconcile_deferrals "" "" || true
+                    #
+                    # The expired set is the second half of that deadlock fix.
+                    # "Nothing offered" while a quarantine is live is not evidence
+                    # of anything — the quarantine is what empties the list — so a
+                    # quarantine that has outlived its window is released here on
+                    # age alone. The next run sees the real feed; if it is still a
+                    # downgrade, mau_regressed_entries re-arms it then. Passed as
+                    # the offer set of the SAME reconcile call on purpose: two
+                    # export/import cycles in one run race each other through
+                    # cfprefsd, which is how an earlier fix resurrected the entry
+                    # it had just removed.
+                    MAU_EXPIRED="$(mau_quarantine_expired_ids)"
+                    if [ -n "$MAU_EXPIRED" ]; then
+                        print_info "Microsoft AutoUpdate quarantine older than $(mau_quarantine_max_days)d — releasing so the feed can be re-evaluated: $MAU_EXPIRED"
+                        internet_diag_log "MAU quarantine expiry releasing: $MAU_EXPIRED"
+                    fi
+                    mau_reconcile_deferrals "" "$MAU_EXPIRED" || true
 
                     MAU_HELD="$(mau_active_office_deferrals)"
                     if [ -n "$MAU_HELD" ]; then
@@ -1715,7 +1906,12 @@ iu_ipmiview() {
     if [ -n "$IPMI_PATH" ]; then
         VER=$(app_version "$IPMI_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "IPMIView")"
+        # A vendor that ships no auto-updater is a permanent fact about that vendor, not
+        # a fault in this run. Reported as information for the same reason Antigravity's
+        # 404 feed was demoted on 2026-08-26: a warning the operator can never clear
+        # trains them to ignore warnings that matter. The manual-update line below still
+        # tells them exactly what to do.
+        print_info "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "IPMIView")"
         print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://www.supermicro.com/en/solutions/management-software/ipmi-utilities")"
         STATUS_IPMIVIEW="$L_INTERNET_STATUS_MANUAL_UPDATE"
     else
@@ -1731,7 +1927,12 @@ iu_dji_assistant() {
     if [ -d "$DJI_PATH" ]; then
         VER=$(app_version "$DJI_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "DJI Assistant 2")"
+        # A vendor that ships no auto-updater is a permanent fact about that vendor, not
+        # a fault in this run. Reported as information for the same reason Antigravity's
+        # 404 feed was demoted on 2026-08-26: a warning the operator can never clear
+        # trains them to ignore warnings that matter. The manual-update line below still
+        # tells them exactly what to do.
+        print_info "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "DJI Assistant 2")"
         print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://www.dji.com/downloads/djiapp/dji-assistant-2-consumer-drones-series")"
         STATUS_DJI="$L_INTERNET_STATUS_MANUAL_UPDATE"
     else
