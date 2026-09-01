@@ -75,7 +75,12 @@ internet_handler_manual() {
     local ver
     ver="$(app_version "$app_path")"
     print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
-    print_warn "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "$app_display")"
+    # A vendor that ships no auto-updater is a permanent fact about that vendor, not
+    # a fault in this run. Reported as information for the same reason Antigravity's
+    # 404 feed was demoted on 2026-08-26: a warning the operator can never clear
+    # trains them to ignore warnings that matter. The manual-update line below still
+    # tells them exactly what to do.
+    print_info "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "$app_display")"
     print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "$download_url")"
     INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANUAL_UPDATE"
 }

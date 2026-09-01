@@ -182,6 +182,22 @@ echo ""
 mas list
 echo ""
 
+# Numeric App Store IDs out of a `mas outdated` listing. Used to drive TRACK 1
+# from the set this run actually measured, instead of letting `mas upgrade`
+# re-enumerate it in root's context — see mas_upgrade_ids() below.
+mas_outdated_ids() {
+    printf '%s\n' "$1" | awk '$1 ~ /^[0-9]+$/ { print $1 }'
+}
+
+# One `mas outdated` probe, in whichever mode this mas build supports.
+mas_probe_outdated() {
+    if [ "$MAS_OUTDATED_MODE" = "accurate" ]; then
+        run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated --accurate 2>&1
+    else
+        run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated 2>&1
+    fi
+}
+
 MAS_OUTDATED_MODE="default"
 if mas outdated --help 2>&1 | grep -q -- '--accurate'; then
     MAS_OUTDATED_MODE="accurate"
@@ -248,10 +264,28 @@ else
         print_info "$L_APPSTORE_NO_SUDO_SKIPPED"
         SOFT_FAIL=1
     elif sudo -v; then
-        # TODO(M17): Test whether mas 4.1+ can be invoked without outer sudo on real hardware (see https://github.com/orgs/Homebrew/discussions/6550)
-        MAS_TOR1_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
-            sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade 2>&1)
-        MAS_TOR1_EXIT=$?
+        # Explicit IDs, never a bare `mas upgrade`. A bare upgrade makes mas
+        # re-enumerate the outdated set itself, and under `sudo` that
+        # enumeration runs in root's context rather than the context this run
+        # measured. On 2026-09-01 the pre-scan listed Copilot AND WhatsApp;
+        # `sudo mas upgrade` upgraded Copilot, never mentioned WhatsApp, and the
+        # run closed with "unverified" while WhatsApp sat at 26.33.73 with
+        # 26.34.72 available. Driving the command from MAS_TOR1_IDS removes the
+        # enumeration from the equation: what the run measured is what it acts
+        # on, and anything left outdated afterwards is a real failure worth
+        # reporting rather than a list that quietly differed.
+        MAS_TOR1_IDS="$(mas_outdated_ids "$NATIVE_OUTDATED" | tr '\n' ' ')"
+        MAS_TOR1_IDS="${MAS_TOR1_IDS% }"
+        if [ -n "$MAS_TOR1_IDS" ]; then
+            # shellcheck disable=SC2086  # IDs are numeric, word splitting is intended
+            MAS_TOR1_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
+                sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS 2>&1)
+            MAS_TOR1_EXIT=$?
+        else
+            MAS_TOR1_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
+                sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade 2>&1)
+            MAS_TOR1_EXIT=$?
+        fi
     else
         MAS_TOR1_OUT="sudo authentication failed; native App Store updates were not started"
         MAS_TOR1_EXIT=1
@@ -259,6 +293,35 @@ else
     if [ "$MAS_TOR1_EXIT" -eq 0 ]; then
         printf '%s\n' "$MAS_TOR1_OUT"
         print_ok "mas upgrade command completed; the final queue check will verify installation."
+
+        # Second measurement, then one retry in the INVOKING USER's session for
+        # whatever the sudo pass left behind. App Store receipts and the signed-in
+        # Apple ID belong to the user, not to root; `mas upgrade 310633997` run as
+        # the user completed in three seconds on 2026-09-02 for the same WhatsApp
+        # update the sudo pass had skipped. The retry is deliberately per-ID and
+        # runs exactly once — it is a fallback for a context mismatch, not a loop,
+        # and the final queue check still has the last word on what installed.
+        MAS_TOR1_LEFT="$(mas_probe_outdated)"
+        MAS_TOR1_LEFT_IDS="$(mas_outdated_ids "$MAS_TOR1_LEFT")"
+        if [ -n "$MAS_TOR1_LEFT_IDS" ]; then
+            print_warn "sudo mas upgrade left these App Store updates pending; retrying in the user session:"
+            printf '%s\n' "$MAS_TOR1_LEFT"
+            for MAS_RETRY_ID in $MAS_TOR1_LEFT_IDS; do
+                MAS_RETRY_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
+                    env MAS_NO_AUTO_INDEX=1 mas upgrade "$MAS_RETRY_ID" 2>&1)
+                MAS_RETRY_EXIT=$?
+                printf '%s\n' "$MAS_RETRY_OUT"
+                if [ "$MAS_RETRY_EXIT" -ne 0 ]; then
+                    print_warn "User-session retry failed for App Store id $MAS_RETRY_ID (exit=$MAS_RETRY_EXIT)"
+                fi
+                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                    {
+                        echo "=== TRACK 1 user-session retry: $MAS_RETRY_ID (exit=$MAS_RETRY_EXIT) ==="
+                        printf '%s\n' "$MAS_RETRY_OUT"
+                    } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
+                fi
+            done
+        fi
     else
         printf '%s\n' "$MAS_TOR1_OUT"
         if [ "$MAS_TOR1_EXIT" -eq 124 ]; then
