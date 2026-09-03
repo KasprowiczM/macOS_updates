@@ -67,3 +67,9 @@ class ClaudeNativeInstallerPathTests(unittest.TestCase):
             r'command_name" = "claude".*-x "\$LOCAL_BIN/claude"',
         )
 
+
+class AgentsRuleTenTests(unittest.TestCase):
+    def test_rule_10_is_in_agents_md(self) -> None:
+        text = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("hides its own diagnostic input", text)
+        self.assertIn("mau_quarantine_expired_ids", text)
