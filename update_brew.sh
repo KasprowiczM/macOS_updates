@@ -343,6 +343,14 @@ elif [ -n "$REMAINING_CASKS" ]; then
     print_info "Casks listed in greedy outdated check (informational only):"
     printf '%s\n' "$REMAINING_CASKS"
 fi
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    PENDING_BREW_FORMULAE="$(printf '%s\n' "$REMAINING_FORMULAE" | wc -l | tr -d ' ')"
+    PENDING_BREW_CASKS="$(printf '%s\n' "$REMAINING_CASKS" | wc -l | tr -d ' ')"
+    [ -n "$REMAINING_FORMULAE" ] || PENDING_BREW_FORMULAE=0
+    [ -n "$REMAINING_CASKS" ] || PENDING_BREW_CASKS=0
+    printf '%s\n' "$PENDING_BREW_FORMULAE" > "$MAC_UPDATE_SESSION_DIR/pending_brew_formulae"
+    printf '%s\n' "$PENDING_BREW_CASKS" > "$MAC_UPDATE_SESSION_DIR/pending_brew_casks"
+fi
 if [ "$HARD_FAIL" -eq 0 ] && [ "$SOFT_FAIL" -eq 0 ]; then
     print_ok "$L_BREW_SUMMARY"
 fi

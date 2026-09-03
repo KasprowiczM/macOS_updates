@@ -9,7 +9,7 @@ npm|npm|npm||npm
 pnpm|pnpm|npm||pnpm
 claude-code|@anthropic-ai/claude-code|native-installer||claude
 codex-cli|@openai/codex|native-installer||codex
-opencode-cli|opencode-ai|npm|opencode|opencode
+opencode-cli|opencode-ai|self-update|opencode|opencode
 agy-cli|agy|native-installer||agy
 cursor-agent|cursor-agent|native-installer||agent
 bun|bun|native-bun|bun|bun

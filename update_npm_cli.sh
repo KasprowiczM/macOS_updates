@@ -862,19 +862,32 @@ install_latest_npm_packages() {
             # installer blocked until run_with_timeout killed it (exit 124) and
             # codex-cli failed on every run.
             installer_env="$(native_installer_env "$command_name")"
-            if [ -n "$install_url" ]; then
-                print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
+            if [ -z "$install_url" ]; then
+                print_warn "${display_name}: native-installer method not implemented for ${command_name}"
+                failures=$((failures + 1))
+                continue
+            fi
+            print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
+            if [ "$command_name" = "claude" ] && [ -x "$LOCAL_BIN/claude" ]; then
+                # Installed Claude must use "claude" update, not install.sh.
                 if run_quiet_with_error_log \
-                    "${command_name} native installer" \
+                    "${command_name} update" \
                     run_with_timeout "$(native_installer_timeout)" \
-                    env $installer_env sh -c "curl -fsSL '$install_url' | sh" </dev/null; then
+                    "$LOCAL_BIN/claude" update </dev/null; then
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
                 else
                     print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                     failures=$((failures + 1))
                 fi
+                continue
+            fi
+            if run_quiet_with_error_log \
+                "${command_name} native installer" \
+                run_with_timeout "$(native_installer_timeout)" \
+                env $installer_env sh -c "curl -fsSL '$install_url' | sh -s latest" </dev/null; then
+                print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
             else
-                print_warn "${display_name}: native-installer method not implemented for ${command_name}"
+                print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                 failures=$((failures + 1))
             fi
         elif [ "$method" = "self-update" ]; then
@@ -884,12 +897,22 @@ install_latest_npm_packages() {
                 # `npm install -g` internally. Pin the prefix and the
                 # PATH for the child only (subshell), so the managed prefix is
                 # the one that actually gets upgraded.
+                #
+                # opencode uses `upgrade --method npm` rather than `update`; the
+                # --method flag keeps it inside the managed npm prefix instead of
+                # falling back to curl/brew.
+                local _self_update_cmd="update"
+                local _self_update_args=""
+                if [ "$command_name" = "opencode" ]; then
+                    _self_update_cmd="upgrade"
+                    _self_update_args="--method npm"
+                fi
                 if ( export npm_config_prefix="$NPM_GLOBAL_PREFIX"
                      export NPM_CONFIG_PREFIX="$NPM_GLOBAL_PREFIX"
                      export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$PATH"
                      run_quiet_with_error_log \
-                        "${command_name} update" \
-                        run_with_timeout 300 "$command_path" update ); then
+                        "${command_name} ${_self_update_cmd}" \
+                        run_with_timeout 300 "$command_path" "$_self_update_cmd" $_self_update_args ); then
                     command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
                 else
