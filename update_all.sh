@@ -2001,6 +2001,8 @@ if os.environ.get("MAC_UPDATE_JSON_SUMMARY") == "1":
 ' "$SCRIPT_DIR" "$SESSION_DIR" "$START_TIME" "$END_TIME" "$OVERALL_EXIT" "$DEGRADED" "$BLOCKING_EXIT" \
   "$RESULT_SCAN" "$RESULT_APPSTORE" "$RESULT_NPMCLI" "$RESULT_BREW" "$RESULT_INTERNET" "$RESULT_MD" "$RESULT_SYSTEM" 2>/dev/null || true
 
+bash "$SCRIPT_DIR/scripts/report_chronic_warnings.sh" || true
+
 _ui_summary=$(cat <<EOS
 0. Scan:      $RESULT_SCAN
 1. App Store: $RESULT_APPSTORE
