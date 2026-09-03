@@ -35,3 +35,14 @@ class TimeoutKillAfterTests(unittest.TestCase):
         elapsed = time.monotonic() - start
         self.assertEqual(out.returncode, 124, out.stderr)
         self.assertLess(elapsed, 10)
+    def test_sigkill_before_deadline_is_not_124(self) -> None:
+        """SIGKILL before the deadline is 137, not timeout 124."""
+        start = time.monotonic()
+        out = run_proc(
+            "run_with_timeout 10 bash -c 'kill -KILL $$'",
+            timeout=5,
+        )
+        elapsed = time.monotonic() - start
+        self.assertEqual(out.returncode, 137, out.stderr)
+        self.assertLess(elapsed, 2)
+
