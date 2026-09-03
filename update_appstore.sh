@@ -221,6 +221,12 @@ else
     print_info "Pending native App Store updates:"
     printf '%s\n' "$NATIVE_OUTDATED"
 fi
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    {
+        echo "=== mas outdated before TRACK 1 ==="
+        printf '%s\n' "$NATIVE_OUTDATED"
+    } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
+fi
 
 # ============================================================
 # STEP 3: CONFIRMATION
@@ -525,13 +531,11 @@ else
     SOFT_FAIL=1
 fi
 
-if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] \
-    && [ "$APPSTORE_TOR2_BRANCH" != "update_all" ] \
-    && [ "$APPSTORE_TOR2_BRANCH" != "individual" ] \
-    && [ "$APPSTORE_TOR2_BRANCH" != "no_updates" ]; then
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
     {
         echo ""
-        echo "=== TRACK 2 (App Store GUI automation) branch=$APPSTORE_TOR2_BRANCH ==="
+        echo "=== TRACK 2 AppleScript ==="
+        echo "branch=$APPSTORE_TOR2_BRANCH"
         echo "--- AS_RESULT ---"
         printf '%s\n' "$AS_RESULT"
     } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
@@ -577,6 +581,13 @@ elif [ -n "$STILL_OUTDATED" ]; then
             printf '%s\n' "$STILL_OUTDATED"
         } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
     fi
+fi
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    {
+        echo ""
+        echo "=== mas outdated after both tracks ==="
+        printf '%s\n' "${STILL_OUTDATED:-none}"
+    } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
 fi
 
 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then

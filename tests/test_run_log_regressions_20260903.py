@@ -134,14 +134,18 @@ class ChronicWarningsTests(unittest.TestCase):
             self.assertFalse(any(hit["step"] == "internet" for hit in hits))
 
     def test_missing_step_keys_do_not_extend_streak(self) -> None:
+        """A summary without the step key terminates the trailing streak."""
         sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
         from chronic_warnings import find_chronic_streaks
 
         with tempfile.TemporaryDirectory() as tmp:
+            # Newest two summaries lack the internet key entirely;
+            # the older one has a warning.  The streak must be 0 because
+            # the trailing window is broken by the missing-key runs.
             steps = [
-                {},
-                {},
                 {"internet": "Ostrzeżenie zakończono z ostrzeżeniami (niezweryfikowane)"},
+                {},
+                {},
             ]
             for i, st in enumerate(steps):
                 p = Path(tmp) / f"run_summary_2026081{i}_101000.json"
@@ -155,8 +159,7 @@ class ChronicWarningsTests(unittest.TestCase):
                     encoding="utf-8",
                 )
             hits = find_chronic_streaks(tmp, window=10, threshold=1)
-            self.assertEqual(hits[0]["step"], "internet")
-            self.assertEqual(hits[0]["streak"], 1)
+            self.assertEqual(hits, [], "Absent step key must break the trailing streak")
 
     def test_wrapper_never_fails(self) -> None:
         out = subprocess.run(

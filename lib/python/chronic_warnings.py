@@ -46,7 +46,7 @@ def find_chronic_streaks(logs_dir: str, window: int = 10, threshold: int = 3) ->
             if not isinstance(steps, dict):
                 steps = {}
             if step not in steps:
-                continue
+                break  # step absent from this run — trailing streak ends here
             status = steps.get(step, "")
             if is_ok(status):
                 break

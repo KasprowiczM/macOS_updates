@@ -1342,6 +1342,11 @@ iu_microsoft_365() {
                                 fi
                             fi
                         else
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                # Install failed — record pre-install pending count so the
+                                # summary shows what was still outstanding, not a false zero.
+                                printf '%s\n' "$(mau_count_lines "$MAU_INSTALL_IDS")" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                            fi
                             if [ "$MAU_INSTALL_EXIT" = "124" ] || [ "$MAU_INSTALL_EXIT" = "137" ] || [ "$MAU_INSTALL_EXIT" = "143" ]; then
                                 print_warn "$L_INTERNET_MS_TIMEOUT"
                             else
