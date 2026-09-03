@@ -96,7 +96,8 @@ iu_firefox_developer_edition() {
             STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"
         elif [ "$FF_RELATION" = "current" ]; then
             # Equal or local ahead (e.g. local=150.0.1, remote=150.0b5).
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$VER (remote: $LATEST_FF)")"
+            FF_VER_DISPLAY="$VER (kanał $LATEST_FF)"
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_FF" "$VER")"
@@ -113,7 +114,8 @@ iu_firefox_developer_edition() {
                             STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
                         elif copy_verified_app "$FF_MOUNT/Firefox Developer Edition.app" "Firefox Developer Edition.app"; then
                             NEW_VER=$(firefox_dev_version)
-                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$NEW_VER")"
+                            FF_VER_DISPLAY="$NEW_VER (kanał $LATEST_FF)"
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
                             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
                             print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
@@ -1180,6 +1182,9 @@ iu_microsoft_365() {
 
     MAU_CLI="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate"
     MAU_APP="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app"
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        printf '%s\n' 0 > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+    fi
     MAU_TEAMS21_OFFERED=0
     MAU_CHECK_TIMEOUT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT:-120}" 120)"
     # msupdate's own --wait returns the current install state instead of
@@ -1314,6 +1319,9 @@ iu_microsoft_365() {
                             # feed, so they are expected to remain listed.
                             MAU_REMAINING="$(mau_parse_pending "$MAU_VERIFY" \
                                 | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                printf '%s\n' "$(mau_count_lines "$MAU_REMAINING")" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                            fi
                             if [ "$MAU_VERIFY_EXIT" -ne 0 ]; then
                                 print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_EXIT")"
                                 internet_diag_log "ERROR: msupdate --list re-verification failed (exit=$MAU_VERIFY_EXIT)"
@@ -1336,6 +1344,11 @@ iu_microsoft_365() {
                                 fi
                             fi
                         else
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                # Install failed — record pre-install pending count so the
+                                # summary shows what was still outstanding, not a false zero.
+                                printf '%s\n' "$(mau_count_lines "$MAU_INSTALL_IDS")" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                            fi
                             if [ "$MAU_INSTALL_EXIT" = "124" ] || [ "$MAU_INSTALL_EXIT" = "137" ] || [ "$MAU_INSTALL_EXIT" = "143" ]; then
                                 print_warn "$L_INTERNET_MS_TIMEOUT"
                             else

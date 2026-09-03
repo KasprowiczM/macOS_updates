@@ -53,7 +53,12 @@ class NativeInstallerNonInteractiveTest(unittest.TestCase):
         self.assertRegex(self.source, r"env \$installer_env sh -c")
 
     def test_installer_stdin_is_detached(self) -> None:
-        self.assertIn("| sh\" </dev/null", self.source)
+        # T2 (v1.4.4) changed bootstrap to `sh -s latest` — match either form.
+        self.assertTrue(
+            '| sh\" </dev/null' in self.source
+            or '| sh -s latest\" </dev/null' in self.source,
+            "Bootstrap sh invocation must redirect stdin away from terminal",
+        )
 
     def test_timeout_exceeds_the_vendor_asset_timeout(self) -> None:
         """The codex installer allows 300s for the release download alone."""
