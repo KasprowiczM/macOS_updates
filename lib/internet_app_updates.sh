@@ -1180,6 +1180,9 @@ iu_microsoft_365() {
 
     MAU_CLI="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate"
     MAU_APP="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app"
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        printf '%s\n' 0 > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+    fi
     MAU_TEAMS21_OFFERED=0
     MAU_CHECK_TIMEOUT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT:-120}" 120)"
     # msupdate's own --wait returns the current install state instead of
@@ -1314,6 +1317,9 @@ iu_microsoft_365() {
                             # feed, so they are expected to remain listed.
                             MAU_REMAINING="$(mau_parse_pending "$MAU_VERIFY" \
                                 | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                printf '%s\n' "$(mau_count_lines "$MAU_REMAINING")" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                            fi
                             if [ "$MAU_VERIFY_EXIT" -ne 0 ]; then
                                 print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_EXIT")"
                                 internet_diag_log "ERROR: msupdate --list re-verification failed (exit=$MAU_VERIFY_EXIT)"

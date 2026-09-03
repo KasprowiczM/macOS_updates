@@ -1977,6 +1977,23 @@ except (OSError, ValueError):
     # an empty counts block is then the truthful answer, not a missing one.
     counts = {}
 
+def merge_pending(counts: dict, session_dir: str) -> dict:
+    from pathlib import Path
+    for key, filename in (
+        ("pending_after_run_appstore", "pending_appstore"),
+        ("pending_after_run_brew_formulae", "pending_brew_formulae"),
+        ("pending_after_run_brew_casks", "pending_brew_casks"),
+        ("pending_after_run_mau", "pending_mau"),
+    ):
+        path = os.path.join(session_dir, filename)
+        try:
+            counts[key] = int(Path(path).read_text().strip() or "0")
+        except (OSError, ValueError):
+            counts[key] = 0
+    return counts
+
+counts = merge_pending(counts, session_dir)
+
 summary = build_run_summary(
     counts=counts,
     start_time=start_time,
