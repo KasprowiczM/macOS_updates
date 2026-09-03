@@ -4,6 +4,61 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.4.4] — 2026-09-03
+
+Run-log review release. The 2026-09-03 run hung at the Claude Code update step and never reached
+Homebrew, internet apps, postupdate, or the macOS system update. The binary landed correctly
+(2.1.258 → 2.1.259) but the installer's post-install TUI blocked the pipeline indefinitely.
+
+### Fixed
+
+- **Claude Code native installer hung the entire pipeline every run (Z0).** Anthropic's
+  `install.sh` downloads the binary and then calls `"$binary_path" install` — a TUI that issues
+  `stty sane` on signal death and ignores SIGTERM. GNU `timeout` without `--kill-after` waited
+  forever once the TUI caught the signal. Steps 3–6 (Homebrew, internet, postupdate, system
+  update) never ran. Two changes close the gap: (1) `lib/proc.sh` adds `--kill-after=5` to the
+  GNU timeout path so SIGTERM is followed by SIGKILL after five seconds; exit 137 is mapped to 124
+  only when the elapsed time meets or exceeds the deadline, preserving the distinction between
+  a timeout kill and an unrelated SIGKILL. (2) When `~/.local/bin/claude` already exists,
+  `update_npm_cli.sh` calls `claude update` instead of re-running `install.sh`; the first-install
+  bootstrap path (`curl | sh -s latest`) is retained for new machines. Measured: `timeout
+  --kill-after=5 60 ~/.local/bin/claude update </dev/null` exits 0 in under 10 seconds; version
+  confirmed 2.1.259.
+- **OpenCode CLI switched to its own self-updater.** `opencode upgrade --method npm` is the
+  vendor-documented update path and keeps the install inside the managed npm prefix. The manifest
+  method changed from `npm` to `self-update`.
+- **Chronic step-warning detector added (Z1).** `lib/python/chronic_warnings.py` scans the
+  trailing window of dated run summaries and reports any step whose status has not started with
+  `"OK"` for `MAC_UPDATE_CHRONIC_THRESHOLD` or more consecutive runs. A missing step key in a
+  summary terminates the trailing streak rather than being silently skipped.
+  `scripts/report_chronic_warnings.sh` is called by `update_all.sh` after `write_run_summary`
+  and always exits 0. August run logs: internet step warned 4 consecutive times before v1.4.3
+  landed; current last-10 is clean.
+- **Guard audit — all three guards pass (Z2).** Cask downgrade guard, `internet_handler_vendor_latest`,
+  and npm skip filters all re-evaluate from live state every run with no persistent hidden state.
+  AGENTS.md rule 10 added: every mechanism that hides its own diagnostic input must declare a
+  lifetime and a path back to re-evaluation.
+- **`pending_after_run_*` counts added to `run_counts.json` (Z3).** Four new integer keys track
+  how many updates remained after each step: App Store (`mas_outdated_ids` of `STILL_OUTDATED`),
+  Homebrew formulae and casks (from `brew_outdated_formulae`/`brew_outdated_casks`, never raw
+  `brew outdated`), and Microsoft AutoUpdate (pre-install count on failure, post-install
+  `MAU_REMAINING` on success).
+- **App Store three-way diagnostic always written (Z4).** `appstore_diag.txt` now always contains
+  three sections: `mas outdated` before TRACK 1, the TRACK 2 AppleScript result (including
+  `NO_UPDATES_FOUND`), and `mas outdated` after both tracks. Previously the TOR 2 success branch
+  wrote nothing, so the GUI-vs-native discrepancy seen on 2026-09-01 was not recorded.
+- **Firefox Developer Edition reports both bundle version and channel (Z5).** The updated/current
+  message now shows `"<version> (kanał <channel>)"`, e.g. `156.0 (kanał 156.0b1)`. The stale
+  `FIREFOX_DEV_CHANNEL_VERSION=150.0b10` key deleted from `.mac_update_prefs` (local machine
+  only; was not read by any script).
+
+### Added
+
+- `tests/test_run_log_regressions_20260903.py` — 16 regression tests covering the timeout
+  kill-after semantics, Claude self-update gating, chronic streak detection, pending-after-run
+  wiring, App Store diag sections, Firefox channel message, and opencode native updater method.
+  229 tests total, green.
+
 ## [1.4.3] — 2026-09-02
 
 Run-log review release. The 2026-09-01 run exited 0 but `degraded: true`, and so had 20 of the
