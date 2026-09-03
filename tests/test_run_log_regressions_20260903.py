@@ -103,6 +103,61 @@ class ChronicWarningsTests(unittest.TestCase):
             self.assertEqual(hits[0]["step"], "internet")
             self.assertEqual(hits[0]["streak"], 3)
 
+    def test_debug_summary_is_not_counted(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
+        from chronic_warnings import find_chronic_streaks
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for i in range(3):
+                p = Path(tmp) / f"run_summary_2026081{i}_101000.json"
+                p.write_text(
+                    json.dumps(
+                        {
+                            "timestamp": f"2026-08-1{i}T08:00:00+00:00",
+                            "steps": {"internet": "OK completed"},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+            (Path(tmp) / "run_summary_debug.json").write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-08-31T08:00:00+00:00",
+                        "steps": {
+                            "internet": "Ostrzeżenie zakończono z ostrzeżeniami (niezweryfikowane)"
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            hits = find_chronic_streaks(tmp, window=10, threshold=1)
+            self.assertFalse(any(hit["step"] == "internet" for hit in hits))
+
+    def test_missing_step_keys_do_not_extend_streak(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
+        from chronic_warnings import find_chronic_streaks
+
+        with tempfile.TemporaryDirectory() as tmp:
+            steps = [
+                {},
+                {},
+                {"internet": "Ostrzeżenie zakończono z ostrzeżeniami (niezweryfikowane)"},
+            ]
+            for i, st in enumerate(steps):
+                p = Path(tmp) / f"run_summary_2026081{i}_101000.json"
+                p.write_text(
+                    json.dumps(
+                        {
+                            "timestamp": f"2026-08-1{i}T08:00:00+00:00",
+                            "steps": st,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+            hits = find_chronic_streaks(tmp, window=10, threshold=1)
+            self.assertEqual(hits[0]["step"], "internet")
+            self.assertEqual(hits[0]["streak"], 1)
+
     def test_wrapper_never_fails(self) -> None:
         out = subprocess.run(
             ["bash", str(REPO_ROOT / "scripts/report_chronic_warnings.sh")],
