@@ -8,9 +8,19 @@ run_with_timeout() {
     local command_pid command_exit elapsed grace
     shift
     if command -v timeout >/dev/null 2>&1; then
-        timeout "$seconds" "$@"
+        timeout --kill-after=5 "$seconds" "$@"
+        command_exit=$?
+        if [ "$command_exit" -eq 124 ] || [ "$command_exit" -eq 137 ]; then
+            return 124
+        fi
+        return "$command_exit"
     elif command -v gtimeout >/dev/null 2>&1; then
-        gtimeout "$seconds" "$@"
+        gtimeout --kill-after=5 "$seconds" "$@"
+        command_exit=$?
+        if [ "$command_exit" -eq 124 ] || [ "$command_exit" -eq 137 ]; then
+            return 124
+        fi
+        return "$command_exit"
     else
         "$@" &
         command_pid=$!
