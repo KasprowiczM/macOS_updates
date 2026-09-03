@@ -579,6 +579,11 @@ elif [ -n "$STILL_OUTDATED" ]; then
     fi
 fi
 
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    PENDING_APPSTORE="$(mas_outdated_ids "$STILL_OUTDATED" | wc -l | tr -d ' ')"
+    printf '%s\n' "${PENDING_APPSTORE:-0}" > "$MAC_UPDATE_SESSION_DIR/pending_appstore"
+fi
+
 if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
     print_warn "Track 2 is still installing in the background; its completion is not verified by mas ($MAS_OUTDATED_MODE checks native apps only)."
     SOFT_FAIL=1

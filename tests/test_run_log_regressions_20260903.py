@@ -166,3 +166,21 @@ class ChronicWarningsTests(unittest.TestCase):
             env={**os.environ, "MAC_UPDATE_LOGS_DIR": "/no/such"},
         )
         self.assertEqual(out.returncode, 0)
+
+
+class PendingAfterRunTests(unittest.TestCase):
+    def test_brew_pending_uses_lib_helpers_not_raw_outdated(self):
+        text = (REPO_ROOT / "update_brew.sh").read_text()
+        self.assertIn("pending_brew_formulae", text)
+        self.assertIn("brew_outdated_formulae", text)
+        self.assertNotRegex(text, r"brew outdated.*2>&1")
+
+    def test_appstore_pending_uses_mas_outdated_ids(self):
+        text = (REPO_ROOT / "update_appstore.sh").read_text()
+        self.assertIn("pending_appstore", text)
+        self.assertIn("mas_outdated_ids", text)
+
+    def test_update_all_merges_pending_into_counts(self):
+        text = (REPO_ROOT / "update_all.sh").read_text()
+        self.assertIn("pending_after_run_appstore", text)
+        self.assertIn("merge_pending", text)
