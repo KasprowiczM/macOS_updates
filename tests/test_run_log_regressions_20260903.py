@@ -46,3 +46,24 @@ class TimeoutKillAfterTests(unittest.TestCase):
         self.assertEqual(out.returncode, 137, out.stderr)
         self.assertLess(elapsed, 2)
 
+
+class ClaudeNativeInstallerPathTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.source = (REPO_ROOT / "update_npm_cli.sh").read_text(encoding="utf-8")
+
+    def test_installed_claude_uses_self_update_not_install_sh(self) -> None:
+        """install.sh always downloads ~200MB then runs a TUI (`claude install`).
+
+        2026-09-03: binary 2.1.259 landed at 10:15; the TUI never returned, so
+        brew/internet/system never ran. The vendor's own `claude update` is the
+        update path once ~/.local/bin/claude exists.
+        """
+        self.assertIn('"claude" update', self.source)
+        self.assertIn("https://claude.ai/install.sh", self.source)
+
+    def test_claude_update_is_gated_on_existing_binary(self) -> None:
+        self.assertRegex(
+            self.source,
+            r'command_name" = "claude".*-x "\$LOCAL_BIN/claude"',
+        )
+

@@ -862,19 +862,32 @@ install_latest_npm_packages() {
             # installer blocked until run_with_timeout killed it (exit 124) and
             # codex-cli failed on every run.
             installer_env="$(native_installer_env "$command_name")"
-            if [ -n "$install_url" ]; then
-                print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
+            if [ -z "$install_url" ]; then
+                print_warn "${display_name}: native-installer method not implemented for ${command_name}"
+                failures=$((failures + 1))
+                continue
+            fi
+            print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
+            if [ "$command_name" = "claude" ] && [ -x "$LOCAL_BIN/claude" ]; then
+                # Installed Claude must use "claude" update, not install.sh.
                 if run_quiet_with_error_log \
-                    "${command_name} native installer" \
+                    "${command_name} update" \
                     run_with_timeout "$(native_installer_timeout)" \
-                    env $installer_env sh -c "curl -fsSL '$install_url' | sh" </dev/null; then
+                    "$LOCAL_BIN/claude" update </dev/null; then
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
                 else
                     print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                     failures=$((failures + 1))
                 fi
+                continue
+            fi
+            if run_quiet_with_error_log \
+                "${command_name} native installer" \
+                run_with_timeout "$(native_installer_timeout)" \
+                env $installer_env sh -c "curl -fsSL '$install_url' | sh -s latest" </dev/null; then
+                print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
             else
-                print_warn "${display_name}: native-installer method not implemented for ${command_name}"
+                print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                 failures=$((failures + 1))
             fi
         elif [ "$method" = "self-update" ]; then
