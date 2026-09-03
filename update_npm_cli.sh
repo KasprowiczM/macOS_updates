@@ -897,12 +897,22 @@ install_latest_npm_packages() {
                 # `npm install -g` internally. Pin the prefix and the
                 # PATH for the child only (subshell), so the managed prefix is
                 # the one that actually gets upgraded.
+                #
+                # opencode uses `upgrade --method npm` rather than `update`; the
+                # --method flag keeps it inside the managed npm prefix instead of
+                # falling back to curl/brew.
+                local _self_update_cmd="update"
+                local _self_update_args=""
+                if [ "$command_name" = "opencode" ]; then
+                    _self_update_cmd="upgrade"
+                    _self_update_args="--method npm"
+                fi
                 if ( export npm_config_prefix="$NPM_GLOBAL_PREFIX"
                      export NPM_CONFIG_PREFIX="$NPM_GLOBAL_PREFIX"
                      export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$PATH"
                      run_quiet_with_error_log \
-                        "${command_name} update" \
-                        run_with_timeout 300 "$command_path" update ); then
+                        "${command_name} ${_self_update_cmd}" \
+                        run_with_timeout 300 "$command_path" "$_self_update_cmd" $_self_update_args ); then
                     command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
                     print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
                 else

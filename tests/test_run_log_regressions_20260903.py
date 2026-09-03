@@ -184,3 +184,31 @@ class PendingAfterRunTests(unittest.TestCase):
         text = (REPO_ROOT / "update_all.sh").read_text()
         self.assertIn("pending_after_run_appstore", text)
         self.assertIn("merge_pending", text)
+
+
+class AppStoreDiagTests(unittest.TestCase):
+    def test_appstore_diag_records_three_tracks(self):
+        text = (REPO_ROOT / "update_appstore.sh").read_text()
+        self.assertIn("mas outdated before TRACK 1", text)
+        self.assertIn("TRACK 2 AppleScript", text)
+        self.assertIn("mas outdated after both tracks", text)
+
+class OpencodeNativeUpdaterTests(unittest.TestCase):
+    """opencode uses `upgrade --method npm`, not npm install -g."""
+
+    def test_opencode_manifest_method_is_self_update(self) -> None:
+        manifest = (REPO_ROOT / "config" / "npm_global_clis.txt").read_text(encoding="utf-8")
+        for line in manifest.splitlines():
+            if line.startswith("opencode-cli|"):
+                fields = line.split("|")
+                self.assertEqual(fields[2], "self-update",
+                    "opencode-cli must use self-update method, not npm")
+                return
+        self.fail("opencode-cli entry not found in manifest")
+
+    def test_opencode_self_update_calls_upgrade_not_update(self) -> None:
+        source = (REPO_ROOT / "update_npm_cli.sh").read_text(encoding="utf-8")
+        self.assertIn("opencode", source)
+        self.assertIn('_self_update_cmd="upgrade"', source)
+        self.assertIn("--method npm", source)
+
