@@ -67,6 +67,13 @@ Load only when relevant to your task:
 6. **All `update_*.sh` orchestrators must `set -o pipefail`** — and must **not** `set -e`; the orchestrator has to run every step even on partial failure.
 7. **A config method name is only valid if a handler exists** — every method in `config/internet_app_methods.txt` needs an `internet_handler_*` / `iu_*` implementation. `tests/test_safety_static.py` enforces this.
 8. **Never call interactive `sudo` without a TTY** — see `docs/agents/critical_rules.md`.
+10. **Every mechanism that hides its own diagnostic input must declare a
+   lifetime and a path back to re-evaluation.** A guard whose release
+   condition is an observation the guard itself suppresses is a deadlock
+   (Office `DeferralDays` 2026-07-14 → 2026-09-01). Pattern: record an
+   expiry the guard controls, pass the expired set into the same
+   reconcile call, never a second export/import. See
+   `mau_quarantine_expired_ids`.
 
 ---
 
