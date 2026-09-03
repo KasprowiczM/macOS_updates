@@ -19,7 +19,7 @@ def load_summaries(logs_dir: str, window: int) -> list[dict[str, Any]]:
         return []
 
     files = sorted(
-        path for path in logs_path.glob("run_summary_*.json") if path.name != "run_summary_latest.json"
+        path for path in logs_path.glob("run_summary_20*.json") if path.name != "run_summary_latest.json"
     )
     summaries: list[dict[str, Any]] = []
     for path in files[-window:]:
@@ -39,15 +39,14 @@ def find_chronic_streaks(logs_dir: str, window: int = 10, threshold: int = 3) ->
 
     hits: list[dict[str, Any]] = []
     for step in STEPS:
-        if not any(isinstance(summary.get("steps"), dict) and step in summary.get("steps", {}) for summary in summaries):
-            continue
-
         streak = 0
         first_timestamp = ""
         for summary in reversed(summaries):
             steps = summary.get("steps")
             if not isinstance(steps, dict):
                 steps = {}
+            if step not in steps:
+                continue
             status = steps.get(step, "")
             if is_ok(status):
                 break
