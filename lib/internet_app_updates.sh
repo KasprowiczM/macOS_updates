@@ -96,7 +96,8 @@ iu_firefox_developer_edition() {
             STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"
         elif [ "$FF_RELATION" = "current" ]; then
             # Equal or local ahead (e.g. local=150.0.1, remote=150.0b5).
-            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$VER (remote: $LATEST_FF)")"
+            FF_VER_DISPLAY="$VER (kanał $LATEST_FF)"
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_FF" "$VER")"
@@ -113,7 +114,8 @@ iu_firefox_developer_edition() {
                             STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
                         elif copy_verified_app "$FF_MOUNT/Firefox Developer Edition.app" "Firefox Developer Edition.app"; then
                             NEW_VER=$(firefox_dev_version)
-                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$NEW_VER")"
+                            FF_VER_DISPLAY="$NEW_VER (kanał $LATEST_FF)"
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
                             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
                             print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"

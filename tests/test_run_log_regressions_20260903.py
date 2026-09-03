@@ -215,3 +215,9 @@ class OpencodeNativeUpdaterTests(unittest.TestCase):
         self.assertIn('_self_update_cmd="upgrade"', source)
         self.assertIn("--method npm", source)
 
+class FirefoxChannelMessageTests(unittest.TestCase):
+    def test_firefox_updated_message_includes_channel_argument(self):
+        text = (REPO_ROOT / "lib/internet_app_updates.sh").read_text()
+        self.assertIn('"$NEW_VER (kanał $LATEST_FF)"', text)
+        self.assertIn('"$VER (kanał $LATEST_FF)"', text)
+
