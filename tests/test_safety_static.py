@@ -196,6 +196,15 @@ class DevSyncMatchingTests(unittest.TestCase):
         self.assertEqual(transport, "rclone")
         self.assertEqual(files, ["a.txt", "b.txt"])
 
+    def test_rclone_sync_from_plans_overlay_after_stage(self) -> None:
+        text = (REPO_ROOT / "dev_sync" / "dev_sync_core.py").read_text(encoding="utf-8")
+        self.assertIn("from overlay_import import plan_overlay_import", text)
+        self.assertIn("plan.files_to_copy", text)
+        self.assertNotIn(
+            "sync_relpaths(staging_root, dest_root, selected, logger, options, transactional=True)",
+            text,
+        )
+
 
 class StaticShellSafetyTests(unittest.TestCase):
     def read_script(self, name: str) -> str:

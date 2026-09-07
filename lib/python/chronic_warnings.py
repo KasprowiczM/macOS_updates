@@ -27,7 +27,7 @@ def load_summaries(logs_dir: str, window: int) -> list[dict[str, Any]]:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             continue
-        if isinstance(data, dict):
+        if isinstance(data, dict) and data.get("run_status", "completed") == "completed":
             summaries.append(data)
     return summaries
 

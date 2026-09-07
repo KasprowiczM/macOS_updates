@@ -1,5 +1,7 @@
 # User Guide (English)
 
+**Version:** 1.4.5 · **Apple Silicon, macOS 13+**
+
 ## What this toolkit does
 
 macOS Updates orchestrates updates across six layers on **Apple Silicon Macs running macOS 13+**. The full pipeline runs in this order:

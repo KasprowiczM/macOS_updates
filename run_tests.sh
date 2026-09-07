@@ -96,7 +96,7 @@ else
 fi
 
 say "3/4  python3 -m unittest discover tests"
-if PYTHONPATH=dev_sync python3 -m unittest discover tests 2>&1; then
+if PYTHONPATH=dev_sync:lib/python python3 -m unittest discover tests 2>&1; then
     ok "test suite passed"
 else
     err "test suite failed"

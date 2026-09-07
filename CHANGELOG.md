@@ -4,6 +4,71 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.4.5] — 2026-09-07
+
+Ultra-review integrity release. Overlay import could replace Git-tracked descendants and
+delete local files; a failed swap plus failed restore deleted the only backup; vendor CLI
+installers reported success without a working binary; pending measurements became zero when
+unknown.
+
+### Fixed
+
+- **Overlay import overwrote Git files and dropped unlisted local data (H1).** Directory
+  manifest entries were set-diffed as exact paths, then `copytree` replaced the whole
+  directory. Import now expands to leaves, skips tracked/excluded files, and refuses to
+  directory-swap.
+- **Failed overlay swap plus failed restore deleted recovery data (H2).** The transaction
+  now journals after moving the original and raises `OverlayRecoveryError` with a recovery
+  path; the backup directory is left in place when restore fails.
+- **Symlink ancestors escaped the overlay source root (H3).** `validate_source` walks with
+  `lstat`/`resolve_under` and refuses copy before any `copy2`.
+- **Codex/agy bootstrap `latest` and curl-pipe success (H4/H5).** Per-vendor args, download
+  to a temp file with size/emptiness checks, then exec. Existing Claude/agy binaries use
+  `update`. Exit 0 without a working `--version` is a failure.
+- **OpenCode `?` reported as success (M1).** Repair runs only for an existing stub in the
+  managed prefix. npm 12's `allow-scripts` user allowlist skips `postinstall.mjs`
+  even when `ignore-scripts` is false; the repair child uses
+  `--allow-scripts=opencode-ai` and, if the binary is still a stub, `node
+  postinstall.mjs` in the managed package tree. `NPM_CONFIG_ALLOW_SCRIPTS` is
+  exported only inside the `opencode upgrade --method npm` subshell. The
+  toolkit never writes `~/.npmrc`.
+- **Codex UI printed the product name as the version.** `codex --version`
+  prints `codex-cli 0.153.4`; taking the first token reported `codex-cli`.
+  `report_cli_version_or_fail` now prefers the last token when the first has
+  no digit, and requires a digit afterwards.
+- **Unknown pending became zero (M2).** `merge_pending` keeps `null` plus verification
+  (`missing`/`empty`/`unknown`/`invalid`/`verified`). App Store verify failure writes
+  `unknown`; MAU does not write `0` before measuring.
+- **TERM-ignoring timeout leftover children (M3).** Fallback timeout uses a process group
+  and SIGKILL; GNU `timeout --kill-after=5` remains when not forced.
+- **MCP rewrite 0600→0644 (M5).** `mkstemp` in the destination directory, `fchmod` 0600 or
+  stricter original; dump failure leaves the original file.
+- **Inventory table edits impersonated installs (M6).** Counts are
+  `inventory_version_fields_changed` vs `observed_package_changes`. The
+  postupdate UI prints both lines (seven languages) instead of one “total
+  version changes” figure. Run JSON is format 2, mode 0600, with
+  `run_id`/`run_status`; write errors are visible. Parallel runs take a
+  per-repo lock.
+
+### Changed
+
+- Ubuntu portable Python gate on push/PR; macOS full suite remains manual/tag.
+- Gitleaks scans tracked markdown. Installer honors `MAC_UPDATE_REF`.
+- rclone export writes `.dev_sync_manifest.json`; import uses that manifest, not a full
+  remote listing. `run_command` has timeout and limited retries.
+
+### Evidence
+
+- New regression files: `tests/test_dev_sync_import_boundaries.py`,
+  `tests/test_dev_sync_transactions.py`, `tests/test_cli_installers.py`,
+  `tests/test_run_summary.py`, `tests/test_process_timeout.py`,
+  `tests/test_mcp_config_permissions.py`, `tests/test_run_lock.py`,
+  `tests/test_http_fetch.py`, `tests/test_version_consistency.py`.
+- `bash run_tests.sh` 270 OK on 2026-09-07; ShellCheck warning-clean; gitleaks
+  clean. Live OpenCode repair path verified (stub → 1.18.29) via scoped
+  `--allow-scripts=opencode-ai` (no `~/.npmrc` write). Isolated live macOS
+  install/restore remains a separate release gate.
+
 ## [1.4.4] — 2026-09-03
 
 Run-log review release. The 2026-09-03 run hung at the Claude Code update step and never reached

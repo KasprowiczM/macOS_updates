@@ -11,10 +11,10 @@
 - **Version detection:** `app_version()` reads `CFBundleShortVersionString`, then `CFBundleVersion`, then falls back to `mdls -name kMDItemVersion` (covers iOS/iPadOS apps on Apple Silicon that have no `Contents/Info` plist).
 
 ## Python
-- Update pipeline Python is inline via heredocs written to session dir.
-- Existing standalone Python is limited to the `dev_sync/` backend and `scripts/fix_mcp_configs.py`.
-- Used for `APPLICATIONS.md` / `UPDATES.md` processing, cloud sync, and MCP config repair.
-- **Atomic private writes:** JSON, inventory and history writes use a same-directory temp file + `os.replace()`; user-owned MCP configs are copied to `.bak` first. Private provider config and logs use restrictive permissions.
+- Update pipeline Python is inline via heredocs written to the session dir, or importable pure-function modules under `lib/python/` (`run_tests.sh` compiles and tests them). Do not add new standalone pipeline entrypoints.
+- Existing standalone tools: `dev_sync/` (including `overlay_import.py`) and `scripts/fix_mcp_configs.py`.
+- Used for `APPLICATIONS.md` / `UPDATES.md` processing, cloud sync, run summary/lock, and MCP config repair.
+- **Atomic private writes:** JSON, inventory and history writes use a same-directory temp file + `os.replace()`; user-owned MCP configs use `mkstemp` in the destination directory with `fchmod` min(original, 0600). Private provider config and logs use restrictive permissions.
 
 ## Session Dir
 - Path: `mktemp -d "${TMPDIR:-/tmp}/mac_update.XXXXXX"` stored in `$MAC_UPDATE_SESSION_DIR`
@@ -29,8 +29,8 @@
 - Providers: `protondrive`, `icloud`, `googledrive`, `onedrive`, `mega`, `rclone`, `local`
 - GitHub = code + AI context. Cloud = private files.
 - Config via `dev_sync/provider_setup.sh`
-- Local filesystem exports write `.dev_sync_manifest.json` in the provider mirror; import prefers it to avoid restoring stale provider files.
-- Imports are transactional: allowlisted files are copied into a private staging directory, then committed with retained backups and rollback. Rclone imports list and stage individual accepted paths instead of copying the remote tree over the repository.
+- Local filesystem **and rclone** exports write `.dev_sync_manifest.json` in the provider mirror; import uses that manifest (a missing rclone manifest is an empty list — no full remote `lsf` fallback).
+- Imports go through `dev_sync/overlay_import.py`: directory manifests expand to leaves, Git-tracked and excluded paths are skipped, destination-escaping leaf symlinks are refused, and a failed swap+restore leaves the transaction directory in place (`OverlayRecoveryError`).
 - Exclude rebuildable/dependency/external-skill folders from Proton (`node_modules/`, caches, build output, `.agent/skills/`, `.claude/skills/`, `.gemini/skills/`).
 - `migration_setup.sh` is idempotent — single source of truth for first-run.
 
