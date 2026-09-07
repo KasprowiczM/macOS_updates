@@ -58,14 +58,14 @@ class ClaudeNativeInstallerPathTests(unittest.TestCase):
         brew/internet/system never ran. The vendor's own `claude update` is the
         update path once ~/.local/bin/claude exists.
         """
-        self.assertIn('"claude" update', self.source)
-        self.assertIn("https://claude.ai/install.sh", self.source)
+        lib = (REPO_ROOT / "lib" / "native_installers.sh").read_text(encoding="utf-8")
+        self.assertIn("native_installer_existing_update_cmd", self.source)
+        self.assertIn("https://claude.ai/install.sh", lib)
+        self.assertRegex(lib, r"claude\|agy\) printf '%s' \"update\"")
 
     def test_claude_update_is_gated_on_existing_binary(self) -> None:
-        self.assertRegex(
-            self.source,
-            r'command_name" = "claude".*-x "\$LOCAL_BIN/claude"',
-        )
+        self.assertIn('existing_cmd', self.source)
+        self.assertIn('LOCAL_BIN/$command_name', self.source)
 
 
 class AgentsRuleTenTests(unittest.TestCase):
@@ -185,8 +185,9 @@ class PendingAfterRunTests(unittest.TestCase):
 
     def test_update_all_merges_pending_into_counts(self):
         text = (REPO_ROOT / "update_all.sh").read_text()
-        self.assertIn("pending_after_run_appstore", text)
+        summary = (REPO_ROOT / "lib" / "python" / "run_summary.py").read_text()
         self.assertIn("merge_pending", text)
+        self.assertIn("pending_after_run_appstore", summary)
 
 
 class AppStoreDiagTests(unittest.TestCase):

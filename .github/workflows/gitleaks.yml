@@ -5,6 +5,10 @@ on:
     branches: [main, master]
     paths:
       - '**.sh'
+      - '**.py'
+      - '**.md'
+      - 'dev_sync/**'
+      - 'scripts/**'
       - 'lib/**'
       - 'config/**'
       - 'tests/**'
@@ -16,6 +20,10 @@ on:
     branches: [main, master]
     paths:
       - '**.sh'
+      - '**.py'
+      - '**.md'
+      - 'dev_sync/**'
+      - 'scripts/**'
       - 'lib/**'
       - 'config/**'
       - 'tests/**'
@@ -28,6 +36,9 @@ on:
 concurrency:
   group: gitleaks-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   gitleaks:

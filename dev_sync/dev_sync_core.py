@@ -540,15 +540,38 @@ def run_command(
     cwd: Path,
     check: bool = True,
     input_text: str | None = None,
+    timeout: int | None = None,
+    retries: int = 0,
 ) -> subprocess.CompletedProcess[str]:
-    completed = subprocess.run(
-        list(command),
-        cwd=str(cwd),
-        input=input_text,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    if timeout is None:
+        raw = os.environ.get("DEV_SYNC_COMMAND_TIMEOUT", "300")
+        try:
+            timeout = int(raw)
+        except ValueError:
+            timeout = 300
+    attempts = max(1, retries + 1)
+    completed: subprocess.CompletedProcess[str] | None = None
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            completed = subprocess.run(
+                list(command),
+                cwd=str(cwd),
+                input=input_text,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=timeout,
+            )
+            last_error = None
+            if completed.returncode == 0 or attempt == attempts - 1:
+                break
+        except subprocess.TimeoutExpired as exc:
+            last_error = exc
+            if attempt == attempts - 1:
+                joined = " ".join(shlex.quote(part) for part in command)
+                raise DevSyncError(f"Command timed out after {timeout}s: {joined}") from exc
+    assert completed is not None
     if check and completed.returncode != 0:
         joined = " ".join(shlex.quote(part) for part in command)
         redacted_stdout = _redact(completed.stdout)
@@ -874,16 +897,53 @@ class RCloneProvider(CloudProvider):
             run_command(
                 ["rclone", "copyto", str(source_root / relpath), f"{remote_root}/{relpath}", "--checksum"],
                 cwd=source_root,
+                retries=2,
             )
+        self._upload_manifest(files, source_root, remote_root)
         return files, "rclone"
+
+    def _upload_manifest(self, files: list[str], source_root: Path, remote_root: str) -> None:
+        payload = {
+            "format": 1,
+            "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+            "files": sorted({safe_relpath(rel) for rel in files}),
+        }
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as handle:
+            json.dump(payload, handle)
+            handle.flush()
+            temp_path = handle.name
+        try:
+            run_command(
+                ["rclone", "copyto", temp_path, f"{remote_root}/{MANIFEST_FILENAME}", "--checksum"],
+                cwd=source_root,
+                retries=2,
+            )
+        finally:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
     def list_remote_files(self, cwd: Path) -> list[str]:
         remote_root = self._remote_root()
-        listing = run_command(
-            ["rclone", "lsf", "--files-only", "-R", remote_root],
-            cwd=cwd,
-        )
-        return sorted({safe_relpath(line.strip()) for line in listing.stdout.splitlines() if line.strip()})
+        with tempfile.TemporaryDirectory(prefix="dev-sync-rclone-manifest-") as temp_dir:
+            staged = Path(temp_dir) / MANIFEST_FILENAME
+            result = run_command(
+                ["rclone", "copyto", f"{remote_root}/{MANIFEST_FILENAME}", str(staged), "--checksum"],
+                cwd=cwd,
+                check=False,
+                retries=2,
+            )
+            if result.returncode != 0 or not staged.is_file():
+                return []
+            try:
+                payload = json.loads(staged.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise DevSyncError(f"Invalid rclone overlay manifest: {exc}") from exc
+            files = payload.get("files")
+            if not isinstance(files, list):
+                raise DevSyncError("Invalid rclone overlay manifest file list")
+            return sorted({safe_relpath(line) for line in files if normalize_relpath(line)})
 
     def sync_from(
         self,
@@ -914,8 +974,22 @@ class RCloneProvider(CloudProvider):
                             "--checksum",
                         ],
                         cwd=dest_root,
+                        retries=2,
                     )
-                sync_relpaths(staging_root, dest_root, selected, logger, options, transactional=True)
+                from overlay_import import plan_overlay_import
+
+                plan = plan_overlay_import(
+                    dest_root, staging_root, self.config, selected
+                )
+                sync_relpaths(
+                    staging_root,
+                    dest_root,
+                    plan.files_to_copy,
+                    logger,
+                    options,
+                    transactional=True,
+                )
+                return plan.files_to_copy, "rclone-staged"
         finally:
             logger.close()
         return selected, "rclone-staged"
@@ -1003,84 +1077,9 @@ def copy_relpaths(
     logger: Logger,
     options: RunOptions,
 ) -> None:
-    paths = sorted({safe_relpath(relpath) for relpath in relpaths})
-    for rel in paths:
-        logger.verbose(f"copy {source_base / rel} -> {dest_base / rel}")
-    if options.dry_run or not paths:
-        return
+    from overlay_import import commit_overlay
 
-    # A manifest must contain independent roots. Overlapping entries would make
-    # rollback order ambiguous (for example both `folder` and `folder/file`).
-    path_set = set(paths)
-    for rel in paths:
-        parent = PurePosixPath(rel).parent
-        while str(parent) not in ("", "."):
-            if str(parent) in path_set:
-                raise DevSyncError(f"Overlapping overlay paths are not allowed: {parent} and {rel}")
-            parent = parent.parent
-
-    dest_base.mkdir(parents=True, exist_ok=True)
-    validate_no_symlink_dest_ancestors(dest_base, paths)
-    transaction_root = Path(tempfile.mkdtemp(prefix=".dev-sync-txn-", dir=dest_base))
-    incoming_root = transaction_root / "incoming"
-    backup_root = transaction_root / "backup"
-    swapped: list[tuple[str, bool]] = []
-
-    try:
-        # Stage the complete overlay first. No destination is touched until
-        # every source has been copied successfully.
-        for rel in paths:
-            source = source_base / rel
-            staging = incoming_root / rel
-            staging.parent.mkdir(parents=True, exist_ok=True)
-            if source.is_symlink():
-                os.symlink(os.readlink(source), staging)
-            elif source.is_file():
-                shutil.copy2(source, staging)
-            elif source.is_dir():
-                shutil.copytree(source, staging, symlinks=True)
-            else:
-                raise DevSyncError(f"Source path vanished during copy: {source}")
-
-        # Swap all staged roots. Previous destinations remain under backup_root
-        # until the complete batch has succeeded.
-        for rel in paths:
-            staging = incoming_root / rel
-            dest = dest_base / rel
-            backup = backup_root / rel
-            had_dest = lexists(dest)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if had_dest:
-                backup.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(dest, backup)
-            try:
-                os.replace(staging, dest)
-            except Exception:
-                if had_dest and lexists(backup) and not lexists(dest):
-                    os.replace(backup, dest)
-                raise
-            swapped.append((rel, had_dest))
-    except Exception as error:
-        rollback_errors: list[str] = []
-        for rel, had_dest in reversed(swapped):
-            dest = dest_base / rel
-            backup = backup_root / rel
-            try:
-                remove_path(dest, dry_run=False)
-                if had_dest and lexists(backup):
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(backup, dest)
-            except Exception as rollback_error:  # pragma: no cover - catastrophic filesystem failure
-                rollback_errors.append(f"{rel}: {rollback_error}")
-        if rollback_errors:
-            raise DevSyncError(
-                "Overlay import failed and rollback was incomplete. "
-                f"Recovery data remains at {transaction_root}: {'; '.join(rollback_errors)}"
-            ) from error
-        shutil.rmtree(transaction_root, ignore_errors=True)
-        raise
-    else:
-        shutil.rmtree(transaction_root)
+    commit_overlay(source_base, dest_base, relpaths, logger, options)
 
 
 def sync_relpaths(
@@ -1173,7 +1172,7 @@ def export_candidates(
             destination = Path(f"{config.rclone_remote}:{config.rclone_remote_path}/{config.project_name}")
             exported, transport = provider.sync_to(files_to_copy, repo_root, dry_run=dry_run)
             files_to_copy = exported
-            logger.log("Manifest support is unavailable for rclone exports.", always_stdout=False)
+            logger.log(f"Wrote rclone export manifest ({len(files_to_copy)} file(s)).", always_stdout=False)
 
         logger.log(f"project_root={repo_root}", always_stdout=False)
         logger.log(f"provider={config.provider}", always_stdout=False)
@@ -1209,12 +1208,13 @@ def import_overlay(
             source = provider.get_project_folder()
             if not source.exists():
                 raise DevSyncError(f"Project folder not found in {config.provider}: {source}")
+            from overlay_import import plan_overlay_import
+
             manifest_files = read_manifest(source)
-            provider_files = manifest_files if manifest_files is not None else scan_overlay_files(source, config)
-            provider_files = {rel for rel in provider_files if should_include_candidate(rel, config)}
-            tracked = tracked_files(repo_root)
-            skipped_tracked = sorted(provider_files & tracked)
-            files_to_copy = sorted(provider_files - tracked)
+            provider_entries = manifest_files if manifest_files is not None else scan_overlay_files(source, config)
+            plan = plan_overlay_import(repo_root, source, config, provider_entries)
+            skipped_tracked = plan.skipped_tracked
+            files_to_copy = plan.files_to_copy
             if skipped_tracked:
                 logger.log(f"Skipping {len(skipped_tracked)} tracked Git file(s) from provider overlay")
                 for relpath in skipped_tracked:
@@ -1240,7 +1240,7 @@ def import_overlay(
                 dry_run=dry_run,
                 files=files_to_copy,
             )
-            logger.log("rclone import used validated staging without a provider manifest.", always_stdout=False)
+            logger.log("rclone import used the export manifest; full remote listings are not imported.", always_stdout=False)
 
         logger.log(f"project_root={repo_root}", always_stdout=False)
         logger.log(f"provider={config.provider}", always_stdout=False)

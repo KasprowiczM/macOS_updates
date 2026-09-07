@@ -1183,7 +1183,7 @@ iu_microsoft_365() {
     MAU_CLI="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate"
     MAU_APP="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app"
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
-        printf '%s\n' 0 > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+        printf '%s\n' unknown > "$MAC_UPDATE_SESSION_DIR/pending_mau"
     fi
     MAU_TEAMS21_OFFERED=0
     MAU_CHECK_TIMEOUT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT:-120}" 120)"

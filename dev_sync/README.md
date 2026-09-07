@@ -99,11 +99,11 @@ Common exclusions:
 
 ## Manifest Behavior
 
-Local filesystem providers write `.dev_sync_manifest.json` into the provider mirror on export.
+Local filesystem and rclone exports write `.dev_sync_manifest.json` into the provider mirror on export. A missing rclone manifest is treated as an empty list (no full remote listing fallback).
 
 Import prefers the manifest when present. This prevents old provider files from being restored just because they still physically exist from an older append-only export.
 
-Import also skips provider files that are tracked by Git, so GitHub remains authoritative for source files.
+Import goes through `overlay_import.py`: directory manifests expand to leaves, Git-tracked and excluded paths are skipped, destination-escaping leaf symlinks are refused, and a failed swap+restore leaves the transaction directory in place. GitHub remains authoritative for source files.
 
 ## Cleanup And Quarantine
 

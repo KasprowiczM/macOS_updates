@@ -12,6 +12,7 @@
 #   MAC_UPDATE_REPO=git URL         (default: GitHub repo below)
 #   MAC_UPDATE_LANG=en              (skip language picker: en|pl|de|fr|es|it|pt)
 #   MAC_UPDATE_SKIP_INVENTORY=1     (skip build_inventory.sh)
+#   MAC_UPDATE_REF=v1.4.5           (tested tag, branch, or SHA; default clone branch)
 #
 # Flow: pre-clone checks in English → clone → language picker (EN menu) →
 #       localized messages for setup, inventory, and coverage report.
@@ -28,8 +29,13 @@ MAC_UPDATE_REPO="${MAC_UPDATE_REPO:-https://github.com/KasprowiczM/macOS_updates
 MAC_UPDATE_DIR="${MAC_UPDATE_DIR:-$HOME/Dev_Env/macOS_updates}"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
-    echo "macOS Updates v1.0.21 — Automated update system (Bash 3.2+ with a Python 3 backend in dev_sync/ and inline pipeline helpers)"
+    _help_ver="unknown"
+    if [ -f "$(cd "$(dirname "$0")" && pwd)/VERSION" ]; then
+        _help_ver="$(tr -d '[:space:]' < "$(cd "$(dirname "$0")" && pwd)/VERSION")"
+    fi
+    echo "macOS Updates v${_help_ver} — Automated update system (Bash 3.2+ with a Python 3 backend in dev_sync/ and inline pipeline helpers)"
     echo "Usage: bash install.sh [--help]"
+    echo "Optional: MAC_UPDATE_REF=<tag|branch|sha> MAC_UPDATE_DIR=... MAC_UPDATE_LANG=en"
     exit 0
 fi
 
@@ -63,12 +69,23 @@ mkdir -p "$PARENT_DIR" || fail "Cannot create $PARENT_DIR"
 
 if [ -d "$MAC_UPDATE_DIR/.git" ]; then
     info "Updating existing clone: $MAC_UPDATE_DIR"
-    git -C "$MAC_UPDATE_DIR" pull --ff-only origin main 2>/dev/null \
-        || git -C "$MAC_UPDATE_DIR" pull --ff-only 2>/dev/null \
-        || fail "git pull failed in $MAC_UPDATE_DIR"
+    git -C "$MAC_UPDATE_DIR" fetch --tags origin 2>/dev/null || git -C "$MAC_UPDATE_DIR" fetch --tags 2>/dev/null || true
+    if [ -n "${MAC_UPDATE_REF:-}" ]; then
+        git -C "$MAC_UPDATE_DIR" checkout "$MAC_UPDATE_REF" \
+            || fail "Cannot checkout MAC_UPDATE_REF=$MAC_UPDATE_REF"
+    else
+        git -C "$MAC_UPDATE_DIR" pull --ff-only origin main 2>/dev/null \
+            || git -C "$MAC_UPDATE_DIR" pull --ff-only 2>/dev/null \
+            || fail "git pull failed in $MAC_UPDATE_DIR"
+    fi
 else
     info "Cloning into $MAC_UPDATE_DIR"
     git clone "$MAC_UPDATE_REPO" "$MAC_UPDATE_DIR" || fail "git clone failed"
+    if [ -n "${MAC_UPDATE_REF:-}" ]; then
+        git -C "$MAC_UPDATE_DIR" fetch --tags origin 2>/dev/null || true
+        git -C "$MAC_UPDATE_DIR" checkout "$MAC_UPDATE_REF" \
+            || fail "Cannot checkout MAC_UPDATE_REF=$MAC_UPDATE_REF"
+    fi
 fi
 
 cd "$MAC_UPDATE_DIR" || fail "Cannot cd to $MAC_UPDATE_DIR"

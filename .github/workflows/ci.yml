@@ -1,13 +1,22 @@
 name: CI
 
+# Cost model (public repo, no schedules, macOS still manual/tag only):
+# Ubuntu shellcheck + python-gate ~0.5-1 min per qualifying push/PR.
+# At ~60 events/month that is about 30-60 extra Ubuntu minutes.
+# macOS full suite stays workflow_dispatch/tag only.
+
 on:
   push:
     branches: [main, master]
     paths:
       - '**.sh'
+      - '**.py'
+      - '**.md'
       - 'lib/**'
       - 'config/**'
       - 'tests/**'
+      - 'dev_sync/**'
+      - 'scripts/**'
       - '.github/**'
       - '.gitleaks.toml'
       - 'VERSION'
@@ -17,9 +26,13 @@ on:
     branches: [main, master]
     paths:
       - '**.sh'
+      - '**.py'
+      - '**.md'
       - 'lib/**'
       - 'config/**'
       - 'tests/**'
+      - 'dev_sync/**'
+      - 'scripts/**'
       - '.github/**'
       - '.gitleaks.toml'
       - 'VERSION'
@@ -29,6 +42,9 @@ on:
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -52,6 +68,20 @@ jobs:
 
       - name: Run full test suite
         run: bash run_tests.sh
+
+  python-gate:
+    name: portable Python compile + unittest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: py_compile and unittest
+        run: |
+          set -o pipefail
+          python3 -m py_compile lib/python/*.py dev_sync/*.py scripts/*.py tests/*.py
+          PYTHONPATH=dev_sync:lib/python python3 -m unittest discover tests
 
   shellcheck:
     name: shellcheck

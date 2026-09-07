@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–26**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.4.5** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–26**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -204,7 +204,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Package version (1.4.0)
+├── VERSION                     # Package version (see VERSION)
 ├── install.sh                  # One-line installer entrypoint
 ├── uninstall.sh                # Remove clone (keeps Homebrew/apps)
 ├── setup.sh                    # First-run setup (no cloud)
@@ -290,6 +290,9 @@ Root `dev-sync-*.sh` wrappers call the same scripts in `dev_sync/`.
 ---
 
 ## Test
+
+Pull requests run Ubuntu ShellCheck, portable Python tests, and the secret scan.
+The full `run_tests.sh` suite on a macOS runner runs only on `workflow_dispatch` or a `v*` tag — not on every push.
 
 ```bash
 bash run_tests.sh

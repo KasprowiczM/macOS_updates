@@ -10,7 +10,7 @@ sudo softwareupdate -ia -R --verbose   # CORRECT — writes boot metadata
 ## 2. mas MUST use `sudo` (macOS 15.7.2+/14.8.2+/26.1+ entitlement change, see https://github.com/orgs/Homebrew/discussions/6550)
 ```bash
 export MAS_NO_AUTO_INDEX=1   # suppress Spotlight warnings
-sudo env MAS_NO_AUTO_INDEX=1 mas upgrade
+sudo env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS   # explicit IDs, never a bare upgrade
 ```
 
 ## 3. App Store — Two tracks
@@ -188,17 +188,26 @@ The quarantine is now maintained by the toolkit instead of by hand:
 - `MAC_UPDATE_MAU_CLEAR_DEFERRALS=1` forces removal of active deferrals via
   `defaults delete` to test feed recovery or clear stale quarantines.
 
-## 10. Centralized Version Normalization (`lib/version.sh`)
+## 10. npm 12 lifecycle scripts stay per-package
+
+npm 12 does not run dependency `postinstall` unless the package is on the
+user `allow-scripts` allowlist. Scope `--allow-scripts=<pkg>` (and
+`NPM_CONFIG_ALLOW_SCRIPTS`) to the child that installs that package. Never
+write a global `~/.npmrc` exception from this toolkit. A CLI whose
+`--version` is `?` or whose binary is the vendor stub is a failed update,
+not success.
+
+## 11. Centralized Version Normalization (`lib/version.sh`)
 
 - `app_version()` and `internet_version_relation()` must be sourced from `lib/version.sh` across all components (`update_brew.sh`, `update_internet_apps.sh`, `lib/internet_app_updates.sh`).
 - Never maintain duplicate or diverging implementations of `app_version()` or version comparison functions across scripts.
 
-## 11. Inventory Exclusions (`config/inventory_exclusions.txt`)
+## 12. Inventory Exclusions (`config/inventory_exclusions.txt`)
 
 - Apps listed in `config/inventory_exclusions.txt` (such as `Ascendo`, which was intentionally removed from the update pipeline on 2026-08-14) are excluded from `APPLICATIONS.md` discovery and inventory scans.
 - `lib/python/inventory.py:load_exclusions()` parses this file and filters matches during prescan.
 
-## 12. Step Severity Contract and Non-blocking Update Gating
+## 13. Step Severity Contract and Non-blocking Update Gating
 
 - Child `update_*.sh` scripts return exit codes adhering to the severity contract:
   - `0`: Clean execution without issues.

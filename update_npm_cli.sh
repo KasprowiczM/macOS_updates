@@ -408,6 +408,9 @@ resolve_command_path() {
 }
 
 . "$SCRIPT_DIR/lib/proc.sh"
+# Per-vendor bootstrap/update contracts (H4/H5/M1).
+# shellcheck source=lib/native_installers.sh
+. "$SCRIPT_DIR/lib/native_installers.sh"
 
 write_cli_snapshot() {
     local outfile="$1"
@@ -781,30 +784,62 @@ ensure_latest_bun() {
     hash -r 2>/dev/null || true
 }
 
-# Non-interactive switches for vendor native installers. An installer that
-# waits on a prompt is indistinguishable from a hung download: both end as a
-# timeout kill, so the switch has to be passed, never worked around with a
-# longer timeout.
-native_installer_env() {
-    case "$1" in
-        codex) printf '%s' "CODEX_NON_INTERACTIVE=1" ;;
-        *)     printf '%s' "" ;;
-    esac
-}
+# Vendor contracts live in lib/native_installers.sh (CODEX_NON_INTERACTIVE=1,
+# per-vendor bootstrap args, download-then-exec). Do not pipe curl into sh.
+install_native_cli() {
+    local display_name="$1"
+    local command_name="$2"
+    local install_url installer_env bootstrap_args existing_cmd installer_tmp command_path verified=""
 
-# Hard backstop for a native installer run. It must stay strictly above the
-# vendor script's own asset timeout (codex uses 300s for the release download),
-# otherwise a legitimately slow but healthy download is killed as a failure.
-native_installer_timeout() {
-    local raw="${MAC_UPDATE_NATIVE_INSTALLER_TIMEOUT:-360}"
-    case "$raw" in
-        ''|*[!0-9]*) echo 360; return 0 ;;
-    esac
-    if [ "$raw" -lt 60 ]; then
-        echo 360
-    else
-        echo "$raw"
+    install_url="$(native_installer_url "$command_name")"
+    if [ -z "$install_url" ]; then
+        print_warn "${display_name}: native-installer method not implemented for ${command_name}"
+        return 1
     fi
+    installer_env="$(native_installer_env "$command_name")"
+    bootstrap_args="$(native_installer_bootstrap_args "$command_name")"
+    existing_cmd="$(native_installer_existing_update_cmd "$command_name")"
+    print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
+
+    if [ -n "$existing_cmd" ] && [ -x "$LOCAL_BIN/$command_name" ]; then
+        # shellcheck disable=SC2086
+        if run_quiet_with_error_log \
+            "${command_name} ${existing_cmd}" \
+            run_with_timeout "$(native_installer_timeout)" \
+            "$LOCAL_BIN/$command_name" $existing_cmd \
+            && verified="$(report_cli_version_or_fail "$display_name" "$LOCAL_BIN/$command_name")"; then
+            print_ok "${display_name}: ${verified}"
+            return 0
+        fi
+        print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+        return 1
+    fi
+
+    installer_tmp="$(mktemp "${TMPDIR:-/tmp}/mac-update-installer.XXXXXX")" || return 1
+    if ! download_installer_script "$install_url" "$installer_tmp"; then
+        rm -f "$installer_tmp"
+        print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+        return 1
+    fi
+    # shellcheck disable=SC2086
+    if run_quiet_with_error_log \
+        "${command_name} native installer" \
+        run_with_timeout "$(native_installer_timeout)" \
+        env $installer_env /bin/sh "$installer_tmp" $bootstrap_args
+    then
+        command_path="$LOCAL_BIN/$command_name"
+        if [ ! -x "$command_path" ]; then
+            command_path="$(resolve_command_path "$command_name" 2>/dev/null || true)"
+        fi
+        if [ -n "$command_path" ] && verified="$(report_cli_version_or_fail "$display_name" "$command_path")"; then
+            print_ok "${display_name}: ${verified}"
+            rm -f "$installer_tmp"
+            return 0
+        fi
+    fi
+    rm -f "$installer_tmp"
+    print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+    return 1
 }
 
 install_latest_npm_packages() {
@@ -844,50 +879,7 @@ install_latest_npm_packages() {
                 failures=$((failures + 1))
             fi
         elif [ "$method" = "native-installer" ]; then
-            # Standalone native installer — the vendor provides an install
-            # script that both installs AND updates the binary in ~/.local/bin.
-            local install_url=""
-            local installer_env=""
-            case "$command_name" in
-                claude) install_url="https://claude.ai/install.sh" ;;
-                codex)  install_url="https://chatgpt.com/codex/install.sh" ;;
-                agy)    install_url="https://antigravity.google/cli/install.sh" ;;
-                agent)  install_url="https://cursor.com/install" ;;
-            esac
-            # Vendor installers that prompt on a tty must be told to stay
-            # silent. The codex installer opens /dev/tty directly ("Start Codex
-            # now?", "Uninstall the existing npm-managed Codex now?"), so
-            # redirecting stdin is not enough — only its documented
-            # CODEX_NON_INTERACTIVE switch skips the prompts. Without it the
-            # installer blocked until run_with_timeout killed it (exit 124) and
-            # codex-cli failed on every run.
-            installer_env="$(native_installer_env "$command_name")"
-            if [ -z "$install_url" ]; then
-                print_warn "${display_name}: native-installer method not implemented for ${command_name}"
-                failures=$((failures + 1))
-                continue
-            fi
-            print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
-            if [ "$command_name" = "claude" ] && [ -x "$LOCAL_BIN/claude" ]; then
-                # Installed Claude must use "claude" update, not install.sh.
-                if run_quiet_with_error_log \
-                    "${command_name} update" \
-                    run_with_timeout "$(native_installer_timeout)" \
-                    "$LOCAL_BIN/claude" update </dev/null; then
-                    print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
-                else
-                    print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
-                    failures=$((failures + 1))
-                fi
-                continue
-            fi
-            if run_quiet_with_error_log \
-                "${command_name} native installer" \
-                run_with_timeout "$(native_installer_timeout)" \
-                env $installer_env sh -c "curl -fsSL '$install_url' | sh -s latest" </dev/null; then
-                print_ok "${display_name}: $(detect_command_version "$display_name" "$LOCAL_BIN/$command_name")"
-            else
-                print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
+            if ! install_native_cli "$display_name" "$command_name"; then
                 failures=$((failures + 1))
             fi
         elif [ "$method" = "self-update" ]; then
@@ -903,6 +895,9 @@ install_latest_npm_packages() {
                 # falling back to curl/brew.
                 local _self_update_cmd="update"
                 local _self_update_args=""
+                local _update_ok=0
+                local _verified=""
+                local _repair_rc=0
                 if [ "$command_name" = "opencode" ]; then
                     _self_update_cmd="upgrade"
                     _self_update_args="--method npm"
@@ -910,17 +905,39 @@ install_latest_npm_packages() {
                 if ( export npm_config_prefix="$NPM_GLOBAL_PREFIX"
                      export NPM_CONFIG_PREFIX="$NPM_GLOBAL_PREFIX"
                      export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$PATH"
+                     if [ "$command_name" = "opencode" ]; then
+                         export NPM_CONFIG_ALLOW_SCRIPTS="opencode-ai"
+                     fi
                      run_quiet_with_error_log \
                         "${command_name} ${_self_update_cmd}" \
                         run_with_timeout 300 "$command_path" "$_self_update_cmd" $_self_update_args ); then
-                    command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
-                    print_ok "${display_name}: $(detect_command_version "$display_name" "$command_path")"
+                    _update_ok=1
+                fi
+                command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
+                if ! _verified="$(report_cli_version_or_fail "$display_name" "$command_path")"; then
+                    _verified=""
+                    if [ "$command_name" = "opencode" ]; then
+                        _repair_rc=0
+                        repair_broken_opencode "$NPM_GLOBAL_PREFIX" "$command_path" || _repair_rc=$?
+                        if [ "$_repair_rc" -eq 2 ]; then
+                            print_info "$(printf "$L_NPM_CLI_NOT_INSTALLED" "${display_name}")"
+                            continue
+                        fi
+                        if [ "$_repair_rc" -eq 0 ] && _verified="$(report_cli_version_or_fail "$display_name" "$command_path")"; then
+                            _update_ok=1
+                        else
+                            _verified=""
+                        fi
+                    fi
+                fi
+                if [ "$_update_ok" -eq 1 ] && [ -n "$_verified" ]; then
+                    print_ok "${display_name}: ${_verified}"
                 else
                     print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                     failures=$((failures + 1))
                 fi
             else
-                print_info "${display_name} nie jest zainstalowany — pomijam"
+                print_info "$(printf "$L_NPM_CLI_NOT_INSTALLED" "${display_name}")"
             fi
         fi
     done < "$MANIFEST_PATH"

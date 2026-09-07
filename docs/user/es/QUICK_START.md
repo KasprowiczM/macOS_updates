@@ -1,6 +1,6 @@
 # Inicio rápido (Español)
 
-**Se requiere Mac con Apple Silicon** · macOS 13+ · **v1.4.1**
+**Se requiere Mac con Apple Silicon** · macOS 13+ · **v1.4.5**
 
 ## Instalación en una línea
 
