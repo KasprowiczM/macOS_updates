@@ -15,6 +15,9 @@
 | `Error: uninitialized constant Cask::CaskLoader` | Upstream Homebrew bug in `brew list --cask --versions` (seen on 6.0.18-48-gad5738c). Handled: all callers go through `brew_cask_versions` in `lib/brew.sh`, which falls back to `brew list --cask` + the Caskroom layout. Never add a raw `brew list --cask --versions` back — `test_no_raw_brew_cask_versions_call` enforces this |
 | "Formulae still outdated after upgrade" with no formulae listed under it | `brew outdated` progress chatter got captured as the value. Fixed in v1.4.1 via `brew_outdated_formulae`; if it reappears, check that no caller reintroduced `2>&1` on a `brew outdated` capture |
 | `update_all.sh` reports CLIs green but your terminal has older versions | Split-brain toolchain: something (usually nvm) sits ahead of `~/.local/share/mac-update/{npm-global,node}/bin` on `PATH`. Run `bash update_npm_cli.sh` to rewrite the profile block, open a new shell, and confirm with `command -v node npm claude codex` |
+| `opencode --version` says postinstall was not run, or the log shows `opencode-cli: ?` | npm 12 only runs lifecycle scripts for packages on the user `allow-scripts` allowlist. Repair is scoped to the managed prefix (`~/.local/share/mac-update/npm-global`) with `--allow-scripts=opencode-ai`; do not add a global `~/.npmrc` exception. Re-run `bash update_npm_cli.sh` |
+| Log shows `✅ codex-cli: codex-cli` instead of a version | The vendor prints `codex-cli 0.153.4`. Fixed in v1.4.5 (`report_cli_version_or_fail`) |
+| Postupdate “total version changes” looks larger than what actually updated | Inventory table field edits are not installs. v1.4.5 prints inventory fields changed vs observed package/CLI changes separately |
 | `mas upgrade` fails | `sudo mas upgrade` (CVE-2025-43411) |
 | iPad apps "not allowed" error | System Settings → Privacy → Accessibility → add terminal |
 | Wrong language | Edit `.mac_update_prefs` → `MAC_LANG=en` |

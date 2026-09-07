@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 
 def first_existing_path(paths):
     for path in paths:
@@ -104,21 +105,32 @@ def fix_mcp_config(config_path):
             modified = True
 
     if modified:
+        tmp_path = None
         try:
-            # Create backup before modifying
+            original_mode = os.stat(config_path).st_mode & 0o777
+            desired_mode = min(original_mode, 0o600) if original_mode else 0o600
             bak_path = config_path + '.bak'
             shutil.copy2(config_path, bak_path)
-            # Atomic write: tmp file + os.replace
-            tmp_path = config_path + f'.tmp.{os.getpid()}'
-            with open(tmp_path, 'w') as f:
-                json.dump(data, f, indent=2)
-                f.write('\n')
-            os.replace(tmp_path, config_path)
+            os.chmod(bak_path, original_mode)
+            dest_dir = os.path.dirname(os.path.abspath(config_path)) or "."
+            fd, tmp_path = tempfile.mkstemp(prefix=".mcp.", suffix=".tmp", dir=dest_dir, text=True)
+            try:
+                os.fchmod(fd, desired_mode)
+                with os.fdopen(fd, 'w') as f:
+                    json.dump(data, f, indent=2)
+                    f.write('\n')
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_path, config_path)
+                os.chmod(config_path, desired_mode)
+                tmp_path = None
+            except Exception:
+                if tmp_path and os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
             print(f"Successfully updated: {config_path}")
             return True
         except Exception as e:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
             print(f"Error writing JSON: {e}")
             return False
     else:

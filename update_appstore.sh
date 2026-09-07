@@ -555,6 +555,7 @@ if [ "$MAS_OUTDATED_MODE" = "accurate" ]; then
         fi
         SOFT_FAIL=1
         STILL_OUTDATED=""
+        APPSTORE_PENDING_UNKNOWN=1
     fi
 else
     if ! STILL_OUTDATED=$(run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated 2>&1); then
@@ -566,6 +567,7 @@ else
         fi
         SOFT_FAIL=1
         STILL_OUTDATED=""
+        APPSTORE_PENDING_UNKNOWN=1
     fi
 fi
 if [ -z "$STILL_OUTDATED" ] && [ "$HARD_FAIL" -eq 0 ] && [ "$SOFT_FAIL" -eq 0 ]; then
@@ -591,8 +593,12 @@ if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
 fi
 
 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
-    PENDING_APPSTORE="$(mas_outdated_ids "$STILL_OUTDATED" | wc -l | tr -d ' ')"
-    printf '%s\n' "${PENDING_APPSTORE:-0}" > "$MAC_UPDATE_SESSION_DIR/pending_appstore"
+    if [ "${APPSTORE_PENDING_UNKNOWN:-0}" -eq 1 ]; then
+        printf '%s\n' "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_appstore"
+    else
+        PENDING_APPSTORE="$(mas_outdated_ids "$STILL_OUTDATED" | wc -l | tr -d ' ')"
+        printf '%s\n' "${PENDING_APPSTORE:-0}" > "$MAC_UPDATE_SESSION_DIR/pending_appstore"
+    fi
 fi
 
 if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then

@@ -5,9 +5,7 @@ title = "macOS_updates gitleaks"
 useDefault = true
 
 [allowlist]
-description = "Template placeholders and docs"
+description = "Template placeholders"
 paths = [
   '''\.env\.example$''',
-  '''^docs/''',
-  '''^README\.md$''',
 ]
