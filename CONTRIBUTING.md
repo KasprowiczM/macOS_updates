@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to **macOS Updates** (v1.0.21).
+Thank you for contributing to **macOS Updates** (v1.4.5).
 
 ## Requirements
 
@@ -11,6 +11,7 @@ Thank you for contributing to **macOS Updates** (v1.0.21).
 ## Before you submit
 
 ```bash
+bash scripts/pre-commit.sh # staged bash -n + py_compile
 bash run_tests.sh          # bash -n, py_compile, unit/static tests, gitleaks
 shellcheck --severity=warning $(find . -name '*.sh' ! -path './.git/*' -print)  # uses .shellcheckrc
 ```

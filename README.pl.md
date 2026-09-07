@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.0** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–26**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+> **v1.4.5** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–26**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
 
 **Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Zmiany: [CHANGELOG.md](CHANGELOG.md)
 
@@ -231,7 +231,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Wersja pakietu (1.4.1)
+├── VERSION                     # Wersja pakietu (see VERSION)
 ├── install.sh                  # Jednolinijkowy instalator
 ├── uninstall.sh                # Usuwa sklonowane pliki (zachowuje Homebrew/aplikacje)
 ├── setup.sh                    # Konfiguracja pierwszego uruchomienia (bez chmury)
@@ -315,6 +315,9 @@ bash dev_sync/dev-sync-verify-full.sh
 ---
 
 ## Testowanie
+
+Pull requesty uruchamiają na Ubuntu ShellCheck, przenośne testy Pythona i skan sekretów.
+Pełna suite `run_tests.sh` na runnerze macOS działa tylko przy `workflow_dispatch` albo tagu `v*` — nie przy każdym pushu.
 
 ```bash
 bash run_tests.sh

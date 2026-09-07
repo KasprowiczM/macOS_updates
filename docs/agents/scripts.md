@@ -15,7 +15,13 @@
 | `update_brew.sh` | `brew upgrade` + cleanup + doctor |
 | `lib/brew.sh` | Resilient Homebrew queries: `brew_cask_versions`, `brew_formula_versions`, `brew_outdated_formulae`, `brew_outdated_casks` |
 | `lib/python/inventory.py` | Pure Python library for inventory normalization, exclusions, and prescan |
-| `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON |
+| `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON (format 2) |
+| `lib/python/http_fetch.py` | HTTPS download helper used by tests and the fetch adapter |
+| `lib/python/run_lock.py` | Exclusive run lock (`.mac-update.lock`); `kill(pid,0)` EPERM counts as alive |
+| `lib/fetch.sh` | HTTPS-only download with emptiness and size checks (no curl-pipe-to-sh) |
+| `lib/native_installers.sh` | Per-vendor CLI install/update (Claude positional `latest`, Codex `--release latest`, OpenCode repair) |
+| `lib/run_lock.sh` | Shell wrapper for the Python run lock |
+| `dev_sync/overlay_import.py` | Overlay import planner: expand directory manifests, skip Git/excluded, refuse symlink escapes |
 | `config/inventory_exclusions.txt` | Explicit list of apps to ignore during inventory scans (e.g. `Ascendo`) |
 | `dev_sync/*.sh` | Export/import/verify private files to/from cloud storage |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |

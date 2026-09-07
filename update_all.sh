@@ -40,6 +40,85 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/brew.sh"
 . "$SCRIPT_DIR/lib/platform.sh"
 . "$SCRIPT_DIR/lib/version.sh"
+. "$SCRIPT_DIR/lib/run_lock.sh"
+
+write_machine_summary() {
+    local status="${1:-completed}"
+    local end_now rc
+    [ -n "${SCRIPT_DIR:-}" ] && [ -n "${SESSION_DIR:-}" ] && [ -n "${START_TIME:-}" ] || return 0
+    end_now="$(date +%s)"
+    export MAC_UPDATE_RUN_STATUS="$status"
+    python3 -c '
+import json, os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "lib", "python"))
+from run_summary import build_run_summary, write_run_summary, merge_pending
+
+script_dir = sys.argv[1]
+session_dir = sys.argv[2]
+start_time = int(sys.argv[3])
+end_time = int(sys.argv[4])
+overall_exit = int(sys.argv[5])
+degraded = int(sys.argv[6])
+blocking_exit = int(sys.argv[7])
+
+step_results = {
+    "prescan": sys.argv[8],
+    "appstore": sys.argv[9],
+    "npmcli": sys.argv[10],
+    "brew": sys.argv[11],
+    "internet": sys.argv[12],
+    "postupdate": sys.argv[13],
+    "system": sys.argv[14],
+}
+
+flags = {
+    "dry_run": os.environ.get("MAC_UPDATE_DRY_RUN") == "1",
+    "inventory_only": os.environ.get("MAC_UPDATE_INVENTORY_ONLY") == "1",
+    "noninteractive": os.environ.get("MAC_UPDATE_NONINTERACTIVE") == "1",
+}
+
+counts = {}
+counts_path = os.path.join(session_dir, "run_counts.json")
+try:
+    with open(counts_path, encoding="utf-8") as cf:
+        loaded = json.load(cf)
+    if isinstance(loaded, dict):
+        counts = {k: int(v) for k, v in loaded.items() if isinstance(v, int)}
+except (OSError, ValueError):
+    counts = {}
+
+counts, verification = merge_pending(counts, session_dir)
+summary = build_run_summary(
+    counts=counts,
+    start_time=start_time,
+    end_time=end_time,
+    overall_exit=overall_exit,
+    degraded=degraded,
+    blocking_exit=blocking_exit,
+    step_results=step_results,
+    flags=flags,
+    session_dir=session_dir,
+    verification=verification,
+    run_status=os.environ.get("MAC_UPDATE_RUN_STATUS", "completed"),
+    run_id=os.environ.get("MAC_UPDATE_RUN_ID"),
+)
+
+logs_dir = os.path.join(script_dir, "logs")
+ts_str = os.environ.get("RUN_TIMESTAMP") or str(start_time)
+out_file = os.path.join(logs_dir, f"run_summary_{ts_str}.json")
+write_run_summary(out_file, summary)
+latest_file = os.path.join(logs_dir, "run_summary_latest.json")
+write_run_summary(latest_file, summary)
+
+if os.environ.get("MAC_UPDATE_JSON_SUMMARY") == "1" and os.environ.get("MAC_UPDATE_RUN_STATUS") == "completed":
+    print(json.dumps(summary, indent=2))
+' "$SCRIPT_DIR" "$SESSION_DIR" "$START_TIME" "$end_now"       "${OVERALL_EXIT:-0}" "${DEGRADED:-0}" "${BLOCKING_EXIT:-0}"       "${RESULT_SCAN:-}" "${RESULT_APPSTORE:-}" "${RESULT_NPMCLI:-}" "${RESULT_BREW:-}"       "${RESULT_INTERNET:-}" "${RESULT_MD:-}" "${RESULT_SYSTEM:-}"
+    rc=$?
+    if [ "$rc" -eq 0 ] && { [ "$status" = "completed" ] || [ "$status" = "interrupted" ]; }; then
+        MAC_UPDATE_SUMMARY_DONE=1
+    fi
+    return "$rc"
+}
 
 export UI_START_EPOCH=$(date +%s)
 mac_update_parse_cli "$@"
@@ -273,6 +352,10 @@ cleanup_session_dir() {
         wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
         SUDO_KEEPALIVE_PID=""
     fi
+    if [ "${MAC_UPDATE_SUMMARY_DONE:-0}" != "1" ] && [ -n "${START_TIME:-}" ] && [ -n "${SESSION_DIR:-}" ]; then
+        write_machine_summary interrupted || true
+    fi
+    mac_update_lock_release "$SCRIPT_DIR"
     if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
         python3 - <<'PYJSON' 2>/dev/null || true
 import json, os
@@ -327,6 +410,12 @@ PYJSON
 }
 trap cleanup_session_dir EXIT
 trap 'cleanup_session_dir; exit 130' INT TERM
+
+if ! mac_update_lock_acquire "$SCRIPT_DIR"; then
+    exit 1
+fi
+export MAC_UPDATE_RUN_ID="${MAC_UPDATE_RUN_ID:-$(python3 -c 'import uuid; print(uuid.uuid4())' 2>/dev/null || echo "run-$LOG_TS")}"
+write_machine_summary started || true
 
 # ============================================================
 # Track wyników
@@ -1768,7 +1857,13 @@ print(f"     Casks Homebrew zaktualizowane:    {len(cask_upgrades)}")
 print(f"     Nowe pakiety Homebrew:            {len(formula_new) + len(cask_new)}")
 print(f"     Native CLI + npm:                 {len(npm_cli_upgrades) + len(npm_cli_new)}")
 print(f"     Zmiany wersji aplikacji inet.:    {len(internet_upgrades)}")
-print(f"     {os.environ.get('L_POSTUPDATE_TOTAL_VERSION_CHANGES', 'Total version changes: %s') % updated_count}")
+_observed = (
+    len(formula_upgrades) + len(cask_upgrades) + len(formula_new)
+    + len(cask_new) + len(npm_cli_upgrades) + len(npm_cli_new)
+    + len(internet_upgrades)
+)
+print(f"     {os.environ.get('L_POSTUPDATE_INVENTORY_FIELDS_CHANGED', 'Inventory version fields changed: %s') % updated_count}")
+print(f"     {os.environ.get('L_POSTUPDATE_OBSERVED_PACKAGE_CHANGES', 'Observed package/CLI changes: %s') % _observed}")
 
 # Hand the same numbers to the machine-readable summary. build_run_summary has
 # always accepted a `counts` mapping and the caller never passed one, so every
@@ -1782,7 +1877,8 @@ _counts = {
     "brew_new_packages": len(formula_new) + len(cask_new),
     "native_cli_npm_changed": len(npm_cli_upgrades) + len(npm_cli_new),
     "internet_app_versions_changed": len(internet_upgrades),
-    "total_version_changes": updated_count,
+    "inventory_version_fields_changed": updated_count,
+    "observed_package_changes": _observed,
 }
 try:
     _counts_path = os.path.join(session_dir, "run_counts.json")
@@ -1936,87 +2032,11 @@ export MAC_UPDATE_RESULT_MD="$RESULT_MD"
 export MAC_UPDATE_LOG_FILE="$LOG_FILE"
 export RUN_TIMESTAMP="${RUN_TIMESTAMP:-$LOG_TS}"
 
-python3 -c '
-import json, os, sys
-sys.path.insert(0, os.path.join(sys.argv[1], "lib", "python"))
-from run_summary import build_run_summary, write_run_summary
+if ! write_machine_summary completed; then
+    print_error "Could not write run_summary JSON"
+    OVERALL_EXIT=1
+fi
 
-script_dir = sys.argv[1]
-session_dir = sys.argv[2]
-start_time = int(sys.argv[3])
-end_time = int(sys.argv[4])
-overall_exit = int(sys.argv[5])
-degraded = int(sys.argv[6])
-blocking_exit = int(sys.argv[7])
-
-step_results = {
-    "prescan": sys.argv[8],
-    "appstore": sys.argv[9],
-    "npmcli": sys.argv[10],
-    "brew": sys.argv[11],
-    "internet": sys.argv[12],
-    "postupdate": sys.argv[13],
-    "system": sys.argv[14],
-}
-
-flags = {
-    "dry_run": os.environ.get("MAC_UPDATE_DRY_RUN") == "1",
-    "inventory_only": os.environ.get("MAC_UPDATE_INVENTORY_ONLY") == "1",
-    "noninteractive": os.environ.get("MAC_UPDATE_NONINTERACTIVE") == "1",
-}
-
-counts = {}
-counts_path = os.path.join(session_dir, "run_counts.json")
-try:
-    with open(counts_path, encoding="utf-8") as cf:
-        loaded = json.load(cf)
-    if isinstance(loaded, dict):
-        counts = {k: int(v) for k, v in loaded.items() if isinstance(v, int)}
-except (OSError, ValueError):
-    # Step 5 may have been skipped (--inventory-only) or failed before writing;
-    # an empty counts block is then the truthful answer, not a missing one.
-    counts = {}
-
-def merge_pending(counts: dict, session_dir: str) -> dict:
-    from pathlib import Path
-    for key, filename in (
-        ("pending_after_run_appstore", "pending_appstore"),
-        ("pending_after_run_brew_formulae", "pending_brew_formulae"),
-        ("pending_after_run_brew_casks", "pending_brew_casks"),
-        ("pending_after_run_mau", "pending_mau"),
-    ):
-        path = os.path.join(session_dir, filename)
-        try:
-            counts[key] = int(Path(path).read_text().strip() or "0")
-        except (OSError, ValueError):
-            counts[key] = 0
-    return counts
-
-counts = merge_pending(counts, session_dir)
-
-summary = build_run_summary(
-    counts=counts,
-    start_time=start_time,
-    end_time=end_time,
-    overall_exit=overall_exit,
-    degraded=degraded,
-    blocking_exit=blocking_exit,
-    step_results=step_results,
-    flags=flags,
-    session_dir=session_dir,
-)
-
-logs_dir = os.path.join(script_dir, "logs")
-ts_str = os.environ.get("RUN_TIMESTAMP") or str(start_time)
-out_file = os.path.join(logs_dir, f"run_summary_{ts_str}.json")
-write_run_summary(out_file, summary)
-latest_file = os.path.join(logs_dir, "run_summary_latest.json")
-write_run_summary(latest_file, summary)
-
-if os.environ.get("MAC_UPDATE_JSON_SUMMARY") == "1":
-    print(json.dumps(summary, indent=2))
-' "$SCRIPT_DIR" "$SESSION_DIR" "$START_TIME" "$END_TIME" "$OVERALL_EXIT" "$DEGRADED" "$BLOCKING_EXIT" \
-  "$RESULT_SCAN" "$RESULT_APPSTORE" "$RESULT_NPMCLI" "$RESULT_BREW" "$RESULT_INTERNET" "$RESULT_MD" "$RESULT_SYSTEM" 2>/dev/null || true
 
 bash "$SCRIPT_DIR/scripts/report_chronic_warnings.sh" || true
 

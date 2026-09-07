@@ -1,6 +1,6 @@
 # Benutzerhandbuch (Deutsch)
 
-**Version:** 1.4.1 · **Apple Silicon, macOS 13+**
+**Version:** 1.4.5 · **Apple Silicon, macOS 13+**
 
 ## Funktion
 

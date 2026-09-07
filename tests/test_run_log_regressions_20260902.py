@@ -330,7 +330,8 @@ class RunSummaryCountsTests(unittest.TestCase):
     def test_postupdate_writes_run_counts(self) -> None:
         text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
         self.assertIn('"run_counts.json"', text)
-        self.assertIn('"total_version_changes": updated_count', text)
+        self.assertIn('"inventory_version_fields_changed": updated_count', text)
+        self.assertIn("observed_package_changes", text)
 
     def test_summary_passes_counts(self) -> None:
         text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
@@ -342,9 +343,9 @@ class RunSummaryCountsTests(unittest.TestCase):
 
         summary = build_run_summary(
             start_time=0, end_time=10, overall_exit=0, degraded=0, blocking_exit=0,
-            step_results={}, counts={"total_version_changes": 11},
+            step_results={}, counts={"inventory_version_fields_changed": 11},
         )
-        self.assertEqual(summary["counts"], {"total_version_changes": 11})
+        self.assertEqual(summary["counts"], {"inventory_version_fields_changed": 11})
 
 
 if __name__ == "__main__":

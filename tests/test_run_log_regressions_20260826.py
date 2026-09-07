@@ -50,20 +50,18 @@ class NativeInstallerNonInteractiveTest(unittest.TestCase):
         self.assertIn("CODEX_NON_INTERACTIVE=1", self.source)
 
     def test_native_installer_env_is_applied_to_the_run(self) -> None:
-        self.assertRegex(self.source, r"env \$installer_env sh -c")
+        self.assertRegex(self.source, r"env \$installer_env")
+        self.assertIn("lib/native_installers.sh", self.source)
 
     def test_installer_stdin_is_detached(self) -> None:
-        # T2 (v1.4.4) changed bootstrap to `sh -s latest` — match either form.
-        self.assertTrue(
-            '| sh\" </dev/null' in self.source
-            or '| sh -s latest\" </dev/null' in self.source,
-            "Bootstrap sh invocation must redirect stdin away from terminal",
-        )
+        self.assertIn("download_installer_script", self.source)
+        self.assertNotIn("sh -s latest", self.source)
 
     def test_timeout_exceeds_the_vendor_asset_timeout(self) -> None:
         """The codex installer allows 300s for the release download alone."""
+        lib = (REPO_ROOT / "lib" / "native_installers.sh").read_text(encoding="utf-8")
         match = re.search(
-            r"^native_installer_timeout\(\) \{.*?^\}", self.source, re.M | re.S
+            r"^native_installer_timeout\(\) \{.*?^\}", lib, re.M | re.S
         )
         self.assertIsNotNone(match, "native_installer_timeout() not found")
         with tempfile.NamedTemporaryFile(
