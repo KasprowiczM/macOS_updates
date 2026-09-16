@@ -1918,6 +1918,14 @@ _counts = {
     "inventory_version_fields_changed": updated_count,
     "observed_package_changes": _observed,
 }
+for _k in ("internet_verified", "internet_behind", "internet_unverified"):
+    _p = os.path.join(session_dir, _k)
+    if os.path.isfile(_p):
+        try:
+            with open(_p, encoding="utf-8") as _f:
+                _counts[_k] = int(_f.read().strip())
+        except (ValueError, OSError):
+            pass
 try:
     _counts_path = os.path.join(session_dir, "run_counts.json")
     with open(_counts_path, "w", encoding="utf-8") as _cf:

@@ -581,6 +581,26 @@ def collect_run_items(
                     "details": "Intel-only; Rosetta missing; EOL macOS 28",
                 })
 
+    # Internet apps behind cask oracle
+    inet_behind_file = sdir / "internet_behind_apps.txt"
+    if inet_behind_file.is_file():
+        for line in inet_behind_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|")
+            if len(parts) >= 3:
+                b_name, b_old, b_new = parts[0].strip(), parts[1].strip(), parts[2].strip()
+                items.append({
+                    "name": b_name,
+                    "id": b_name,
+                    "category": "internet",
+                    "old_version": b_old or None,
+                    "new_version": b_new or None,
+                    "status": "pending",
+                    "details": f"Behind cask ({b_old} < {b_new})",
+                })
+
     # 8. Unconfirmed or degraded steps from step_results
     if step_results:
         step_labels = {

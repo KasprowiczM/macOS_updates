@@ -2558,6 +2558,8 @@ class I18nCompletenessTests(unittest.TestCase):
             "L_INTERNET_STATUS_MANUAL_UPDATE",
             "L_INTERNET_STATUS_SKIPPED",
             "L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT",
+            "L_INTERNET_STATUS_CASK_CURRENT",
+            "L_INTERNET_STATUS_CASK_BEHIND_FMT",
         }
 
         for key in all_status_keys:
