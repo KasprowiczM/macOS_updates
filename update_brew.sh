@@ -71,6 +71,42 @@ BREW_VERSION=$(brew --version | head -1)
 print_ok "$BREW_VERSION"
 print_info "Location: $(which brew)"
 
+# ============================================================
+# Check Xcode license agreement (preflight)
+# ============================================================
+if ! brew_xcode_license_ok; then
+    XCODE_INFO=""
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/xcode_changed.txt" ]; then
+        raw_xc="$(cat "$MAC_UPDATE_SESSION_DIR/xcode_changed.txt" 2>/dev/null)"
+        xc_change="${raw_xc#xcode_changed=}"
+        [ -n "$xc_change" ] && XCODE_INFO=" (Xcode $xc_change)"
+    fi
+    print_warn "$(printf "$L_BREW_XCODE_LICENSE_NOTICE" "$XCODE_INFO")"
+
+    LICENSE_ACCEPTED=0
+    if [ -t 0 ] && [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ]; then
+        read -r -p "  $L_BREW_XCODE_LICENSE_PROMPT" CONFIRM_XCODE
+        CONFIRM_XCODE="${CONFIRM_XCODE:-T}"
+        if [[ "$CONFIRM_XCODE" =~ ^[TtYy]$ ]]; then
+            print_info "Running: sudo xcodebuild -license accept..."
+            if sudo xcodebuild -license accept 2>/dev/null && brew_xcode_license_ok; then
+                LICENSE_ACCEPTED=1
+                print_ok "Xcode license accepted successfully."
+            fi
+        fi
+    fi
+
+    if [ "$LICENSE_ACCEPTED" -ne 1 ]; then
+        print_warn "$L_BREW_XCODE_LICENSE_MANUAL"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+            echo "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_brew_formulae"
+            echo "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_brew_casks"
+            echo "xcode_license" > "$MAC_UPDATE_SESSION_DIR/pending_brew_reason"
+        fi
+        exit 10
+    fi
+fi
+
 # ── Snapshot of installed packages before update ──
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_BREW_SAVING_BEFORE"

@@ -624,6 +624,13 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
         print_warn "Could not save the post-update App Store snapshot."
         SOFT_FAIL=1
     fi
+    if [ -f "$MAC_UPDATE_SESSION_DIR/mas_before.txt" ] && [ -f "$MAC_UPDATE_SESSION_DIR/mas_after.txt" ]; then
+        xcode_before="$(awk '$1 == "497799835" || $2 == "Xcode" { for (i=1; i<=NF; i++) if ($i ~ /^\(.*\)$/) { gsub(/[()]/, "", $i); print $i; exit } }' "$MAC_UPDATE_SESSION_DIR/mas_before.txt" 2>/dev/null)"
+        xcode_after="$(awk '$1 == "497799835" || $2 == "Xcode" { for (i=1; i<=NF; i++) if ($i ~ /^\(.*\)$/) { gsub(/[()]/, "", $i); print $i; exit } }' "$MAC_UPDATE_SESSION_DIR/mas_after.txt" 2>/dev/null)"
+        if [ -n "$xcode_before" ] && [ -n "$xcode_after" ] && [ "$xcode_before" != "$xcode_after" ]; then
+            echo "xcode_changed=${xcode_before}->${xcode_after}" > "$MAC_UPDATE_SESSION_DIR/xcode_changed.txt"
+        fi
+    fi
 fi
 
 APPSTORE_EXIT="$(mac_update_severity_exit_code)"

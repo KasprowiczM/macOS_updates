@@ -100,3 +100,21 @@ brew_outdated_casks() {
     printf '%s' "$out" | grep -v '^==>' | grep -v '^✔' | grep -v '^[[:space:]]*$' || true
     return "$rc"
 }
+
+# brew_xcode_license_ok
+#   Returns 0 if xcode-select does not point to Xcode.app or if xcodebuild
+#   license check succeeds. Returns 1 if Xcode.app is selected and license
+#   has not been agreed to. Does not invoke brew.
+brew_xcode_license_ok() {
+    local dev_path
+    command -v xcode-select >/dev/null 2>&1 || return 0
+    dev_path="$(xcode-select -p 2>/dev/null)"
+    case "$dev_path" in
+        *.app/Contents/Developer*)
+            if command -v xcodebuild >/dev/null 2>&1; then
+                xcodebuild -license check >/dev/null 2>&1 || return 1
+            fi
+            ;;
+    esac
+    return 0
+}

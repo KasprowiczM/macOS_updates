@@ -217,6 +217,9 @@ L_UPDATES_ADDED="— migration entry added"
 
 # ── update_brew.sh — additional strings ───────────────────────
 L_BREW_SAVING_BEFORE="Saving package versions before update..."
+L_BREW_XCODE_LICENSE_NOTICE="Xcode license has not been agreed to%s."
+L_BREW_XCODE_LICENSE_PROMPT="Do you want to accept the Xcode license now (sudo xcodebuild -license accept)? [Y/n]: "
+L_BREW_XCODE_LICENSE_MANUAL="Xcode license has not been accepted. Run manually: sudo xcodebuild -license accept"
 L_BREW_PACKAGES_FOUND="Packages found to update."
 L_BREW_CONFIRM_UPDATE="Do you want to update all packages? [y/n]:"
 L_BREW_UPDATE_CANCELED="Update cancelled by user."

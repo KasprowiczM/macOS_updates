@@ -553,9 +553,29 @@ def collect_run_items(
             "postupdate": "Inventory update",
             "system": "macOS System",
         }
+        pending_brew_reason = None
+        pbr_file = sdir / "pending_brew_reason"
+        if pbr_file.is_file():
+            pending_brew_reason = pbr_file.read_text(encoding="utf-8", errors="replace").strip()
+
+        xcode_change = None
+        xc_file = sdir / "xcode_changed.txt"
+        if xc_file.is_file():
+            xc_txt = xc_file.read_text(encoding="utf-8", errors="replace").strip()
+            if xc_txt.startswith("xcode_changed="):
+                xcode_change = xc_txt.split("=", 1)[1].strip()
+            elif xc_txt:
+                xcode_change = xc_txt
+
         for step_key, step_val in step_results.items():
             status_code = classify_step_status(step_val)
             if status_code in ("warn", "error", "unconfirmed"):
+                details = str(step_val)
+                if step_key == "brew" and pending_brew_reason == "xcode_license":
+                    if xcode_change:
+                        details = f"Xcode license not accepted (Xcode {xcode_change})"
+                    else:
+                        details = "Xcode license not accepted"
                 items.append({
                     "name": f"Step: {step_labels.get(step_key, step_key)}",
                     "id": step_key,
@@ -563,7 +583,7 @@ def collect_run_items(
                     "old_version": None,
                     "new_version": None,
                     "status": "unconfirmed",
-                    "details": str(step_val),
+                    "details": details,
                 })
 
     return items
