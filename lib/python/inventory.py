@@ -45,14 +45,14 @@ def norm_name(s: str) -> str:
 
     Markers the toolkit itself writes into APPLICATIONS.md must not change a
     name's identity. The prescan appends new applications to the "🆕" section
-    as e.g. "GarageBand 🆕"; leaving the emoji in the normalized form meant the
-    row never matched the installed "GarageBand" again, so every auto-appended
-    app was re-reported as new on every subsequent run. Drop symbol, modifier
-    and format characters (emoji and variation selectors) along with the
-    separators.
+    as e.g. "GarageBand 🆕" or architecture markers like "[x86_64]"; leaving
+    markers in the normalized form meant the row never matched the installed
+    app again. Drop architecture markers, symbol, modifier and format characters
+    (emoji and variation selectors) along with separators.
     """
+    cleaned = re.sub(r"\[(x86_64(?:-only)?|arm64|universal|unknown)\]", "", s, flags=re.IGNORECASE)
     stripped = "".join(
-        ch for ch in s if unicodedata.category(ch) not in ("So", "Sk", "Cf")
+        ch for ch in cleaned if unicodedata.category(ch) not in ("So", "Sk", "Cf")
     )
     return re.sub(r"[-_ .]", "", stripped.lower().strip())
 
@@ -177,6 +177,85 @@ def installed_app_version(app_path: str | Path) -> str:
         pass
 
     return "?"
+
+
+def app_architecture(app_path: str | Path) -> str:
+    """Determine application architecture using lipo -archs on CFBundleExecutable.
+
+    Returns: "arm64" | "universal" | "x86_64-only" | "unknown"
+    """
+    path = Path(app_path)
+    if not path.exists():
+        return "unknown"
+
+    exe_path: Path | None = None
+    info_plist = path / "Contents" / "Info.plist"
+    exe_name: str | None = None
+
+    if info_plist.is_file():
+        try:
+            import plistlib
+            with open(info_plist, "rb") as fp:
+                plist = plistlib.load(fp)
+                if isinstance(plist, dict):
+                    exe_name = plist.get("CFBundleExecutable")
+        except Exception:
+            pass
+
+    if not exe_name:
+        try:
+            res = subprocess.run(
+                ["defaults", "read", str(path / "Contents" / "Info"), "CFBundleExecutable"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                exe_name = res.stdout.strip()
+        except Exception:
+            pass
+
+    if exe_name:
+        candidate = path / "Contents" / "MacOS" / exe_name
+        if candidate.is_file():
+            exe_path = candidate
+
+    if not exe_path:
+        macos_dir = path / "Contents" / "MacOS"
+        if macos_dir.is_dir():
+            try:
+                files = [f for f in macos_dir.iterdir() if f.is_file()]
+                if len(files) == 1:
+                    exe_path = files[0]
+                elif (macos_dir / path.stem).is_file():
+                    exe_path = macos_dir / path.stem
+            except Exception:
+                pass
+
+    if not exe_path or not exe_path.is_file():
+        return "unknown"
+
+    try:
+        res = subprocess.run(
+            ["lipo", "-archs", str(exe_path)],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            archs = set(res.stdout.strip().split())
+            has_arm = any("arm64" in a for a in archs)
+            has_intel = any("x86_64" in a or "i386" in a for a in archs)
+            if has_arm and has_intel:
+                return "universal"
+            elif has_arm:
+                return "arm64"
+            elif has_intel:
+                return "x86_64-only"
+    except Exception:
+        pass
+
+    return "unknown"
 
 
 def scan_installed_app_paths(

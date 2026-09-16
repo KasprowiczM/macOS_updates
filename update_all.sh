@@ -598,6 +598,7 @@ from inventory import (
     row_exists,
     app_exists,
     installed_app_version,
+    app_architecture,
     scan_installed_app_paths,
 )
 
@@ -990,9 +991,13 @@ if os.path.exists(new_apps_file):
                     handled.add(norm_name(name_ver))
     unhandled = [a for a in new_app_names if norm_name(a) not in handled]
     if unhandled:
-        new_rows = ''
-        for app in unhandled:
-            new_rows += f"| {app} | 🆕 do skategoryzowania | — |\n"
+        def _format_unhandled_row(app_name):
+            app_path = installed_app_paths.get(app_name, '')
+            arch = app_architecture(app_path) if app_path else "unknown"
+            arch_marker = f" [{arch}]" if arch != "unknown" else ""
+            return f"| {app_name}{arch_marker} | 🆕 do skategoryzowania | — |\n"
+
+        new_rows = ''.join(_format_unhandled_row(a) for a in unhandled)
         # POPRAWKA: sprawdź czy sekcja 🆕 już istnieje — jeśli tak, dołącz do niej
         # zamiast tworzyć duplikat sekcji
         existing_new_section = "### 🆕 Nowo wykryte aplikacje (do skategoryzowania)"
@@ -1006,8 +1011,7 @@ if os.path.exists(new_apps_file):
                 unhandled_dedup = [a for a in unhandled
                                    if not re.search(re.escape(a), content, re.IGNORECASE)]
                 if unhandled_dedup:
-                    new_rows_dedup = ''.join(f"| {a} | 🆕 do skategoryzowania | — |\n"
-                                             for a in unhandled_dedup)
+                    new_rows_dedup = ''.join(_format_unhandled_row(a) for a in unhandled_dedup)
                     content = content[:insert_pos] + new_rows_dedup + content[insert_pos:]
                     changes_made = True
                     print(f"  ✅ {os.environ.get('L_PRESCAN_APPENDED_NEW_APPS', 'Appended %s new applications to section 🆕') % len(unhandled_dedup)}")
