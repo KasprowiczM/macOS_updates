@@ -1139,25 +1139,47 @@ mau_quarantine_forget() {
     return 0
 }
 
-# Office IDs whose live DeferralDays entry has outlived the expiry window.
+# Office IDs whose live DeferralDays entry has outlived the expiry window,
+# or whose DeferralVersions pin matches the currently installed build (dead deferral).
 # An entry with no record at all is treated as expired: it predates this
 # bookkeeping, so it is by definition older than the window.
 mau_quarantine_expired_ids() {
-    local active file max cutoff now id armed out=""
+    local active file max cutoff now id armed out="" plist entry val installed
     active="$(mau_active_office_deferrals)"
-    [ -n "$active" ] || return 0
-    file="$(mau_quarantine_state_file)"
-    max="$(mau_quarantine_max_days)"
-    now="$(date +%s)"
-    cutoff=$(( now - max * 86400 ))
-    for id in $active; do
-        armed=""
-        [ -f "$file" ] && armed="$(awk -F'\t' -v k="$id" '$1 == k { print $2; exit }' "$file" 2>/dev/null)"
-        case "$armed" in
-            ''|*[!0-9]*) out="$out $id"; continue ;;
-        esac
-        [ "$armed" -lt "$cutoff" ] && out="$out $id"
-    done
+    if [ -n "$active" ]; then
+        file="$(mau_quarantine_state_file)"
+        max="$(mau_quarantine_max_days)"
+        now="$(date +%s)"
+        cutoff=$(( now - max * 86400 ))
+        for id in $active; do
+            armed=""
+            [ -f "$file" ] && armed="$(awk -F'\t' -v k="$id" '$1 == k { print $2; exit }' "$file" 2>/dev/null)"
+            case "$armed" in
+                ''|*[!0-9]*) out="$out $id"; continue ;;
+            esac
+            [ "$armed" -lt "$cutoff" ] && out="$out $id"
+        done
+    fi
+
+    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || plist=""
+    if [ -n "$plist" ] && mau_prefs_export "$plist"; then
+        while IFS= read -r entry; do
+            [ -n "$entry" ] || continue
+            id="${entry%%=*}"
+            val="${entry#*=}"
+            installed="$(mau_installed_build_for_id "$id")"
+            if [ -n "$val" ] && [ -n "$installed" ] && [ "$val" = "$installed" ]; then
+                case " $out " in
+                    *" $id "*) ;;
+                    *) out="$out $id" ;;
+                esac
+            fi
+        done <<EOF
+$(mau_deferral_entries "$plist" DeferralVersions)
+EOF
+        rm -f "$plist" 2>/dev/null || true
+    fi
+
     printf '%s' "${out# }"
 }
 
