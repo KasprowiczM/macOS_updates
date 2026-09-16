@@ -24,9 +24,12 @@ class ArchitectureRosettaTests(unittest.TestCase):
         os.makedirs(self.bin_dir, exist_ok=True)
         self.old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{self.bin_dir}:{self.old_path}"
+        self.rosetta_dir = os.path.join(self.temp_dir, "rosetta")
+        os.environ["MAC_UPDATE_ROSETTA_DIR"] = self.rosetta_dir
 
     def tearDown(self):
         os.environ["PATH"] = self.old_path
+        os.environ.pop("MAC_UPDATE_ROSETTA_DIR", None)
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _create_mock_bin(self, name: str, script_body: str) -> str:
@@ -99,6 +102,11 @@ class ArchitectureRosettaTests(unittest.TestCase):
         self._create_mock_bin("pgrep", 'exit 1')
         res = subprocess.run(["bash", "-c", script], env=os.environ, capture_output=True)
         self.assertEqual(res.returncode, 1)
+
+        # Case C: pgrep reports not running but rosetta dir exists
+        os.makedirs(self.rosetta_dir, exist_ok=True)
+        res = subprocess.run(["bash", "-c", script], env=os.environ, capture_output=True)
+        self.assertEqual(res.returncode, 0)
 
     def test_run_summary_rosetta_item(self):
         sdir = Path(self.temp_dir) / "session"

@@ -224,6 +224,10 @@ for lbl in "${INSTALL_LABELS[@]}"; do
     if ! sudo softwareupdate -i "$lbl" -R --verbose; then
         INSTALL_FAILED=1
         print_warn "Failed to install: $lbl"
+    else
+        if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+            echo "$lbl" >> "$MAC_UPDATE_SESSION_DIR/system_installed_labels.txt" 2>/dev/null || true
+        fi
     fi
 done
 
@@ -240,6 +244,7 @@ else
     # Remeasure pending updates after install without restart
     if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
         POST_UPDATES=$(LANG=C LC_ALL=C softwareupdate -l 2>&1) || true
+        echo "$POST_UPDATES" > "$MAC_UPDATE_SESSION_DIR/system_available.txt" 2>/dev/null || true
         if echo "$POST_UPDATES" | grep -q "No new software available"; then
             echo "0" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
         else

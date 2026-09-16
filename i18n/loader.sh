@@ -25,9 +25,10 @@ fi
 PREFS_FILE="$SCRIPT_DIR/.mac_update_prefs"
 
 # ── Load language preference ──────────────────────────────────
-MAC_LANG="en"  # Default language
+# Allow environment override via MAC_UPDATE_LANG or MAC_LANG
+MAC_LANG="${MAC_UPDATE_LANG:-${MAC_LANG:-}}"
 
-if [ -f "$PREFS_FILE" ]; then
+if [ -z "$MAC_LANG" ] && [ -f "$PREFS_FILE" ]; then
     # Parse MAC_LANG from .mac_update_prefs
     # Simple key=value format: MAC_LANG=en (no spaces around =)
     while IFS='=' read -r key value; do

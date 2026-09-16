@@ -553,6 +553,30 @@ def collect_run_items(
                 "details": f"{pas_val} updates pending",
             })
 
+    # System updates installed in this run
+    installed_sys_labels = set()
+    sys_inst_file = sdir / "system_installed_labels.txt"
+    if sys_inst_file.is_file():
+        for line in sys_inst_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            lbl = line.strip()
+            if not lbl:
+                continue
+            installed_sys_labels.add(lbl)
+            if "-" in lbl:
+                name_part, ver_part = lbl.rsplit("-", 1)
+            else:
+                name_part, ver_part = lbl, None
+            installed_sys_labels.add(name_part)
+            items.append({
+                "name": name_part,
+                "id": lbl,
+                "category": "system",
+                "old_version": None,
+                "new_version": ver_part,
+                "status": "updated",
+                "details": f"System update installed: {lbl}",
+            })
+
     # macOS System pending updates from system_available.txt
     pending_sys_file = sdir / "pending_system"
     sys_avail_file = sdir / "system_available.txt"
@@ -565,14 +589,18 @@ def collect_run_items(
         raw_sys = sys_avail_file.read_text(encoding="utf-8", errors="replace")
         sys_items = parse_softwareupdate_list(raw_sys)
         for s_it in sys_items:
+            s_lbl = s_it.get("label")
+            s_title = s_it.get("title")
+            if (s_lbl and s_lbl in installed_sys_labels) or (s_title and s_title in installed_sys_labels):
+                continue
             items.append({
-                "name": s_it.get("title") or s_it.get("label", "macOS update"),
-                "id": s_it.get("label", "system"),
+                "name": s_title or s_lbl or "macOS update",
+                "id": s_lbl or "system",
                 "category": "system",
                 "old_version": None,
                 "new_version": s_it.get("version") or None,
                 "status": "pending",
-                "details": f"Label: {s_it.get('label')}" if s_it.get("label") else None,
+                "details": f"Label: {s_lbl}" if s_lbl else None,
             })
 
     # Intel-only apps missing Rosetta
