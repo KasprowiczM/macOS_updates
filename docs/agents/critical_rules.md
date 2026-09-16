@@ -218,5 +218,16 @@ not success.
   - `0`: Clean execution without issues.
   - `10`: Soft / degraded result (e.g. offline check, unverified launch, missing remote feed). Surfaces as warnings in banners, logs, and `UPDATES.md`.
   - `1` / `127`: Hard failure (e.g. broken installation, corrupt download, failed bundle swap).
-- `update_all.sh` tracks `BLOCKING_EXIT` separately from `OVERALL_EXIT`. Only hard failures defer the final `softwareupdate -ia -R` step. Soft warnings never suppress macOS system updates.
+- `update_all.sh` tracks `BLOCKING_EXIT` separately from `OVERALL_EXIT`. Only hard failures defer the final `softwareupdate -i <label> -R` step. Soft warnings never suppress macOS system updates.
+
+## 14. macOS 27 Golden Gate Constraints and Ecosystem Rules
+
+- **Xcode License Gate after App Store Update:** macOS 27 invalidates or requires re-acceptance of the Xcode license agreement upon upgrading Xcode via `mas`. `update_brew.sh` and any toolchain consumers must gate on `xcodebuild -checkFirstLaunchStatus` and prompt the user to accept (`sudo xcodebuild -license accept`) before running Homebrew commands to avoid catastrophic failure across the entire Homebrew step.
+- **Rosetta Translation Lifecycle & EOL 28:** macOS 27 drops preinstalled Rosetta; Apple Silicon systems do not retain it across upgrades. Any Intel-only x86_64 apps (e.g. DJI Assistant 2) must be flagged with `[x86_64: Rosetta missing — will not run]` (or warning in inventory) and warned that Rosetta is completely removed in macOS 28. Do not attempt silent background reinstallation of Rosetta.
+- **Command Line Tools on macOS 27:** Homebrew 7.0+ sets `minimum_version "27.0.0"` for CLT on macOS 27. Older CLT versions (e.g., 26.x CLT from macOS 26) trigger `CLT does not support macOS 27` Tier 2 warnings under `brew doctor`.
+- **Installer Packages (`.pkg`) Default to arm64:** On macOS 27, package installers without an explicit `hostArchitecture` tag default to `arm64`. Any custom `.pkg` scripts must specify hostArchitecture or be verified arm64-native.
+- **Launchd Quarantined Plist Rejection:** `launchd` on macOS 27 strictly rejects loading property lists carrying extended quarantine attributes (`com.apple.quarantine`). `scripts/install_launchagent.sh` must strip quarantine (`xattr -d com.apple.quarantine`) and use domain-targeted `launchctl bootstrap gui/$(id -u)` and `launchctl enable` instead of legacy `load -w`.
+- **TCC.db Inaccessibility:** Direct read or query of `TCC.db` is blocked by SIP on macOS 27. Permission checks (such as Accessibility for Track 2 App Store updates) must use API/AppleScript probes (`osascript`) rather than SQLite inspection.
+- **TLS 1.2+ / ATS for Update Handlers:** Network requests and sparkle/vendor feed downloads must comply with App Transport Security and TLS 1.2+ minimums.
+
 

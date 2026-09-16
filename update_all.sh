@@ -671,12 +671,12 @@ def read_md():
         _u = os.environ.get('USER', 'user')
         _pv = _sp0.run(['sw_vers', '-productVersion'], capture_output=True, text=True).stdout.strip() or 'unknown'
         _bv = _sp0.run(['sw_vers', '-buildVersion'], capture_output=True, text=True).stdout.strip() or 'unknown'
-        # Codename mapping: 13=Ventura, 14=Sonoma, 15=Sequoia, 26=Tahoe
+        # Codename mapping: 13=Ventura, 14=Sonoma, 15=Sequoia, 26=Tahoe, 27=Golden Gate
         try:
             _major = int(_pv.split('.', 1)[0])
         except (ValueError, IndexError):
             _major = 0
-        _codename = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe'}.get(_major, '')
+        _codename = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe', 27: 'Golden Gate'}.get(_major, '')
         _label = f"macOS {_pv} {_codename}".rstrip()
         _h = os.path.expanduser('~')
         _t = _dt0.now().strftime('%Y-%m-%d')
@@ -1746,7 +1746,7 @@ try:
             _major = int(_pv.split('.', 1)[0])
         except (ValueError, IndexError):
             _major = 0
-        _codenames = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe'}
+        _codenames = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe', 27: 'Golden Gate'}
         _codename = _codenames.get(_major, '')
         _os_label = f'macOS {_pv}' + (f' {_codename}' if _codename else '')
         content = re.sub(
@@ -1754,10 +1754,10 @@ try:
             f'# 📱 ZAINSTALOWANE APLIKACJE — MacBook {_mac_user} ({_os_label})',
             content, count=1, flags=re.MULTILINE)
         content = re.sub(
-            r'(\*\*System:\*\* macOS )[\d.]+(?: [A-Za-z]+)? \(Build [A-Z0-9]+\)',
+            r'(\*\*System:\*\* macOS )[\d.]+(?: [A-Za-z ]+)? \(Build [A-Z0-9]+\)',
             r'\g<1>' + _os_label + f' (Build {_bv})', content)
         content = re.sub(
-            r'(\| macOS )[\d.]+(?: [A-Za-z]+)?( arm64)',
+            r'(\| macOS )[\d.]+(?: [A-Za-z ]+)?( arm64)',
             lambda m: m.group(1) + _pv + (f' {_codename}' if _codename else '') + m.group(2), content)
 except Exception:
     pass
@@ -1946,13 +1946,13 @@ if '_pv' in vars() and _pv:
         _major_updates = int(_pv.split('.', 1)[0])
     except (ValueError, IndexError):
         _major_updates = 0
-    _updates_codename = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe'}.get(_major_updates, '')
+    _updates_codename = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe', 27: 'Golden Gate'}.get(_major_updates, '')
     ak_content = re.sub(
-        r'(\*\*System:\*\* macOS )[\d.]+(?: Ventura| Sonoma| Sequoia| Tahoe)?',
+        r'(\*\*System:\*\* macOS )[\d.]+(?: Ventura| Sonoma| Sequoia| Tahoe| Golden Gate)?',
         lambda m: m.group(1) + _pv + (f' {_updates_codename}' if _updates_codename else ''),
         ak_content)
     ak_content = re.sub(
-        r'(\| macOS )[\d.]+(?: Ventura| Sonoma| Sequoia| Tahoe)?( arm64)',
+        r'(\| macOS )[\d.]+(?: Ventura| Sonoma| Sequoia| Tahoe| Golden Gate)?( arm64)',
         lambda m: m.group(1) + _pv + (f' {_updates_codename}' if _updates_codename else '') + m.group(2),
         ak_content)
 

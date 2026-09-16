@@ -306,9 +306,11 @@ fi
 # ============================================================
 print_section "$L_SETUP_PHASE_4"
 
-# Codenames: 13 = Ventura, 14 = Sonoma, 15 = Sequoia, 26 = Tahoe
-if [ "$MACOS_MAJOR" -ge 27 ]; then
+# Codenames: 13 = Ventura, 14 = Sonoma, 15 = Sequoia, 26 = Tahoe, 27 = Golden Gate
+if [ "$MACOS_MAJOR" -ge 28 ]; then
     NEW_MACOS_LABEL="macOS ${MACOS_VERSION}"
+elif [ "$MACOS_MAJOR" -eq 27 ]; then
+    NEW_MACOS_LABEL="macOS ${MACOS_VERSION} Golden Gate"
 elif [ "$MACOS_MAJOR" -eq 26 ]; then
     NEW_MACOS_LABEL="macOS ${MACOS_VERSION} Tahoe"
 elif [ "$MACOS_MAJOR" -eq 15 ]; then
@@ -326,9 +328,9 @@ for md_file in "$SCRIPT_DIR/CLAUDE.md" "$SCRIPT_DIR/AGENTS.md" "$SCRIPT_DIR/GEMI
     TMPFILE="$(mktemp)"
     cp "$md_file" "$TMPFILE"
 
-    # Replace full macOS label (version + TitleCase codename), e.g. "macOS 26.4 Sequoia", "macOS 26.4.1 Sequoia Sequoia"
-    # Regex matches consecutive TitleCase codename words (Sequoia, Sonoma) but NOT CVE, Apple, etc.
-    sed -i '' "s|macOS [0-9][0-9]*\.[0-9.x]*[0-9x]\( [A-Z][a-z][a-z]*\)*|${NEW_MACOS_LABEL}|g" "$TMPFILE"
+    # Replace full macOS label (version + TitleCase codename), e.g. "macOS 27.0 Golden Gate", "macOS 26.5 Tahoe"
+    # Regex matches consecutive TitleCase codename words (Golden Gate, Tahoe, Sequoia, Sonoma) but NOT CVE, Apple, etc.
+    sed -i '' "s|macOS [0-9][0-9]*\.[0-9.x]*[0-9x]\( [A-Z][a-z][a-z]*\)*\( [A-Z][a-z][a-z]*\)*|${NEW_MACOS_LABEL}|g" "$TMPFILE"
 
     if [ "$ARCH" = "arm64" ]; then
         sed -i '' 's|Intel x86_64|Apple Silicon arm64|g' "$TMPFILE"
