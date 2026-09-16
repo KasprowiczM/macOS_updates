@@ -434,7 +434,64 @@ STATUS_PICSART="→ managed by App Store (update_appstore.sh)"
 # App handlers — config/internet_dispatch_order.txt
 # ============================================================
 . "$SCRIPT_DIR/lib/internet_app_updates.sh"
+
+# Check for Intel-only (x86_64-only) applications and Rosetta availability
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    rm -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
+fi
+
+HAS_X86_64=0
+while IFS='|' read -r _app_name _method _status_var _rest; do
+    case "$_app_name" in '#'*|'') continue ;; esac
+    _app_path="$(internet_app_path "$_app_name")"
+    if [ -d "$_app_path" ]; then
+        _arch="$(mac_update_app_architecture "$_app_path")"
+        if [ "$_arch" = "x86_64-only" ]; then
+            HAS_X86_64=1
+            break
+        fi
+    fi
+done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+if [ "$HAS_X86_64" -eq 1 ]; then
+    if ! mac_update_rosetta_installed; then
+        if [ "${MAC_UPDATE_INSTALL_ROSETTA:-0}" = "1" ]; then
+            print_step "Installing Rosetta via softwareupdate..."
+            softwareupdate --install-rosetta --agree-to-license
+            if mac_update_rosetta_installed; then
+                print_ok "Rosetta installed successfully"
+            else
+                print_warn "Rosetta installation could not be verified"
+            fi
+        fi
+    fi
+fi
+
 internet_dispatch_run_all
+
+# Ensure all x86_64-only apps reflect Rosetta requirement in their final status
+while IFS='|' read -r _app_name _method _status_var _rest; do
+    case "$_app_name" in '#'*|'') continue ;; esac
+    _status_var="$(echo "$_status_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    _app_path="$(internet_app_path "$_app_name")"
+    if [ -d "$_app_path" ]; then
+        _arch="$(mac_update_app_architecture "$_app_path")"
+        if [ "$_arch" = "x86_64-only" ]; then
+            if mac_update_rosetta_installed; then
+                eval "$_status_var=\"\$L_INTERNET_ROSETTA_REQUIRED; \$L_INTERNET_ROSETTA_EOL\""
+            else
+                eval "$_status_var=\"\$L_INTERNET_ROSETTA_REQUIRED \$L_INTERNET_ROSETTA_NOT_INSTALLED; \$L_INTERNET_ROSETTA_EOL\""
+                if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+                    echo "$_app_name" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
+                fi
+            fi
+        fi
+    fi
+done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+if [ -n "$MAC_UPDATE_SESSION_DIR" ] && [ -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" ]; then
+    sort -u "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" -o "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
+fi
 
 # ── Snapshot PO aktualizacji ──────────────────────────────────
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then

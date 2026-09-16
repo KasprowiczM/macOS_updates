@@ -565,6 +565,22 @@ def collect_run_items(
                 "details": f"Label: {s_it.get('label')}" if s_it.get("label") else None,
             })
 
+    # Intel-only apps missing Rosetta
+    rosetta_file = sdir / "rosetta_missing_apps.txt"
+    if rosetta_file.is_file():
+        for line in rosetta_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            app_name = line.strip()
+            if app_name:
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": "Intel-only; Rosetta missing; EOL macOS 28",
+                })
+
     # 8. Unconfirmed or degraded steps from step_results
     if step_results:
         step_labels = {
