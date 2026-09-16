@@ -250,6 +250,9 @@ L_SYSTEM_SCRIPT_DONE="✅ SKRIPT 1 ERFOLGREICH ABGESCHLOSSEN"
 
 # ── update_all.sh — zusätzliche Nachrichten ───────────────────
 L_ALL_RESULT_SKIPPED="übersprungen"
+L_ALL_RESULT_SKIPPED_BY_USER="vom Benutzer übersprungen"
+L_SYSTEM_MAJOR_AVAILABLE="Major-macOS-Upgrade verfügbar: %s (%s) — übersprungen (erfordert MAC_UPDATE_ALLOW_MAJOR_UPGRADE=1)"
+L_SYSTEM_MAJOR_CONFIRM="Möchten Sie das Major-Upgrade (%s) wirklich installieren? [J/n]: "
 L_ALL_SUDO_NO_TTY="Kein TTY verfügbar — sudo wird nicht angefordert; Schritte mit Root-Rechten (App Store, macOS) werden übersprungen"
 L_ALL_TOUCHID_HINT="Tipp: Touch ID für sudo ist nicht aktiviert. Führen Sie 'bash scripts/setup_touchid_sudo.sh' aus, um den Fingerabdruck zu verwenden."
 L_ALL_SUDO_PREAUTH_FAILED="sudo-Vorauthentifizierung fehlgeschlagen oder übersprungen; Schritte mit Root-Rechten werden möglicherweise nicht ausgeführt"

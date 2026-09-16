@@ -275,6 +275,9 @@ L_SYSTEM_SCRIPT_DONE="✅ SCRIPT 1 COMPLETATO CON SUCCESSO"
 
 # ── update_all.sh — messaggi aggiuntivi ───────────────────────
 L_ALL_RESULT_SKIPPED="saltato"
+L_ALL_RESULT_SKIPPED_BY_USER="saltato dall'utente"
+L_SYSTEM_MAJOR_AVAILABLE="Aggiornamento principale macOS disponibile: %s (%s) — ignorato (richiede MAC_UPDATE_ALLOW_MAJOR_UPGRADE=1)"
+L_SYSTEM_MAJOR_CONFIRM="Sei sicuro di voler installare l'aggiornamento principale (%s)? [S/n]: "
 L_ALL_SUDO_NO_TTY="Nessun TTY disponibile — sudo non verrà richiesto; i passaggi che richiedono root (App Store, macOS) vengono saltati"
 L_ALL_TOUCHID_HINT="Suggerimento: Touch ID per sudo non è attivo. Esegui 'bash scripts/setup_touchid_sudo.sh' per usare l'impronta digitale."
 L_ALL_SUDO_PREAUTH_FAILED="Preautenticazione sudo fallita o saltata; i passaggi che richiedono root potrebbero non essere eseguiti"

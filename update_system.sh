@@ -68,22 +68,113 @@ UPDATES_EXIT=0
 UPDATES=$(LANG=C LC_ALL=C softwareupdate -l 2>&1) || UPDATES_EXIT=$?
 echo "$UPDATES"
 
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    echo "$UPDATES" > "$MAC_UPDATE_SESSION_DIR/system_available.txt" 2>/dev/null || true
+fi
+
 if [ "$UPDATES_EXIT" -ne 0 ]; then
     print_error "softwareupdate -l failed (exit $UPDATES_EXIT)"
+    if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+        echo "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
+    fi
     exit 1
 fi
 
 if echo "$UPDATES" | grep -q "No new software available"; then
     print_ok "$L_SYSTEM_UPDATES_NONE"
+    if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+        echo "0" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
+    fi
     echo ""
     exit 0
 fi
 
+# Parse and classify available updates
+CURRENT_VERSION="$(sw_vers -productVersion 2>/dev/null || echo '0.0.0')"
+SYSTEM_PARSED_FILE="$(mktemp "${TMPDIR:-/tmp}/mac_update_sys_parsed.XXXXXX")" || exit 1
+python3 - "$SCRIPT_DIR" "$UPDATES" "$CURRENT_VERSION" > "$SYSTEM_PARSED_FILE" <<'PYEOF'
+import sys
+from pathlib import Path
+
+repo_dir = Path(sys.argv[1])
+sys.path.insert(0, str(repo_dir / "lib" / "python"))
+from system_updates import classify_updates, parse_softwareupdate_list
+
+raw_text = sys.argv[2]
+cur_ver = sys.argv[3]
+items = parse_softwareupdate_list(raw_text)
+classified = classify_updates(items, cur_ver)
+
+print(f"COUNT_TOTAL={len(items)}")
+print(f"COUNT_SAME={len(classified['same_major'])}")
+print(f"COUNT_MAJOR={len(classified['major'])}")
+print(f"COUNT_OTHER={len(classified['other'])}")
+
+for it in classified['same_major']:
+    print(f"SAME\t{it['label']}\t{it['title']}\t{it['version']}\t{1 if it['restart'] else 0}")
+for it in classified['other']:
+    print(f"OTHER\t{it['label']}\t{it['title']}\t{it['version']}\t{1 if it['restart'] else 0}")
+for it in classified['major']:
+    print(f"MAJOR\t{it['label']}\t{it['title']}\t{it['version']}\t{1 if it['restart'] else 0}")
+PYEOF
+
+COUNT_TOTAL="$(grep '^COUNT_TOTAL=' "$SYSTEM_PARSED_FILE" | cut -d= -f2)"
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    echo "${COUNT_TOTAL:-unknown}" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
+fi
+
+# Major upgrade policy check
+ALLOW_MAJOR="${MAC_UPDATE_ALLOW_MAJOR_UPGRADE:-0}"
+MAJOR_ALLOWED=0
+if grep -q '^MAJOR' "$SYSTEM_PARSED_FILE"; then
+    while IFS=$'\t' read -r kind label title version req_restart; do
+        [ "$kind" = "MAJOR" ] || continue
+        print_warn "$(printf "$L_SYSTEM_MAJOR_AVAILABLE" "$title" "$version")"
+        if [ "$ALLOW_MAJOR" = "1" ] && [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ]; then
+            if [ "${MAC_UPDATE_YES:-0}" = "1" ]; then
+                MAJOR_ALLOWED=1
+            elif [ -t 0 ]; then
+                read -r -p "  $(printf "$L_SYSTEM_MAJOR_CONFIRM" "$title")" CONFIRM_MAJOR
+                CONFIRM_MAJOR="${CONFIRM_MAJOR:-T}"
+                if [[ "$CONFIRM_MAJOR" =~ ^[TtYy]$ ]]; then
+                    MAJOR_ALLOWED=1
+                fi
+            fi
+        fi
+    done < "$SYSTEM_PARSED_FILE"
+fi
+
+# Select labels to install
+INSTALL_LABELS=()
+ANY_RESTART=false
+while IFS=$'\t' read -r kind label title version req_restart; do
+    case "$kind" in
+        SAME|OTHER)
+            INSTALL_LABELS+=("$label")
+            [ "$req_restart" = "1" ] && ANY_RESTART=true
+            ;;
+        MAJOR)
+            if [ "$MAJOR_ALLOWED" -eq 1 ]; then
+                INSTALL_LABELS+=("$label")
+                [ "$req_restart" = "1" ] && ANY_RESTART=true
+            fi
+            ;;
+    esac
+done < "$SYSTEM_PARSED_FILE"
+rm -f "$SYSTEM_PARSED_FILE" 2>/dev/null || true
+
+if [ "${#INSTALL_LABELS[@]}" -eq 0 ]; then
+    print_ok "$L_SYSTEM_UPDATES_NONE"
+    exit 0
+fi
+
 # ============================================================
-# User confirmation
+# User confirmation & DRY-RUN
 # ============================================================
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
-    print_info "[DRY-RUN] Would run: sudo softwareupdate -ia -R --verbose"
+    for lbl in "${INSTALL_LABELS[@]}"; do
+        print_info "[DRY-RUN] Would run: sudo softwareupdate -i \"$lbl\" -R --verbose"
+    done
     exit 0
 fi
 
@@ -96,7 +187,26 @@ if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
     CONFIRM="${CONFIRM:-T}"
     if [[ "$CONFIRM" =~ ^[Nn] ]]; then
         print_info "$L_UPDATE_CANCELED"
-        exit 0
+        if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+            touch "$MAC_UPDATE_SESSION_DIR/system_skipped_by_user" 2>/dev/null || true
+        fi
+        exit 10
+    fi
+fi
+
+if [ "$ANY_RESTART" = true ]; then
+    echo ""
+    print_warn "$L_SYSTEM_RESTART_REQUIRED"
+    print_info "$L_SYSTEM_RESTART_AFTER_INFO"
+    if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
+        read -r -p "  $L_SYSTEM_CONFIRM_RESTART " AUTO_RESTART
+        AUTO_RESTART="${AUTO_RESTART:-T}"
+        if [[ "$AUTO_RESTART" =~ ^[Nn] ]]; then
+            print_error "Restart-required macOS updates will not be installed without softwareupdate -R."
+            print_info "$L_SYSTEM_RESTART_MECHANISM"
+            print_warn "$L_SYSTEM_REMEMBER_RESTART"
+            exit 1
+        fi
     fi
 fi
 
@@ -104,65 +214,48 @@ fi
 # Install system updates
 # ============================================================
 print_header "$L_SOFTWAREUPDATE_RUN"
-
 echo -e "${CYAN}$L_SYSTEM_PLEASE_WAIT${NC}"
 echo ""
 
-# Aktualizuje wszystkie dostępne pakiety systemowe
-# Wymaga sudo — system poprosi o hasło
-#
-# WAŻNE: flaga -R (--restart) jest wymagana dla aktualizacji macOS!
-# Bez niej softwareupdate pobiera pliki aktualizacji, ale NIE ustawia
-# metadanych rozruchowych potrzebnych do ich zastosowania podczas restartu.
-# Flaga -R powoduje, że macOS zamknie aplikacje, wyloguje użytkownika
-# i zrestartuje komputer przez właściwy mechanizm aktualizacji.
-#
-# BŁĄD: "sudo reboot" to surowy restart jądra — omija mechanizm
-# aktualizacji macOS i dlatego aktualizacje nie są stosowane przy restarcie.
+sudo -v 2>/dev/null || true
+INSTALL_FAILED=0
+for lbl in "${INSTALL_LABELS[@]}"; do
+    print_step "Installing: $lbl..."
+    if ! sudo softwareupdate -i "$lbl" -R --verbose; then
+        INSTALL_FAILED=1
+        print_warn "Failed to install: $lbl"
+    fi
+done
 
-# Sprawdź czy któraś aktualizacja wymaga restartu (użyj już pobranego wyniku,
-# zamiast ponownie odpytywać softwareupdate).
-NEEDS_RESTART=false
-if echo "$UPDATES" | grep -qi "restart"; then
-    NEEDS_RESTART=true
+if [ "$INSTALL_FAILED" -ne 0 ]; then
+    print_warn "$L_SYSTEM_SOME_FAILED"
+    exit 1
 fi
 
-if [ "$NEEDS_RESTART" = true ]; then
-    echo ""
-    print_warn "$L_SYSTEM_RESTART_REQUIRED"
-    print_info "$L_SYSTEM_RESTART_AFTER_INFO"
-    if [ "${MAC_UPDATE_YES:-0}" = "1" ]; then
-        AUTO_RESTART="T"
-    else
-        read -r -p "  $L_SYSTEM_CONFIRM_RESTART " AUTO_RESTART
-        AUTO_RESTART="${AUTO_RESTART:-T}"
-    fi
-    if [[ "$AUTO_RESTART" =~ ^[Nn] ]]; then
-        print_error "Restart-required macOS updates will not be installed without softwareupdate -R."
-        print_info "$L_SYSTEM_RESTART_MECHANISM"
-        print_warn "$L_SYSTEM_REMEMBER_RESTART"
-        exit 1
-    else
-        print_info "$L_SYSTEM_RESTART_MECHANISM"
-        # -R uruchamia właściwy restart macOS (nie surowy reboot),
-        # który stosuje aktualizację podczas ponownego uruchomienia
-        if sudo softwareupdate -ia -R --verbose; then
-            print_ok "$L_SYSTEM_RESTARTING"
+if [ "$ANY_RESTART" = true ]; then
+    print_ok "$L_SYSTEM_RESTARTING"
+else
+    print_ok "$L_SYSTEM_DONE_OK"
+    print_ok "$L_SYSTEM_NO_RESTART_NEEDED"
+    # Remeasure pending updates after install without restart
+    if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+        POST_UPDATES=$(LANG=C LC_ALL=C softwareupdate -l 2>&1) || true
+        if echo "$POST_UPDATES" | grep -q "No new software available"; then
+            echo "0" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
         else
-            print_warn "$L_SYSTEM_SOME_FAILED"
-            exit 1
+            rem_cnt=$(python3 - "$SCRIPT_DIR" "$POST_UPDATES" <<'PYEOF'
+import sys
+from pathlib import Path
+repo_dir = Path(sys.argv[1])
+sys.path.insert(0, str(repo_dir / "lib" / "python"))
+from system_updates import parse_softwareupdate_list
+raw_text = sys.argv[2]
+print(len(parse_softwareupdate_list(raw_text)))
+PYEOF
+)
+            echo "${rem_cnt:-unknown}" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
         fi
     fi
-else
-    # Brak aktualizacji wymagających restartu — zwykła instalacja
-    # Project rule: keep -R on every install. softwareupdate only restarts when required.
-    if sudo softwareupdate -ia -R --verbose; then
-        print_ok "$L_SYSTEM_DONE_OK"
-    else
-        print_warn "$L_SYSTEM_SOME_FAILED"
-        exit 1
-    fi
-    print_ok "$L_SYSTEM_NO_RESTART_NEEDED"
 fi
 
 # ── Snapshot systemu PO aktualizacji ─────────────────────────

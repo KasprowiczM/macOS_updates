@@ -1958,8 +1958,17 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
     elif mac_update_run_child "update_system.sh" "update_system.sh (final step)"; then
         RESULT_SYSTEM="$L_STATUS_OK completed"
     else
-        RESULT_SYSTEM="$L_STATUS_ERROR"
-        OVERALL_EXIT=1
+        SYS_EXIT=$?
+        if [ "$SYS_EXIT" -eq "${MAC_UPDATE_SOFT_EXIT:-10}" ]; then
+            if [ -f "$SESSION_DIR/system_skipped_by_user" ]; then
+                RESULT_SYSTEM="${L_ALL_RESULT_SKIPPED_BY_USER:-pominięte przez użytkownika}"
+            else
+                RESULT_SYSTEM="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            fi
+        else
+            RESULT_SYSTEM="$L_STATUS_ERROR"
+            OVERALL_EXIT=1
+        fi
     fi
 
     # Postupdate runs before the reboot-capable system step. If softwareupdate
