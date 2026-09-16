@@ -709,7 +709,13 @@ fi
 print_section "$L_PHASE_12_TITLE"
 
 if command -v mas &>/dev/null; then
-    APPLE_ID="$(mas account 2>/dev/null || echo '')"
+    MAS_VER_DETECT="$(mas version 2>/dev/null || echo '0')"
+    MAS_MAJ_DETECT="${MAS_VER_DETECT%%.*}"
+    if [ "${MAS_MAJ_DETECT:-0}" -lt 5 ]; then
+        APPLE_ID="$(mas account 2>/dev/null || echo '')"
+    else
+        APPLE_ID=""
+    fi
     if [ -n "$APPLE_ID" ]; then
         print_ok "$(printf "$L_MSG_APPSTORE_OK" "$APPLE_ID")"
     else

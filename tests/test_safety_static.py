@@ -293,6 +293,23 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("appstore_diag.txt", text)
         self.assertIn("MAS_TOR1_OUT", text)
 
+    def test_mas_account_only_inside_version_gate(self) -> None:
+        """mas account was removed in mas 5.0 and must only appear inside version gates."""
+        for script_path in REPO_ROOT.glob("*.sh"):
+            content = script_path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            for idx, line in enumerate(lines, 1):
+                stripped = line.strip()
+                if stripped.startswith("#") or "echo" in stripped or "print_" in stripped:
+                    continue
+                if "mas account" in stripped:
+                    self.assertIn(script_path.name, ["update_appstore.sh", "setup.sh", "migration_setup.sh"])
+                    context = "\n".join(lines[max(0, idx - 10):idx])
+                    self.assertTrue(
+                        "MAS_MAJOR" in context or "MAS_MAJ_DETECT" in context,
+                        f"{script_path.name}:{idx} calls 'mas account' without a preceding version check",
+                    )
+
 
     def test_bun_bootstrap_verifies_checksum(self) -> None:
         text = self.read_script("update_npm_cli.sh")
