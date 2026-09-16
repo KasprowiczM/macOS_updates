@@ -53,7 +53,9 @@ neste projeto.
 
 **A execução agendada não instala atualizações do macOS nem da App Store.** Ambas exigem
 autenticação do utilizador — em Apple Silicon o `softwareupdate` exige credenciais de
-proprietário do volume. Execute `bash update_all.sh` de forma interativa para as aplicar.
+proprietário do volume. As atualizações da App Store são ignoradas em segundo plano por falta de TTY
+(sem `sudo mas` nem TOR 2 / AppleScript GUI; reportadas como aviso suave exit 10).
+Execute `bash update_all.sh` de forma interativa para as aplicar.
 
 **Contrato do sudo (v1.4.0):** no máximo um pedido por execução; **nunca** sem um TTY de
 controlo (é exportada `MAC_UPDATE_NO_SUDO=1` em vez disso); nunca com `--dry-run`.

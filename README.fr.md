@@ -54,8 +54,9 @@ mot de passe.
 
 **L'exécution planifiée n'installe ni les mises à jour macOS ni celles de l'App Store.** Les
 deux exigent une authentification — sur Apple Silicon, `softwareupdate` réclame les
-identifiants du propriétaire du volume. Lancez `bash update_all.sh` en interactif pour les
-appliquer.
+identifiants du propriétaire du volume. Les mises à jour de l'App Store sont ignorées en arrière-plan faute de TTY
+(ni `sudo mas` ni TOR 2 / AppleScript GUI ; signalées comme avertissement souple code 10).
+Lancez `bash update_all.sh` en interactif pour les appliquer.
 
 **Contrat sudo (v1.3.1 / v1.4.0) :** au plus une demande par exécution ; **jamais** sans TTY de
 contrôle (`MAC_UPDATE_NO_SUDO=1` est exporté à la place) ; jamais avec `--dry-run`.
