@@ -41,7 +41,8 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$MODE" = "check" ]; then
-    if launchctl list | grep -q "$PLIST_LABEL"; then
+    CURRENT_UID="$(id -u)"
+    if launchctl print "gui/${CURRENT_UID}/${PLIST_LABEL}" >/dev/null 2>&1 || launchctl list | grep -q "$PLIST_LABEL"; then
         echo "✅ LaunchAgent is active: $PLIST_LABEL"
         echo "   Plist: $PLIST_PATH"
         if [ -f "$PLIST_PATH" ]; then
@@ -60,9 +61,11 @@ if [ "$MODE" = "check" ]; then
 fi
 
 if [ "$MODE" = "uninstall" ]; then
-    if launchctl list | grep -q "$PLIST_LABEL"; then
-        launchctl unload -w "$PLIST_PATH" 2>/dev/null || true
-    fi
+    CURRENT_UID="$(id -u)"
+    launchctl bootout "gui/${CURRENT_UID}/${PLIST_LABEL}" 2>/dev/null \
+        || launchctl bootout "gui/${CURRENT_UID}" "$PLIST_PATH" 2>/dev/null \
+        || launchctl unload -w "$PLIST_PATH" 2>/dev/null \
+        || true
     rm -f "$PLIST_PATH"
     echo "✅ LaunchAgent uninstalled: $PLIST_LABEL"
     exit 0
@@ -122,8 +125,20 @@ cat <<PLISTEOF > "$PLIST_PATH"
 PLISTEOF
 
 chmod 644 "$PLIST_PATH"
-launchctl unload -w "$PLIST_PATH" 2>/dev/null || true
-launchctl load -w "$PLIST_PATH"
+xattr -d com.apple.quarantine "$PLIST_PATH" 2>/dev/null || true
+
+CURRENT_UID="$(id -u)"
+# Unload/bootout previous instance if present
+launchctl bootout "gui/${CURRENT_UID}/${PLIST_LABEL}" 2>/dev/null \
+    || launchctl bootout "gui/${CURRENT_UID}" "$PLIST_PATH" 2>/dev/null \
+    || launchctl unload -w "$PLIST_PATH" 2>/dev/null \
+    || true
+
+# Modern bootstrap + enable (macOS 10.10+ / macOS 27) with fallback to legacy load -w
+if ! launchctl bootstrap "gui/${CURRENT_UID}" "$PLIST_PATH" 2>/dev/null; then
+    launchctl load -w "$PLIST_PATH" 2>/dev/null || true
+fi
+launchctl enable "gui/${CURRENT_UID}/${PLIST_LABEL}" 2>/dev/null || true
 
 echo "✅ Installed and loaded LaunchAgent: $PLIST_LABEL"
 echo "   Schedule: Weekday $WEEKDAY at $HOUR:00"

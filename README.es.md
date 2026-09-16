@@ -53,7 +53,9 @@ frecuente en este proyecto.
 
 **La ejecución programada no instala actualizaciones de macOS ni de la App Store.** Ambas
 requieren autenticación del usuario — en Apple Silicon `softwareupdate` exige credenciales
-de propietario del volumen. Ejecute `bash update_all.sh` de forma interactiva para aplicarlas.
+de propietario del volumen. Las actualizaciones de la App Store se omiten en segundo plano por falta de TTY
+(sin `sudo mas` ni TOR 2 / AppleScript GUI; notificadas como advertencia suave exit 10).
+Ejecute `bash update_all.sh` de forma interactiva para aplicarlas.
 
 **Contrato de sudo (v1.3.1 / v1.4.0):** como máximo una solicitud por ejecución; **nunca** sin un TTY
 de control (en su lugar se exporta `MAC_UPDATE_NO_SUDO=1`); nunca con `--dry-run`.

@@ -53,8 +53,9 @@ das ist die häufigste Verwechslung in diesem Projekt.
 
 **Der geplante Hintergrundlauf installiert weder macOS- noch App-Store-Updates.** Beide
 erfordern eine Benutzerauthentifizierung — auf Apple Silicon verlangt `softwareupdate`
-Volume-Owner-Anmeldedaten. Führen Sie `bash update_all.sh` interaktiv aus, wenn Sie diese
-Updates einspielen möchten.
+Volume-Owner-Anmeldedaten. App-Store-Updates werden im Hintergrundmodus mangels TTY
+übersprungen (weder `sudo mas` noch TOR 2 / AppleScript GUI verfügbar; als Soft-Warnung Exit 10 gemeldet).
+Führen Sie `bash update_all.sh` interaktiv aus, wenn Sie diese Updates einspielen möchten.
 
 **sudo-Kontrakt (v1.3.1 / v1.4.0):** höchstens eine Abfrage pro Lauf; **nie** ohne steuerndes TTY
 (stattdessen wird `MAC_UPDATE_NO_SUDO=1` exportiert); nie bei `--dry-run`.
