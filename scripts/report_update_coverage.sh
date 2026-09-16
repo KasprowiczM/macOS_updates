@@ -34,8 +34,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 script_dir = sys.argv[1]
+sys.path.insert(0, os.path.join(script_dir, "lib", "python"))
+from inventory import app_architecture
 json_out = sys.argv[2] == "1"
 lang = os.environ.get("MAC_LANG", "en")
 
@@ -525,7 +526,11 @@ for app in apps:
     method = registry.get(app, "unknown")
     by_method.setdefault(method, {"installed": [], "not_installed": []})
 
+intel_only_apps = []
 for item in installed:
+    arch = app_architecture(item["path"])
+    if arch == "x86_64-only":
+        intel_only_apps.append(item["app"])
     target = target_for(item, apps)
     method = registry.get(target, "unknown") if target else "unknown"
     if target:
@@ -592,6 +597,8 @@ report = {
     "externally_managed_count": externally_managed_count,
     "manual_count": manual_count,
     "unknown_count": unknown_count,
+    "intel_only_count": len(intel_only_apps),
+    "intel_only_apps": sorted(intel_only_apps),
     "classification_counts": {key: len(value) for key, value in classifications.items()},
     "classifications": classifications,
     "registry_installed_target_count": len(installed_targets),
@@ -646,6 +653,12 @@ for key in ("verified_direct", "triggered_unverified", "externally_managed", "ma
         else:
             detail = method_labels.get(row["method"], row["method"])
         print(f"       · {row['app']}{target_suffix} ({detail})")
+
+if intel_only_apps:
+    print("")
+    print(f"  ⚠️  Intel-only (Rosetta, EOL macOS 28): {len(intel_only_apps)}")
+    for app in sorted(intel_only_apps):
+        print(f"       · {app}")
 
 print("")
 print(f"  ⏭️  {not_inst_hdr} {len(not_installed_supported)}")

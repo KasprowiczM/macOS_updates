@@ -4,6 +4,58 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.4.6] — 2026-09-16
+
+macOS 27 Golden Gate adaptation release. Upgrade to macOS 27 and Homebrew 7.0 revealed
+gaps in cross-step toolchain coordination, major upgrade isolation, architecture awareness,
+and launchd service management.
+
+### Added
+
+- **Xcode License Gate (P0-1):**
+  - *Symptom:* Step 1 (App Store) upgraded Xcode to 27.0, after which step 3 (Homebrew) failed completely with `You have not agreed to the Xcode license`.
+  - *Cause:* Upgrading Xcode resets acceptance of Apple's license agreement, breaking all downstream `git`, `clang`, and `brew` calls.
+  - *Fix:* Added `xcode_license_check_and_prompt` in `lib/brew.sh` gating on `xcodebuild -checkFirstLaunchStatus` and prompting for `sudo xcodebuild -license accept`.
+  - *Measurement:* `tests/test_xcode_license_gate.py`.
+- **macOS System Step Honest State & Major Upgrade Policy (P0-3):**
+  - *Symptom:* Declining macOS 27 major upgrade reported `OK completed` with `system_upgraded: 0` and lost available updates from summary.
+  - *Cause:* `softwareupdate -ia` lumped major upgrades with security patches, and user cancellation returned 0 without recording pending state.
+  - *Fix:* Added `classify_system_updates` in `lib/python/system_updates.py` to isolate same-major from major upgrades, prompting for major upgrade explicitly only when approved. Cancellation records `pending_system_updates` and exits with code 10.
+  - *Measurement:* `tests/test_system_step.py`.
+- **Architecture Awareness & Rosetta Deprecation Warning (P0-2):**
+  - *Symptom:* macOS 27 dropped Rosetta on upgrade; Intel x86_64 apps ceased functioning without warning.
+  - *Cause:* Toolkit assumed all apps were native arm64 and did not scan binary architecture.
+  - *Fix:* Added `app_architecture()` in `lib/python/inventory.py` to tag x86_64 binaries with warnings about missing Rosetta and upcoming macOS 28 EOL.
+  - *Measurement:* `tests/test_architecture_rosetta.py`.
+- **Homebrew Cask Oracle for silent_launch (P1-7):**
+  - *Symptom:* Verified apps without sparkle feeds reported unverified status indefinitely.
+  - *Cause:* No secondary source of truth for current upstream version.
+  - *Fix:* Added `config/cask_oracles.txt` and `brew_cask_latest_versions` in `lib/brew.sh` to cross-reference installed versions with Homebrew Cask metadata.
+  - *Measurement:* `tests/test_cask_oracle.py`.
+- **Stable Step Status Codes & Schema v4 (P1-8):**
+  - *Symptom:* Run summaries parsed localized status strings with fragile substring heuristics.
+  - *Cause:* No machine-readable status enum was exported by shell steps.
+  - *Fix:* Exported `STATUS_CODE_*` (`ok|warn|error|skipped|skipped_by_user|unconfirmed`) to `$SESSION_DIR/step_status_codes.txt`; bumped `run_summary.py` to schema v4.
+  - *Measurement:* `tests/test_step_status_codes.py`.
+- **LaunchAgent Modernization for macOS 27 (P1-9):**
+  - *Symptom:* macOS 27 launchd rejected plists carrying quarantine extended attributes; `launchctl load -w` deprecated.
+  - *Cause:* macOS 27 launchd enforcement changes.
+  - *Fix:* Stripped `com.apple.quarantine` via `xattr -d`; migrated to `launchctl bootstrap gui/$(id -u)` and `launchctl enable` with fallback.
+  - *Measurement:* `tests/test_launchagent.py`.
+
+### Changed
+
+- **`mas account` Deprecation Gate (P1-4):**
+  - *Symptom:* mas 7.0.0 failed on `mas account` (subcommand removed in mas 5.0+).
+  - *Fix:* Gated `mas account` behind `mas_version < 5.0.0` in `lib/appstore.sh` and `setup.sh`.
+  - *Measurement:* `tests/test_appstore_mas.py`.
+- **Command Line Tools macOS 27 Diagnosis (P1-5):**
+  - *Symptom:* `brew doctor` flagged CLT on macOS 27 as Tier 2 when versions were below 27.0.0.
+  - *Fix:* Added `clt_status_diagnosis` in `lib/python/clt_status.py` enforcing `27.0.0` minimum for macOS 27.
+  - *Measurement:* `tests/test_clt_status.py`.
+- **Platform Support Metadata (P2-10):**
+  - Updated documentation and version ranges from macOS 13–26 to macOS 13–27 Golden Gate across all agent profiles and 7 localized README files.
+
 ## [1.4.5] — 2026-09-07
 
 Ultra-review integrity release. Overlay import could replace Git-tracked descendants and

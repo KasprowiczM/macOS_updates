@@ -32,9 +32,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 LIB = REPO_ROOT / "lib" / "internet_app_updates.sh"
 
 
+EMPTY_PLIST = Path(tempfile.gettempdir()) / "test_empty_mau.plist"
+if not EMPTY_PLIST.exists():
+    EMPTY_PLIST.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict></dict></plist>\n', encoding="utf-8")
+
+
 def run_lib(snippet: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     """Run a snippet with lib/internet_app_updates.sh sourced."""
     full_env = dict(os.environ)
+    if "MAC_UPDATE_MAU_PREFS_FILE" not in full_env:
+        full_env["MAC_UPDATE_MAU_PREFS_FILE"] = str(EMPTY_PLIST)
     if env:
         full_env.update(env)
     return subprocess.run(

@@ -5,7 +5,10 @@
 | New Mac — where to start? | `bash install.sh` or `setup.sh` + `build_inventory.sh` |
 | Wrong app catalog / another user's apps | `bash build_inventory.sh` — never copy someone else's `APPLICATIONS.md` |
 | App not auto-updating | `bash scripts/report_update_coverage.sh` — add handler per GUIDE |
-| macOS update not applied after reboot | `softwareupdate -ia -R` — never `sudo reboot` |
+| macOS update not applied after reboot | `softwareupdate -i <label> -R` — never `sudo reboot` |
+| brew: You have not agreed to the Xcode license | `sudo xcodebuild -license accept` or launch Xcode. `update_brew.sh` checks `xcodebuild -checkFirstLaunchStatus` and prompts before Homebrew runs. |
+| brew doctor: CLT does not support macOS 27 (Tier 2) | Homebrew 7 requires CLT 27.0.0+ on macOS 27 (`softwareupdate --install -a` or `xcode-select --install`). |
+| Intel app nie startuje po upgrade (Rosetta) | macOS 27 drops Rosetta on upgrade; Intel x86_64 apps won't run without reinstalling Rosetta (`softwareupdate --install-rosetta --agree-to-license`), and Rosetta is completely removed in macOS 28. Migrate to Apple Silicon native build. |
 | macOS step was skipped | An earlier step failed; inspect the summary/log, fix it, then rerun. macOS runs last to avoid rebooting a partial session. |
 | macOS update step exits after declining restart | Rerun and accept the framework-managed restart (`-R`) or use System Settings; never replace it with a plain reboot. |
 | Touch ID for sudo not working | `bash scripts/setup_touchid_sudo.sh` (per-machine setup; survives OS updates) |

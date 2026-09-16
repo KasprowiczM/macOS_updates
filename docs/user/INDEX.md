@@ -1,6 +1,6 @@
 # User documentation
 
-**Version 1.4.5** · [Install](../INSTALL.md) · [Uninstall](../UNINSTALL.md) · [Public release](../PUBLIC_RELEASE.md)
+**Version 1.4.6** · [Install](../INSTALL.md) · [Uninstall](../UNINSTALL.md) · [Public release](../PUBLIC_RELEASE.md)
 
 | Language | Quick start | Guide | Operations |
 |----------|-------------|-------|------------|

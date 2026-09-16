@@ -1,0 +1,24 @@
+# ============================================================
+# config/cask_oracles.txt — Cask oracles for unverified apps
+# ============================================================
+# Homebrew casks are a free, read-only oracle used to verify installed
+# bundle versions for silent_launch and unverified apps.
+# Format: App Name|cask_token (one per line, # comments allowed)
+# ============================================================
+ChatGPT / Codex|chatgpt
+Claude|claude
+Claude Desktop|claude
+Comet|comet
+Comet (Perplexity Browser)|comet
+Gemini|gemini
+Gemini Desktop|gemini
+Antigravity|antigravity
+Antigravity IDE|antigravity-ide
+OpenCode|opencode-desktop
+OpenCode Desktop|opencode-desktop
+Cursor|cursor
+Proton Mail|proton-mail
+Warp|warp
+Microsoft Teams|microsoft-teams
+Microsoft Teams (hybrid)|microsoft-teams
+Docker Desktop|docker

@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.5** — Orchestratore di aggiornamenti in un singolo comando pronto per la produzione per **Mac Apple Silicon con macOS 13–26**. Coordina gli aggiornamenti verificati dei pacchetti per i software già installati su questo Mac. **Multilingue** (7 lingue). Layer cloud privato opzionale tramite [`dev_sync/`](dev_sync/README.md).
+> **v1.4.6** — Orchestratore di aggiornamenti in un singolo comando pronto per la produzione per **Mac Apple Silicon con macOS 13–27**. Coordina gli aggiornamenti verificati dei pacchetti per i software già installati su questo Mac. **Multilingue** (7 lingue). Layer cloud privato opzionale tramite [`dev_sync/`](dev_sync/README.md).
 
 **Repository pubblico:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -53,8 +53,9 @@ comune in questo progetto.
 
 **L'esecuzione pianificata non installa aggiornamenti macOS né App Store.** Entrambi
 richiedono l'autenticazione dell'utente — su Apple Silicon `softwareupdate` richiede le
-credenziali del proprietario del volume. Esegui `bash update_all.sh` in modo interattivo per
-applicarli.
+credenziali del proprietario del volume. Gli aggiornamenti di App Store vengono saltati in background per assenza di TTY
+(né `sudo mas` né TOR 2 / AppleScript GUI; segnalati come avviso soft exit 10).
+Esegui `bash update_all.sh` in modo interattivo per applicarli.
 
 **Contratto sudo (v1.3.1 / v1.4.0):** al massimo una richiesta per esecuzione; **mai** senza un TTY di
 controllo (viene invece esportata `MAC_UPDATE_NO_SUDO=1`); mai con `--dry-run`.
