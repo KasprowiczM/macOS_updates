@@ -71,6 +71,12 @@ BREW_VERSION=$(brew --version | head -1)
 print_ok "$BREW_VERSION"
 print_info "Location: $(which brew)"
 
+# CLT status check (one-line info if stale or orphan)
+CLT_STATUS="$(mac_update_clt_status)"
+if [ "$CLT_STATUS" = "stale" ] || [ "$CLT_STATUS" = "orphan" ]; then
+    print_info "Command Line Tools ($CLT_STATUS) — Homebrew recommendation: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+fi
+
 # ============================================================
 # Check Xcode license agreement (preflight)
 # ============================================================
@@ -401,6 +407,9 @@ print_header "$L_BREW_HEALTH_CHECKING"
 
 DOCTOR_OUT=$(brew doctor 2>&1 | strip_ansi)
 DOCTOR_EXIT=$?
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    printf '%s\n' "$DOCTOR_OUT" > "$MAC_UPDATE_SESSION_DIR/brew_doctor.txt"
+fi
 
 UNLINKED_KEGS=$(echo "$DOCTOR_OUT" | awk '
     /You have unlinked kegs in your Cellar/ { in_block = 1; next }
@@ -428,8 +437,11 @@ elif [ -n "$UNLINKED_KEGS" ]; then
 $UNLINKED_KEGS
 EOF
     if [ "$RELINKED2" -gt 0 ]; then
-        DOCTOR_OUT=$(brew doctor 2>&1)
+        DOCTOR_OUT=$(brew doctor 2>&1 | strip_ansi)
         DOCTOR_EXIT=$?
+        if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+            printf '%s\n' "$DOCTOR_OUT" > "$MAC_UPDATE_SESSION_DIR/brew_doctor.txt"
+        fi
     fi
 fi
 
@@ -442,6 +454,28 @@ DOCTOR_FILTERED=$(printf '%s\n' "$DOCTOR_OUT" | awk '
         dylib_block = ""
         dylib_paths = 0
         asaf_paths = 0
+    }
+    function emit_clt_block() {
+        if (!clt_emitted) {
+            printf "Warning: Command Line Tools (CLT) requires update/reinstall (details in brew_doctor.txt)\n"
+            clt_emitted = 1
+        }
+        in_clt_block = 0
+    }
+    in_clt_block && /^(Warning:|Error:)/ {
+        emit_clt_block()
+        if ($0 ~ /^Warning: .*Command Line Tools/) {
+            in_clt_block = 1
+            next
+        }
+    }
+    in_clt_block {
+        next
+    }
+    /^Warning: .*Command Line Tools/ {
+        if (in_dylib_block) emit_dylib_block()
+        in_clt_block = 1
+        next
     }
     /^Warning: Unbrewed dylibs were found in \/usr\/local\/lib/ {
         in_dylib_block = 1
@@ -466,6 +500,7 @@ DOCTOR_FILTERED=$(printf '%s\n' "$DOCTOR_OUT" | awk '
     { print }
     END {
         if (in_dylib_block) emit_dylib_block()
+        if (in_clt_block) emit_clt_block()
     }
 ')
 
