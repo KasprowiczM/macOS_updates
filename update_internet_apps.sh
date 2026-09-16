@@ -434,7 +434,64 @@ STATUS_PICSART="→ managed by App Store (update_appstore.sh)"
 # App handlers — config/internet_dispatch_order.txt
 # ============================================================
 . "$SCRIPT_DIR/lib/internet_app_updates.sh"
+
+# Check for Intel-only (x86_64-only) applications and Rosetta availability
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    rm -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
+fi
+
+HAS_X86_64=0
+while IFS='|' read -r _app_name _method _status_var _rest; do
+    case "$_app_name" in '#'*|'') continue ;; esac
+    _app_path="$(internet_app_path "$_app_name")"
+    if [ -d "$_app_path" ]; then
+        _arch="$(mac_update_app_architecture "$_app_path")"
+        if [ "$_arch" = "x86_64-only" ]; then
+            HAS_X86_64=1
+            break
+        fi
+    fi
+done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+if [ "$HAS_X86_64" -eq 1 ]; then
+    if ! mac_update_rosetta_installed; then
+        if [ "${MAC_UPDATE_INSTALL_ROSETTA:-0}" = "1" ]; then
+            print_step "Installing Rosetta via softwareupdate..."
+            softwareupdate --install-rosetta --agree-to-license
+            if mac_update_rosetta_installed; then
+                print_ok "Rosetta installed successfully"
+            else
+                print_warn "Rosetta installation could not be verified"
+            fi
+        fi
+    fi
+fi
+
 internet_dispatch_run_all
+
+# Ensure all x86_64-only apps reflect Rosetta requirement in their final status
+while IFS='|' read -r _app_name _method _status_var _rest; do
+    case "$_app_name" in '#'*|'') continue ;; esac
+    _status_var="$(echo "$_status_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    _app_path="$(internet_app_path "$_app_name")"
+    if [ -d "$_app_path" ]; then
+        _arch="$(mac_update_app_architecture "$_app_path")"
+        if [ "$_arch" = "x86_64-only" ]; then
+            if mac_update_rosetta_installed; then
+                eval "$_status_var=\"\$L_INTERNET_ROSETTA_REQUIRED; \$L_INTERNET_ROSETTA_EOL\""
+            else
+                eval "$_status_var=\"\$L_INTERNET_ROSETTA_REQUIRED \$L_INTERNET_ROSETTA_NOT_INSTALLED; \$L_INTERNET_ROSETTA_EOL\""
+                if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+                    echo "$_app_name" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
+                fi
+            fi
+        fi
+    fi
+done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+if [ -n "$MAC_UPDATE_SESSION_DIR" ] && [ -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" ]; then
+    sort -u "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" -o "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
+fi
 
 # ── Snapshot PO aktualizacji ──────────────────────────────────
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
@@ -570,6 +627,157 @@ while IFS='|' read -r _v_app _v_meth _v_var; do
         fi
     fi
 done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+# ── Cask Oracle for Unverified / Silent Launch Apps ──
+# Homebrew casks are a free, read-only oracle used to verify installed
+# bundle versions. Never mutates system; only transforms ⏳ into ✅ or ⚠️.
+if [ -f "$SCRIPT_DIR/config/cask_oracles.txt" ] && command -v brew >/dev/null 2>&1; then
+    _oracle_tokens=""
+    while IFS='|' read -r _o_app _o_token; do
+        case "$_o_app" in '#'*|'') continue ;; esac
+        _o_app="$(echo "$_o_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        _o_token="$(echo "$_o_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        [ -n "$_o_token" ] || continue
+
+        _o_var=""
+        while IFS='|' read -r _m_app _m_meth _m_var; do
+            case "$_m_app" in '#'*|'') continue ;; esac
+            _m_app="$(echo "$_m_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            if [ "$_m_app" = "$_o_app" ]; then
+                _o_var="$(echo "$_m_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                break
+            fi
+        done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+        _cur_st=""
+        if [ -n "$_o_var" ]; then
+            eval "_cur_st=\$$_o_var"
+            case "$_cur_st" in
+                *"⏳"*)
+                    _oracle_tokens="$_oracle_tokens $_o_token"
+                    ;;
+            esac
+        fi
+    done < "$SCRIPT_DIR/config/cask_oracles.txt"
+
+    _oracle_data=""
+    if [ -n "$_oracle_tokens" ]; then
+        # shellcheck disable=SC2086
+        _oracle_data="$(brew_cask_latest_versions $_oracle_tokens 2>/dev/null || true)"
+    fi
+
+    if [ -n "$_oracle_data" ]; then
+        while IFS='|' read -r _o_app _o_token; do
+            case "$_o_app" in '#'*|'') continue ;; esac
+            _o_app="$(echo "$_o_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            _o_token="$(echo "$_o_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            [ -n "$_o_token" ] || continue
+
+            _o_var=""
+            while IFS='|' read -r _m_app _m_meth _m_var; do
+                case "$_m_app" in '#'*|'') continue ;; esac
+                _m_app="$(echo "$_m_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                if [ "$_m_app" = "$_o_app" ]; then
+                    _o_var="$(echo "$_m_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+                    break
+                fi
+            done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+            [ -n "$_o_var" ] || continue
+            _cur_st=""
+            eval "_cur_st=\$$_o_var"
+            case "$_cur_st" in
+                *"⏳"*) ;;
+                *) continue ;;
+            esac
+
+            _cask_ver="$(echo "$_oracle_data" | awk -F'\t' -v tok="$_o_token" '$1 == tok {print $2; exit}')"
+            [ -n "$_cask_ver" ] || continue
+
+            _bundle_ver=""
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/internet_after.txt" ]; then
+                _bundle_ver="$(awk -F'|' -v app="$_o_app" '$1 == app {print $2; exit}' "$MAC_UPDATE_SESSION_DIR/internet_after.txt")"
+            fi
+            if [ -z "$_bundle_ver" ]; then
+                _app_path="$(capture_app_path "$_o_app")"
+                [ -n "$_app_path" ] && _bundle_ver="$(app_version "$_app_path" 2>/dev/null)"
+            fi
+
+            case "$_bundle_ver" in
+                ''|'unknown'|'nieznana'|'null'|"${L_INTERNET_VERSION_UNKNOWN:-unknown}") continue ;;
+            esac
+
+            _cask_rel="$(app_vs_package_version_relation "$_cask_ver" "$_bundle_ver" 2>/dev/null || echo "unknown")"
+
+            if [ "$_cask_rel" = "newer" ]; then
+                eval "${_o_var}=\"\$(internet_msg \"\$L_INTERNET_STATUS_CASK_BEHIND_FMT\" \"\$_bundle_ver\" \"\$_cask_ver\")\""
+                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+                    printf "%s|%s|%s\n" "$_o_app" "$_bundle_ver" "$_cask_ver" >> "$MAC_UPDATE_SESSION_DIR/internet_behind_apps.txt"
+                fi
+            elif [ "$_cask_rel" = "current" ]; then
+                eval "${_o_var}=\"\$L_INTERNET_STATUS_CASK_CURRENT\""
+                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+                    printf "%s|%s\n" "$_o_app" "$_bundle_ver" >> "$MAC_UPDATE_SESSION_DIR/internet_verified_apps.txt"
+                fi
+            fi
+        done < "$SCRIPT_DIR/config/cask_oracles.txt"
+    fi
+fi
+
+# ── Compute and Persist Internet Counts ──
+_cnt_verified=0
+_cnt_behind=0
+_cnt_unverified=0
+
+while IFS='|' read -r _c_app _c_meth _c_var; do
+    case "$_c_app" in '#'*|'') continue ;; esac
+    _c_var="$(echo "$_c_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [ -n "$_c_var" ] || continue
+    _v_st=""
+    eval "_v_st=\$$_c_var"
+    case "$_v_st" in
+        *"⏳"*)
+            _cnt_unverified=$((_cnt_unverified + 1))
+            ;;
+        *"w tyle"*|*"behind"*|*"im Rückstand"*|*"en retard"*|*"atrás"*|*"indietro"*|*"atrasada"*)
+            _cnt_behind=$((_cnt_behind + 1))
+            ;;
+        *"cask)"*|*"Cask)"*)
+            _cnt_verified=$((_cnt_verified + 1))
+            ;;
+    esac
+done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+    printf "%d\n" "$_cnt_verified" > "$MAC_UPDATE_SESSION_DIR/internet_verified"
+    printf "%d\n" "$_cnt_behind" > "$MAC_UPDATE_SESSION_DIR/internet_behind"
+    printf "%d\n" "$_cnt_unverified" > "$MAC_UPDATE_SESSION_DIR/internet_unverified"
+
+    python3 - "$MAC_UPDATE_SESSION_DIR" "$_cnt_verified" "$_cnt_behind" "$_cnt_unverified" <<'PYEOF'
+import json, os, sys
+
+sdir = sys.argv[1]
+try:
+    v, b, u = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+    cpath = os.path.join(sdir, "run_counts.json")
+    data = {}
+    if os.path.isfile(cpath):
+        try:
+            with open(cpath, encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                data = loaded
+        except Exception:
+            data = {}
+    data["internet_verified"] = v
+    data["internet_behind"] = b
+    data["internet_unverified"] = u
+    with open(cpath, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+except Exception:
+    pass
+PYEOF
+fi
 
 # ============================================================
 # PODSUMOWANIE

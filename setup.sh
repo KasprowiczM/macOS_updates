@@ -306,9 +306,11 @@ fi
 # ============================================================
 print_section "$L_SETUP_PHASE_4"
 
-# Codenames: 13 = Ventura, 14 = Sonoma, 15 = Sequoia, 26 = Tahoe
-if [ "$MACOS_MAJOR" -ge 27 ]; then
+# Codenames: 13 = Ventura, 14 = Sonoma, 15 = Sequoia, 26 = Tahoe, 27 = Golden Gate
+if [ "$MACOS_MAJOR" -ge 28 ]; then
     NEW_MACOS_LABEL="macOS ${MACOS_VERSION}"
+elif [ "$MACOS_MAJOR" -eq 27 ]; then
+    NEW_MACOS_LABEL="macOS ${MACOS_VERSION} Golden Gate"
 elif [ "$MACOS_MAJOR" -eq 26 ]; then
     NEW_MACOS_LABEL="macOS ${MACOS_VERSION} Tahoe"
 elif [ "$MACOS_MAJOR" -eq 15 ]; then
@@ -326,9 +328,9 @@ for md_file in "$SCRIPT_DIR/CLAUDE.md" "$SCRIPT_DIR/AGENTS.md" "$SCRIPT_DIR/GEMI
     TMPFILE="$(mktemp)"
     cp "$md_file" "$TMPFILE"
 
-    # Replace full macOS label (version + TitleCase codename), e.g. "macOS 26.4 Sequoia", "macOS 26.4.1 Sequoia Sequoia"
-    # Regex matches consecutive TitleCase codename words (Sequoia, Sonoma) but NOT CVE, Apple, etc.
-    sed -i '' "s|macOS [0-9][0-9]*\.[0-9.x]*[0-9x]\( [A-Z][a-z][a-z]*\)*|${NEW_MACOS_LABEL}|g" "$TMPFILE"
+    # Replace full macOS label (version + TitleCase codename), e.g. "macOS 27.0 Golden Gate", "macOS 26.5 Tahoe"
+    # Regex matches consecutive TitleCase codename words (Golden Gate, Tahoe, Sequoia, Sonoma) but NOT CVE, Apple, etc.
+    sed -i '' "s|macOS [0-9][0-9]*\.[0-9.x]*[0-9x]\( [A-Z][a-z][a-z]*\)*\( [A-Z][a-z][a-z]*\)*|${NEW_MACOS_LABEL}|g" "$TMPFILE"
 
     if [ "$ARCH" = "arm64" ]; then
         sed -i '' 's|Intel x86_64|Apple Silicon arm64|g' "$TMPFILE"
@@ -351,30 +353,43 @@ done
 # ============================================================
 print_section "$L_SETUP_PHASE_5"
 
-if xcode-select -p &>/dev/null 2>&1; then
-    XCLT_PATH="$(xcode-select -p)"
-    print_ok "Xcode CLT installed: $XCLT_PATH"
-else
-    print_warn "Xcode Command Line Tools not installed!"
-    print_step "Launching Xcode CLT installer..."
-    echo ""
-    echo -e "  ${YELLOW}A dialog will appear — click 'Install'.${NC}"
-    echo -e "  ${YELLOW}Installation may take a few minutes.${NC}"
-    echo ""
-    xcode-select --install 2>/dev/null || true
-    echo ""
-    if [ "$MAC_UPDATE_NONINTERACTIVE" != "1" ]; then
-        read -r -p "  Press ENTER after Xcode CLT installation completes..."
-    else
-        print_warn "Non-interactive mode: install Xcode CLT from the dialog, then re-run setup.sh if needed."
-    fi
+CLT_STATUS="$(mac_update_clt_status)"
+if [ "$CLT_STATUS" = "stale" ] || [ "$CLT_STATUS" = "orphan" ]; then
     if xcode-select -p &>/dev/null 2>&1; then
-        print_ok "Xcode CLT installed successfully!"
-        add_fix "Installed Xcode Command Line Tools"
-    else
-        print_error "Xcode CLT still unavailable — check manually."
-        add_action "Install Xcode CLT: xcode-select --install"
+        XCLT_PATH="$(xcode-select -p)"
+        print_ok "Xcode CLT installed: $XCLT_PATH"
     fi
+    print_warn "Xcode Command Line Tools status: $CLT_STATUS"
+    print_info "Homebrew recommendation: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+    add_action "Reinstall CLT: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+elif [ "$CLT_STATUS" = "missing" ]; then
+    if [ -d "/Applications/Xcode.app" ]; then
+        print_ok "Xcode.app detected; skipping standalone CLT installer."
+    else
+        print_warn "Xcode Command Line Tools not installed!"
+        print_step "Launching Xcode CLT installer..."
+        echo ""
+        echo -e "  ${YELLOW}A dialog will appear — click 'Install'.${NC}"
+        echo -e "  ${YELLOW}Installation may take a few minutes.${NC}"
+        echo ""
+        xcode-select --install 2>/dev/null || true
+        echo ""
+        if [ "$MAC_UPDATE_NONINTERACTIVE" != "1" ]; then
+            read -r -p "  Press ENTER after Xcode CLT installation completes..."
+        else
+            print_warn "Non-interactive mode: install Xcode CLT from the dialog, then re-run setup.sh if needed."
+        fi
+        if xcode-select -p &>/dev/null 2>&1; then
+            print_ok "Xcode CLT installed successfully!"
+            add_fix "Installed Xcode Command Line Tools"
+        else
+            print_error "Xcode CLT still unavailable — check manually."
+            add_action "Install Xcode CLT: xcode-select --install"
+        fi
+    fi
+else
+    XCLT_PATH="$(xcode-select -p 2>/dev/null || echo "/Library/Developer/CommandLineTools")"
+    print_ok "Xcode CLT installed: $XCLT_PATH"
 fi
 
 # ============================================================
@@ -661,11 +676,17 @@ fi
 print_section "$L_SETUP_PHASE_12"
 
 if command -v mas &>/dev/null; then
-    APPLE_ID="$(mas account 2>/dev/null || echo '')"
+    MAS_VER_DETECT="$(mas version 2>/dev/null || echo '0')"
+    MAS_MAJ_DETECT="${MAS_VER_DETECT%%.*}"
+    if [ "${MAS_MAJ_DETECT:-0}" -lt 5 ]; then
+        APPLE_ID="$(mas account 2>/dev/null || echo '')"
+    else
+        APPLE_ID=""
+    fi
     if [ -n "$APPLE_ID" ]; then
         print_ok "Signed in to App Store as: $APPLE_ID"
     else
-        print_info "mas account returned no ID (known macOS 26.x limitation) — testing via mas list..."
+        print_info "mas account returned no ID (installd entitlement change) — testing via mas list..."
     fi
 
     if mas list &>/dev/null 2>&1; then

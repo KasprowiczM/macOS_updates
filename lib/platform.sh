@@ -69,3 +69,105 @@ mac_update_require_supported_platform() {
 mac_update_platform_label() {
     echo "Apple Silicon (arm64)"
 }
+
+# Check if Rosetta 2 translation environment is installed and active.
+mac_update_rosetta_installed() {
+    if pgrep -q oahd 2>/dev/null || /usr/bin/pgrep -q oahd 2>/dev/null; then
+        return 0
+    fi
+    if [ -d "/Library/Apple/usr/share/rosetta" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# Determine binary architecture of an app bundle using lipo.
+# Outputs: arm64 | universal | x86_64-only | unknown
+mac_update_app_architecture() {
+    local app_path="$1"
+    local info_plist="$app_path/Contents/Info.plist"
+    local exe_name=""
+    local exe_path=""
+    local archs=""
+
+    [ -d "$app_path" ] || { echo "unknown"; return 0; }
+
+    if [ -f "$info_plist" ]; then
+        exe_name="$(defaults read "$app_path/Contents/Info" CFBundleExecutable 2>/dev/null || true)"
+    fi
+    if [ -n "$exe_name" ] && [ -f "$app_path/Contents/MacOS/$exe_name" ]; then
+        exe_path="$app_path/Contents/MacOS/$exe_name"
+    elif [ -d "$app_path/Contents/MacOS" ]; then
+        for f in "$app_path/Contents/MacOS"/*; do
+            if [ -f "$f" ]; then
+                exe_path="$f"
+                break
+            fi
+        done
+    fi
+
+    if [ -z "$exe_path" ] || [ ! -f "$exe_path" ]; then
+        echo "unknown"
+        return 0
+    fi
+
+    archs="$(lipo -archs "$exe_path" 2>/dev/null || true)"
+    case "$archs" in
+        *arm64*x86_64*|*x86_64*arm64*|*arm64*i386*|*i386*arm64*)
+            echo "universal"
+            ;;
+        *arm64*)
+            echo "arm64"
+            ;;
+        *x86_64*|*i386*)
+            echo "x86_64-only"
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
+# Diagnose Command Line Tools (CLT) status against the current macOS major release.
+# Outputs: ok | missing | stale | orphan
+mac_update_clt_status() {
+    local clt_dir="${MAC_UPDATE_CLT_DIR:-/Library/Developer/CommandLineTools}"
+    local pkg_info=""
+    local clt_version=""
+    local clt_major=""
+    local os_version=""
+    local os_major=""
+
+    if [ ! -d "$clt_dir" ]; then
+        echo "missing"
+        return 0
+    fi
+
+    pkg_info="$(pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null || true)"
+    if [ -z "$pkg_info" ]; then
+        echo "orphan"
+        return 0
+    fi
+
+    clt_version="$(echo "$pkg_info" | awk -F': ' '/^version:/ {print $2}' | head -n1)"
+    clt_major="${clt_version%%.*}"
+
+    if [ -z "$clt_major" ] || [ -n "${clt_major//[0-9]/}" ]; then
+        echo "orphan"
+        return 0
+    fi
+
+    os_version="$(sw_vers -productVersion 2>/dev/null || echo "0")"
+    os_major="${os_version%%.*}"
+
+    if [ -n "$os_major" ] && [ -z "${os_major//[0-9]/}" ]; then
+        if [ "$clt_major" -lt "$os_major" ]; then
+            echo "stale"
+            return 0
+        fi
+    fi
+
+    echo "ok"
+    return 0
+}
+

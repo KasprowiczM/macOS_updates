@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to **macOS Updates** (v1.4.5).
+Thank you for contributing to **macOS Updates** (v1.4.6).
 
 ## Requirements
 

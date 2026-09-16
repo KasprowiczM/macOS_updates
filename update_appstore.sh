@@ -158,11 +158,15 @@ fi
 # ============================================================
 print_header "$L_APPSTORE_CHECK"
 
-if mas account >/dev/null 2>&1; then
-    print_ok "App Store account detected (identifier not displayed)"
+if [ "$MAS_MAJOR" -ge 5 ]; then
+    print_info "${L_APPSTORE_MAS5_NO_ACCOUNT:-mas >= 5 does not provide 'account'; verifying access via 'mas list'}"
 else
-    print_warn "$L_APPSTORE_LOGIN_UNSTABLE"
-    print_info "$L_APPSTORE_VERIFY_ACCESS"
+    if mas account >/dev/null 2>&1; then
+        print_ok "App Store account detected (identifier not displayed)"
+    else
+        print_warn "$L_APPSTORE_LOGIN_UNSTABLE"
+        print_info "$L_APPSTORE_VERIFY_ACCESS"
+    fi
 fi
 
 if ! mas list &> /dev/null; then
@@ -623,6 +627,13 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     else
         print_warn "Could not save the post-update App Store snapshot."
         SOFT_FAIL=1
+    fi
+    if [ -f "$MAC_UPDATE_SESSION_DIR/mas_before.txt" ] && [ -f "$MAC_UPDATE_SESSION_DIR/mas_after.txt" ]; then
+        xcode_before="$(awk '$1 == "497799835" || $2 == "Xcode" { for (i=1; i<=NF; i++) if ($i ~ /^\(.*\)$/) { gsub(/[()]/, "", $i); print $i; exit } }' "$MAC_UPDATE_SESSION_DIR/mas_before.txt" 2>/dev/null)"
+        xcode_after="$(awk '$1 == "497799835" || $2 == "Xcode" { for (i=1; i<=NF; i++) if ($i ~ /^\(.*\)$/) { gsub(/[()]/, "", $i); print $i; exit } }' "$MAC_UPDATE_SESSION_DIR/mas_after.txt" 2>/dev/null)"
+        if [ -n "$xcode_before" ] && [ -n "$xcode_after" ] && [ "$xcode_before" != "$xcode_after" ]; then
+            echo "xcode_changed=${xcode_before}->${xcode_after}" > "$MAC_UPDATE_SESSION_DIR/xcode_changed.txt"
+        fi
     fi
 fi
 

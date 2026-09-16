@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.5** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–26**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.4.6** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
 
 **Öffentliches Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -53,8 +53,9 @@ das ist die häufigste Verwechslung in diesem Projekt.
 
 **Der geplante Hintergrundlauf installiert weder macOS- noch App-Store-Updates.** Beide
 erfordern eine Benutzerauthentifizierung — auf Apple Silicon verlangt `softwareupdate`
-Volume-Owner-Anmeldedaten. Führen Sie `bash update_all.sh` interaktiv aus, wenn Sie diese
-Updates einspielen möchten.
+Volume-Owner-Anmeldedaten. App-Store-Updates werden im Hintergrundmodus mangels TTY
+übersprungen (weder `sudo mas` noch TOR 2 / AppleScript GUI verfügbar; als Soft-Warnung Exit 10 gemeldet).
+Führen Sie `bash update_all.sh` interaktiv aus, wenn Sie diese Updates einspielen möchten.
 
 **sudo-Kontrakt (v1.3.1 / v1.4.0):** höchstens eine Abfrage pro Lauf; **nie** ohne steuerndes TTY
 (stattdessen wird `MAC_UPDATE_NO_SUDO=1` exportiert); nie bei `--dry-run`.

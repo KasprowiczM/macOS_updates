@@ -100,3 +100,82 @@ brew_outdated_casks() {
     printf '%s' "$out" | grep -v '^==>' | grep -v '^✔' | grep -v '^[[:space:]]*$' || true
     return "$rc"
 }
+
+# brew_xcode_license_ok
+#   Returns 0 if xcode-select does not point to Xcode.app or if xcodebuild
+#   license check succeeds. Returns 1 if Xcode.app is selected and license
+#   has not been agreed to. Does not invoke brew.
+brew_xcode_license_ok() {
+    local dev_path
+    command -v xcode-select >/dev/null 2>&1 || return 0
+    dev_path="$(xcode-select -p 2>/dev/null)"
+    case "$dev_path" in
+        *.app/Contents/Developer*)
+            if command -v xcodebuild >/dev/null 2>&1; then
+                xcodebuild -license check >/dev/null 2>&1 || return 1
+            fi
+            ;;
+    esac
+    return 0
+}
+
+# brew_cask_latest_versions
+#   Queries Homebrew for the latest version of one or more casks (read-only oracle).
+#   Prints "token<TAB>version" lines to stdout.
+#   Returns 0 on success, 1 on failure.
+brew_cask_latest_versions() {
+    [ $# -gt 0 ] || return 0
+    command -v brew >/dev/null 2>&1 || return 1
+    local err_file rc
+    err_file="$(mktemp "${TMPDIR:-/tmp}/mac_update_brew_cask_info.XXXXXX")" || return 1
+    python3 - "$err_file" "$@" <<'PYEOF'
+import json
+import subprocess
+import sys
+
+err_file = sys.argv[1]
+tokens = sys.argv[2:]
+if not tokens:
+    sys.exit(0)
+
+def query_casks(cask_list):
+    try:
+        with open(err_file, "w", encoding="utf-8") as ef:
+            res = subprocess.run(
+                ["brew", "info", "--json=v2", "--cask"] + cask_list,
+                stdout=subprocess.PIPE,
+                stderr=ef,
+                text=True,
+                check=False,
+            )
+        if res.stdout and res.stdout.strip():
+            return json.loads(res.stdout).get("casks", [])
+    except Exception:
+        pass
+    return None
+
+casks = query_casks(tokens)
+if casks is None:
+    casks = []
+    for tok in tokens:
+        res = query_casks([tok])
+        if res:
+            casks.extend(res)
+
+seen = set()
+for cask in casks:
+    tok = cask.get("token") or ""
+    ver = cask.get("version") or ""
+    if tok and ver and tok not in seen:
+        seen.add(tok)
+        print(f"{tok}\t{ver}")
+    for old_tok in cask.get("old_tokens", []):
+        if old_tok and ver and old_tok not in seen:
+            seen.add(old_tok)
+            print(f"{old_tok}\t{ver}")
+PYEOF
+    rc=$?
+    rm -f "$err_file" 2>/dev/null || true
+    return "$rc"
+}
+
