@@ -2805,7 +2805,8 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
             with open(written, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
             self.assertEqual(loaded["exit_code"], 0)
-            self.assertEqual(loaded["steps"]["prescan"], "OK")
+            self.assertEqual(loaded["steps"]["prescan"]["code"], "ok")
+            self.assertEqual(loaded["steps"]["prescan"]["text"], "OK")
 
     def test_no_deprecated_datetime_utcnow_in_repo(self) -> None:
         """Assert no occurrences of deprecated datetime.utcnow() in shell scripts or python."""

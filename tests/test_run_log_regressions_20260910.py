@@ -636,7 +636,7 @@ class FixtureRun20260910RegressionTests(unittest.TestCase):
                 items=items,
             )
 
-            self.assertEqual(summary["format_version"], 3)
+            self.assertEqual(summary["format_version"], 4)
             self.assertEqual(summary["counts"]["observed_package_changes"], 7)
             self.assertEqual(summary["counts"]["inventory_version_fields_changed"], 9)
             self.assertNotEqual(

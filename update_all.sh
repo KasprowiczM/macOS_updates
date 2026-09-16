@@ -42,10 +42,25 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/version.sh"
 . "$SCRIPT_DIR/lib/run_lock.sh"
 
+save_step_status_codes() {
+    if [ -n "${SESSION_DIR:-}" ] && [ -d "$SESSION_DIR" ]; then
+        cat <<EOF > "$SESSION_DIR/step_status_codes.txt"
+prescan=${STATUS_CODE_SCAN:-skipped}
+appstore=${STATUS_CODE_APPSTORE:-skipped}
+npmcli=${STATUS_CODE_NPMCLI:-skipped}
+brew=${STATUS_CODE_BREW:-skipped}
+internet=${STATUS_CODE_INTERNET:-skipped}
+postupdate=${STATUS_CODE_MD:-skipped}
+system=${STATUS_CODE_SYSTEM:-skipped}
+EOF
+    fi
+}
+
 write_machine_summary() {
     local status="${1:-completed}"
     local end_now rc
     [ -n "${SCRIPT_DIR:-}" ] && [ -n "${SESSION_DIR:-}" ] && [ -n "${START_TIME:-}" ] || return 0
+    save_step_status_codes || true
     end_now="$(date +%s)"
     export MAC_UPDATE_RUN_STATUS="$status"
     python3 -c '
@@ -70,6 +85,19 @@ step_results = {
     "postupdate": sys.argv[13],
     "system": sys.argv[14],
 }
+
+step_codes = {}
+codes_path = os.path.join(session_dir, "step_status_codes.txt")
+if os.path.isfile(codes_path):
+    try:
+        with open(codes_path, encoding="utf-8") as scf:
+            for line in scf:
+                line = line.strip()
+                if line and "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    step_codes[k.strip()] = v.strip()
+    except Exception:
+        pass
 
 flags = {
     "dry_run": os.environ.get("MAC_UPDATE_DRY_RUN") == "1",
@@ -111,6 +139,7 @@ summary = build_run_summary(
     run_status=os.environ.get("MAC_UPDATE_RUN_STATUS", "completed"),
     run_id=os.environ.get("MAC_UPDATE_RUN_ID"),
     items=items,
+    step_codes=step_codes,
 )
 
 logs_dir = os.path.join(script_dir, "logs")
@@ -442,6 +471,13 @@ RESULT_INTERNET="$L_ALL_RESULT_SKIPPED"
 RESULT_NPMCLI="$L_ALL_RESULT_SKIPPED"
 RESULT_BREW="$L_ALL_RESULT_SKIPPED"
 RESULT_MD="$L_ALL_RESULT_SKIPPED"
+STATUS_CODE_SCAN="skipped"
+STATUS_CODE_SYSTEM="skipped"
+STATUS_CODE_APPSTORE="skipped"
+STATUS_CODE_INTERNET="skipped"
+STATUS_CODE_NPMCLI="skipped"
+STATUS_CODE_BREW="skipped"
+STATUS_CODE_MD="skipped"
 SYSTEM_HISTORY_PENDING="⏳ pending final step"
 SYSTEM_DEFERRED=0
 
@@ -572,8 +608,10 @@ ui_master_progress 0 6
 if [ "${MAC_UPDATE_SKIP_PRESCAN:-0}" = "1" ]; then
     print_info "Skipped step 0 (--skip-prescan)"
     RESULT_SCAN="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_SCAN="skipped"
 elif mac_update_dry_run_msg "prescan.py (APPLICATIONS.md scan)"; then
     RESULT_SCAN="[DRY-RUN] skipped"
+    STATUS_CODE_SCAN="skipped"
 else
 ui_step_header 0 6 "$L_ALL_STEP0"
 
@@ -1111,6 +1149,7 @@ PYEOF
 
 if python3 "$SESSION_DIR/prescan.py" "$SCRIPT_DIR" "$SESSION_DIR"; then
     RESULT_SCAN="$L_STATUS_OK"
+    STATUS_CODE_SCAN="ok"
     if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
         print_info "Capturing current versions for the inventory refresh..."
         if [ -f "$SESSION_DIR/installed_apps_scan.txt" ]; then
@@ -1119,6 +1158,7 @@ if python3 "$SESSION_DIR/prescan.py" "$SCRIPT_DIR" "$SESSION_DIR"; then
         if ! internet_capture_versions "$SESSION_DIR/internet_before.txt"; then
             print_error "Could not capture installed internet-app versions"
             RESULT_SCAN="$L_ALL_RESULT_WARN"
+            STATUS_CODE_SCAN="warn"
             OVERALL_EXIT=1
         else
             cp "$SESSION_DIR/internet_before.txt" "$SESSION_DIR/internet_after.txt"
@@ -1131,6 +1171,7 @@ if python3 "$SESSION_DIR/prescan.py" "$SCRIPT_DIR" "$SESSION_DIR"; then
             else
                 print_error "Could not capture Homebrew versions for inventory"
                 RESULT_SCAN="$L_ALL_RESULT_WARN"
+                STATUS_CODE_SCAN="warn"
                 OVERALL_EXIT=1
             fi
         fi
@@ -1202,6 +1243,7 @@ PYEOF
         else
             print_error "Could not capture native CLI versions for inventory"
             RESULT_SCAN="$L_ALL_RESULT_WARN"
+            STATUS_CODE_SCAN="warn"
             OVERALL_EXIT=1
         fi
     fi
@@ -1209,6 +1251,7 @@ else
     # Step 0 is a read-only scan: a hard failure here is reported but never
     # blocking, because nothing on the machine was mutated.
     RESULT_SCAN="$L_ALL_RESULT_WARN"
+    STATUS_CODE_SCAN="warn"
     OVERALL_EXIT=1
 fi
 fi
@@ -1220,12 +1263,15 @@ fi
 if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" = "1" ]; then
     print_info "Skipped final macOS step (--skip-system)"
     RESULT_SYSTEM="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_SYSTEM="skipped"
 else
     SYSTEM_DEFERRED=1
     if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
         RESULT_SYSTEM="[DRY-RUN] pending final step"
+        STATUS_CODE_SYSTEM="skipped"
     else
         RESULT_SYSTEM="$SYSTEM_HISTORY_PENDING"
+        STATUS_CODE_SYSTEM="unconfirmed"
     fi
 fi
 
@@ -1236,6 +1282,7 @@ ui_master_progress 1 6
 if [ "${MAC_UPDATE_SKIP_APPSTORE:-0}" = "1" ]; then
     print_info "Skipped step 1 (--skip-appstore)"
     RESULT_APPSTORE="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_APPSTORE="skipped"
 else
 ui_step_header 1 6 "$L_SCRIPT_TITLE_APPSTORE"
 
@@ -1244,20 +1291,25 @@ if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
     APPSTORE_EXIT=0
     if mac_update_dry_run_msg "update_appstore.sh"; then
         RESULT_APPSTORE="[DRY-RUN] skipped"
+        STATUS_CODE_APPSTORE="skipped"
     elif bash "$SCRIPT_DIR/update_appstore.sh"; then
         RESULT_APPSTORE="$L_STATUS_OK completed"
+        STATUS_CODE_APPSTORE="ok"
     else
         APPSTORE_EXIT=$?
         if [ "$APPSTORE_EXIT" -eq 2 ] && [ "${MAC_UPDATE_TREAT_APPSTORE_AX_AS_WARNING:-0}" = "1" ]; then
             RESULT_APPSTORE="$L_STATUS_WARN Accessibility required"
+            STATUS_CODE_APPSTORE="warn"
             DEGRADED=1
             print_warn "App Store exit 2 (Accessibility) treated as warning"
         elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
             RESULT_APPSTORE="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            STATUS_CODE_APPSTORE="warn"
             DEGRADED=1
             print_warn "App Store reported unverified updates (soft) — macOS step not blocked"
         else
             RESULT_APPSTORE="$L_STATUS_ERROR"
+            STATUS_CODE_APPSTORE="error"
             OVERALL_EXIT=1
             BLOCKING_EXIT=1
         fi
@@ -1265,6 +1317,7 @@ if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
 else
     print_error "File not found: update_appstore.sh"
     RESULT_APPSTORE="$L_STATUS_ERROR missing file"
+    STATUS_CODE_APPSTORE="error"
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
 fi
@@ -1277,22 +1330,27 @@ ui_master_progress 2 6
 if [ "${MAC_UPDATE_SKIP_NPM:-0}" = "1" ]; then
     print_info "Skipped step 2 (--skip-npm)"
     RESULT_NPMCLI="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_NPMCLI="skipped"
 else
 ui_step_header 2 6 "Native CLI + npm"
 if mac_update_dry_run_msg "update_npm_cli.sh"; then
     RESULT_NPMCLI="[DRY-RUN] skipped"
+    STATUS_CODE_NPMCLI="skipped"
 elif mac_update_run_child "update_npm_cli.sh" "update_npm_cli.sh"; then
     RESULT_NPMCLI="$L_STATUS_OK completed"
+    STATUS_CODE_NPMCLI="ok"
 else
     # mac_update_run_child ends with `bash <child>`, so the child's exit status
     # reaches us unchanged and 10 stays distinguishable from 1 / 127.
     NPMCLI_EXIT=$?
     if [ "$NPMCLI_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
         RESULT_NPMCLI="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+        STATUS_CODE_NPMCLI="warn"
         DEGRADED=1
         print_warn "Native CLI + npm reported unverified updates (soft) — macOS step not blocked"
     else
         RESULT_NPMCLI="$L_STATUS_ERROR"
+        STATUS_CODE_NPMCLI="error"
         OVERALL_EXIT=1
         BLOCKING_EXIT=1
     fi
@@ -1306,23 +1364,28 @@ ui_master_progress 3 6
 if [ "${MAC_UPDATE_SKIP_BREW:-0}" = "1" ]; then
     print_info "Skipped step 3 (--skip-brew)"
     RESULT_BREW="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_BREW="skipped"
 else
 ui_step_header 3 6 "$L_SCRIPT_TITLE_BREW"
 
 if mac_update_dry_run_msg "update_brew.sh"; then
     RESULT_BREW="[DRY-RUN] skipped"
+    STATUS_CODE_BREW="skipped"
 elif [ -f "$SCRIPT_DIR/update_brew.sh" ]; then
     chmod +x "$SCRIPT_DIR/update_brew.sh"
     if bash "$SCRIPT_DIR/update_brew.sh"; then
         RESULT_BREW="$L_STATUS_OK completed"
+        STATUS_CODE_BREW="ok"
     else
         BREW_EXIT=$?
         if [ "$BREW_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
             RESULT_BREW="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            STATUS_CODE_BREW="warn"
             DEGRADED=1
             print_warn "Homebrew reported unverified updates (soft) — macOS step not blocked"
         else
             RESULT_BREW="$L_STATUS_ERROR"
+            STATUS_CODE_BREW="error"
             OVERALL_EXIT=1
             BLOCKING_EXIT=1
         fi
@@ -1330,6 +1393,7 @@ elif [ -f "$SCRIPT_DIR/update_brew.sh" ]; then
 else
     print_error "File not found: update_brew.sh"
     RESULT_BREW="$L_STATUS_ERROR missing file"
+    STATUS_CODE_BREW="error"
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
 fi
@@ -1342,15 +1406,18 @@ ui_master_progress 4 6
 if [ "${MAC_UPDATE_SKIP_INTERNET:-0}" = "1" ]; then
     print_info "Skipped step 4 (--skip-internet)"
     RESULT_INTERNET="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_INTERNET="skipped"
 else
 ui_step_header 4 6 "$L_SCRIPT_TITLE_INTERNET"
 
 if mac_update_dry_run_msg "update_internet_apps.sh"; then
     RESULT_INTERNET="[DRY-RUN] skipped"
+    STATUS_CODE_INTERNET="skipped"
 elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
     chmod +x "$SCRIPT_DIR/update_internet_apps.sh"
     if bash "$SCRIPT_DIR/update_internet_apps.sh"; then
         RESULT_INTERNET="$L_STATUS_OK completed"
+        STATUS_CODE_INTERNET="ok"
     else
         INTERNET_EXIT=$?
         # A soft result means "could not verify" — offline, a vendor updater did
@@ -1358,10 +1425,12 @@ elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
         # must never postpone macOS security updates (2026-07-26 regression).
         if [ "$INTERNET_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
             RESULT_INTERNET="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            STATUS_CODE_INTERNET="warn"
             DEGRADED=1
             print_warn "Internet apps reported unverified updates (soft) — macOS step not blocked"
         else
             RESULT_INTERNET="$L_STATUS_ERROR"
+            STATUS_CODE_INTERNET="error"
             OVERALL_EXIT=1
             BLOCKING_EXIT=1
         fi
@@ -1369,6 +1438,7 @@ elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
 else
     print_error "File not found: update_internet_apps.sh"
     RESULT_INTERNET="$L_STATUS_ERROR missing file"
+    STATUS_CODE_INTERNET="error"
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
 fi
@@ -1381,10 +1451,12 @@ ui_master_progress 5 6
 if [ "${MAC_UPDATE_SKIP_POSTUPDATE:-0}" = "1" ]; then
     print_info "Skipped step 5 (--skip-postupdate)"
     RESULT_MD="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_MD="skipped"
 else
 ui_step_header 5 6 "$L_ALL_STEP5_DESC"
 if mac_update_dry_run_msg "postupdate.py (APPLICATIONS.md / UPDATES.md)"; then
     RESULT_MD="[DRY-RUN] skipped"
+    STATUS_CODE_MD="skipped"
 else
 
     # Fresh snapshot of /Applications after updates have run (P1-2)
@@ -1944,10 +2016,12 @@ if python3 "$SESSION_DIR/postupdate.py" \
     "$RESULT_NPMCLI" \
     "$RESULT_BREW"; then
     RESULT_MD="$L_STATUS_OK completed"
+    STATUS_CODE_MD="ok"
 else
     # Step 5 is how a run records what happened: if it fails, the results were
     # never written, so it is blocking.
     RESULT_MD="$L_STATUS_ERROR"
+    STATUS_CODE_MD="error"
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
 fi
@@ -1962,23 +2036,29 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
     ui_step_header 6 6 "$L_SYSTEM_UPDATE_TITLE"
     if mac_update_dry_run_msg "update_system.sh (final step)"; then
         RESULT_SYSTEM="[DRY-RUN] skipped"
+        STATUS_CODE_SYSTEM="skipped"
     elif [ "$BLOCKING_EXIT" -ne 0 ]; then
         # Only a blocking hard failure may defer macOS updates. Soft/degraded
         # results (exit 10) never reach this branch — see the severity contract.
         RESULT_SYSTEM="${L_ALL_SYSTEM_DEFERRED:-⏭️ skipped because a blocking update step failed}"
+        STATUS_CODE_SYSTEM="skipped"
         print_warn "Skipping the final macOS update because a blocking step failed (the machine may be mid-transaction); fix it and rerun."
     elif mac_update_run_child "update_system.sh" "update_system.sh (final step)"; then
         RESULT_SYSTEM="$L_STATUS_OK completed"
+        STATUS_CODE_SYSTEM="ok"
     else
         SYS_EXIT=$?
         if [ "$SYS_EXIT" -eq "${MAC_UPDATE_SOFT_EXIT:-10}" ]; then
             if [ -f "$SESSION_DIR/system_skipped_by_user" ]; then
                 RESULT_SYSTEM="${L_ALL_RESULT_SKIPPED_BY_USER:-pominięte przez użytkownika}"
+                STATUS_CODE_SYSTEM="skipped_by_user"
             else
                 RESULT_SYSTEM="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+                STATUS_CODE_SYSTEM="warn"
             fi
         else
             RESULT_SYSTEM="$L_STATUS_ERROR"
+            STATUS_CODE_SYSTEM="error"
             OVERALL_EXIT=1
         fi
     fi

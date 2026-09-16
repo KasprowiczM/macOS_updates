@@ -9,8 +9,10 @@ from typing import Any
 STEPS = ("prescan", "appstore", "npmcli", "brew", "internet", "postupdate", "system")
 
 
-def is_ok(status: str) -> bool:
-    return (status or "").startswith("OK")
+def is_ok(status: Any) -> bool:
+    if isinstance(status, dict):
+        return status.get("code") == "ok"
+    return str(status or "").startswith("OK")
 
 
 def load_summaries(logs_dir: str, window: int) -> list[dict[str, Any]]:

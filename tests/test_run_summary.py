@@ -102,9 +102,9 @@ class JsonWriteFailureIsVisible(unittest.TestCase):
         self.assertNotIn("2>/dev/null || true", text[idx:idx + 250])
 
 
-class FormatVersion3AndMigrationTests(unittest.TestCase):
-    def test_format_version_is_3(self) -> None:
-        self.assertEqual(FORMAT_VERSION, 3)
+class FormatVersion4AndMigrationTests(unittest.TestCase):
+    def test_format_version_is_4(self) -> None:
+        self.assertEqual(FORMAT_VERSION, 4)
 
     def test_build_run_summary_has_items_field(self) -> None:
         sample_item = {
@@ -124,7 +124,7 @@ class FormatVersion3AndMigrationTests(unittest.TestCase):
             step_results={"appstore": "OK"},
             items=[sample_item],
         )
-        self.assertEqual(summary["format_version"], 3)
+        self.assertEqual(summary["format_version"], 4)
         self.assertEqual(len(summary["items"]), 1)
         self.assertEqual(summary["items"][0]["name"], "WhatsApp")
 
@@ -138,17 +138,18 @@ class FormatVersion3AndMigrationTests(unittest.TestCase):
             "steps": {"brew": "OK"},
         }
         migrated = migrate_run_summary(v2_data)
-        self.assertEqual(migrated["format_version"], 3)
+        self.assertEqual(migrated["format_version"], 4)
         self.assertEqual(migrated["items"], [])
         self.assertEqual(migrated["verification"], {})
         self.assertEqual(migrated["counts"]["observed_package_changes"], 6)
+        self.assertEqual(migrated["steps"]["brew"], {"code": "ok", "text": "OK"})
 
         v1_data = {
             "exit_code": 0,
             "counts": {"inventory_fields_changed": 5},
         }
         migrated_v1 = migrate_run_summary(v1_data)
-        self.assertEqual(migrated_v1["format_version"], 3)
+        self.assertEqual(migrated_v1["format_version"], 4)
         self.assertEqual(migrated_v1["run_status"], "completed")
         self.assertEqual(migrated_v1["items"], [])
         self.assertEqual(migrated_v1["counts"]["inventory_version_fields_changed"], 5)

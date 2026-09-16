@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 
-FORMAT_VERSION = 3
+FORMAT_VERSION = 4
 
 PENDING_FILES = (
     ("pending_after_run_appstore", "pending_appstore"),
@@ -121,17 +121,27 @@ def normalize_app_key(name: str) -> str:
 def classify_step_status(val: Any) -> str:
     """Classify localized or English step message into a stable status code:
 
-    'ok', 'warn', 'error', 'skipped', or 'unconfirmed'.
+    'ok', 'warn', 'error', 'skipped', 'skipped_by_user', or 'unconfirmed'.
     """
     if val is None:
         return "unconfirmed"
+    if isinstance(val, dict):
+        if "code" in val and val["code"]:
+            return str(val["code"])
+        val = val.get("text", "")
     s = str(val).strip().lower()
     if not s:
         return "unconfirmed"
 
+    if s in ("ok", "warn", "error", "skipped", "skipped_by_user", "unconfirmed"):
+        return s
+
     error_tokens = ("error", "błąd", "blad", "fehler", "erreur", "fallo", "errore", "erro", "failed")
     if any(tok in s for tok in error_tokens):
         return "error"
+
+    if "pominięte przez użytkownika" in s or "skipped by user" in s:
+        return "skipped_by_user"
 
     warn_tokens = (
         "warn", "ostrzeż", "ostrzez", "warnung", "avertissement", "advertencia", "avviso", "aviso",
@@ -715,7 +725,7 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
 
 
 def migrate_run_summary(data: dict[str, Any]) -> dict[str, Any]:
-    """Migrate older run_summary dict (v1 or v2) to schema v3."""
+    """Migrate older run_summary dict (v1, v2, or v3) to schema v4."""
     migrated = dict(data)
     migrated["format_version"] = FORMAT_VERSION
     if "items" not in migrated or not isinstance(migrated["items"], list):
@@ -731,6 +741,21 @@ def migrate_run_summary(data: dict[str, Any]) -> dict[str, Any]:
         if "inventory_version_fields_changed" not in c and "inventory_fields_changed" in c:
             c["inventory_version_fields_changed"] = c["inventory_fields_changed"]
         migrated["counts"] = c
+    if "steps" in migrated and isinstance(migrated["steps"], dict):
+        new_steps = {}
+        for step_k, step_v in migrated["steps"].items():
+            if isinstance(step_v, dict) and "code" in step_v:
+                new_steps[step_k] = {
+                    "code": str(step_v["code"]),
+                    "text": str(step_v.get("text", "")),
+                }
+            else:
+                code = classify_step_status(step_v)
+                new_steps[step_k] = {
+                    "code": code,
+                    "text": str(step_v) if step_v is not None else "",
+                }
+        migrated["steps"] = new_steps
     return migrated
 
 
@@ -778,7 +803,7 @@ def build_run_summary(
     overall_exit: int,
     degraded: int,
     blocking_exit: int,
-    step_results: dict[str, str],
+    step_results: dict[str, Any],
     counts: dict[str, Any] | None = None,
     flags: dict[str, Any] | None = None,
     session_dir: str | None = None,
@@ -786,6 +811,7 @@ def build_run_summary(
     run_status: str = "completed",
     run_id: str | None = None,
     items: list[dict[str, Any]] | None = None,
+    step_codes: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Compose the structured run summary dict."""
     duration = max(0, end_time - start_time)
@@ -794,6 +820,25 @@ def build_run_summary(
 
     start_iso = datetime.datetime.fromtimestamp(start_time, tz=datetime.timezone.utc).isoformat()
     end_iso = datetime.datetime.fromtimestamp(end_time, tz=datetime.timezone.utc).isoformat()
+
+    steps_v4: dict[str, dict[str, str]] = {}
+    if step_results:
+        for k, v in step_results.items():
+            if isinstance(v, dict) and "code" in v:
+                steps_v4[k] = {
+                    "code": str(v["code"]),
+                    "text": str(v.get("text", "")),
+                }
+            else:
+                code = None
+                if step_codes and k in step_codes:
+                    code = step_codes[k]
+                if not code or code == "unconfirmed":
+                    code = classify_step_status(v)
+                steps_v4[k] = {
+                    "code": code,
+                    "text": str(v) if v is not None else "",
+                }
 
     summary: dict[str, Any] = {
         "format_version": FORMAT_VERSION,
@@ -807,7 +852,7 @@ def build_run_summary(
         "exit_class": determine_exit_class(overall_exit, degraded),
         "degraded": bool(degraded),
         "blocking_exit": blocking_exit,
-        "steps": step_results,
+        "steps": steps_v4,
         "counts": counts or {},
         "verification": verification or {},
         "flags": flags or {},
