@@ -223,6 +223,33 @@ class RunItemsAndTerminalSummaryTests(unittest.TestCase):
             self.assertIn("Uruchomiono updater, ale nie potwierdzono aktualizacji:", term_pl)
             self.assertIn("Zmieniono pól wersji w inventory: 9", term_pl)
 
+    def test_collect_run_items_system_installed_and_deduplicated(self) -> None:
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "system_installed_labels.txt").write_text(
+                "Command Line Tools for Xcode 27.0-27.0\n", encoding="utf-8"
+            )
+            (tmp_path / "system_available.txt").write_text(
+                "Software Update found the following new or updated software:\n"
+                "* Label: Command Line Tools for Xcode 27.0-27.0\n"
+                "\tTitle: Command Line Tools for Xcode 27.0, Version: 27.0, Size: 519460KiB, Recommended: YES, \n"
+                "* Label: macOS 27.1 Update-27.1\n"
+                "\tTitle: macOS 27.1 Update, Version: 27.1, Size: 2519460KiB, Recommended: YES, \n",
+                encoding="utf-8",
+            )
+            (tmp_path / "pending_system").write_text("1\n", encoding="utf-8")
+
+            items = collect_run_items(tmp_path)
+            updated_items = [it for it in items if it["status"] == "updated" and it["category"] == "system"]
+            self.assertEqual(len(updated_items), 1)
+            self.assertEqual(updated_items[0]["name"], "Command Line Tools for Xcode 27.0")
+            self.assertEqual(updated_items[0]["new_version"], "27.0")
+
+            pending_items = [it for it in items if it["status"] == "pending" and it["category"] == "system"]
+            self.assertEqual(len(pending_items), 1)
+            self.assertEqual(pending_items[0]["name"], "macOS 27.1 Update")
+
 
 if __name__ == "__main__":
     unittest.main()

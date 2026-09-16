@@ -72,10 +72,17 @@ mac_update_platform_label() {
 
 # Check if Rosetta 2 translation environment is installed and active.
 mac_update_rosetta_installed() {
-    if pgrep -q oahd 2>/dev/null || /usr/bin/pgrep -q oahd 2>/dev/null; then
-        return 0
+    if command -v pgrep >/dev/null 2>&1; then
+        if pgrep -q oahd 2>/dev/null; then
+            return 0
+        fi
+    elif [ -x /usr/bin/pgrep ]; then
+        if /usr/bin/pgrep -q oahd 2>/dev/null; then
+            return 0
+        fi
     fi
-    if [ -d "/Library/Apple/usr/share/rosetta" ]; then
+    local rosetta_dir="${MAC_UPDATE_ROSETTA_DIR:-/Library/Apple/usr/share/rosetta}"
+    if [ -d "$rosetta_dir" ]; then
         return 0
     fi
     return 1
