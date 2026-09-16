@@ -1,11 +1,16 @@
 # Critical Rules — Do NOT Violate
 
-## 1. softwareupdate MUST use `-R`
+## 1. softwareupdate MUST use `-R` and per-label selection
 ```bash
-sudo softwareupdate -ia -R --verbose   # CORRECT — writes boot metadata
+sudo softwareupdate -i "$label" -R --verbose   # CORRECT — writes boot metadata
 # Without -R: update downloads but NEVER applies after reboot
 ```
 `-R` only restarts or shuts down when required, so it is safe to keep on every install path. If the user declines a restart-required update, do not install it without `-R`; exit non-zero with manual instructions.
+
+Never run bare `softwareupdate -ia`: it attempts to install all updates indiscriminately, including major macOS upgrades across releases (e.g. macOS 28.0 from macOS 27.0). Updates must be classified by major version:
+- Point/security updates (`same_major` and `other` components) are installed per label.
+- Major upgrades (`major`) require `MAC_UPDATE_ALLOW_MAJOR_UPGRADE=1` and explicit confirmation. If declined, exit code is 10 (`SKIPPED_BY_USER`).
+- On macOS 27+, `softwareupdate -l` labels may omit marketing codenames (e.g. `macOS 28.0-26A...` or `macOS 27.1 Update`), parsed by Title and Version headers rather than relying on codenames.
 
 ## 2. mas MUST use `sudo` (macOS 15.7.2+/14.8.2+/26.1+ entitlement change, see https://github.com/orgs/Homebrew/discussions/6550)
 ```bash

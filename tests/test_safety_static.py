@@ -212,8 +212,8 @@ class StaticShellSafetyTests(unittest.TestCase):
 
     def test_softwareupdate_install_uses_restart_flag(self) -> None:
         text = self.read_script("update_system.sh")
-        self.assertNotIn("softwareupdate -ia --verbose", text)
-        self.assertIn("softwareupdate -ia -R --verbose", text)
+        self.assertNotIn("softwareupdate -ia", text)
+        self.assertIn("softwareupdate -i \"$lbl\" -R --verbose", text)
 
     def test_update_all_uses_secure_tempdir(self) -> None:
         text = self.read_script("update_all.sh")

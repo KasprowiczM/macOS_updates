@@ -274,6 +274,9 @@ L_SYSTEM_SCRIPT_DONE="✅ SCRIPT 1 COMPLETED SUCCESSFULLY"
 
 # ── update_all.sh — additional strings ────────────────────────
 L_ALL_RESULT_SKIPPED="skipped"
+L_ALL_RESULT_SKIPPED_BY_USER="skipped by user"
+L_SYSTEM_MAJOR_AVAILABLE="Major macOS upgrade available: %s (%s) — skipped (requires MAC_UPDATE_ALLOW_MAJOR_UPGRADE=1)"
+L_SYSTEM_MAJOR_CONFIRM="Are you sure you want to install major upgrade (%s)? [Y/n]: "
 L_ALL_SUDO_NO_TTY="No TTY available — sudo will not be requested; root-only steps (App Store, macOS) are skipped"
 L_ALL_TOUCHID_HINT="Tip: Touch ID for sudo is not enabled. Run 'bash scripts/setup_touchid_sudo.sh' to use your fingerprint."
 L_ALL_SUDO_PREAUTH_FAILED="sudo pre-authentication failed or was skipped; steps requiring root may not run"

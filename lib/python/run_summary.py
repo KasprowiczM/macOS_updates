@@ -22,6 +22,7 @@ PENDING_FILES = (
     ("pending_after_run_brew_formulae", "pending_brew_formulae"),
     ("pending_after_run_brew_casks", "pending_brew_casks"),
     ("pending_after_run_mau", "pending_mau"),
+    ("pending_after_run_system", "pending_system"),
 )
 
 MAU_PRODUCT_NAMES = {
@@ -540,6 +541,28 @@ def collect_run_items(
                 "new_version": None,
                 "status": "pending",
                 "details": f"{pas_val} updates pending",
+            })
+
+    # macOS System pending updates from system_available.txt
+    pending_sys_file = sdir / "pending_system"
+    sys_avail_file = sdir / "system_available.txt"
+    pending_sys_val = None
+    if pending_sys_file.is_file():
+        pending_sys_val = pending_sys_file.read_text(encoding="utf-8", errors="replace").strip()
+
+    if pending_sys_val != "0" and sys_avail_file.is_file():
+        from system_updates import parse_softwareupdate_list
+        raw_sys = sys_avail_file.read_text(encoding="utf-8", errors="replace")
+        sys_items = parse_softwareupdate_list(raw_sys)
+        for s_it in sys_items:
+            items.append({
+                "name": s_it.get("title") or s_it.get("label", "macOS update"),
+                "id": s_it.get("label", "system"),
+                "category": "system",
+                "old_version": None,
+                "new_version": s_it.get("version") or None,
+                "status": "pending",
+                "details": f"Label: {s_it.get('label')}" if s_it.get("label") else None,
             })
 
     # 8. Unconfirmed or degraded steps from step_results

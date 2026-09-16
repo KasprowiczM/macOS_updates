@@ -275,6 +275,9 @@ L_SYSTEM_SCRIPT_DONE="✅ SKRYPT 1 ZAKOŃCZONY POMYŚLNIE"
 
 # ── update_all.sh — dodatkowe komunikaty ──────────────────────
 L_ALL_RESULT_SKIPPED="pominięty"
+L_ALL_RESULT_SKIPPED_BY_USER="pominięte przez użytkownika"
+L_SYSTEM_MAJOR_AVAILABLE="Dostępne uaktualnienie do nowej wersji systemu: %s (%s) — pominięto (wymaga MAC_UPDATE_ALLOW_MAJOR_UPGRADE=1)"
+L_SYSTEM_MAJOR_CONFIRM="Czy na pewno chcesz zainstalować uaktualnienie majora (%s)? [T/n]: "
 L_ALL_SUDO_NO_TTY="Brak TTY — sudo nie zostanie zapytane; kroki wymagające roota (App Store, macOS) są pomijane"
 L_ALL_TOUCHID_HINT="Wskazówka: Touch ID dla sudo nie jest włączony. Uruchom 'bash scripts/setup_touchid_sudo.sh', aby używać odcisku palca."
 L_ALL_SUDO_PREAUTH_FAILED="Uwierzytelnienie sudo nie powiodło się lub zostało pominięte; kroki wymagające roota mogą się nie wykonać"
