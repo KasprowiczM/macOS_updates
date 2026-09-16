@@ -51,7 +51,7 @@ write_machine_summary() {
     python3 -c '
 import json, os, sys
 sys.path.insert(0, os.path.join(sys.argv[1], "lib", "python"))
-from run_summary import build_run_summary, write_run_summary, merge_pending
+from run_summary import build_run_summary, write_run_summary, merge_pending, collect_run_items, format_terminal_summary
 
 script_dir = sys.argv[1]
 session_dir = sys.argv[2]
@@ -88,6 +88,15 @@ except (OSError, ValueError):
     counts = {}
 
 counts, verification = merge_pending(counts, session_dir)
+items = collect_run_items(
+    session_dir,
+    step_results=step_results,
+    inventory_updated_count=counts.get("inventory_version_fields_changed", 0),
+)
+observed_updates = len([it for it in items if it.get("status") == "updated"])
+counts["observed_package_changes"] = observed_updates
+if "inventory_version_fields_changed" not in counts:
+    counts["inventory_version_fields_changed"] = 0
 summary = build_run_summary(
     counts=counts,
     start_time=start_time,
@@ -101,6 +110,7 @@ summary = build_run_summary(
     verification=verification,
     run_status=os.environ.get("MAC_UPDATE_RUN_STATUS", "completed"),
     run_id=os.environ.get("MAC_UPDATE_RUN_ID"),
+    items=items,
 )
 
 logs_dir = os.path.join(script_dir, "logs")
@@ -110,8 +120,13 @@ write_run_summary(out_file, summary)
 latest_file = os.path.join(logs_dir, "run_summary_latest.json")
 write_run_summary(latest_file, summary)
 
-if os.environ.get("MAC_UPDATE_JSON_SUMMARY") == "1" and os.environ.get("MAC_UPDATE_RUN_STATUS") == "completed":
-    print(json.dumps(summary, indent=2))
+if os.environ.get("MAC_UPDATE_JSON_SUMMARY") == "1":
+    if os.environ.get("MAC_UPDATE_RUN_STATUS") == "completed":
+        print(json.dumps(summary, indent=2))
+elif os.environ.get("MAC_UPDATE_RUN_STATUS") == "completed":
+    lang = os.environ.get("MAC_LANG", "en")
+    print("")
+    print(format_terminal_summary(summary, lang=lang))
 ' "$SCRIPT_DIR" "$SESSION_DIR" "$START_TIME" "$end_now"       "${OVERALL_EXIT:-0}" "${DEGRADED:-0}" "${BLOCKING_EXIT:-0}"       "${RESULT_SCAN:-}" "${RESULT_APPSTORE:-}" "${RESULT_NPMCLI:-}" "${RESULT_BREW:-}"       "${RESULT_INTERNET:-}" "${RESULT_MD:-}" "${RESULT_SYSTEM:-}"
     rc=$?
     if [ "$rc" -eq 0 ] && { [ "$status" = "completed" ] || [ "$status" = "interrupted" ]; }; then
@@ -1402,6 +1417,9 @@ result_brew      = sys.argv[7]
 programy_md_path    = os.path.join(script_dir, 'APPLICATIONS.md')
 aktualizacje_md_path = os.path.join(script_dir, 'UPDATES.md')
 
+sys.path.insert(0, os.path.join(script_dir, 'lib', 'python'))
+from run_summary import collect_run_items
+
 def atomic_write_text(path, text, mode=0o600):
     directory = os.path.dirname(path) or '.'
     fd, tmp_path = tempfile.mkstemp(prefix='.mac-update.', dir=directory, text=True)
@@ -1452,6 +1470,20 @@ def read_npm_cli_versions(filepath):
     return versions, paths
 
 # ── Load snapshots ────────────────────────────────────────────
+def read_mas_versions(filepath):
+    versions = {}
+    try:
+        with open(filepath, encoding='utf-8', errors='replace') as f:
+            for line in f:
+                m = re.match(r'^\s*(\d+)\s+(.+?)\s+\(([^)]+)\)\s*$', line)
+                if m:
+                    versions[m.group(2).strip()] = m.group(3).strip()
+    except FileNotFoundError:
+        pass
+    return versions
+
+mas_before          = read_mas_versions(os.path.join(session_dir, 'mas_before.txt'))
+mas_after           = read_mas_versions(os.path.join(session_dir, 'mas_after.txt'))
 brew_formula_before = read_versions(os.path.join(session_dir, 'brew_formulae_before.txt'))
 brew_formula_after  = read_versions(os.path.join(session_dir, 'brew_formulae_after.txt'))
 brew_cask_before    = read_versions(os.path.join(session_dir, 'brew_casks_before.txt'))
@@ -1459,27 +1491,18 @@ brew_cask_after     = read_versions(os.path.join(session_dir, 'brew_casks_after.
 npm_cli_before, npm_cli_paths_before = read_npm_cli_versions(os.path.join(session_dir, 'npm_cli_before.txt'))
 npm_cli_after, npm_cli_paths_after = read_npm_cli_versions(os.path.join(session_dir, 'npm_cli_after.txt'))
 
-# ── Compute what changed ──────────────────────────────────────
-formula_upgrades = {}
-for name, new_ver in brew_formula_after.items():
-    old_ver = brew_formula_before.get(name)
-    if old_ver and old_ver != new_ver:
-        formula_upgrades[name] = (old_ver, new_ver)
+# ── Compute what changed (harmonized with collect_run_items) ──
+updated_items = [it for it in collect_run_items(session_dir) if it.get("status") == "updated"]
 
-cask_upgrades = {}
-for name, new_ver in brew_cask_after.items():
-    old_ver = brew_cask_before.get(name)
-    if old_ver and old_ver != new_ver:
-        cask_upgrades[name] = (old_ver, new_ver)
+appstore_upgrades = {it["name"]: (it["old_version"], it["new_version"]) for it in updated_items if it.get("category") == "appstore"}
+formula_upgrades  = {it["name"]: (it["old_version"], it["new_version"]) for it in updated_items if it.get("category") == "brew_formula"}
+cask_upgrades     = {it["name"]: (it["old_version"], it["new_version"]) for it in updated_items if it.get("category") == "brew_cask"}
+npm_cli_upgrades  = {it["name"]: (it["old_version"], it["new_version"]) for it in updated_items if it.get("category") == "npm_cli"}
+internet_upgrades = {it["name"]: (it["old_version"], it["new_version"]) for it in updated_items if it.get("category") == "internet"}
+system_upgrades   = {it["name"]: (it["old_version"], it["new_version"]) for it in updated_items if it.get("category") == "system"}
 
 formula_new = {k: v for k, v in brew_formula_after.items() if k not in brew_formula_before}
 cask_new    = {k: v for k, v in brew_cask_after.items()    if k not in brew_cask_before}
-npm_cli_upgrades = {}
-for name, new_ver in npm_cli_after.items():
-    old_ver = npm_cli_before.get(name)
-    if old_ver and old_ver != new_ver and old_ver != '?' and new_ver != '?':
-        npm_cli_upgrades[name] = (old_ver, new_ver)
-
 npm_cli_new = {k: v for k, v in npm_cli_after.items() if k not in npm_cli_before}
 
 # ── Compute internet app changes ──────────────────────────────
@@ -1500,12 +1523,6 @@ def read_internet_versions(filepath):
 internet_before = read_internet_versions(os.path.join(session_dir, 'internet_before.txt'))
 internet_after  = read_internet_versions(os.path.join(session_dir, 'internet_after.txt'))
 installed_apps_after = read_internet_versions(os.path.join(session_dir, 'installed_apps_after.txt'))
-
-internet_upgrades = {}
-for name, new_ver in internet_after.items():
-    old_ver = internet_before.get(name)
-    if old_ver and old_ver != new_ver and old_ver != '?' and new_ver != '?':
-        internet_upgrades[name] = (old_ver, new_ver)
 
 # Map config/snapshot keys → APPLICATIONS.md table row names
 INTERNET_SNAPSHOT_ALIASES = {
@@ -1729,7 +1746,7 @@ if os.environ.get('MAC_UPDATE_INVENTORY_ONLY') == '1':
 print(f"\n  {os.environ.get('L_POSTUPDATE_UPDATING_HISTORY_UPDATES_MD', 'Updating session history in UPDATES.md...')}")
 
 now = datetime.now().strftime('%Y-%m-%d %H:%M')
-total_upgrades = len(formula_upgrades) + len(cask_upgrades) + len(internet_upgrades) + len(npm_cli_upgrades)
+total_upgrades = len(updated_items)
 
 history_lines = [
     f"\n### 🔄 Sesja aktualizacji: {now}\n",
@@ -1742,6 +1759,22 @@ history_lines = [
     f"| 🍺 Homebrew | {result_brew} |",
     f"",
 ]
+
+if system_upgrades:
+    history_lines.append("**🍎 System macOS — zaktualizowano:**\n")
+    history_lines.append("| Komponent | Poprzednia wersja | Nowa wersja |")
+    history_lines.append("|-----------|-------------------|-------------|")
+    for name, (old, new) in sorted(system_upgrades.items()):
+        history_lines.append(f"| {name} | {old} | {new} |")
+    history_lines.append("")
+
+if appstore_upgrades:
+    history_lines.append("**🛍️ App Store — zaktualizowane aplikacje:**\n")
+    history_lines.append("| Aplikacja | Poprzednia wersja | Nowa wersja |")
+    history_lines.append("|-----------|-------------------|-------------|")
+    for name, (old, new) in sorted(appstore_upgrades.items()):
+        history_lines.append(f"| {name} | {old} | {new} |")
+    history_lines.append("")
 
 if formula_upgrades or cask_upgrades:
     history_lines.append("**🍺 Homebrew — zaktualizowane pakiety:**\n")
@@ -1852,16 +1885,15 @@ atomic_write_text(aktualizacje_md_path, ak_content)
 print(f"  ✅ UPDATES.md zaktualizowany")
 print(f"")
 print(f"  📊 Podsumowanie zmian:")
+print(f"     App Store zaktualizowane:         {len(appstore_upgrades)}")
 print(f"     Formulae Homebrew zaktualizowane: {len(formula_upgrades)}")
 print(f"     Casks Homebrew zaktualizowane:    {len(cask_upgrades)}")
 print(f"     Nowe pakiety Homebrew:            {len(formula_new) + len(cask_new)}")
 print(f"     Native CLI + npm:                 {len(npm_cli_upgrades) + len(npm_cli_new)}")
 print(f"     Zmiany wersji aplikacji inet.:    {len(internet_upgrades)}")
-_observed = (
-    len(formula_upgrades) + len(cask_upgrades) + len(formula_new)
-    + len(cask_new) + len(npm_cli_upgrades) + len(npm_cli_new)
-    + len(internet_upgrades)
-)
+if system_upgrades:
+    print(f"     System macOS zaktualizowany:      {len(system_upgrades)}")
+_observed = len(updated_items)
 print(f"     {os.environ.get('L_POSTUPDATE_INVENTORY_FIELDS_CHANGED', 'Inventory version fields changed: %s') % updated_count}")
 print(f"     {os.environ.get('L_POSTUPDATE_OBSERVED_PACKAGE_CHANGES', 'Observed package/CLI changes: %s') % _observed}")
 
@@ -1872,11 +1904,13 @@ print(f"     {os.environ.get('L_POSTUPDATE_OBSERVED_PACKAGE_CHANGES', 'Observed 
 # the human log to learn how many packages actually moved. These are the counts
 # already printed above, written once, from the step that computed them.
 _counts = {
+    "appstore_upgraded": len(appstore_upgrades),
     "brew_formulae_upgraded": len(formula_upgrades),
     "brew_casks_upgraded": len(cask_upgrades),
     "brew_new_packages": len(formula_new) + len(cask_new),
     "native_cli_npm_changed": len(npm_cli_upgrades) + len(npm_cli_new),
     "internet_app_versions_changed": len(internet_upgrades),
+    "system_upgraded": len(system_upgrades),
     "inventory_version_fields_changed": updated_count,
     "observed_package_changes": _observed,
 }

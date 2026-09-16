@@ -524,7 +524,7 @@ mau_classify_output() {
 # "No updates available" is authoritative: when MAU prints it there are zero
 # pending updates no matter what spinner fragments trail behind it.
 mau_has_no_updates_sentinel() {
-    mau_sanitize_output "$1" | grep -qi '^no updates available$'
+    mau_sanitize_output "$1" | grep -qi '^[[:space:]]*no updates available'
 }
 
 # Genuine pending product IDs only, de-duplicated, one per line.
@@ -554,20 +554,132 @@ mau_installable_ids() {
         | sed 's/[[:space:]]*$//' || true
 }
 
+# Echo space-separated IDs that appear in both $1 and $2
+mau_intersect_ids() {
+    local candidates="$1"
+    local permitted="$2"
+    # shellcheck disable=SC2086
+    printf '%s\n' $candidates | awk -v perm=" $permitted " '
+        NF && index(perm, " " $1 " ") > 0 { print $1 }
+    ' | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+}
+
+# Detect interruption patterns in msupdate output regardless of exit code.
+mau_output_has_interruption() {
+    local clean
+    clean="$(mau_sanitize_output "$1")"
+    if printf '%s\n' "$clean" | grep -qE 'Update Assistant terminated|XPC Connection to updater invalidated|Connection to updater invalidated'; then
+        return 0
+    fi
+    return 1
+}
+
+# Verify msupdate --list output semantically:
+# Returns 0 if listing was successful (either valid empty queue sentinel or valid recognized IDs).
+# Returns 1 if exit != 0, output has interruption, sanitized output is empty, or output is unrecognized.
+mau_is_valid_listing() {
+    local exit_code="$1"
+    local output="$2"
+    if [ "$exit_code" -ne 0 ]; then
+        return 1
+    fi
+    if mau_output_has_interruption "$output"; then
+        return 1
+    fi
+    local clean
+    clean="$(mau_sanitize_output "$output")"
+    if [ -z "$clean" ]; then
+        return 1
+    fi
+    if mau_has_no_updates_sentinel "$output"; then
+        return 0
+    fi
+    local pending
+    pending="$(mau_parse_pending "$output")"
+    if [ -n "$pending" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# Specific interruption cause for diagnostics and logs.
+mau_interruption_reason() {
+    local clean
+    clean="$(mau_sanitize_output "$1")"
+    if printf '%s\n' "$clean" | grep -q 'Update Assistant terminated'; then
+        echo "Update Assistant terminated"
+    elif printf '%s\n' "$clean" | grep -q 'XPC Connection to updater invalidated'; then
+        echo "XPC Connection to updater invalidated"
+    elif printf '%s\n' "$clean" | grep -qE 'Connection.*invalidated'; then
+        echo "Connection to updater invalidated"
+    else
+        echo "Updater process interrupted"
+    fi
+}
+
+# Check for active Microsoft AutoUpdate / msupdate processes.
+mau_active_install_processes() {
+    if [ -n "${MAC_UPDATE_MOCK_ACTIVE_PROCESSES+x}" ]; then
+        printf '%s' "$MAC_UPDATE_MOCK_ACTIVE_PROCESSES"
+        return 0
+    fi
+    pgrep -f "Microsoft Update Assistant.app/Contents/MacOS/Microsoft Update Assistant|msupdate" 2>/dev/null || true
+}
+
+# Wait until active MAU installer processes finish or timeout expires.
+mau_wait_for_idle() {
+    local max_wait="${MAC_UPDATE_MAU_IDLE_TIMEOUT:-${1:-15}}" elapsed=0
+    while [ "$elapsed" -lt "$max_wait" ]; do
+        if [ -z "$(mau_active_install_processes)" ]; then
+            return 0
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    [ -z "$(mau_active_install_processes)" ]
+}
+
+# Record detailed diagnostics before and after msupdate runs.
+mau_log_listing_diagnostics() {
+    local phase="$1" exit_code="$2" output="$3"
+    local pending unrecognized count
+    pending="$(mau_parse_pending "$output")"
+    unrecognized="$(mau_parse_unrecognized "$output")"
+    count="$(mau_count_lines "$pending")"
+    internet_diag_log "MAU listing diagnostics ($phase): exit=$exit_code count=$count pending=[$(printf '%s' "$pending" | tr '\n' ' ' | sed 's/[[:space:]]*$//')]"
+    if [ -n "$unrecognized" ]; then
+        internet_diag_log "MAU listing diagnostics ($phase) unrecognized: $(printf '%s\n' "$unrecognized" | tr '\n' ';')"
+    fi
+}
+
 # One scoped msupdate --install pass over a space-separated ID list. Sets
-# MAU_INSTALL_CLEAN for the caller and returns msupdate's exit status.
+# MAU_INSTALL_CLEAN, MAU_INSTALL_INTERRUPTED, and MAU_INSTALL_INTERRUPT_REASON
+# for the caller and returns msupdate's exit status (or soft failure 10 if interrupted).
 mau_run_scoped_install() {
     local ids="$1" out="" install_exit=0
-    print_step "$(internet_msg "$L_INTERNET_MS_INSTALLING_SCOPED_FMT" "$ids")"
+    MAU_INSTALL_INTERRUPTED=0
+    MAU_INSTALL_INTERRUPT_REASON=""
+    local timeout="${MAU_INSTALL_TIMEOUT:-$(( ${MAU_INSTALL_WAIT:-300} + 60 ))}"
+    local cli="${MAU_CLI:-msupdate}"
+    local wait_secs="${MAU_INSTALL_WAIT:-300}"
     # shellcheck disable=SC2086  # deliberate word splitting: one argv per product ID
-    out=$(run_with_timeout "$MAU_INSTALL_TIMEOUT" "$MAU_CLI" \
-        --install --wait "$MAU_INSTALL_WAIT" --apps $ids 2>&1) || install_exit=$?
+    out=$(run_with_timeout "$timeout" "$cli" \
+        --install --wait "$wait_secs" --apps $ids 2>&1) || install_exit=$?
     MAU_INSTALL_CLEAN="$(mau_sanitize_output "$out")"
     [ -n "$MAU_INSTALL_CLEAN" ] && printf '%s\n' "$MAU_INSTALL_CLEAN" | tail -n 20
-    internet_diag_log "msupdate --install --apps $ids (exit=$install_exit, sanitized):"
+    if mau_output_has_interruption "$out"; then
+        MAU_INSTALL_INTERRUPTED=1
+        MAU_INSTALL_INTERRUPT_REASON="$(mau_interruption_reason "$out")"
+        internet_diag_log "WARNING: msupdate --install interrupted ($MAU_INSTALL_INTERRUPT_REASON) despite exit=$install_exit"
+    fi
+    internet_diag_log "msupdate --install --apps $ids (exit=$install_exit, interrupted=$MAU_INSTALL_INTERRUPTED, sanitized):"
     [ -n "$MAU_INSTALL_CLEAN" ] && internet_diag_log "$MAU_INSTALL_CLEAN"
+    if [ "$MAU_INSTALL_INTERRUPTED" -eq 1 ] && [ "$install_exit" -eq 0 ]; then
+        install_exit=10
+    fi
     return "$install_exit"
 }
+
 
 # Strictly numeric count of non-blank lines, so the caller's -gt comparison
 # can never see whitespace or a multiline value.
@@ -601,7 +713,11 @@ mau_timeout_value() {
 # Every read and every mutation happens on an exported copy, so a partial
 # failure can never corrupt the live com.microsoft.autoupdate2 domain.
 mau_prefs_export() {
-    defaults export com.microsoft.autoupdate2 "$1" >/dev/null 2>&1
+    if [ -n "${MAC_UPDATE_MAU_PREFS_FILE:-}" ] && [ -f "$MAC_UPDATE_MAU_PREFS_FILE" ]; then
+        cp "$MAC_UPDATE_MAU_PREFS_FILE" "$1" >/dev/null 2>&1
+    else
+        defaults export com.microsoft.autoupdate2 "$1" >/dev/null 2>&1
+    fi
 }
 
 mau_plist_keys() {
@@ -649,7 +765,11 @@ mau_installed_build_for_id() {
 
 # One entry of Microsoft AutoUpdate's AppVersions register, by bundle path.
 mau_prefs_read_app_version() {
-    defaults read com.microsoft.autoupdate2 AppVersions 2>/dev/null \
+    local cmd="defaults read com.microsoft.autoupdate2 AppVersions"
+    if [ -n "${MAC_UPDATE_MAU_PREFS_FILE:-}" ] && [ -f "$MAC_UPDATE_MAU_PREFS_FILE" ]; then
+        cmd="defaults read $MAC_UPDATE_MAU_PREFS_FILE AppVersions"
+    fi
+    $cmd 2>/dev/null \
         | awk -v app="\"$1\"" '
             index($0, app) == 0 { next }
             {
@@ -792,13 +912,14 @@ mau_arm_deferrals() {
 # Microsoft product ID → the installed bundle that product updates.
 # Bash 3.2 has no associative arrays, so this stays a case lookup.
 mau_app_path_for_id() {
+    local apps_dir="${MAC_UPDATE_APPS_DIR:-/Applications}"
     case "$1" in
-        MSWD2019) echo "/Applications/Microsoft Word.app" ;;
-        XCEL2019) echo "/Applications/Microsoft Excel.app" ;;
-        PPT32019) echo "/Applications/Microsoft PowerPoint.app" ;;
-        OPIM2019) echo "/Applications/Microsoft Outlook.app" ;;
-        ONMC2019) echo "/Applications/Microsoft OneNote.app" ;;
-        TEAMS21)  echo "/Applications/Microsoft Teams.app" ;;
+        MSWD2019) echo "$apps_dir/Microsoft Word.app" ;;
+        XCEL2019) echo "$apps_dir/Microsoft Excel.app" ;;
+        PPT32019) echo "$apps_dir/Microsoft PowerPoint.app" ;;
+        OPIM2019) echo "$apps_dir/Microsoft Outlook.app" ;;
+        ONMC2019) echo "$apps_dir/Microsoft OneNote.app" ;;
+        TEAMS21)  echo "$apps_dir/Microsoft Teams.app" ;;
     esac
 }
 
@@ -886,7 +1007,9 @@ mau_deferral_preflight() {
     plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
     # defaults import replaces the whole domain, so stop MAU first — otherwise
     # its daemon can race the rewrite and win.
-    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    fi
     if ! mau_prefs_export "$plist"; then
         rm -f "$plist" 2>/dev/null || true
         internet_diag_log "WARN: could not export com.microsoft.autoupdate2 preferences"
@@ -1073,7 +1196,9 @@ mau_reconcile_deferrals() {
     plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
     # defaults import replaces the whole domain, so stop MAU first — otherwise
     # its daemon can race the rewrite and win.
-    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    fi
     if ! mau_prefs_export "$plist"; then
         rm -f "$plist" 2>/dev/null || true
         internet_diag_log "WARN: could not export com.microsoft.autoupdate2 for reconcile"
@@ -1109,12 +1234,21 @@ mau_reconcile_deferrals() {
         rm -f "$plist" 2>/dev/null || true
         return 1
     fi
-    if ! defaults import com.microsoft.autoupdate2 "$plist" >/dev/null 2>&1; then
-        print_warn "Could not import reconciled Microsoft AutoUpdate preferences"
-        print_info "Restore with: defaults import com.microsoft.autoupdate2 $backup"
-        internet_diag_log "ERROR: defaults import failed during reconcile; backup at $backup"
-        rm -f "$plist" 2>/dev/null || true
-        return 1
+    if [ -n "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        if ! cp "$plist" "$MAC_UPDATE_MAU_PREFS_FILE" 2>/dev/null; then
+            print_warn "Could not import reconciled Microsoft AutoUpdate preferences"
+            internet_diag_log "ERROR: cp to MAC_UPDATE_MAU_PREFS_FILE failed during reconcile"
+            rm -f "$plist" 2>/dev/null || true
+            return 1
+        fi
+    else
+        if ! defaults import com.microsoft.autoupdate2 "$plist" >/dev/null 2>&1; then
+            print_warn "Could not import reconciled Microsoft AutoUpdate preferences"
+            print_info "Restore with: defaults import com.microsoft.autoupdate2 $backup"
+            internet_diag_log "ERROR: defaults import failed during reconcile; backup at $backup"
+            rm -f "$plist" 2>/dev/null || true
+            return 1
+        fi
     fi
     rm -f "$plist" 2>/dev/null || true
     # Deliberately no `killall cfprefsd` here. defaults import hands the write
@@ -1122,7 +1256,9 @@ mau_reconcile_deferrals() {
     # straight afterwards discards the write. That silently reverted every
     # reconcile while still reporting success. Only MAU is restarted, so it
     # re-reads the domain on its next launch.
-    killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    fi
 
     # Never claim a change that did not land: re-read the live domain and
     # report what it actually contains.
@@ -1180,8 +1316,9 @@ mau_reconcile_deferrals() {
 iu_microsoft_365() {
     print_header "💼 Microsoft 365 (via Microsoft AutoUpdate)"
 
-    MAU_CLI="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate"
-    MAU_APP="/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app"
+    local apps_dir="${MAC_UPDATE_APPS_DIR:-/Applications}"
+    MAU_CLI="${MAC_UPDATE_MAU_CLI:-/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate}"
+    MAU_APP="${MAC_UPDATE_MAU_APP:-/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app}"
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
         printf '%s\n' unknown > "$MAC_UPDATE_SESSION_DIR/pending_mau"
     fi
@@ -1199,27 +1336,36 @@ iu_microsoft_365() {
     MS_INSTALLED=0
     for ms_app in "Microsoft Word" "Microsoft Excel" "Microsoft PowerPoint" \
                    "Microsoft Outlook" "Microsoft OneNote"; do
-        if [ -d "/Applications/${ms_app}.app" ]; then
-            VER=$(app_version "/Applications/${ms_app}.app")
+        if [ -d "${apps_dir}/${ms_app}.app" ]; then
+            VER=$(app_version "${apps_dir}/${ms_app}.app")
             print_info "${ms_app}: $VER"
             MS_INSTALLED=1
         fi
     done
 
-    if [ "$MS_INSTALLED" = "1" ]; then
-        if [ -f "$MAU_CLI" ]; then
-            # Report the deferral state and clear version pins. The DeferralDays
-            # quarantine is reconciled after the list, once the offer is known.
-            mau_deferral_preflight || true
+    if [ "$MS_INSTALLED" = "0" ]; then
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+            printf '0\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+            : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+        fi
+        print_info "$L_INTERNET_MS_NONE_INSTALLED"
+        return 0
+    fi
 
-            if [ "${MAC_UPDATE_MAU_CLEAR_DEFERRALS:-0}" = "1" ]; then
-                local _plist_def before_def _def_key _def_entry _after_def=""
-                _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
-                if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
-                    before_def="$(mau_deferral_state "$_plist_def")"
-                    rm -f "$_plist_def" 2>/dev/null || true
-                    if [ -n "$before_def" ]; then
-                        print_step "MAC_UPDATE_MAU_CLEAR_DEFERRALS=1: Clearing detected MAU deferrals..."
+    if [ -f "$MAU_CLI" ]; then
+        # Report the deferral state and clear version pins. The DeferralDays
+        # quarantine is reconciled after the list, once the offer is known.
+        mau_deferral_preflight || true
+
+        if [ "${MAC_UPDATE_MAU_CLEAR_DEFERRALS:-0}" = "1" ]; then
+            local _plist_def before_def _def_key _def_entry _after_def=""
+            _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
+            if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
+                before_def="$(mau_deferral_state "$_plist_def")"
+                rm -f "$_plist_def" 2>/dev/null || true
+                if [ -n "$before_def" ]; then
+                    print_step "MAC_UPDATE_MAU_CLEAR_DEFERRALS=1: Clearing detected MAU deferrals..."
+                    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
                         killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
                         for _def_entry in $before_def; do
                             [ -n "$_def_entry" ] || continue
@@ -1227,144 +1373,285 @@ iu_microsoft_365() {
                             defaults delete com.microsoft.autoupdate2 "OptionalUpdatesDeferrals.$_def_key" 2>/dev/null || true
                         done
                         defaults delete com.microsoft.autoupdate2 "OptionalUpdatesDeferrals" 2>/dev/null || true
-
-                        _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
-                        if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
-                            _after_def="$(mau_deferral_state "$_plist_def")"
-                            rm -f "$_plist_def" 2>/dev/null || true
-                        fi
-                        print_ok "Cleared MAU deferrals (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
-                        internet_diag_log "MAU deferrals cleared by MAC_UPDATE_MAU_CLEAR_DEFERRALS=1 (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
                     fi
+
+                    _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
+                    if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
+                        _after_def="$(mau_deferral_state "$_plist_def")"
+                        rm -f "$_plist_def" 2>/dev/null || true
+                    fi
+                    print_ok "Cleared MAU deferrals (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
+                    internet_diag_log "MAU deferrals cleared by MAC_UPDATE_MAU_CLEAR_DEFERRALS=1 (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
                 fi
             fi
+        fi
 
-            # Krok 1: sprawdź dostępne aktualizacje z limitem czasu MAU_CHECK_TIMEOUT
-            print_step "$L_INTERNET_MS_CHECKING"
-            MAU_LIST_EXIT=0
-            MAU_LIST=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_LIST_EXIT=$?
+        # Krok 1: sprawdź dostępne aktualizacje z limitem czasu MAU_CHECK_TIMEOUT
+        print_step "$L_INTERNET_MS_CHECKING"
+        MAU_LIST_EXIT=0
+        MAU_LIST=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_LIST_EXIT=$?
+        mau_log_listing_diagnostics "initial" "$MAU_LIST_EXIT" "$MAU_LIST"
 
-            if [ "$MAU_LIST_EXIT" -ne 0 ]; then
-                print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_LIST_EXIT")"
-                MAU_LIST_CLEAN="$(mau_sanitize_output "$MAU_LIST")"
-                [ -n "$MAU_LIST_CLEAN" ] && printf '%s\n' "$MAU_LIST_CLEAN" | tail -n 20
-                internet_diag_log "ERROR: msupdate --list failed (exit=$MAU_LIST_EXIT)"
-                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
-            else
-                # Only positively identified product IDs count as pending. The
-                # old "every non-blank line" filter counted spinner fragments.
-                MAU_PENDING="$(mau_parse_pending "$MAU_LIST")"
-                MAU_UNRECOGNIZED="$(mau_parse_unrecognized "$MAU_LIST")"
-                [ -n "$MAU_UNRECOGNIZED" ] && internet_diag_log \
-                    "msupdate --list unrecognized lines: $(printf '%s\n' "$MAU_UNRECOGNIZED" | tr '\n' ';')"
-                if printf '%s\n' "$MAU_PENDING" | grep -q '^TEAMS21$'; then
-                    MAU_TEAMS21_OFFERED=1
+        if ! mau_is_valid_listing "$MAU_LIST_EXIT" "$MAU_LIST"; then
+            print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_LIST_EXIT")"
+            MAU_LIST_CLEAN="$(mau_sanitize_output "$MAU_LIST")"
+            [ -n "$MAU_LIST_CLEAN" ] && printf '%s\n' "$MAU_LIST_CLEAN" | tail -n 20
+            internet_diag_log "ERROR: msupdate --list failed or invalid (exit=$MAU_LIST_EXIT)"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                printf 'unknown\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                rm -f "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt" 2>/dev/null || true
+                if mau_output_has_interruption "$MAU_LIST"; then
+                    printf '%s\n' "$(mau_interruption_reason "$MAU_LIST")" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
                 fi
-                MAU_COUNT="$(mau_count_lines "$MAU_PENDING")"
+            fi
+            STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+        else
+            # Only positively identified product IDs count as pending. The
+            # old "every non-blank line" filter counted spinner fragments.
+            MAU_PENDING="$(mau_parse_pending "$MAU_LIST")"
+            MAU_UNRECOGNIZED="$(mau_parse_unrecognized "$MAU_LIST")"
+            [ -n "$MAU_UNRECOGNIZED" ] && internet_diag_log \
+                "msupdate --list unrecognized lines: $(printf '%s\n' "$MAU_UNRECOGNIZED" | tr '\n' ';')"
+            if printf '%s\n' "$MAU_PENDING" | grep -q '^TEAMS21$'; then
+                MAU_TEAMS21_OFFERED=1
+            fi
+            MAU_COUNT="$(mau_count_lines "$MAU_PENDING")"
 
-                if [ "$MAU_COUNT" -gt 0 ]; then
-                    print_info "$(internet_msg "$L_INTERNET_MS_UPDATES_AVAILABLE" "$MAU_COUNT")"
-                    printf '%s\n' "$MAU_PENDING" | while IFS= read -r line; do
-                        [ -n "$line" ] && print_info "  → $line"
+            if [ "$MAU_COUNT" -gt 0 ]; then
+                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                    printf '%s\n' "$MAU_PENDING" > "$MAC_UPDATE_SESSION_DIR/mau_pending.txt"
+                fi
+                print_info "$(internet_msg "$L_INTERNET_MS_UPDATES_AVAILABLE" "$MAU_COUNT")"
+                printf '%s\n' "$MAU_PENDING" | while IFS= read -r line; do
+                    [ -n "$line" ] && print_info "  → $line"
+                done
+
+                # A package whose short version is not newer than the
+                # installed app can never install: PackageKit skips the
+                # component and the delta postinstall fails with 112.
+                # Quarantine those instead of downloading them again.
+                MAU_PENDING_IDS="$(printf '%s\n' "$MAU_PENDING" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                MAU_REGRESSED="$(mau_regressed_entries "$MAU_LIST" "$MAU_PENDING_IDS")"
+                MAU_REGRESSED_IDS="$(printf '%s\n' "$MAU_REGRESSED" \
+                    | awk 'NF { print $1 }' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                if [ -n "$MAU_REGRESSED_IDS" ]; then
+                    _mau_chan="$(mau_current_channel)"
+                    _mau_stale_limit="${MAC_UPDATE_STALE_DAYS:-45}"
+                    _mau_days_unchanged="$(internet_get_app_days_unchanged "Microsoft Word")"
+                    printf '%s\n' "$MAU_REGRESSED" | while read -r r_id r_offered r_installed; do
+                        [ -n "$r_id" ] || continue
+                        print_warn "$(internet_msg "$L_INTERNET_MS_REGRESSION_FMT" "$r_id" "$r_offered" "$r_installed")"
+                        print_warn "$(internet_msg "$L_INTERNET_MS_CHANNEL_DIAG_FMT" "$_mau_chan" "$r_installed" "$r_offered")"
+                    done
+                    if [ "$_mau_days_unchanged" -gt "$_mau_stale_limit" ]; then
+                        print_warn "$(internet_msg "$L_INTERNET_STALE_WARNING_FMT" "$_mau_days_unchanged" "$_mau_stale_limit")"
+                    else
+                        print_info "$L_INTERNET_MS_REGRESSION_NOTE"
+                    fi
+                    internet_diag_log "MAU upstream package regression (channel=$_mau_chan, offered <= installed): $(printf '%s\n' "$MAU_REGRESSED" | tr '\n' ';')"
+                fi
+                mau_reconcile_deferrals "$MAU_REGRESSED_IDS" "$MAU_PENDING_IDS" || true
+
+                # TEAMS21 is dropped by mau_installable_ids: Microsoft
+                # documents Teams as unmanageable through msupdate.
+                MAU_INSTALL_IDS="$(printf '%s\n' "$MAU_PENDING" \
+                    | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                MAU_INSTALL_IDS="$(mau_installable_ids "$MAU_INSTALL_IDS")"
+
+                if [ -z "$MAU_INSTALL_IDS" ]; then
+                    # Everything pending is quarantined or Teams-owned:
+                    # there is nothing msupdate can usefully install.
+                    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                        printf '0\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                        : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                    fi
+                    if [ -n "$MAU_REGRESSED_IDS" ]; then
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
+                    else
+                        print_ok "$L_INTERNET_MS_CURRENT"
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+                    fi
+                else
+                    # Snapshot pre-install versions of installable targets
+                    _mau_pre_versions=""
+                    for _mid in $MAU_INSTALL_IDS; do
+                        _mapp="$(mau_app_path_for_id "$_mid")"
+                        if [ -n "$_mapp" ] && [ -d "$_mapp" ]; then
+                            _mver="$(mau_installed_short_version "$_mapp")"
+                            _mau_pre_versions="${_mau_pre_versions} ${_mid}=${_mver}"
+                        fi
                     done
 
-                    # A package whose short version is not newer than the
-                    # installed app can never install: PackageKit skips the
-                    # component and the delta postinstall fails with 112.
-                    # Quarantine those instead of downloading them again.
-                    MAU_PENDING_IDS="$(printf '%s\n' "$MAU_PENDING" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
-                    MAU_REGRESSED="$(mau_regressed_entries "$MAU_LIST" "$MAU_PENDING_IDS")"
-                    MAU_REGRESSED_IDS="$(printf '%s\n' "$MAU_REGRESSED" \
-                        | awk 'NF { print $1 }' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
-                    if [ -n "$MAU_REGRESSED_IDS" ]; then
-                        _mau_chan="$(mau_current_channel)"
-                        _mau_stale_limit="${MAC_UPDATE_STALE_DAYS:-45}"
-                        _mau_days_unchanged="$(internet_get_app_days_unchanged "Microsoft Word")"
-                        printf '%s\n' "$MAU_REGRESSED" | while read -r r_id r_offered r_installed; do
-                            [ -n "$r_id" ] || continue
-                            print_warn "$(internet_msg "$L_INTERNET_MS_REGRESSION_FMT" "$r_id" "$r_offered" "$r_installed")"
-                            print_warn "$(internet_msg "$L_INTERNET_MS_CHANNEL_DIAG_FMT" "$_mau_chan" "$r_installed" "$r_offered")"
-                        done
-                        if [ "$_mau_days_unchanged" -gt "$_mau_stale_limit" ]; then
-                            print_warn "$(internet_msg "$L_INTERNET_STALE_WARNING_FMT" "$_mau_days_unchanged" "$_mau_stale_limit")"
-                        else
-                            print_info "$L_INTERNET_MS_REGRESSION_NOTE"
-                        fi
-                        internet_diag_log "MAU upstream package regression (channel=$_mau_chan, offered <= installed): $(printf '%s\n' "$MAU_REGRESSED" | tr '\n' ';')"
-                    fi
-                    mau_reconcile_deferrals "$MAU_REGRESSED_IDS" "$MAU_PENDING_IDS" || true
+                    MAU_INSTALL_EXIT=0
+                    mau_run_scoped_install "$MAU_INSTALL_IDS" || MAU_INSTALL_EXIT=$?
+                    mau_wait_for_idle 15 || true
 
-                    # TEAMS21 is dropped by mau_installable_ids: Microsoft
-                    # documents Teams as unmanageable through msupdate.
-                    MAU_INSTALL_IDS="$(printf '%s\n' "$MAU_PENDING" \
-                        | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
-                    MAU_INSTALL_IDS="$(mau_installable_ids "$MAU_INSTALL_IDS")"
+                    MAU_LAST_EXIT="$MAU_INSTALL_EXIT"
+                    MAU_LAST_INTERRUPTED="${MAU_INSTALL_INTERRUPTED:-0}"
+                    MAU_LAST_REASON="${MAU_INSTALL_INTERRUPT_REASON:-}"
 
-                    if [ -z "$MAU_INSTALL_IDS" ]; then
-                        # Everything pending is quarantined or Teams-owned:
-                        # there is nothing msupdate can usefully install.
-                        if [ -n "$MAU_REGRESSED_IDS" ]; then
-                            STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
-                        else
-                            print_ok "$L_INTERNET_MS_CURRENT"
-                            STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
-                        fi
-                    else
-                        MAU_INSTALL_EXIT=0
-                        mau_run_scoped_install "$MAU_INSTALL_IDS" || MAU_INSTALL_EXIT=$?
-                        if [ "$MAU_INSTALL_EXIT" -eq 0 ]; then
-                            MAU_VERIFY_EXIT=0
-                            MAU_VERIFY=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
-                            # Quarantined products are still offered by the
-                            # feed, so they are expected to remain listed.
-                            MAU_REMAINING="$(mau_parse_pending "$MAU_VERIFY" \
-                                | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
-                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
-                                printf '%s\n' "$(mau_count_lines "$MAU_REMAINING")" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                    MAU_VERIFY_EXIT=0
+                    MAU_VERIFY=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
+                    mau_log_listing_diagnostics "post-install-1" "$MAU_VERIFY_EXIT" "$MAU_VERIFY"
+
+                    if ! mau_is_valid_listing "$MAU_VERIFY_EXIT" "$MAU_VERIFY"; then
+                        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                            printf 'unknown\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                            rm -f "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt" 2>/dev/null || true
+                            if mau_output_has_interruption "$MAU_VERIFY"; then
+                                printf '%s\n' "$(mau_interruption_reason "$MAU_VERIFY")" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                            elif [ -n "$MAU_LAST_REASON" ]; then
+                                printf '%s\n' "$MAU_LAST_REASON" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
                             fi
-                            if [ "$MAU_VERIFY_EXIT" -ne 0 ]; then
-                                print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_EXIT")"
-                                internet_diag_log "ERROR: msupdate --list re-verification failed (exit=$MAU_VERIFY_EXIT)"
-                                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
-                            elif [ -n "$MAU_REMAINING" ]; then
-                                print_warn "$L_INTERNET_MS_STILL_PENDING"
-                                printf '%s\n' "$MAU_REMAINING" | while IFS= read -r line; do
-                                    [ -n "$line" ] && print_info "  → $line"
-                                done
-                                internet_diag_log "WARN: Microsoft updates still pending after install: $(printf '%s\n' "$MAU_REMAINING" | tr '\n' ' ')"
-                                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
-                            elif [ -n "$MAU_REGRESSED_IDS" ]; then
-                                # Installable set succeeded, quarantine stands.
-                                STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
+                        fi
+                        print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_EXIT")"
+                        internet_diag_log "ERROR: msupdate --list re-verification failed or invalid (exit=$MAU_VERIFY_EXIT)"
+                        print_info "$(internet_msg "$L_INTERNET_MS_MANUAL_ACTION_FMT" "msupdate --install --apps $MAU_INSTALL_IDS")"
+                        if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ] && [ -t 0 ] && [ -d "$MAU_APP" ]; then
+                            if open -a "$MAU_APP" 2>/dev/null; then
+                                print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                            fi
+                        fi
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                    else
+                        MAU_FRESH_PENDING="$(mau_parse_pending "$MAU_VERIFY")"
+
+                        # Intersect fresh pending with originally permitted MAU_INSTALL_IDS
+                        MAU_RETRY_CANDIDATES="$(mau_intersect_ids "$MAU_FRESH_PENDING" "$MAU_INSTALL_IDS")"
+
+                        # Re-check downgrade protection against fresh offer
+                        local _fresh_regressed _fresh_regressed_ids
+                        _fresh_regressed="$(mau_regressed_entries "$MAU_VERIFY" "$MAU_RETRY_CANDIDATES")"
+                        _fresh_regressed_ids="$(printf '%s\n' "$_fresh_regressed" | awk 'NF { print $1 }' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                        MAU_RETRY_IDS="$(printf '%s\n' "$MAU_RETRY_CANDIDATES" | mau_filter_out_ids "$_fresh_regressed_ids" | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                        MAU_RETRY_IDS="$(mau_installable_ids "$MAU_RETRY_IDS")"
+
+                        MAU_VERIFY_FINAL_EXIT=0
+                        MAU_VERIFY_FINAL=""
+
+                        # Limited recovery: at most ONE retry of still-pending permitted IDs,
+                        # only if previous installation process is not running.
+                        if [ -n "$MAU_RETRY_IDS" ]; then
+                            if [ -n "$(mau_active_install_processes)" ]; then
+                                internet_diag_log "MAU active install process still detected after waiting; skipping retry."
+                                print_warn "Active Microsoft installer process detected; skipping retry."
+                                MAU_VERIFY_FINAL_EXIT="$MAU_VERIFY_EXIT"
+                                MAU_VERIFY_FINAL="$MAU_VERIFY"
                             else
-                                print_ok "$L_INTERNET_MS_UPDATED"
-                                STATUS_MICROSOFT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "Microsoft apps")"
-                                if [ "$MAU_TEAMS21_OFFERED" -eq 1 ]; then
-                                    MAU_TEAMS21_VERIFIED=1
+                                print_warn "$(internet_msg "$L_INTERNET_MS_INTERRUPTED_RETRY" "$MAU_RETRY_IDS")"
+                                internet_diag_log "Retrying MAU install for still-pending apps: $MAU_RETRY_IDS"
+                                MAU_RETRY_EXIT=0
+                                mau_run_scoped_install "$MAU_RETRY_IDS" || MAU_RETRY_EXIT=$?
+                                mau_wait_for_idle 15 || true
+
+                                MAU_LAST_EXIT="$MAU_RETRY_EXIT"
+                                MAU_LAST_INTERRUPTED="${MAU_INSTALL_INTERRUPTED:-0}"
+                                MAU_LAST_REASON="${MAU_INSTALL_INTERRUPT_REASON:-}"
+
+                                MAU_VERIFY2_EXIT=0
+                                MAU_VERIFY2=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY2_EXIT=$?
+                                mau_log_listing_diagnostics "post-install-2" "$MAU_VERIFY2_EXIT" "$MAU_VERIFY2"
+
+                                MAU_VERIFY_FINAL_EXIT="$MAU_VERIFY2_EXIT"
+                                MAU_VERIFY_FINAL="$MAU_VERIFY2"
+                            fi
+                        else
+                            MAU_VERIFY_FINAL_EXIT="$MAU_VERIFY_EXIT"
+                            MAU_VERIFY_FINAL="$MAU_VERIFY"
+                        fi
+
+                        if ! mau_is_valid_listing "$MAU_VERIFY_FINAL_EXIT" "$MAU_VERIFY_FINAL"; then
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                printf 'unknown\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                                rm -f "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt" 2>/dev/null || true
+                                if mau_output_has_interruption "$MAU_VERIFY_FINAL"; then
+                                    printf '%s\n' "$(mau_interruption_reason "$MAU_VERIFY_FINAL")" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                                elif [ -n "$MAU_LAST_REASON" ]; then
+                                    printf '%s\n' "$MAU_LAST_REASON" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
                                 fi
                             fi
-                        else
-                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
-                                # Install failed — record pre-install pending count so the
-                                # summary shows what was still outstanding, not a false zero.
-                                printf '%s\n' "$(mau_count_lines "$MAU_INSTALL_IDS")" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
-                            fi
-                            if [ "$MAU_INSTALL_EXIT" = "124" ] || [ "$MAU_INSTALL_EXIT" = "137" ] || [ "$MAU_INSTALL_EXIT" = "143" ]; then
-                                print_warn "$L_INTERNET_MS_TIMEOUT"
-                            else
-                                print_warn "$(internet_msg "$L_INTERNET_MS_INSTALL_ERROR" "$MAU_INSTALL_EXIT")"
-                            fi
-                            if [ -d "$MAU_APP" ]; then
+                            print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_FINAL_EXIT")"
+                            internet_diag_log "ERROR: msupdate --list final verification failed or invalid (exit=$MAU_VERIFY_FINAL_EXIT)"
+                            print_info "$(internet_msg "$L_INTERNET_MS_MANUAL_ACTION_FMT" "msupdate --install --apps ${MAU_RETRY_IDS:-$MAU_INSTALL_IDS}")"
+                            if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ] && [ -t 0 ] && [ -d "$MAU_APP" ]; then
                                 if open -a "$MAU_APP" 2>/dev/null; then
                                     print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
-                                else
-                                    print_warn "Could not launch Microsoft AutoUpdate after the CLI failure."
                                 fi
                             fi
                             STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                        else
+                            MAU_FINAL_PENDING="$(mau_parse_pending "$MAU_VERIFY_FINAL")"
+                            MAU_REMAINING_IDS="$(printf '%s\n' "$MAU_FINAL_PENDING" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+
+                            local _mau_any_ver_changed=0 _mid _mapp _mver _oldver
+                            for _mid in $MAU_INSTALL_IDS; do
+                                _mapp="$(mau_app_path_for_id "$_mid")"
+                                if [ -n "$_mapp" ] && [ -d "$_mapp" ]; then
+                                    _mver="$(mau_installed_short_version "$_mapp")"
+                                    _oldver="$(printf '%s\n' "$_mau_pre_versions" | tr ' ' '\n' | grep "^${_mid}=" | head -n 1 | cut -d= -f2)"
+                                    if [ -n "$_oldver" ] && [ -n "$_mver" ] && [ "$_mver" != "$_oldver" ]; then
+                                        _mau_any_ver_changed=1
+                                        break
+                                    fi
+                                fi
+                            done
+
+                            local _rem_count
+                            _rem_count="$(mau_count_lines "$MAU_FINAL_PENDING")"
+
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                printf '%s\n' "$_rem_count" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                                if [ "$_rem_count" -gt 0 ]; then
+                                    printf '%s\n' "$MAU_FINAL_PENDING" > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                                    if [ -n "$MAU_LAST_REASON" ]; then
+                                        printf '%s\n' "$MAU_LAST_REASON" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                                    fi
+                                else
+                                    : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                                    rm -f "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt" 2>/dev/null || true
+                                fi
+                            fi
+
+                            if [ "$_rem_count" -gt 0 ]; then
+                                if [ "$MAU_LAST_EXIT" = "124" ] || [ "$MAU_LAST_EXIT" = "137" ] || [ "$MAU_LAST_EXIT" = "143" ]; then
+                                    print_warn "$L_INTERNET_MS_TIMEOUT"
+                                elif [ "$MAU_LAST_INTERRUPTED" = "1" ]; then
+                                    print_warn "Microsoft update was interrupted (${MAU_LAST_REASON:-terminated})."
+                                elif [ "$MAU_LAST_EXIT" -ne 0 ]; then
+                                    print_warn "$(internet_msg "$L_INTERNET_MS_INSTALL_ERROR" "$MAU_LAST_EXIT")"
+                                else
+                                    print_warn "Microsoft updates still pending after installation: $MAU_REMAINING_IDS"
+                                fi
+                                print_info "$(internet_msg "$L_INTERNET_MS_MANUAL_ACTION_FMT" "msupdate --install --apps $MAU_REMAINING_IDS")"
+                                if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ] && [ -t 0 ] && [ -d "$MAU_APP" ]; then
+                                    if open -a "$MAU_APP" 2>/dev/null; then
+                                        print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                                    fi
+                                fi
+                                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                            else
+                                if [ "$MAU_LAST_INTERRUPTED" = "1" ] && [ "$_mau_any_ver_changed" -eq 0 ]; then
+                                    print_warn "Microsoft update interrupted (${MAU_LAST_REASON:-terminated}) and no version changes observed."
+                                    STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                                elif [ -n "$MAU_REGRESSED_IDS" ]; then
+                                    STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
+                                else
+                                    print_ok "$L_INTERNET_MS_UPDATED"
+                                    STATUS_MICROSOFT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "Microsoft apps")"
+                                    if [ "$MAU_TEAMS21_OFFERED" -eq 1 ]; then
+                                        MAU_TEAMS21_VERIFIED=1
+                                    fi
+                                fi
+                            fi
                         fi
                     fi
-                else
+                fi
+            else
+                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                        printf '0\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                        : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                        rm -f "$MAC_UPDATE_SESSION_DIR/mau_pending.txt" "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt" 2>/dev/null || true
+                    fi
                     # Nothing offered. A live quarantine could be the reason, so
                     # say so instead of claiming everything is up to date.
                     # An active DeferralDays entry suppresses the product from
@@ -1431,9 +1718,6 @@ iu_microsoft_365() {
             print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://learn.microsoft.com/en-us/microsoft-365-apps/mac/update-office-for-mac-using-msupdate")"
             STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_MISSING"
         fi
-    else
-        print_info "$L_INTERNET_MS_NONE_INSTALLED"
-    fi
 
     # ============================================================
     # ██ SEKCJA 7: NARZĘDZIA DEWELOPERSKIE
