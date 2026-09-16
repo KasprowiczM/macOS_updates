@@ -127,3 +127,47 @@ mac_update_app_architecture() {
             ;;
     esac
 }
+
+# Diagnose Command Line Tools (CLT) status against the current macOS major release.
+# Outputs: ok | missing | stale | orphan
+mac_update_clt_status() {
+    local clt_dir="${MAC_UPDATE_CLT_DIR:-/Library/Developer/CommandLineTools}"
+    local pkg_info=""
+    local clt_version=""
+    local clt_major=""
+    local os_version=""
+    local os_major=""
+
+    if [ ! -d "$clt_dir" ]; then
+        echo "missing"
+        return 0
+    fi
+
+    pkg_info="$(pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null || true)"
+    if [ -z "$pkg_info" ]; then
+        echo "orphan"
+        return 0
+    fi
+
+    clt_version="$(echo "$pkg_info" | awk -F': ' '/^version:/ {print $2}' | head -n1)"
+    clt_major="${clt_version%%.*}"
+
+    if [ -z "$clt_major" ] || [ -n "${clt_major//[0-9]/}" ]; then
+        echo "orphan"
+        return 0
+    fi
+
+    os_version="$(sw_vers -productVersion 2>/dev/null || echo "0")"
+    os_major="${os_version%%.*}"
+
+    if [ -n "$os_major" ] && [ -z "${os_major//[0-9]/}" ]; then
+        if [ "$clt_major" -lt "$os_major" ]; then
+            echo "stale"
+            return 0
+        fi
+    fi
+
+    echo "ok"
+    return 0
+}
+

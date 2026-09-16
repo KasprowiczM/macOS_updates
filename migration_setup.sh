@@ -399,30 +399,43 @@ fi
 # ============================================================
 print_section "$L_PHASE_5_TITLE"
 
-if xcode-select -p &>/dev/null 2>&1; then
-    XCLT_PATH="$(xcode-select -p)"
-    print_ok "$(printf "$L_MSG_XCODE_OK" "$XCLT_PATH")"
-else
-    print_warn "$L_MSG_XCODE_MISSING"
-    print_step "$L_MSG_XCODE_LAUNCH"
-    echo ""
-    echo -e "  ${YELLOW}$L_MSG_XCODE_DIALOG${NC}"
-    echo -e "  ${YELLOW}$L_MSG_XCODE_WAIT${NC}"
-    echo ""
-    xcode-select --install 2>/dev/null || true
-    echo ""
-    if [ "$MAC_UPDATE_NONINTERACTIVE" != "1" ]; then
-        read -r -p "  $L_MSG_XCODE_PRESS_ENTER"
-    else
-        print_warn "Non-interactive mode: install Xcode CLT from the dialog, then re-run setup.sh if needed."
-    fi
+CLT_STATUS="$(mac_update_clt_status)"
+if [ "$CLT_STATUS" = "stale" ] || [ "$CLT_STATUS" = "orphan" ]; then
     if xcode-select -p &>/dev/null 2>&1; then
-        print_ok "$L_MSG_XCODE_OK2"
-        add_fix "$L_MSG_XCODE_FIX"
-    else
-        print_error "$L_MSG_XCODE_FAIL"
-        add_action "$L_MSG_XCODE_ACTION"
+        XCLT_PATH="$(xcode-select -p)"
+        print_ok "$(printf "$L_MSG_XCODE_OK" "$XCLT_PATH")"
     fi
+    print_warn "Xcode Command Line Tools status: $CLT_STATUS"
+    print_info "Homebrew recommendation: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+    add_action "Reinstall CLT: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+elif [ "$CLT_STATUS" = "missing" ]; then
+    if [ -d "/Applications/Xcode.app" ]; then
+        print_ok "Xcode.app detected; skipping standalone CLT installer."
+    else
+        print_warn "$L_MSG_XCODE_MISSING"
+        print_step "$L_MSG_XCODE_LAUNCH"
+        echo ""
+        echo -e "  ${YELLOW}$L_MSG_XCODE_DIALOG${NC}"
+        echo -e "  ${YELLOW}$L_MSG_XCODE_WAIT${NC}"
+        echo ""
+        xcode-select --install 2>/dev/null || true
+        echo ""
+        if [ "$MAC_UPDATE_NONINTERACTIVE" != "1" ]; then
+            read -r -p "  $L_MSG_XCODE_PRESS_ENTER"
+        else
+            print_warn "Non-interactive mode: install Xcode CLT from the dialog, then re-run setup.sh if needed."
+        fi
+        if xcode-select -p &>/dev/null 2>&1; then
+            print_ok "$L_MSG_XCODE_OK2"
+            add_fix "$L_MSG_XCODE_FIX"
+        else
+            print_error "$L_MSG_XCODE_FAIL"
+            add_action "$L_MSG_XCODE_ACTION"
+        fi
+    fi
+else
+    XCLT_PATH="$(xcode-select -p 2>/dev/null || echo "/Library/Developer/CommandLineTools")"
+    print_ok "$(printf "$L_MSG_XCODE_OK" "$XCLT_PATH")"
 fi
 
 # ============================================================

@@ -351,30 +351,43 @@ done
 # ============================================================
 print_section "$L_SETUP_PHASE_5"
 
-if xcode-select -p &>/dev/null 2>&1; then
-    XCLT_PATH="$(xcode-select -p)"
-    print_ok "Xcode CLT installed: $XCLT_PATH"
-else
-    print_warn "Xcode Command Line Tools not installed!"
-    print_step "Launching Xcode CLT installer..."
-    echo ""
-    echo -e "  ${YELLOW}A dialog will appear — click 'Install'.${NC}"
-    echo -e "  ${YELLOW}Installation may take a few minutes.${NC}"
-    echo ""
-    xcode-select --install 2>/dev/null || true
-    echo ""
-    if [ "$MAC_UPDATE_NONINTERACTIVE" != "1" ]; then
-        read -r -p "  Press ENTER after Xcode CLT installation completes..."
-    else
-        print_warn "Non-interactive mode: install Xcode CLT from the dialog, then re-run setup.sh if needed."
-    fi
+CLT_STATUS="$(mac_update_clt_status)"
+if [ "$CLT_STATUS" = "stale" ] || [ "$CLT_STATUS" = "orphan" ]; then
     if xcode-select -p &>/dev/null 2>&1; then
-        print_ok "Xcode CLT installed successfully!"
-        add_fix "Installed Xcode Command Line Tools"
-    else
-        print_error "Xcode CLT still unavailable — check manually."
-        add_action "Install Xcode CLT: xcode-select --install"
+        XCLT_PATH="$(xcode-select -p)"
+        print_ok "Xcode CLT installed: $XCLT_PATH"
     fi
+    print_warn "Xcode Command Line Tools status: $CLT_STATUS"
+    print_info "Homebrew recommendation: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+    add_action "Reinstall CLT: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+elif [ "$CLT_STATUS" = "missing" ]; then
+    if [ -d "/Applications/Xcode.app" ]; then
+        print_ok "Xcode.app detected; skipping standalone CLT installer."
+    else
+        print_warn "Xcode Command Line Tools not installed!"
+        print_step "Launching Xcode CLT installer..."
+        echo ""
+        echo -e "  ${YELLOW}A dialog will appear — click 'Install'.${NC}"
+        echo -e "  ${YELLOW}Installation may take a few minutes.${NC}"
+        echo ""
+        xcode-select --install 2>/dev/null || true
+        echo ""
+        if [ "$MAC_UPDATE_NONINTERACTIVE" != "1" ]; then
+            read -r -p "  Press ENTER after Xcode CLT installation completes..."
+        else
+            print_warn "Non-interactive mode: install Xcode CLT from the dialog, then re-run setup.sh if needed."
+        fi
+        if xcode-select -p &>/dev/null 2>&1; then
+            print_ok "Xcode CLT installed successfully!"
+            add_fix "Installed Xcode Command Line Tools"
+        else
+            print_error "Xcode CLT still unavailable — check manually."
+            add_action "Install Xcode CLT: xcode-select --install"
+        fi
+    fi
+else
+    XCLT_PATH="$(xcode-select -p 2>/dev/null || echo "/Library/Developer/CommandLineTools")"
+    print_ok "Xcode CLT installed: $XCLT_PATH"
 fi
 
 # ============================================================
