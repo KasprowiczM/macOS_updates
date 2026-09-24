@@ -447,6 +447,28 @@ brew_outdated_casks "brave-browser"
         self.assertEqual(proc.returncode, 0, msg=f"Expected 0, got {proc.returncode}. stderr: {proc.stderr}")
         self.assertIn("brave-browser", proc.stdout)
 
+    def test_brew_outdated_casks_rc1_progress_chatter_stderr_success(self) -> None:
+        brew_script = """#!/usr/bin/env bash
+if [ "$1" = "outdated" ] && [ "$2" = "--cask" ]; then
+    echo "==> Downloading Homebrew API data" >&2
+    echo "✔︎ JSON API packages.jws.json" >&2
+    echo "brave-browser"
+    exit 1
+fi
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = os.environ.copy()
+        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
+
+        script = f"""
+. "{REPO_ROOT}/lib/brew.sh"
+brew_outdated_casks "brave-browser"
+"""
+        proc = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, msg=f"Expected 0, got {proc.returncode}. stderr: {proc.stderr}")
+        self.assertIn("brave-browser", proc.stdout)
+
     def test_brew_outdated_casks_rc1_with_stderr_fails(self) -> None:
         brew_script = """#!/usr/bin/env bash
 if [ "$1" = "outdated" ] && [ "$2" = "--cask" ]; then
@@ -489,6 +511,28 @@ brew_outdated_formulae "wget"
         self.assertEqual(proc.returncode, 0, msg=f"Expected 0, got {proc.returncode}. stderr: {proc.stderr}")
         self.assertIn("wget", proc.stdout)
         self.assertIn("outdated --formula wget", log_file.read_text(encoding="utf-8"))
+
+    def test_brew_outdated_formulae_rc1_progress_chatter_stderr_success(self) -> None:
+        brew_script = """#!/usr/bin/env bash
+if [ "$1" = "outdated" ] && [ "$2" = "--formula" ]; then
+    echo "==> Downloading Homebrew API data" >&2
+    echo "✔︎ JSON API packages.jws.json" >&2
+    echo "wget"
+    exit 1
+fi
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = os.environ.copy()
+        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
+
+        script = f"""
+. "{REPO_ROOT}/lib/brew.sh"
+brew_outdated_formulae "wget"
+"""
+        proc = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, msg=f"Expected 0, got {proc.returncode}. stderr: {proc.stderr}")
+        self.assertIn("wget", proc.stdout)
 
     def test_brew_outdated_formulae_rc1_with_stderr_fails(self) -> None:
         brew_script = """#!/usr/bin/env bash

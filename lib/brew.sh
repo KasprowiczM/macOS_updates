@@ -80,7 +80,7 @@ brew_outdated_formulae() {
     rc=$?
     if [ "$rc" -eq 0 ]; then
         :
-    elif [ "$rc" -eq 1 ] && ! grep -q '[^[:space:]]' "$err_file" 2>/dev/null; then
+    elif [ "$rc" -eq 1 ] && ! grep -q '^[[:space:]]*Error:' "$err_file" 2>/dev/null; then
         :
     else
         cat "$err_file" >&2
@@ -104,7 +104,7 @@ brew_outdated_casks() {
     rc=$?
     if [ "$rc" -eq 0 ]; then
         :
-    elif [ "$rc" -eq 1 ] && ! grep -q '[^[:space:]]' "$err_file" 2>/dev/null; then
+    elif [ "$rc" -eq 1 ] && ! grep -q '^[[:space:]]*Error:' "$err_file" 2>/dev/null; then
         :
     else
         cat "$err_file" >&2
@@ -116,7 +116,7 @@ brew_outdated_casks() {
         rc=$?
         if [ "$rc" -eq 0 ]; then
             :
-        elif [ "$rc" -eq 1 ] && ! grep -q '[^[:space:]]' "$err_file" 2>/dev/null; then
+        elif [ "$rc" -eq 1 ] && ! grep -q '^[[:space:]]*Error:' "$err_file" 2>/dev/null; then
             :
         else
             cat "$err_file" >&2
