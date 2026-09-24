@@ -116,19 +116,31 @@ class MauScopedInstallFailureTests(unittest.TestCase):
             self.assertIn("REASON:Update Assistant terminated", res.stdout)
 
 
+def stub_clean_processes(bin_dir: Path) -> None:
+    (bin_dir / "pgrep").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    (bin_dir / "pgrep").chmod(0o755)
+    (bin_dir / "ps").write_text("#!/bin/sh\necho '  PID TTY TIME CMD'\nexit 0\n", encoding="utf-8")
+    (bin_dir / "ps").chmod(0o755)
+
+
 class MauActiveProcessAndListingTests(unittest.TestCase):
     def test_mau_active_processes_when_none_running(self) -> None:
-        cmd = """
-        source lib/internet_app_updates.sh
-        if [ -z "$(mau_active_install_processes)" ]; then
-            echo "IDLE"
-        else
-            echo "BUSY"
-        fi
-        """
-        res = run_bash(cmd)
-        self.assertEqual(res.returncode, 0)
-        self.assertIn("IDLE", res.stdout)
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bin = Path(tmp) / "bin"
+            fake_bin.mkdir()
+            stub_clean_processes(fake_bin)
+            cmd = f"""
+            export PATH="{fake_bin}:$PATH"
+            source lib/internet_app_updates.sh
+            if [ -z "$(mau_active_install_processes)" ]; then
+                echo "IDLE"
+            else
+                echo "BUSY"
+            fi
+            """
+            res = run_bash(cmd)
+            self.assertEqual(res.returncode, 0)
+            self.assertIn("IDLE", res.stdout)
 
     def test_unknown_written_to_pending_mau_on_listing_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -246,6 +258,7 @@ class MauBehavioralRequirementsTests(unittest.TestCase):
             tmp_path = Path(tmp)
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
+            stub_clean_processes(fake_bin)
             mock_msupdate = fake_bin / "msupdate"
             mock_msupdate.write_text("#!/bin/sh\necho 'No updates available'\nexit 0\n", encoding="utf-8")
             mock_msupdate.chmod(0o755)
@@ -296,6 +309,7 @@ class MauBehavioralRequirementsTests(unittest.TestCase):
             tmp_path = Path(tmp)
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
+            stub_clean_processes(fake_bin)
             mock_msupdate = fake_bin / "msupdate"
             calls_log = tmp_path / "calls.log"
 
@@ -421,6 +435,7 @@ exit 0
             tmp_path = Path(tmp)
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
+            stub_clean_processes(fake_bin)
             mock_msupdate = fake_bin / "msupdate"
             marker = tmp_path / ".mau_test_listed"
 
