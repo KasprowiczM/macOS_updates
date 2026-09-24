@@ -425,24 +425,47 @@ print(json.dumps({
 PYJSON
     fi
     # If we failed or finished degraded, dump session dir snapshots into the run
-    # log before wipe. Soft warnings need diagnostics too: they are exactly the
-    # cases where a vendor updater could not be verified.
-    if [ -d "${SESSION_DIR:-/nonexistent}" ] \
-        && { [ "${OVERALL_EXIT:-0}" -ne 0 ] || [ "${DEGRADED:-0}" -ne 0 ]; }; then
-        {
-            echo ""
-            echo "=========================================="
-            echo "SESSION DIR SNAPSHOTS (preserved on failure)"
-            echo "Path: $SESSION_DIR"
-            echo "=========================================="
-            for f in "$SESSION_DIR"/*.txt "$SESSION_DIR"/appstore_diag.txt; do
-                [ -f "$f" ] || continue
+    # log before wipe. Full dump only when BLOCKING_EXIT!=0 or MAC_UPDATE_DEBUG=1.
+    # On DEGRADED alone attach only *diag*.txt, *pending*.txt,
+    # internet_status_codes.txt, brew_orphan_casks.txt.
+    if [ -d "${SESSION_DIR:-/nonexistent}" ]; then
+        if [ "${BLOCKING_EXIT:-0}" -ne 0 ] || [ "${MAC_UPDATE_DEBUG:-0}" = "1" ]; then
+            {
                 echo ""
-                echo "--- ${f##*/} ---"
-                # Cap each snapshot at 200 lines to keep logs reasonable.
-                head -n 200 "$f" 2>/dev/null
-            done
-        } 2>/dev/null || true
+                echo "=========================================="
+                echo "SESSION DIR SNAPSHOTS (preserved on failure)"
+                echo "Path: $SESSION_DIR"
+                echo "=========================================="
+                for f in "$SESSION_DIR"/*.txt "$SESSION_DIR"/appstore_diag.txt; do
+                    [ -f "$f" ] || continue
+                    echo ""
+                    echo "--- ${f##*/} ---"
+                    # Cap each snapshot at 200 lines to keep logs reasonable.
+                    head -n 200 "$f" 2>/dev/null
+                done
+            } 2>/dev/null || true
+        elif [ "${DEGRADED:-0}" -ne 0 ]; then
+            {
+                echo ""
+                echo "=========================================="
+                echo "SESSION DIR SNAPSHOTS (degraded run)"
+                echo "Path: $SESSION_DIR"
+                echo "=========================================="
+                _seen_dumps=""
+                for f in "$SESSION_DIR"/*diag*.txt "$SESSION_DIR"/*pending*.txt \
+                         "$SESSION_DIR"/internet_status_codes.txt "$SESSION_DIR"/brew_orphan_casks.txt; do
+                    [ -f "$f" ] || continue
+                    fname="${f##*/}"
+                    case " $_seen_dumps " in
+                        *" $fname "*) continue ;;
+                    esac
+                    _seen_dumps="$_seen_dumps $fname"
+                    echo ""
+                    echo "--- $fname ---"
+                    head -n 200 "$f" 2>/dev/null
+                done
+            } 2>/dev/null || true
+        fi
     fi
     case "${SESSION_DIR:-}" in
         "${TMPDIR:-/tmp}"/mac_update.*|/tmp/mac_update.*)
@@ -666,56 +689,25 @@ def atomic_write_text(path, text, mode=0o600):
 
 def read_md():
     if not os.path.exists(programy_md_path):
-        import subprocess as _sp0
-        from datetime import datetime as _dt0
-        _u = os.environ.get('USER', 'user')
-        _pv = _sp0.run(['sw_vers', '-productVersion'], capture_output=True, text=True).stdout.strip() or 'unknown'
-        _bv = _sp0.run(['sw_vers', '-buildVersion'], capture_output=True, text=True).stdout.strip() or 'unknown'
-        # Codename mapping: 13=Ventura, 14=Sonoma, 15=Sequoia, 26=Tahoe, 27=Golden Gate
-        try:
-            _major = int(_pv.split('.', 1)[0])
-        except (ValueError, IndexError):
-            _major = 0
-        _codename = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe', 27: 'Golden Gate'}.get(_major, '')
-        _label = f"macOS {_pv} {_codename}".rstrip()
-        _h = os.path.expanduser('~')
-        _t = _dt0.now().strftime('%Y-%m-%d')
-        _minimal = (
-            f"# 📱 ZAINSTALOWANE APLIKACJE — MacBook {_u} ({_label})\n\n"
-            f"> **Data analizy:** {_t}\n"
-            f"> **Użytkownik:** {_u} | **Home:** `{_h}`\n"
-            f"> **System:** {_label} (Build {_bv})\n"
-            "> **Architektura:** Apple Silicon (arm64)\n"
-            f"> **Folder skryptów:** `{script_dir}`\n\n"
-            "---\n\n## GRUPA 1 — Aplikacje Systemowe Apple 🍎\n\n"
-            "| Nazwa | Wersja |\n|-------|--------|\n\n---\n\n"
-            "## GRUPA 2 — App Store 🛍️\n\n"
-            "| Nazwa aplikacji | Apple ID |\n|-----------------|----------|\n\n"
-            "> ⚠️ **Aplikacje iPad na Apple Silicon**\n\n---\n\n"
-            "## GRUPA 3 — Aplikacje z Internetu 🌐\n\n"
-            "### ☁️ Przechowywanie w chmurze\n\n"
-            "| Nazwa | Wersja | Strona aktualizacji |\n|-------|--------|---------------------|\n\n---\n\n"
-            "## GRUPA 4 — Homebrew 🍺\n\n### 4a. Kluczowe pakiety ⭐\n\n"
-            "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-            "### 4b. Formulae (zależności)\n\n"
-            "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-            "### 4c. Casks (aplikacje GUI)\n\n"
-            "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-            "### 4d. Native CLI + npm global\n\n"
-            "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-            "> **Uwaga:** Casks zarządzane przez Homebrew.\n\n"
-            f"## Podsumowanie\n\n*Zaktualizowano: {_t}*\n"
-        )
+        from inventory_sync import minimal_template
+        _minimal = minimal_template(script_dir=script_dir)
         atomic_write_text(programy_md_path, _minimal)
         print("  ℹ️  APPLICATIONS.md nie istnieje — utworzono minimalny szablon")
     with open(programy_md_path, 'r') as f:
         return f.read()
 
 content = read_md()
+original_content = content
 any_new_found = False
+
+from inventory_sync import gather_facts, sync_all
+home_dir = os.path.expanduser('~')
+facts = gather_facts(script_dir, home_dir)
 
 SKIP_DISCOVERY_APPS = load_exclusions(os.path.join(script_dir, 'config', 'inventory_exclusions.txt'))
 SKIP_DISCOVERY_APPS.update(load_appstore_gui_apps(os.path.join(script_dir, 'config', 'internet_app_methods.txt')))
+for item in (facts.get('ipad') or []):
+    SKIP_DISCOVERY_APPS.add(item[0])
 
 print("  Skanowanie /Applications...")
 
@@ -727,6 +719,11 @@ grupo_1_3_match = re.search(r'^(.*?)(?=^## GRUPA 4)', content, re.DOTALL | re.MU
 grupo_1_3_content = grupo_1_3_match.group(1) if grupo_1_3_match else content
 
 installed_app_paths, installed_apps = scan_installed_app_paths()
+for app_name, app_p in installed_app_paths.items():
+    if os.path.isfile(os.path.join(app_p, 'Wrapper', 'iTunesMetadata.plist')) or \
+       os.path.isdir(os.path.join(app_p, 'Contents', '_MASReceipt')):
+        SKIP_DISCOVERY_APPS.add(app_name)
+
 new_apps = []
 
 # Always persist a current installed-app snapshot for the post-scan inventory
@@ -910,16 +907,12 @@ try:
 except Exception as e:
     print(f"  ⚠️  {os.environ.get('L_PRESCAN_ERR_CHECKING_REMOVED', 'Error checking removed applications: %s') % e}")
 
-# ── 6. Aktualizuj APPLICATIONS.md o nowe wpisy ───────────────────
-if not any_new_found:
-    print("\n  ✅ APPLICATIONS.md jest aktualny — nie wykryto zmian.")
-    sys.exit(0)
-
-print(f"\n  📝 {os.environ.get('L_PRESCAN_UPDATING_APPS_MD', 'Updating APPLICATIONS.md with new entries...')}")
-
-content = read_md()
+# ── 6. Aktualizuj APPLICATIONS.md o nowe wpisy i synchronizację grup ──
 changes_made = False
 from datetime import datetime
+
+if any_new_found:
+    print(f"\n  📝 {os.environ.get('L_PRESCAN_UPDATING_APPS_MD', 'Updating APPLICATIONS.md with new entries...')}")
 
 # Add new brew formulae (appended at end of 4a table, before blank line + "4b." header)
 # POPRAWKA: używamy regex żeby wstawić wiersze NA KOŃCU tabeli 4a (bez blank line gap)
@@ -1026,8 +1019,14 @@ if os.path.exists(new_apps_file):
                 parts = line.strip().split(None, 1)
                 if len(parts) > 1:
                     name_ver = parts[1].split('(')[0].strip()
-                    handled.add(norm_name(name_ver))
-    unhandled = [a for a in new_app_names if norm_name(a) not in handled]
+    def _is_appstore_app(app_name):
+        p = installed_app_paths.get(app_name, '')
+        if not p:
+            return False
+        return os.path.isfile(os.path.join(p, 'Wrapper', 'iTunesMetadata.plist')) or \
+               os.path.isdir(os.path.join(p, 'Contents', '_MASReceipt'))
+
+    unhandled = [a for a in new_app_names if norm_name(a) not in handled and not _is_appstore_app(a)]
     if unhandled:
         def _format_unhandled_row(app_name):
             app_path = installed_app_paths.get(app_name, '')
@@ -1139,11 +1138,37 @@ if os.path.exists(removed_apps_file):
         changes_made = True
         print(f"  🗑️  {os.environ.get('L_PRESCAN_REMOVED_UNINSTALLED_APPS', 'Removed %s uninstalled applications from APPLICATIONS.md') % removed_count}")
 
-if changes_made:
+# Synchronize all groups and recompute summary & legend without drift
+content, report = sync_all(content, facts)
+
+if report["mas_removed"]:
+    fmt = os.environ.get('L_PRESCAN_REMOVED_FROM_GROUP_FMT', 'Removed %s entries that are no longer installed from %s')
+    print("  🗑️  " + (fmt % (len(report["mas_removed"]), "App Store (GRUPA 2)")))
+if report["group3_removed"]:
+    fmt = os.environ.get('L_PRESCAN_REMOVED_FROM_GROUP_FMT', 'Removed %s entries that are no longer installed from %s')
+    print("  🗑️  " + (fmt % (len(report["group3_removed"]), "Internet (GRUPA 3)")))
+if report["formulae_removed"]:
+    fmt = os.environ.get('L_PRESCAN_REMOVED_FROM_GROUP_FMT', 'Removed %s entries that are no longer installed from %s')
+    print("  🗑️  " + (fmt % (len(report["formulae_removed"]), "Homebrew Formulae (GRUPA 4)")))
+if report["casks_removed"]:
+    fmt = os.environ.get('L_PRESCAN_REMOVED_FROM_GROUP_FMT', 'Removed %s entries that are no longer installed from %s')
+    print("  🗑️  " + (fmt % (len(report["casks_removed"]), "Homebrew Casks (GRUPA 4c)")))
+if report["clis_removed"]:
+    fmt = os.environ.get('L_PRESCAN_REMOVED_FROM_GROUP_FMT', 'Removed %s entries that are no longer installed from %s')
+    print("  🗑️  " + (fmt % (len(report["clis_removed"]), "Native CLI (GRUPA 4d)")))
+if report.get("ipad_count", 0) > 0:
+    fmt = os.environ.get('L_PRESCAN_IPAD_SECTION_SYNCED_FMT', 'iPad apps section synced (%s apps)')
+    print("  📱  " + (fmt % report["ipad_count"]))
+for grp in report.get("skipped_groups", []):
+    fmt = os.environ.get('L_PRESCAN_GROUP_SYNC_SKIPPED_FMT', 'Inventory group %s was not synchronized: its data source returned nothing (kept unchanged)')
+    print("  ⚠️  " + (fmt % grp))
+
+if content != original_content:
     atomic_write_text(programy_md_path, content)
-    print(f"\n  📝 APPLICATIONS.md zaktualizowany o nowe aplikacje")
-else:
-    print(f"\n  ℹ️  {os.environ.get('L_PRESCAN_NO_TABLE_EDITS_NEEDED', 'APPLICATIONS.md — new entries were reported but did not require table edits')}")
+    print("\n  📝 APPLICATIONS.md zaktualizowany o nowe aplikacje i synchronizację grup")
+elif not any_new_found:
+    print("\n  ✅ APPLICATIONS.md jest aktualny — nie wykryto zmian.")
+    sys.exit(0)
 
 PYEOF
 
@@ -1175,67 +1200,18 @@ if python3 "$SESSION_DIR/prescan.py" "$SCRIPT_DIR" "$SESSION_DIR"; then
                 OVERALL_EXIT=1
             fi
         fi
-        python3 - "$SCRIPT_DIR/config/npm_global_clis.txt" "$SESSION_DIR/npm_cli_after.txt" <<'PYEOF'
+        python3 - "$SCRIPT_DIR/config/npm_global_clis.txt" "$SESSION_DIR/npm_cli_after.txt" "$SCRIPT_DIR" <<'PYEOF'
 import os
-import re
-import shutil
-import subprocess
 import sys
 
-manifest, output = sys.argv[1:3]
-home = os.path.expanduser('~')
+manifest, output, script_dir = sys.argv[1:4]
+sys.path.insert(0, os.path.join(script_dir, 'lib', 'python'))
+from inventory_sync import detect_cli_versions
 
-def candidate_path(command):
-    if not re.fullmatch(r'[A-Za-z0-9._+-]+', command):
-        return None
-    roots = [
-        os.path.join(home, '.local', 'bin'),
-        os.path.join(home, '.local', 'share', 'mac-update', 'npm-global', 'bin'),
-        os.path.join(home, '.local', 'share', 'mac-update', 'node', 'bin'),
-        os.path.join(home, '.bun', 'bin'),
-    ]
-    for root in roots:
-        path = os.path.join(root, command)
-        if os.path.isfile(path) and os.access(path, os.X_OK):
-            return path
-    return shutil.which(command)
-
-rows = []
-with open(manifest, encoding='utf-8') as handle:
-    for raw in handle:
-        raw = raw.split('#', 1)[0].strip()
-        if not raw:
-            continue
-        fields = raw.split('|')
-        if len(fields) != 5:
-            continue
-        display, package, _method, _brew_formula, command = fields
-        path = candidate_path(command)
-        if not path:
-            continue
-        args = [path, '-v' if display in ('node', 'claude-code') else '--version']
-        try:
-            result = subprocess.run(args, capture_output=True, text=True, timeout=10)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if result.returncode != 0:
-            continue
-        first = (result.stdout or result.stderr).strip().splitlines()
-        if not first:
-            continue
-        version = first[0].strip()
-        if display == 'claude-code':
-            version = version.split()[0]
-        elif display == 'codex-cli':
-            version = version.split()[-1]
-        elif display != 'node':
-            version = version.split()[0]
-        if version.startswith('v'):
-            version = version[1:]
-        rows.append(f'{display}|{package}|{version}|{command}|{path}')
-
+records = detect_cli_versions(manifest, os.path.expanduser('~'), as_records=True)
 with open(output, 'w', encoding='utf-8') as handle:
-    handle.write('\n'.join(rows) + ('\n' if rows else ''))
+    for display, pkg, ver, cmd, path in records:
+        handle.write(f'{display}|{pkg}|{ver}|{cmd}|{path}\n')
 PYEOF
         CLI_SNAPSHOT_EXIT=$?
         if [ "$CLI_SNAPSHOT_EXIT" -eq 0 ]; then
@@ -1640,45 +1616,8 @@ try:
     with open(programy_md_path, 'r') as f:
         content = f.read()
 except FileNotFoundError:
-    import subprocess as _sp1
-    _u1 = os.environ.get('USER', 'user')
-    _pv1 = _sp1.run(['sw_vers', '-productVersion'], capture_output=True, text=True).stdout.strip() or 'unknown'
-    _bv1 = _sp1.run(['sw_vers', '-buildVersion'], capture_output=True, text=True).stdout.strip() or 'unknown'
-    _h1 = os.path.expanduser('~')
-    _t1 = datetime.now().strftime('%Y-%m-%d')
-    try:
-        _major1 = int(_pv1.split('.', 1)[0])
-    except (ValueError, IndexError):
-        _major1 = 0
-    _codenames1 = {13: 'Ventura', 14: 'Sonoma', 15: 'Sequoia', 26: 'Tahoe'}
-    _codename1 = _codenames1.get(_major1, '')
-    _os_title1 = f"macOS {_pv1}" + (f" {_codename1}" if _codename1 else "")
-    content = (
-        f"# 📱 ZAINSTALOWANE APLIKACJE — MacBook {_u1} ({_os_title1})\n\n"
-        f"> **Data analizy:** {_t1}\n"
-        f"> **Użytkownik:** {_u1} | **Home:** `{_h1}`\n"
-        f"> **System:** {_os_title1} (Build {_bv1})\n"
-        "> **Architektura:** Apple Silicon (arm64)\n"
-        f"> **Folder skryptów:** `{script_dir}`\n\n"
-        "---\n\n## GRUPA 1 — Aplikacje Systemowe Apple 🍎\n\n"
-        "| Nazwa | Wersja |\n|-------|--------|\n\n---\n\n"
-        "## GRUPA 2 — App Store 🛍️\n\n"
-        "| Nazwa aplikacji | Apple ID |\n|-----------------|----------|\n\n"
-        "> ⚠️ **Aplikacje iPad na Apple Silicon**\n\n---\n\n"
-        "## GRUPA 3 — Aplikacje z Internetu 🌐\n\n"
-        "### ☁️ Przechowywanie w chmurze\n\n"
-        "| Nazwa | Wersja | Strona aktualizacji |\n|-------|--------|---------------------|\n\n---\n\n"
-        "## GRUPA 4 — Homebrew 🍺\n\n### 4a. Kluczowe pakiety ⭐\n\n"
-        "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-        "### 4b. Formulae (zależności)\n\n"
-        "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-        "### 4c. Casks (aplikacje GUI)\n\n"
-        "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-        "### 4d. Native CLI + npm global\n\n"
-        "| Pakiet | Wersja | Opis |\n|--------|--------|------|\n\n"
-        "> **Uwaga:** Casks zarządzane przez Homebrew.\n\n"
-        f"## Podsumowanie\n\n*Zaktualizowano: {_t1}*\n"
-    )
+    from inventory_sync import minimal_template
+    content = minimal_template(script_dir=script_dir)
     print(f"  ℹ️  {os.environ.get('L_POSTUPDATE_CREATING_MINIMAL_TEMPLATE', 'APPLICATIONS.md does not exist — creating minimal template')}")
 
 # Merge all updated versions (brew formulae + casks + internet apps)
@@ -1753,9 +1692,8 @@ try:
             r'^# 📱 ZAINSTALOWANE APLIKACJE — MacBook .*$',
             f'# 📱 ZAINSTALOWANE APLIKACJE — MacBook {_mac_user} ({_os_label})',
             content, count=1, flags=re.MULTILINE)
-        content = re.sub(
-            r'(\*\*System:\*\* macOS )[\d.]+(?: [A-Za-z ]+)? \(Build [A-Z0-9]+\)',
-            r'\g<1>' + _os_label + f' (Build {_bv})', content)
+        from inventory_sync import refresh_system_line
+        content = refresh_system_line(content, _os_label, _bv)
         content = re.sub(
             r'(\| macOS )[\d.]+(?: [A-Za-z ]+)?( arm64)',
             lambda m: m.group(1) + _pv + (f' {_codename}' if _codename else '') + m.group(2), content)
@@ -1809,6 +1747,12 @@ if npm_cli_new:
             insert_pos = m4d.start(3)
             content = content[:insert_pos] + new_rows + content[insert_pos:]
             print(f"  ✅ Dodano nowych CLI do APPLICATIONS.md (sekcja 4d)")
+from inventory_sync import gather_facts, sync_all
+fresh_facts = gather_facts(script_dir, os.path.expanduser('~'))
+content, post_report = sync_all(content, fresh_facts)
+for grp in post_report.get("skipped_groups", []):
+    fmt = os.environ.get('L_PRESCAN_GROUP_SYNC_SKIPPED_FMT', 'Inventory group %s was not synchronized: its data source returned nothing (kept unchanged)')
+    print("  ⚠️  " + (fmt % grp))
 
 atomic_write_text(programy_md_path, content)
 

@@ -52,6 +52,9 @@ METHOD_LABELS = {
         "appstore_gui": "App Store GUI (iPad app)",
         "manual": "manual only",
         "sparkle_appcast": "Sparkle appcast verified",
+        "chromium_updater": "Chromium updater (Omaha)",
+        "vendor_feed": "vendor feed verified",
+        "app_store_ios": "App Store (iPad app)",
     },
     "pl": {
         "keystone": "Google Keystone",
@@ -64,6 +67,9 @@ METHOD_LABELS = {
         "appstore_gui": "GUI App Store (aplikacja iPad)",
         "manual": "wyłącznie ręcznie",
         "sparkle_appcast": "weryfikacja Sparkle appcast",
+        "chromium_updater": "updater Chromium (Omaha)",
+        "vendor_feed": "zweryfikowane przez feed producenta",
+        "app_store_ios": "App Store (aplikacja iPad)",
     },
     "de": {
         "keystone": "Google Keystone",
@@ -76,6 +82,9 @@ METHOD_LABELS = {
         "appstore_gui": "App-Store-GUI (iPad-App)",
         "manual": "nur manuell",
         "sparkle_appcast": "Sparkle Appcast verifiziert",
+        "chromium_updater": "Chromium-Updater (Omaha)",
+        "vendor_feed": "durch Hersteller-Feed verifiziert",
+        "app_store_ios": "App-Store (iPad-App)",
     },
     "fr": {
         "keystone": "Google Keystone",
@@ -88,6 +97,9 @@ METHOD_LABELS = {
         "appstore_gui": "interface App Store (app iPad)",
         "manual": "manuel uniquement",
         "sparkle_appcast": "vérifié par Sparkle appcast",
+        "chromium_updater": "updater Chromium (Omaha)",
+        "vendor_feed": "vérifié par flux éditeur",
+        "app_store_ios": "App Store (app iPad)",
     },
     "es": {
         "keystone": "Google Keystone",
@@ -100,6 +112,9 @@ METHOD_LABELS = {
         "appstore_gui": "interfaz de App Store (app iPad)",
         "manual": "solo manual",
         "sparkle_appcast": "verificado por Sparkle appcast",
+        "chromium_updater": "actualizador Chromium (Omaha)",
+        "vendor_feed": "verificado por feed del proveedor",
+        "app_store_ios": "App Store (app iPad)",
     },
     "it": {
         "keystone": "Google Keystone",
@@ -112,6 +127,9 @@ METHOD_LABELS = {
         "appstore_gui": "GUI App Store (app iPad)",
         "manual": "solo manuale",
         "sparkle_appcast": "verificato da Sparkle appcast",
+        "chromium_updater": "updater Chromium (Omaha)",
+        "vendor_feed": "verificato da feed del fornitore",
+        "app_store_ios": "App Store (app iPad)",
     },
     "pt": {
         "keystone": "Google Keystone",
@@ -124,6 +142,9 @@ METHOD_LABELS = {
         "appstore_gui": "interface da App Store (app iPad)",
         "manual": "apenas manual",
         "sparkle_appcast": "verificado por Sparkle appcast",
+        "chromium_updater": "atualizador Chromium (Omaha)",
+        "vendor_feed": "verificado pelo feed do fornecedor",
+        "app_store_ios": "App Store (app iPad)",
     },
 }
 
@@ -137,7 +158,10 @@ METHOD_AI_HINT = {
         "docker_cli": "Use the Docker Desktop CLI update path.",
         "brew_cask": "Manage the app as an installed Homebrew cask.",
         "appstore_gui": "Manage the iPad app in App Store Track 2.",
+        "app_store_ios": "Manage the iPad app in App Store Track 2.",
         "manual": "Keep as a documented manual target until a safe updater exists.",
+        "chromium_updater": "Add a Chromium updater handler with Omaha verification.",
+        "vendor_feed": "Add a verified vendor feed row.",
     },
     "pl": {
         "keystone": "Dodaj wpis keystone i handler.",
@@ -148,7 +172,10 @@ METHOD_AI_HINT = {
         "docker_cli": "Użyj ścieżki aktualizacji Docker Desktop CLI.",
         "brew_cask": "Zarządzaj aplikacją jako zainstalowanym caskiem Homebrew.",
         "appstore_gui": "Zarządzaj aplikacją iPad przez Track 2 App Store.",
+        "app_store_ios": "Zarządzaj aplikacją iPad przez Track 2 App Store.",
         "manual": "Pozostaw udokumentowany tryb ręczny do czasu bezpiecznej automatyzacji.",
+        "chromium_updater": "Dodaj handler updatera Chromium z weryfikacją Omaha.",
+        "vendor_feed": "Dodaj zweryfikowany wiersz feedu producenta.",
     },
 }
 
@@ -160,6 +187,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater triggered — result unverified",
         "externally_managed": "Externally managed",
         "manual": "Manual only (not automatic)",
+        "excluded": "Excluded from inventory/pipeline",
         "unknown": "Unknown / uncovered",
         "known": "Known coverage",
     },
@@ -170,6 +198,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater uruchomiony — wynik niezweryfikowany",
         "externally_managed": "Zarządzane zewnętrznie",
         "manual": "Wyłącznie ręcznie (nie automatycznie)",
+        "excluded": "Wykluczone z inwentarza/potoku",
         "unknown": "Nieznane / bez pokrycia",
         "known": "Znane pokrycie",
     },
@@ -180,6 +209,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater gestartet — Ergebnis nicht verifiziert",
         "externally_managed": "Extern verwaltet",
         "manual": "Nur manuell (nicht automatisch)",
+        "excluded": "Aus Inventar/Pipeline ausgeschlossen",
         "unknown": "Unbekannt / nicht abgedeckt",
         "known": "Bekannte Abdeckung",
     },
@@ -190,6 +220,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Mise à jour déclenchée — résultat non vérifié",
         "externally_managed": "Gérées en externe",
         "manual": "Manuel uniquement (non automatique)",
+        "excluded": "Exclues de l'inventaire/pipeline",
         "unknown": "Inconnues / non couvertes",
         "known": "Couverture connue",
     },
@@ -200,6 +231,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Actualizador iniciado — resultado sin verificar",
         "externally_managed": "Gestionadas externamente",
         "manual": "Solo manual (no automático)",
+        "excluded": "Excluidas del inventario/pipeline",
         "unknown": "Desconocidas / sin cobertura",
         "known": "Cobertura conocida",
     },
@@ -210,6 +242,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater avviato — risultato non verificato",
         "externally_managed": "Gestite esternamente",
         "manual": "Solo manuale (non automatico)",
+        "excluded": "Escluse da inventario/pipeline",
         "unknown": "Sconosciute / non coperte",
         "known": "Copertura nota",
     },
@@ -220,6 +253,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Atualizador iniciado — resultado não verificado",
         "externally_managed": "Geridas externamente",
         "manual": "Apenas manual (não automático)",
+        "excluded": "Excluídas do inventário/pipeline",
         "unknown": "Desconhecidas / sem cobertura",
         "known": "Cobertura conhecida",
     },
@@ -229,9 +263,9 @@ CLASS_TEXT = {
 # must (a) be used by at least one row of config/internet_app_methods.txt and
 # (b) be backed by a handler that performs a real remote check. Guarded by
 # tests/test_safety_static.py::test_direct_methods_are_used_and_verify.
-DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"}
+DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast", "chromium_updater"}
 TRIGGER_METHODS = {"silent_launch", "mau_fallback_self_update"}
-EXTERNAL_METHODS = {"brew_cask", "appstore_gui"}
+EXTERNAL_METHODS = {"brew_cask", "appstore_gui", "app_store_ios"}
 
 # Canonical registry targets whose on-disk bundle names changed or differ from
 # their product name. ChatGPT / Codex is deliberately bundle-ID-only: the
@@ -385,6 +419,7 @@ def scan_installed_apps():
             receipt = (path / "Contents" / "_MASReceipt" / "receipt").is_file()
             if not receipt:
                 receipt = mdls_value(path, "kMDItemAppStoreHasReceipt") == "1"
+            itunes_meta = (path / "Wrapper" / "iTunesMetadata.plist").is_file()
             found.append(
                 {
                     "app": name,
@@ -392,6 +427,7 @@ def scan_installed_apps():
                     "bundle_id": bundle_id,
                     "version": version or "?",
                     "app_store_receipt": receipt,
+                    "itunes_metadata": itunes_meta,
                 }
             )
     return found
@@ -405,6 +441,16 @@ def load_registry():
         if len(parts) >= 2:
             registry[parts[0]] = parts[1]
     return registry
+
+
+def load_vendor_feed_targets():
+    cfg = os.path.join(script_dir, "config", "vendor_feeds.txt")
+    targets = set()
+    for line in read_lines(cfg):
+        parts = line.split("|")
+        if parts:
+            targets.add(parts[0].strip())
+    return targets
 
 
 def load_mas_names():
@@ -476,12 +522,23 @@ def parent_manager(installed):
     return ""
 
 
-def classify(installed, target, method, mas_names, brew_apps):
+def load_exclusions():
+    path = os.path.join(script_dir, "config", "inventory_exclusions.txt")
+    if not os.path.isfile(path):
+        return set()
+    return {normalize(line) for line in read_lines(path)}
+
+
+def classify(installed, target, method, mas_names, brew_apps, vendor_feeds=None, exclusions=None):
     normalized_name = normalize(installed["app"])
+    if exclusions and (normalized_name in exclusions or (target and normalize(target) in exclusions)):
+        return "excluded", "excluded"
     parent = parent_manager(installed)
 
     if method == "appstore_gui":
         return "externally_managed", "app_store_gui"
+    if installed.get("itunes_metadata"):
+        return "externally_managed", "app_store_ios"
     if installed["app_store_receipt"] or normalized_name in mas_names:
         return "externally_managed", "app_store_mas"
     if method == "brew_cask":
@@ -493,6 +550,8 @@ def classify(installed, target, method, mas_names, brew_apps):
         return "externally_managed", "macos_system"
     if parent:
         return "externally_managed", "parent_app:" + parent
+    if vendor_feeds and target in vendor_feeds:
+        return "verified_direct", "vendor_feed"
     if method in DIRECT_METHODS:
         return "verified_direct", method
     if method in TRIGGER_METHODS:
@@ -509,8 +568,10 @@ method_hints = hints_for(lang)
 class_text = class_text_for(lang)
 apps = read_lines(os.path.join(script_dir, "config", "internet_apps.txt"))
 registry = load_registry()
+vendor_feeds = load_vendor_feed_targets()
 mas_names = load_mas_names()
 brew_apps = load_brew_apps()
+exclusions = load_exclusions()
 installed = scan_installed_apps()
 
 classifications = {
@@ -518,6 +579,7 @@ classifications = {
     "triggered_unverified": [],
     "externally_managed": [],
     "manual": [],
+    "excluded": [],
     "unknown": [],
 }
 installed_targets = set()
@@ -535,7 +597,15 @@ for item in installed:
     method = registry.get(target, "unknown") if target else "unknown"
     if target:
         installed_targets.add(target)
-    classification, managed_by = classify(item, target, method, mas_names, brew_apps)
+    classification, managed_by = classify(item, target, method, mas_names, brew_apps, vendor_feeds, exclusions)
+    if managed_by == "vendor_feed":
+        label = method_labels.get("vendor_feed", "vendor feed verified")
+    elif classification == "externally_managed":
+        label = managed_by
+    elif classification == "excluded":
+        label = class_text.get("excluded", "excluded")
+    else:
+        label = method_labels.get(method, method)
     row = dict(item)
     row.update(
         {
@@ -543,6 +613,7 @@ for item in installed:
             "method": method,
             "classification": classification,
             "managed_by": managed_by,
+            "label": label,
         }
     )
     classifications[classification].append(row)
@@ -563,11 +634,12 @@ verified_direct_count = len(classifications["verified_direct"])
 triggered_unverified_count = len(classifications["triggered_unverified"])
 externally_managed_count = len(classifications["externally_managed"])
 manual_count = len(classifications["manual"])
+excluded_count = len(classifications["excluded"])
 unknown_count = len(classifications["unknown"])
 installed_unique_count = len(installed)
 supported_count = verified_direct_count + triggered_unverified_count + externally_managed_count
 automatic_count = verified_direct_count + externally_managed_count
-known_count = installed_unique_count - unknown_count
+known_count = supported_count + manual_count
 supported_percent = round((supported_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
 automatic_percent = round((automatic_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
 known_percent = round((known_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
@@ -596,6 +668,7 @@ report = {
     "triggered_unverified_count": triggered_unverified_count,
     "externally_managed_count": externally_managed_count,
     "manual_count": manual_count,
+    "excluded_count": excluded_count,
     "unknown_count": unknown_count,
     "intel_only_count": len(intel_only_apps),
     "intel_only_apps": sorted(intel_only_apps),
@@ -632,15 +705,18 @@ print(f"  📦 {class_text['unique']}: {installed_unique_count}")
 print(f"  📊 Update Coverage: {supported_count}/{installed_unique_count} ({supported_percent:.1f}%)")
 print(f"  ✅ {class_text['automatic']}: {automatic_count}/{installed_unique_count} ({automatic_percent:.1f}%)")
 print(f"  🧭 {class_text['known']}: {known_count}/{installed_unique_count} ({known_percent:.1f}%)")
+if excluded_count:
+    print(f"  🚫 {class_text['excluded']}: {excluded_count}")
 
 section_icons = {
     "verified_direct": "✅",
     "triggered_unverified": "⏳",
     "externally_managed": "♻️ ",
     "manual": "🛠️ ",
+    "excluded": "🚫",
     "unknown": "❓",
 }
-for key in ("verified_direct", "triggered_unverified", "externally_managed", "manual", "unknown"):
+for key in ("verified_direct", "triggered_unverified", "externally_managed", "manual", "excluded", "unknown"):
     rows = classifications[key]
     print("")
     print(f"  {section_icons[key]} {class_text[key]}: {len(rows)}")
@@ -648,10 +724,7 @@ for key in ("verified_direct", "triggered_unverified", "externally_managed", "ma
         target_suffix = ""
         if row["target"] and normalize(row["target"]) != normalize(row["app"]):
             target_suffix = f" → {row['target']}"
-        if key == "externally_managed":
-            detail = row["managed_by"]
-        else:
-            detail = method_labels.get(row["method"], row["method"])
+        detail = row["label"]
         print(f"       · {row['app']}{target_suffix} ({detail})")
 
 if intel_only_apps:

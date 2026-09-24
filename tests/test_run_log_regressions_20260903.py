@@ -61,7 +61,7 @@ class ClaudeNativeInstallerPathTests(unittest.TestCase):
         lib = (REPO_ROOT / "lib" / "native_installers.sh").read_text(encoding="utf-8")
         self.assertIn("native_installer_existing_update_cmd", self.source)
         self.assertIn("https://claude.ai/install.sh", lib)
-        self.assertRegex(lib, r"claude\|agy\) printf '%s' \"update\"")
+        self.assertRegex(lib, r"claude\|agy\|codex\|agent\) printf '%s' \"update\"")
 
     def test_claude_update_is_gated_on_existing_binary(self) -> None:
         self.assertIn('existing_cmd', self.source)

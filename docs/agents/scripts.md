@@ -8,7 +8,7 @@
 | `setup.sh` | First-run (public users) — language, deps, paths |
 | `migration_setup.sh` | First-run (owner) — phases 0a–16: language, cloud, deps, paths, app scan |
 | `update_all.sh` | Master: prescan → App Store → npm CLI → Homebrew → internet apps → postupdate/history → macOS final |
-| `update_system.sh` | macOS via `softwareupdate -ia -R --verbose` |
+| `update_system.sh` | per-label `softwareupdate -i <label> -R`, restart-required labels in one final batch |
 | `update_appstore.sh` | `sudo mas upgrade` + AppleScript GUI for iPad apps |
 | `update_internet_apps.sh` | Installed internet apps (see `config/internet_apps.txt`): verified direct handlers, vendor CLIs and honestly reported in-app updater triggers |
 | `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `codex`, `opencode`) + self-updating `agy` |
@@ -24,16 +24,35 @@
 | `dev_sync/overlay_import.py` | Overlay import planner: expand directory manifests, skip Git/excluded, refuse symlink escapes |
 | `config/inventory_exclusions.txt` | Explicit list of apps to ignore during inventory scans (e.g. `Ascendo`) |
 | `dev_sync/*.sh` | Export/import/verify private files to/from cloud storage |
+| `scripts/check_vendor_feeds.sh` | Read-only diagnostic query of vendor feeds and Omaha updaters (table and `--json`) |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
 | `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
 | `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule |
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
 | `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
+| `lib/vendor_feeds.sh` | Vendor feed lookup and parsing helper |
+| `lib/vendor_direct.sh` | Verified vendor direct download, Gatekeeper validation, and atomic swap |
+| `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha, VersionHistory) |
+| `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
+| `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 
-`update_all.sh` supports `--dry-run`, `--yes`, `--verify-only`, and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
+`update_all.sh` supports `--dry-run`, `--yes`, `--verify-only`, `--bootstrap-cli` (explicitly install missing CLI tools), and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MAC_UPDATE_BOOTSTRAP_CLI` | `0` | Set to `1` (or pass `--bootstrap-cli`) to install missing native CLIs; by default only installed CLIs are updated |
+| `MAC_UPDATE_STAGE_WAIT` | `90` | Seconds to wait for staging/install before verifying an updated bundle (0–600, cykl uruchomienia updatera producenta) |
+| `MAC_UPDATE_VENDOR_DIRECT` | `1` | Set to `0` to disable direct vendor installations when apps are behind |
+| `MAC_UPDATE_OMAHA_WAIT` | `45` | Timeout (seconds) waiting for Omaha updater response |
+| `MAC_UPDATE_OMAHA_MAX_AGE_H` | `6` | Maximum age (hours) of previous Omaha noupdate check to accept as current proof |
+| `MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT` | `300` | Timeout (seconds) for post-Track-2 iPad app installation verification (0–1800) |
+| `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |
+| `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
 ## update_all.sh Step Order
 
@@ -41,10 +60,10 @@
 Step 0: prescan             — scan /Applications + ~/Applications + brew + mas → write installed_apps_scan.txt → atomically update APPLICATIONS.md
 Step 1: update_appstore.sh  — Track 1: sudo mas; Track 2: AppleScript GUI for iPad apps
 Step 2: update_npm_cli.sh   — native Node/Bun + npm global CLI migration/update + `agy update`
-Step 3: update_brew.sh      — Homebrew formulae/casks (--greedy) + cleanup + doctor
+Step 3: update_brew.sh      — formulae + casks (greedy only for brew_cask-designated tokens) + orphan skip + cleanup + doctor
 Step 4: update_internet_apps.sh — installed internet apps; direct updates and honest triggers
 Step 5: postupdate.py       — capture fresh /Applications to installed_apps_after.txt → refresh APPLICATIONS.md and append UPDATES.md
-Step 6: update_system.sh    — macOS via softwareupdate -ia -R; last because it may restart
+Step 6: update_system.sh    — macOS via softwareupdate -i <label> -R (per-label no-restart + batch restart); last because it may restart
 ```
 
 If any step before step 6 encounters a hard failure (`BLOCKING_EXIT`), step 6 (`softwareupdate`) is deferred to avoid rebooting into a broken state. Soft warnings (`exit 10`) surface warnings in reporting while allowing system updates to proceed.

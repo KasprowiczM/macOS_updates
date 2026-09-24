@@ -14,13 +14,14 @@ Two-track strategy:
 Amphetamine, Canva, iMovie, KeePassium, Keynote, NordVPN, Notion Web Clipper,
 Numbers, OneDrive, Pages, Perplexity, Prime Video, Telegram, WhatsApp, Xcode, myCANAL
 
-- Requires `sudo` on macOS 26.x due to CVE-2025-43411
+- Requires `sudo mas upgrade` with explicit app IDs
 - `mas` auto-installed via Homebrew if not present
 - Requires mas ≥ 4.0
 
 **Track 2 — AppleScript GUI automation** (iPad apps on Apple Silicon):
 UniFi, WiFiman, Picsart — `mas` officially doesn't support iPad apps.
-Script opens App Store Updates page and clicks "Update All" (or individual Update buttons).
+- **iTunes Lookup Pre-check Gate:** Checks the official App Store iTunes Lookup API first. If all iPad apps are already current, Track 2 GUI automation is cleanly skipped without opening App Store windows.
+- When updates are pending, script opens App Store Updates page and clicks "Update All" (or individual Update buttons).
 
 - Requires **Accessibility permission** for your terminal (Terminal.app / Warp / iTerm)
 - Script auto-detects missing permission and opens System Settings → Privacy → Accessibility

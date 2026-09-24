@@ -8,24 +8,149 @@ if [ -f "$_LIB_DIR/version.sh" ]; then
 elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/version.sh" ]; then
     . "$SCRIPT_DIR/lib/version.sh"
 fi
+if [ -f "$_LIB_DIR/vendor_feeds.sh" ]; then
+    . "$_LIB_DIR/vendor_feeds.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/vendor_feeds.sh" ]; then
+    . "$SCRIPT_DIR/lib/vendor_feeds.sh"
+fi
+if [ -f "$_LIB_DIR/proc.sh" ]; then
+    . "$_LIB_DIR/proc.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/proc.sh" ]; then
+    . "$SCRIPT_DIR/lib/proc.sh"
+fi
+if [ -f "$_LIB_DIR/brew.sh" ]; then
+    . "$_LIB_DIR/brew.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/brew.sh" ]; then
+    . "$SCRIPT_DIR/lib/brew.sh"
+fi
+if [ -f "$_LIB_DIR/internet_handlers.sh" ]; then
+    . "$_LIB_DIR/internet_handlers.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/internet_handlers.sh" ]; then
+    . "$SCRIPT_DIR/lib/internet_handlers.sh"
+fi
 
 GOOGLE_KEYSTONE_RAN=0
 GOOGLE_KEYSTONE_EXIT=1
+GOOGLE_KEYSTONE_USER_INIT=0
+GOOGLE_KEYSTONE_SYS_INIT=0
+GOOGLE_KEYSTONE_DEADLINE=0
+GOOGLE_OMAHA_INC=""
 MAU_TEAMS21_VERIFIED=0
+MAU_TEAMS21_OFFERED=0
+MAU_LISTED=0
 google_keystone_check() {
     local agent="$1"
-    local output=""
-    if [ "$GOOGLE_KEYSTONE_RAN" -eq 1 ]; then
-        return "$GOOGLE_KEYSTONE_EXIT"
+    local appid="${2:-}"
+
+    local user_log="$HOME/Library/Application Support/Google/GoogleUpdater/updater.log"
+    local sys_log="/Library/Application Support/Google/GoogleUpdater/updater.log"
+    local user_init=0 sys_init=0 deadline=0
+
+    local init_file=""
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        init_file="$MAC_UPDATE_SESSION_DIR/google_omaha_init.txt"
     fi
-    GOOGLE_KEYSTONE_RAN=1
-    output=$(run_with_timeout 180 "$agent" --runMode ondemand 2>&1)
-    GOOGLE_KEYSTONE_EXIT=$?
-    if [ "$GOOGLE_KEYSTONE_EXIT" -ne 0 ]; then
-        internet_diag_log "ERROR: Google Keystone check failed (exit=$GOOGLE_KEYSTONE_EXIT)"
-        [ -n "$output" ] && printf '%s\n' "$output" | tail -n 20
+
+    if [ -n "$init_file" ] && [ -f "$init_file" ]; then
+        read -r user_init sys_init deadline < "$init_file" 2>/dev/null || { user_init=0; sys_init=0; deadline=0; }
+    elif [ -z "$init_file" ] && [ "$GOOGLE_KEYSTONE_RAN" -eq 1 ]; then
+        if [ "$GOOGLE_KEYSTONE_EXIT" -ne 0 ]; then
+            return "$GOOGLE_KEYSTONE_EXIT"
+        fi
+        user_init="$GOOGLE_KEYSTONE_USER_INIT"
+        sys_init="$GOOGLE_KEYSTONE_SYS_INIT"
+        deadline="$GOOGLE_KEYSTONE_DEADLINE"
+    else
+        local wait_limit="${MAC_UPDATE_OMAHA_WAIT:-45}"
+        case "$wait_limit" in ''|*[!0-9]*) wait_limit=45 ;; esac
+        [ "$wait_limit" -lt 0 ] && wait_limit=0
+        [ "$wait_limit" -gt 180 ] && wait_limit=180
+        deadline=$(( $(date +%s) + wait_limit ))
+
+        [ -f "$user_log" ] && user_init=$(wc -c < "$user_log" 2>/dev/null | tr -d ' ' || echo 0)
+        [ -f "$sys_log" ] && sys_init=$(wc -c < "$sys_log" 2>/dev/null | tr -d ' ' || echo 0)
+
+        local triggered=0
+        local output=""
+
+        local user_updater="${MAC_UPDATE_GOOGLE_USER_UPDATER-$HOME/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater}"
+        local sys_updater="${MAC_UPDATE_GOOGLE_SYS_UPDATER-/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater}"
+        local updater_timeout=60
+
+        if [ -x "$user_updater" ]; then
+            output=$(run_with_timeout "$updater_timeout" "$user_updater" --wake-all 2>&1)
+            GOOGLE_KEYSTONE_EXIT=$?
+            [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+        fi
+        if [ "$triggered" -eq 0 ] && [ -x "$sys_updater" ]; then
+            output=$(run_with_timeout "$updater_timeout" "$sys_updater" --wake-all 2>&1)
+            GOOGLE_KEYSTONE_EXIT=$?
+            [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+        fi
+        if [ ! -x "$user_updater" ] && [ ! -x "$sys_updater" ]; then
+            if [ -n "$agent" ] && [ -f "$agent" ]; then
+                output=$(run_with_timeout "$updater_timeout" "$agent" --runMode ondemand 2>&1)
+                GOOGLE_KEYSTONE_EXIT=$?
+                [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+            fi
+        fi
+
+        if [ "$triggered" -eq 0 ]; then
+            GOOGLE_KEYSTONE_RAN=1
+            internet_diag_log "ERROR: Google Keystone check failed (exit=$GOOGLE_KEYSTONE_EXIT)"
+            [ -n "$output" ] && printf '%s\n' "$output" | tail -n 20
+            return "$GOOGLE_KEYSTONE_EXIT"
+        fi
+
+        GOOGLE_KEYSTONE_RAN=1
+        GOOGLE_KEYSTONE_USER_INIT="$user_init"
+        GOOGLE_KEYSTONE_SYS_INIT="$sys_init"
+        GOOGLE_KEYSTONE_DEADLINE="$deadline"
+
+        if [ -n "$init_file" ]; then
+            printf '%s %s %s\n' "$user_init" "$sys_init" "$deadline" > "$init_file"
+        fi
     fi
-    return "$GOOGLE_KEYSTONE_EXIT"
+
+    local combined_inc=""
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        local u_inc="" s_inc=""
+        u_inc=$(omaha_read_increment "$user_log" "$user_init")
+        s_inc=$(omaha_read_increment "$sys_log" "$sys_init")
+        combined_inc="${u_inc}${s_inc}"
+        if [ -n "$appid" ]; then
+            local omaha_st=""
+            omaha_st=$(printf '%s\n' "$combined_inc" | PYTHONPATH="$_LIB_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import omaha_last_status
+log = sys.stdin.read()
+appid = sys.argv[1]
+res = omaha_last_status(log, appid)
+print(res if res else "")
+' "$appid" 2>/dev/null || true)
+            if [ -n "$omaha_st" ]; then
+                break
+            fi
+        elif echo "$combined_inc" | grep -E -q '"updatecheck"\s*:\s*\{"status"' 2>/dev/null; then
+            break
+        fi
+        local now=$(date +%s)
+        [ "$now" -ge "$deadline" ] && break
+        local sleep_dur=3
+        [ $(( deadline - now )) -lt 3 ] && sleep_dur=$(( deadline - now ))
+        [ "$sleep_dur" -gt 0 ] && sleep "$sleep_dur"
+    done
+
+    local u_inc="" s_inc=""
+    u_inc=$(omaha_read_increment "$user_log" "$user_init")
+    s_inc=$(omaha_read_increment "$sys_log" "$sys_init")
+    GOOGLE_OMAHA_INC="${u_inc}${s_inc}"
+
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        printf '%s\n' "$GOOGLE_OMAHA_INC" >> "$MAC_UPDATE_SESSION_DIR/chromium_updater_log.txt"
+    fi
+
+    return 0
 }
 
 iu_google_chrome() {
@@ -33,25 +158,35 @@ iu_google_chrome() {
     if [ -d "/Applications/Google Chrome.app" ]; then
         VER=$(app_version "/Applications/Google Chrome.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        # Keystone (Omaha) — oficjalny updater Google dla macOS
+
+        local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
+        local vh_json=""
+        vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+        local pub_ver=""
+        if [ -n "$vh_json" ]; then
+            pub_ver="$(printf '%s\n' "$vh_json" | PYTHONPATH="$_LIB_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import version_history_public
+print(version_history_public(sys.stdin.read()) or "")
+' 2>/dev/null || true)"
+        fi
+        local vh_rel=""
+        [ -n "$pub_ver" ] && vh_rel="$(version_cmp "$VER" "$pub_ver")"
+        if [ "$vh_rel" = "equal" ] || [ "$vh_rel" = "newer" ]; then
+            print_ok "Google Chrome up to date ($VER, Google VersionHistory)"
+            STATUS_CHROME="✅ Up to date ($VER, Google VersionHistory)"
+            return 0
+        fi
+
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
-        if [ -f "$KEYSTONE_AGENT" ]; then
-            print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
-            if google_keystone_check "$KEYSTONE_AGENT"; then
-                print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
-                STATUS_CHROME="$L_INTERNET_STATUS_CHECKED_CLI"
-            else
-                print_warn "Google Keystone failed to check for Chrome updates"
-                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
+        if google_keystone_check "$KEYSTONE_AGENT" "com.google.chrome"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
+            evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "$GOOGLE_OMAHA_INC" "com.google.chrome"
+            STATUS_CHROME="$INTERNET_LAST_STATUS"
         else
-            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Chrome")"
-            if silent_launch_app "Google Chrome"; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$L_INTERNET_HINT_CHROME")"
-                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-            else
-                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+            print_warn "$(printf "$L_INTERNET_KEYSTONE_CHECK_FAILED_FMT" "Chrome")"
+            STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Chrome")"
@@ -156,15 +291,8 @@ iu_chatgpt() {
     print_header "🤖 ChatGPT / Codex (OpenAI)"
     OPENAI_APP="$(internet_app_path "ChatGPT / Codex" 2>/dev/null || true)"
     if [ -n "$OPENAI_APP" ] && [ -d "$OPENAI_APP" ]; then
-        VER=$(app_version "$OPENAI_APP")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "bundle: com.openai.codex")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "ChatGPT / Codex")"
-        if silent_launch_app "$OPENAI_APP"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ChatGPT / Codex → Check for updates")"
-            STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
+        internet_handler_vendor_truth "ChatGPT / Codex" "$OPENAI_APP" "$OPENAI_APP"
+        internet_handler_set_status STATUS_CHATGPT "$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT / Codex (com.openai.codex)")"
     fi
@@ -183,7 +311,23 @@ iu_claude() {
 # silent_launch path: verified when Comet exposes a feed, honestly
 # "⏳ Launched (unverified)" when it does not.
 iu_comet() {
-    internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
+    print_header "☄️  Comet (Perplexity AI)"
+    local app_path="/Applications/Comet.app"
+    [ -d "$app_path" ] || app_path="$(capture_app_path "Comet")"
+    if [ -n "$app_path" ] && [ -d "$app_path" ]; then
+        local ver; ver="$(app_version "$app_path")"
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+        local bin="$HOME/Library/Application Support/Perplexity/CometUpdater/Current/CometUpdater.app/Contents/MacOS/CometUpdater"
+        local log="$HOME/Library/Application Support/Perplexity/CometUpdater/updater.log"
+        if [ -x "$bin" ]; then
+            internet_handler_chromium_updater "Comet" "$app_path" "$bin" "$log" "ai.perplexity.comet"
+            STATUS_COMET="$INTERNET_LAST_STATUS"
+        else
+            internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Comet")"
+    fi
 }
 
 iu_antigravity() {
@@ -195,7 +339,25 @@ iu_antigravity_ide() {
 }
 
 iu_gemini() {
-    internet_dispatch_silent_launch "✨ Gemini" "Gemini" "STATUS_GEMINI" "Gemini" "Gemini → app menu → Check for updates"
+    print_header "✨ Gemini"
+    local app_path="/Applications/Gemini.app"
+    [ -d "$app_path" ] || app_path="$(capture_app_path "Gemini")"
+    if [ -n "$app_path" ] && [ -d "$app_path" ]; then
+        local ver; ver="$(app_version "$app_path")"
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+        KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
+        if google_keystone_check "$KEYSTONE_AGENT" "com.google.geminimacos"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Gemini")"
+            evaluate_omaha_status "Gemini" "$app_path" "$GOOGLE_OMAHA_INC" "com.google.geminimacos"
+            STATUS_GEMINI="$INTERNET_LAST_STATUS"
+        else
+            print_warn "$(printf "$L_INTERNET_KEYSTONE_CHECK_FAILED_FMT" "Gemini")"
+            STATUS_GEMINI="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Gemini")"
+    fi
 }
 
 iu_lm_studio() {
@@ -239,25 +401,24 @@ iu_opencode_desktop() {
     # Strona: https://opencode.ai | GitHub: sst/opencode
     # Uwaga: npm package `opencode-ai` dostarcza CLI `opencode` (brak .app)
     #        Desktop App: pobierz z https://opencode.ai/download
-    OPENCODE_APP_PATH=""
-    for _oc_path in "/Applications/opencode.app" "/Applications/OpenCode.app" \
-                    "/Applications/Opencode.app" "/Applications/opencode Desktop.app"; do
-        if [ -d "$_oc_path" ]; then
-            OPENCODE_APP_PATH="$_oc_path"
-            break
-        fi
-    done
-    if [ -n "$OPENCODE_APP_PATH" ]; then
+    OPENCODE_APP_PATH="$(internet_app_path "OpenCode" 2>/dev/null || true)"
+    if [ -z "$OPENCODE_APP_PATH" ] || [ ! -d "$OPENCODE_APP_PATH" ]; then
+        OPENCODE_APP_PATH=""
+        for _oc_path in "/Applications/OpenCode.app" "${HOME}/Applications/OpenCode.app" \
+                        "/Applications/opencode.app" "${HOME}/Applications/opencode.app" \
+                        "/Applications/Opencode.app" "${HOME}/Applications/Opencode.app" \
+                        "/Applications/opencode Desktop.app" "${HOME}/Applications/opencode Desktop.app"; do
+            if [ -d "$_oc_path" ]; then
+                OPENCODE_APP_PATH="$_oc_path"
+                break
+            fi
+        done
+    fi
+    if [ -n "$OPENCODE_APP_PATH" ] && [ -d "$OPENCODE_APP_PATH" ]; then
         VER=$(app_version "$OPENCODE_APP_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "$OPENCODE_APP_PATH")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "OpenCode Desktop")"
-        if silent_launch_app "$OPENCODE_APP_PATH"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://opencode.ai")"
-            print_info "$L_INTERNET_OPENCODE_CLI_SEPARATE"
-            STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
+        internet_handler_vendor_truth "OpenCode" "$OPENCODE_APP_PATH" "$OPENCODE_APP_PATH"
+        STATUS_OPENCODE="$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED_AS_APP" "OpenCode Desktop")"
         print_info "$(internet_msg "$L_INTERNET_CLI_MANAGED_SEPARATE" "opencode")"
@@ -399,23 +560,14 @@ iu_google_drive() {
         VER=$(app_version "/Applications/Google Drive.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
-        if [ -f "$KEYSTONE_AGENT" ]; then
-            print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
-            if google_keystone_check "$KEYSTONE_AGENT"; then
-                print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_CHECKED_CLI"
-            else
-                print_warn "Google Keystone failed to check for Google Drive updates"
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
+        if google_keystone_check "$KEYSTONE_AGENT" "com.google.drivefs"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
+            evaluate_omaha_status "Google Drive" "/Applications/Google Drive.app" "$GOOGLE_OMAHA_INC" "com.google.drivefs"
+            STATUS_GOOGLEDRIVE="$INTERNET_LAST_STATUS"
         else
-            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Google Drive")"
-            if silent_launch_app "Google Drive"; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Google Drive → O Google Drive")"
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-            else
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+            print_warn "$(printf "$L_INTERNET_KEYSTONE_CHECK_FAILED_FMT" "Google Drive")"
+            STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Drive")"
@@ -1345,6 +1497,7 @@ iu_microsoft_365() {
         printf '%s\n' unknown > "$MAC_UPDATE_SESSION_DIR/pending_mau"
     fi
     MAU_TEAMS21_OFFERED=0
+    MAU_LISTED=0
     MAU_CHECK_TIMEOUT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT:-120}" 120)"
     # msupdate's own --wait returns the current install state instead of
     # hanging, so it is the primary bound. run_with_timeout stays strictly
@@ -1428,6 +1581,7 @@ iu_microsoft_365() {
             fi
             STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
         else
+            MAU_LISTED=1
             # Only positively identified product IDs count as pending. The
             # old "every non-blank line" filter counted spinner fragments.
             MAU_PENDING="$(mau_parse_pending "$MAU_LIST")"
@@ -1753,15 +1907,43 @@ iu_microsoft_365() {
 
 iu_microsoft_teams() {
     print_header "💬 Microsoft Teams"
-    if [ -d "/Applications/Microsoft Teams.app" ]; then
-        VER=$(app_version "/Applications/Microsoft Teams.app")
+    local teams_path="/Applications/Microsoft Teams.app"
+    [ -d "$teams_path" ] || teams_path="$(internet_app_path "Microsoft Teams" 2>/dev/null || true)"
+    if [ -n "$teams_path" ] && [ -d "$teams_path" ]; then
+        VER=$(app_version "$teams_path")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         if [ "$MAU_TEAMS21_VERIFIED" -eq 1 ]; then
             print_ok "Microsoft Teams fallback update verified by MAU (TEAMS21): $VER"
             STATUS_TEAMS="✅ MAU fallback verified ($VER)"
+            return 0
+        fi
+
+        local cask_ver="" cask_rel=""
+        if command -v brew_cask_latest_versions >/dev/null 2>&1; then
+            cask_ver="$(brew_cask_latest_versions "microsoft-teams" 2>/dev/null | awk -F'\t' '$1 == "microsoft-teams" {print $2; exit}')"
+        fi
+        if [ -n "$cask_ver" ]; then
+            cask_rel="$(version_cmp "$cask_ver" "$VER")"
+        fi
+
+        if [ "$cask_rel" = "equal" ] || [ "$cask_rel" = "older" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Microsoft Teams" "$VER (cask: $cask_ver)")"
+            STATUS_TEAMS="$L_INTERNET_STATUS_CASK_CURRENT"
+        elif [ "$cask_rel" = "newer" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$cask_ver" "$VER")"
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Microsoft Teams")"
+            if silent_launch_app "$teams_path"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Microsoft Teams → Check for updates")"
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        elif [ "${MAU_LISTED:-0}" -eq 1 ] && [ "${MAU_TEAMS21_OFFERED:-0}" -eq 0 ] && [ "${STATUS_MICROSOFT:-}" = "$L_INTERNET_STATUS_CURRENT" ]; then
+            print_ok "Microsoft Teams up to date (MAU verified): $VER"
+            STATUS_TEAMS="✅ MAU verified ($VER)"
         else
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Microsoft Teams")"
-            if silent_launch_app "/Applications/Microsoft Teams.app"; then
+            if silent_launch_app "$teams_path"; then
                 print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Microsoft Teams → Check for updates")"
                 STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
             else
@@ -1771,9 +1953,9 @@ iu_microsoft_teams() {
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Microsoft Teams")"
     fi
+}
 
     # ── 19. VISUAL STUDIO CODE ────────────────────────────────────
-}
 
 iu_visual_studio_code() {
     print_header "💻 Visual Studio Code"
@@ -1935,42 +2117,124 @@ iu_docker_desktop() {
         VER=$(app_version "/Applications/Docker.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        # Docker Desktop CLI (available from v4.37+)
-        if command -v docker >/dev/null 2>&1 && run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
-            print_step "$L_INTERNET_DOCKER_CHECKING"
-            # Check if an update is available first (non-destructive)
-            if run_with_timeout 60 docker desktop update --check-only --quiet 2>/dev/null; then
-                print_info "Update available — applying..."
-                if run_with_timeout 600 docker desktop update --quiet 2>/dev/null; then
-                    print_ok "$L_INTERNET_DOCKER_CLI_OK"
-                    STATUS_DOCKER="$L_INTERNET_STATUS_CHECKED_CLI"
-                else
-                    print_warn "Docker desktop update command failed"
-                    STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-                fi
-            else
-                print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Docker Desktop" "$VER")"
-                STATUS_DOCKER="$L_INTERNET_STATUS_CURRENT"
-            fi
+        local feed_row
+        feed_row="$(vendor_feed_lookup "Docker Desktop" 2>/dev/null || true)"
+        if [ -z "$feed_row" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        local R
+        R="$(printf '%s' "$feed_row" | cut -d'|' -f1)"
+        if [ -z "$R" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        local rel
+        rel="$(version_cmp "$R" "$VER")"
+        if [ "$rel" = "equal" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$VER")"
+            INTERNET_LAST_VERIFIED=1
+            print_ok "$STATUS_DOCKER"
+            return 0
+        elif [ "$rel" = "older" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$VER")"
+            INTERNET_LAST_VERIFIED=0
+            print_warn "$STATUS_DOCKER"
+            return 0
+        elif [ "$rel" = "unknown" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        # newer:
+        if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$STATUS_DOCKER"
+            return 0
+        fi
+
+        if ! command -v docker >/dev/null 2>&1; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_warn "$STATUS_DOCKER (docker CLI not found)"
+            return 0
+        fi
+
+        local was_running=0
+        if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+            was_running=1
         else
-            # No CLI, or the CLI plugin is present but the Docker Desktop app
-            # isn't running -- "docker desktop status" fails in that case too,
-            # and --check-only's exit code must not be misread as "no update
-            # available" when it really means "couldn't check at all".
-            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Docker Desktop")"
-            if open -a Docker 2>/dev/null; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Docker icon w menu bar → Software updates")"
-                STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-            else
-                STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            print_step "$L_INTERNET_DOCKER_STARTING"
+            run_with_timeout 180 docker desktop start >/dev/null 2>&1 || true
+            local started=0
+            local elapsed=0
+            while [ "$elapsed" -lt 120 ]; do
+                sleep 5
+                elapsed=$((elapsed + 5))
+                if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+                    started=1
+                    break
+                fi
+            done
+            if [ "$started" -eq 0 ]; then
+                STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
+                INTERNET_LAST_VERIFIED=1
+                print_warn "$L_INTERNET_DOCKER_START_FAILED"
+                return 0
             fi
         fi
+
+        print_step "$L_INTERNET_DOCKER_UPDATING"
+        run_with_timeout 900 docker desktop update -q 2>/dev/null || true
+
+        local elapsed=0
+        local new_ver="$VER"
+        local check_rel
+        local updated=0
+        while [ "$elapsed" -lt 300 ]; do
+            new_ver="$(app_version "/Applications/Docker.app")"
+            check_rel="$(version_cmp "$R" "$new_ver")"
+            if [ "$check_rel" = "equal" ] || [ "$check_rel" = "older" ]; then
+                updated=1
+                break
+            fi
+            sleep 10
+            elapsed=$((elapsed + 10))
+        done
+
+        if [ "$was_running" -eq 0 ]; then
+            run_with_timeout 120 docker desktop stop >/dev/null 2>&1 || true
+        fi
+
+        if [ "$updated" -eq 1 ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$new_ver")"
+            INTERNET_LAST_VERIFIED=1
+            print_ok "$STATUS_DOCKER"
+            return 0
+        fi
+
+        STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$new_ver" "$R")"
+        INTERNET_LAST_VERIFIED=1
+        print_warn "$STATUS_DOCKER"
+        return 0
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Docker Desktop")"
     fi
-
-    # ── 22. WARP ──────────────────────────────────────────────────
 }
+    # ── 22. WARP ──────────────────────────────────────────────────
+
 
 iu_warp() {
     internet_dispatch_silent_launch "⚡ Warp" "Warp" "STATUS_WARP" "Warp" "Warp → Warp → O Warp / Check for Updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Warp")"
@@ -2211,7 +2475,7 @@ except Exception:
 }
 
 iu_remote_desktop_manager() {
-    internet_dispatch_sparkle_appcast "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager"
+    internet_dispatch_silent_launch "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager"
 }
 
     # ── 34. IPMIVIEW (Supermicro) ────────────────────────────────
@@ -2223,6 +2487,13 @@ iu_ipmiview() {
         [ -d "$ipath" ] && IPMI_PATH="$ipath" && break
     done
     if [ -n "$IPMI_PATH" ]; then
+        if command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$IPMI_PATH"; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            STATUS_IPMIVIEW="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            return 0
+        fi
         VER=$(app_version "$IPMI_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         # A vendor that ships no auto-updater is a permanent fact about that vendor, not

@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.4.6**).
+**Version:** see `VERSION` in repo root (currently **1.5.0**).
 
 ## One-line install (new Mac, Apple Silicon)
 
@@ -55,7 +55,7 @@ bash update_all.sh
 | `MAC_UPDATE_LANG` | (picker after clone) | Skip picker: `en`, `pl`, `de`, `fr`, `es`, `it`, `pt` |
 | `MAC_UPDATE_NONINTERACTIVE` | `0` | `1` = default answers in `setup.sh` |
 | `MAC_UPDATE_SKIP_INVENTORY` | `0` | `1` = skip inventory build in `install.sh` |
-| `MAC_UPDATE_REF` | (clone default branch) | Tag, branch, or SHA to check out after clone (`v1.4.6`, `main`, …) |
+| `MAC_UPDATE_REF` | (clone default branch) | Tag, branch, or SHA to check out after clone (`v1.5.0`, `main`, …) |
 
 ## Verify
 

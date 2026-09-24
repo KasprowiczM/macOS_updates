@@ -464,7 +464,7 @@ echo "alias upd='cd ~/Dev_Env/macOS_updates && bash update_all.sh -y'" >> ~/.zsh
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>/Users/mk/Dev_Env/macOS_updates/update_all.sh</string>
+    <string>~/Dev_Env/macOS_updates/update_all.sh</string>
     <string>-y</string>
     <string>--skip-system</string>
   </array>
@@ -473,9 +473,9 @@ echo "alias upd='cd ~/Dev_Env/macOS_updates && bash update_all.sh -y'" >> ~/.zsh
         <key>Hour</key><integer>9</integer>
         <key>Minute</key><integer>0</integer></dict>
   <key>StandardOutPath</key>
-  <string>/Users/mk/Dev_Env/macOS_updates/logs/launchd.out</string>
+  <string>~/Dev_Env/macOS_updates/logs/launchd.out</string>
   <key>StandardErrorPath</key>
-  <string>/Users/mk/Dev_Env/macOS_updates/logs/launchd.err</string>
+  <string>~/Dev_Env/macOS_updates/logs/launchd.err</string>
 </dict></plist>
 ```
 

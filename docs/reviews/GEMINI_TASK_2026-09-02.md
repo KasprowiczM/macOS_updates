@@ -1,6 +1,6 @@
 # Prompt wykonawczy — Gemini Flash 3.7 (high)
 
-**Projekt:** `/Users/mk/Dev_Env/macOS_updates`
+**Projekt:** `~/Dev_Env/macOS_updates`
 **Baza:** v1.4.3 (2026-09-02), 213 testów zielonych
 **Źródło zadań:** `docs/reviews/ULTRA_REVIEW_2026-09-02.md`, sekcja „Rekomendacje" (R1–R7)
 
@@ -8,7 +8,7 @@ Skopiuj wszystko poniżej linii jako prompt.
 
 ---
 
-Pracujesz w repozytorium `/Users/mk/Dev_Env/macOS_updates` na macOS 26.6.2, Apple Silicon. Zanim cokolwiek zmienisz, przeczytaj w tej kolejności: `AGENTS.md`, `docs/reviews/ULTRA_REVIEW_2026-09-02.md`, `docs/agents/critical_rules.md`, `docs/agents/exit_codes.md`, `docs/agents/architecture.md`.
+Pracujesz w repozytorium `~/Dev_Env/macOS_updates` na macOS 26.6.2, Apple Silicon. Zanim cokolwiek zmienisz, przeczytaj w tej kolejności: `AGENTS.md`, `docs/reviews/ULTRA_REVIEW_2026-09-02.md`, `docs/agents/critical_rules.md`, `docs/agents/exit_codes.md`, `docs/agents/architecture.md`.
 
 ## Zasada nadrzędna tego zadania
 

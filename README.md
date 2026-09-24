@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.6** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+
+**Vendor truth (v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -76,6 +78,7 @@ when you want App Store and macOS updates applied.
 | `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
 | `--verify-only` | Verify installed app versions against history without mutating |
 | `--json-summary` | Print a JSON result object on stdout after the run |
+| `--bootstrap-cli` | Explicitly install missing CLI tools (by default only installed CLIs are updated) |
 | `--non-interactive` | Non-interactive mode for launchd / cron (also implies `-y`) |
 | `--notify` | Post a macOS notification when the run finishes |
 | `--treat-appstore-ax-as-warning` | Treat App Store exit `2` (missing Accessibility) as a warning |
@@ -145,7 +148,7 @@ site, and it is governed by three conditions:
 | 3 | **Homebrew** — formulae and casks (`brew_cask` + downgrade protection) + cleanup and health check |
 | 4 | **Internet apps** — verified direct handlers, `sparkle_appcast`, vendor CLIs and honest update triggers |
 | 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
-| 6 | **macOS (final)** — `softwareupdate -ia -R`; skipped when any earlier step failed |
+| 6 | **macOS (final)** — per-label `softwareupdate -i <label> -R` (restart-required in final batch); skipped when any earlier step failed |
 
 **Important:** Updates only touch software already installed on your Mac. Supported-but-missing apps are reported, not installed. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Unknown installed apps are listed so you (or an AI agent) can add handlers.
 

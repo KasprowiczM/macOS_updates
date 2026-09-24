@@ -148,7 +148,7 @@ CapCut is a **non‑App‑Store, non‑Sparkle** direct download (`com.lemon.lvo
 
 Each work item is a **self‑contained prompt** you can paste to a cheaper model (Haiku/Sonnet worker). Every prompt assumes this header:
 
-> **Global constraints (obey exactly):** Bash 3.2 only (no `declare -A`, `mapfile`, `readarray`, `${v^^}`). All `update_*.sh` keep `set -o pipefail` and must NOT add `set -e`. No hardcoded paths (`SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`); temp via `mktemp`. Don't touch i18n keys without adding the key to all 7 `i18n/lang_*.sh`. After changes run `bash -n` on every edited script and `bash run_tests.sh`; both must pass. Make the **smallest** change that fixes the issue. Work on `/Users/mk/Dev_Env/macOS_updates`.
+> **Global constraints (obey exactly):** Bash 3.2 only (no `declare -A`, `mapfile`, `readarray`, `${v^^}`). All `update_*.sh` keep `set -o pipefail` and must NOT add `set -e`. No hardcoded paths (`SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`); temp via `mktemp`. Don't touch i18n keys without adding the key to all 7 `i18n/lang_*.sh`. After changes run `bash -n` on every edited script and `bash run_tests.sh`; both must pass. Make the **smallest** change that fixes the issue. Work on `~/Dev_Env/macOS_updates`.
 
 ---
 

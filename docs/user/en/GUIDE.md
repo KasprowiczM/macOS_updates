@@ -1,6 +1,6 @@
 # User Guide (English)
 
-**Version:** 1.4.6 · **Apple Silicon, macOS 13+**
+**Version:** 1.5.0 · **Apple Silicon, macOS 13+**
 
 ## What this toolkit does
 

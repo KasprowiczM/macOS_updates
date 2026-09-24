@@ -145,23 +145,33 @@ if grep -q '^MAJOR' "$SYSTEM_PARSED_FILE"; then
 fi
 
 # Select labels to install
-INSTALL_LABELS=()
+NORESTART_LABELS=()
+RESTART_LABELS=()
 ANY_RESTART=false
 while IFS=$'\t' read -r kind label title version req_restart; do
+    should_install=0
     case "$kind" in
         SAME|OTHER)
-            INSTALL_LABELS+=("$label")
-            [ "$req_restart" = "1" ] && ANY_RESTART=true
+            should_install=1
             ;;
         MAJOR)
             if [ "$MAJOR_ALLOWED" -eq 1 ]; then
-                INSTALL_LABELS+=("$label")
-                [ "$req_restart" = "1" ] && ANY_RESTART=true
+                should_install=1
             fi
             ;;
     esac
+    if [ "$should_install" -eq 1 ]; then
+        if [ "$req_restart" = "1" ]; then
+            RESTART_LABELS+=("$label")
+            ANY_RESTART=true
+        else
+            NORESTART_LABELS+=("$label")
+        fi
+    fi
 done < "$SYSTEM_PARSED_FILE"
 rm -f "$SYSTEM_PARSED_FILE" 2>/dev/null || true
+
+INSTALL_LABELS=("${NORESTART_LABELS[@]}" "${RESTART_LABELS[@]}")
 
 if [ "${#INSTALL_LABELS[@]}" -eq 0 ]; then
     print_ok "$L_SYSTEM_UPDATES_NONE"
@@ -172,9 +182,17 @@ fi
 # User confirmation & DRY-RUN
 # ============================================================
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
-    for lbl in "${INSTALL_LABELS[@]}"; do
+    for lbl in "${NORESTART_LABELS[@]}"; do
         print_info "[DRY-RUN] Would run: sudo softwareupdate -i \"$lbl\" -R --verbose"
     done
+    if [ "${#RESTART_LABELS[@]}" -gt 0 ]; then
+        _restart_cmd="sudo softwareupdate -i"
+        for lbl in "${RESTART_LABELS[@]}"; do
+            _restart_cmd="$_restart_cmd \"$lbl\""
+        done
+        _restart_cmd="$_restart_cmd -R --verbose"
+        print_info "[DRY-RUN] Would run: $_restart_cmd"
+    fi
     exit 0
 fi
 
@@ -219,7 +237,9 @@ echo ""
 
 sudo -v 2>/dev/null || true
 INSTALL_FAILED=0
-for lbl in "${INSTALL_LABELS[@]}"; do
+
+# First, install no-restart updates individually
+for lbl in "${NORESTART_LABELS[@]}"; do
     print_step "Installing: $lbl..."
     if ! sudo softwareupdate -i "$lbl" -R --verbose; then
         INSTALL_FAILED=1
@@ -230,6 +250,21 @@ for lbl in "${INSTALL_LABELS[@]}"; do
         fi
     fi
 done
+
+# Then, install restart-required updates in ONE batch call
+if [ "${#RESTART_LABELS[@]}" -gt 0 ]; then
+    print_step "$(printf "$L_SYSTEM_INSTALLING_RESTART_BATCH_FMT" "${RESTART_LABELS[*]}")"
+    if ! sudo softwareupdate -i "${RESTART_LABELS[@]}" -R --verbose; then
+        INSTALL_FAILED=1
+        print_warn "$(printf "$L_SYSTEM_RESTART_BATCH_FAILED_FMT" "${RESTART_LABELS[*]}")"
+    else
+        if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+            for lbl in "${RESTART_LABELS[@]}"; do
+                echo "$lbl" >> "$MAC_UPDATE_SESSION_DIR/system_installed_labels.txt" 2>/dev/null || true
+            done
+        fi
+    fi
+fi
 
 if [ "$INSTALL_FAILED" -ne 0 ]; then
     print_warn "$L_SYSTEM_SOME_FAILED"

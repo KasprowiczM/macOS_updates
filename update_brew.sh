@@ -126,6 +126,29 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     fi
 fi
 
+# Determine greedy tokens from config/internet_app_methods.txt
+# (apps using brew_cask method, filtered to installed casks)
+brew_greedy_tokens() {
+    local app meth rest tok installed greedy
+    installed="$(brew list --cask 2>/dev/null || true)"
+    [ -n "$installed" ] || return 0
+
+    greedy=""
+    if [ -f "$SCRIPT_DIR/config/internet_app_methods.txt" ]; then
+        while IFS='|' read -r app meth rest; do
+            case "$app" in '#'*|'') continue ;; esac
+            if [ "$meth" = "brew_cask" ]; then
+                tok="$(internet_cask_name_for_app "$app" 2>/dev/null || true)"
+                [ -n "$tok" ] || tok="$(echo "$app" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')"
+                if echo "$installed" | grep -qw "$tok"; then
+                    greedy="$greedy $tok"
+                fi
+            fi
+        done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+    fi
+    echo "$greedy" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
 # ============================================================
 # DRY-RUN: list outdated only — do not mutate brew refs
 # ============================================================
@@ -135,7 +158,9 @@ if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
     HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula || true
     echo ""
     echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
-    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --cask --greedy-auto-updates || true
+    GREEDY_TOKENS="$(brew_greedy_tokens)"
+    # shellcheck disable=SC2086
+    brew_outdated_casks $GREEDY_TOKENS || true
     print_info "[DRY-RUN] Would run: brew update, brew upgrade, cleanup, doctor"
     exit 0
 fi
@@ -173,12 +198,43 @@ fi
 
 echo ""
 echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
-if ! OUTDATED_CASKS=$(brew_outdated_casks); then
-    print_warn "brew outdated --cask --greedy-auto-updates failed; update state is unknown."
+GREEDY_TOKENS="$(brew_greedy_tokens)"
+# shellcheck disable=SC2086
+if ! OUTDATED_CASKS=$(brew_outdated_casks $GREEDY_TOKENS); then
+    print_warn "brew outdated --cask failed; update state is unknown."
     [ -n "$OUTDATED_CASKS" ] && printf '%s\n' "$OUTDATED_CASKS"
     SOFT_FAIL=1
     exit "$(mac_update_severity_exit_code)"
 fi
+
+# Check for orphan casks (installed cask whose app target is missing)
+ORPHAN_CASKS="$(brew_orphan_casks 2>/dev/null || true)"
+if [ -n "$ORPHAN_CASKS" ]; then
+    for orph in $ORPHAN_CASKS; do
+        [ -n "$orph" ] || continue
+        expected_app="$(brew info --json=v2 --cask "$orph" 2>/dev/null | brew_cask_primary_app || true)"
+        [ -n "$expected_app" ] || expected_app="${orph}.app"
+
+        print_info "$(printf "$L_BREW_ORPHAN_CASK_FMT" "$orph" "$expected_app" "$orph")"
+
+        if [ -n "$OUTDATED_CASKS" ]; then
+            OUTDATED_CASKS="$(echo "$OUTDATED_CASKS" | awk -v o="$orph" '$1 != o')"
+        fi
+
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+            echo "$orph" >> "$MAC_UPDATE_SESSION_DIR/brew_orphan_casks.txt"
+        fi
+
+        if [ -t 0 ] && [ "${MAC_UPDATE_YES:-0}" != "1" ] && [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ]; then
+            printf "  $L_BREW_ORPHAN_CASK_PROMPT_FMT" "$orph"
+            read -r _resp
+            if [[ "$_resp" =~ ^[TtYy]$ ]]; then
+                brew uninstall --cask --force "$orph" || true
+            fi
+        fi
+    done
+fi
+
 if [ -z "$OUTDATED_CASKS" ]; then
     print_ok "All casks are up to date!"
 else
@@ -286,27 +342,12 @@ if [ -n "$OUTDATED_CASKS" ]; then
         cask_ver=""
         cask_app_name=""
         cask_recorded_ver=""
+        targets_str=""
         if [ -n "$cask_json" ]; then
-            parsed=$(python3 -c '
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    c = d["casks"][0]
-    v = c.get("version", "")
-    installed = c.get("installed") or ""
-    app = ""
-    for art in c.get("artifacts", []):
-        if isinstance(art, dict) and "app" in art:
-            apps = art["app"]
-            app = apps[0] if isinstance(apps, list) and apps else (apps if isinstance(apps, str) else "")
-            break
-    print(f"{v}|{app}|{installed}")
-except Exception:
-    pass
-' <<< "$cask_json" 2>/dev/null || true)
+            parsed="$(printf '%s' "$cask_json" | brew_cask_guard_facts || true)"
             cask_ver=$(echo "$parsed" | cut -d'|' -f1)
-            cask_app_name=$(echo "$parsed" | cut -d'|' -f2)
-            cask_recorded_ver=$(echo "$parsed" | cut -d'|' -f3)
+            cask_recorded_ver=$(echo "$parsed" | cut -d'|' -f2)
+            targets_str=$(echo "$parsed" | cut -d'|' -f3)
         fi
 
         # Homebrew's own record of what it installed is the only like-for-like
@@ -321,14 +362,26 @@ except Exception:
         fi
 
         cask_app_path=""
-        if [ -n "$cask_app_name" ]; then
-            cask_app_path="/Applications/$cask_app_name"
-        fi
-        if [ -z "$cask_app_path" ] || [ ! -d "$cask_app_path" ]; then
-            cask_app_path="/Applications/$cask.app"
-        fi
-        if [ ! -d "$cask_app_path" ]; then
-            cask_app_path=$(find "/opt/homebrew/Caskroom/$cask" -maxdepth 3 -name "*.app" 2>/dev/null | head -1)
+        if [ -n "$targets_str" ]; then
+            while IFS= read -r t_name; do
+                [ -n "$t_name" ] || continue
+                for dir in "/Applications" "$HOME/Applications"; do
+                    if [ -d "$dir/$t_name" ]; then
+                        cask_app_path="$dir/$t_name"
+                        break 2
+                    fi
+                done
+            done <<EOF_TARGETS
+$(echo "$targets_str" | tr ';' '\n')
+EOF_TARGETS
+            if [ -z "$cask_app_path" ]; then
+                # Cask declares app targets, but none exist on disk -> skip
+                continue
+            fi
+        else
+            # Only casks without app targets use Caskroom fallback
+            prefix="$(brew --prefix 2>/dev/null || echo "/opt/homebrew")"
+            cask_app_path=$(find "$prefix/Caskroom/$cask" -maxdepth 3 -name "*.app" 2>/dev/null | head -1)
         fi
 
         if [ -n "$cask_app_path" ] && [ -d "$cask_app_path" ]; then
@@ -350,10 +403,37 @@ except Exception:
             fi
         fi
         UPGRADEABLE_CASKS="$UPGRADEABLE_CASKS $cask"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+            if [ -n "$targets_str" ]; then
+                while IFS= read -r t_target; do
+                    [ -n "$t_target" ] || continue
+                    echo "$cask|$t_target" >> "$MAC_UPDATE_SESSION_DIR/brew_cask_targets.txt"
+                done <<EOF_SESSION_TARGETS
+$(echo "$targets_str" | tr ';' '\n')
+EOF_SESSION_TARGETS
+            fi
+        fi
     done
 fi
 
+if [ -n "$UPGRADEABLE_CASKS" ] && [ "${MAC_UPDATE_NO_SUDO:-0}" = "1" ]; then
+    # shellcheck disable=SC2086
+    SUDO_CASKS="$(brew_casks_requiring_sudo $UPGRADEABLE_CASKS 2>/dev/null || true)"
+    if [ -n "$SUDO_CASKS" ]; then
+        for scask in $SUDO_CASKS; do
+            [ -n "$scask" ] || continue
+            print_warn "$(printf "$L_BREW_CASK_NEEDS_INTERACTIVE_FMT" "$scask")"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+                echo "$scask" >> "$MAC_UPDATE_SESSION_DIR/brew_needs_interactive.txt"
+            fi
+            SOFT_FAIL=1
+            UPGRADEABLE_CASKS="$(echo "$UPGRADEABLE_CASKS" | tr ' ' '\n' | awk -v s="$scask" '$1 != s' | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        done
+    fi
+fi
+
 if [ -n "$UPGRADEABLE_CASKS" ]; then
+    # shellcheck disable=SC2086
     if brew upgrade --cask $UPGRADEABLE_CASKS; then
         print_ok "$L_BREW_CASKS_OK"
     else
@@ -377,7 +457,8 @@ elif [ -n "$REMAINING_FORMULAE" ]; then
     printf '%s\n' "$REMAINING_FORMULAE"
     HARD_FAIL=1
 fi
-if ! REMAINING_CASKS=$(brew_outdated_casks | strip_ansi); then
+# shellcheck disable=SC2086
+if ! REMAINING_CASKS=$(brew_outdated_casks $GREEDY_TOKENS | strip_ansi); then
     print_warn "Final brew outdated --cask --greedy-auto-updates verification failed."
     [ -n "$REMAINING_CASKS" ] && printf '%s\n' "$REMAINING_CASKS"
     SOFT_FAIL=1
