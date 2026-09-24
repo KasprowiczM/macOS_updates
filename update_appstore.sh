@@ -619,7 +619,7 @@ fi
         if [ "$all_verified" -eq 1 ]; then
             print_ok "$L_APPSTORE_IOS_VERIFIED"
             APPSTORE_TOR2_BACKGROUND=0
-        elif [ "$_verify_rc" -eq 2 ]; then
+        elif [ "$_verify_rc" -ne 0 ]; then
             print_warn "$L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED"
             SOFT_FAIL=1
         else
