@@ -7,8 +7,29 @@ casks requiring administrator / sudo privileges.
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Callable
+
+
+def cask_guard_facts(text: str) -> str:
+    """'version|installed|A.app;B.app' from `brew info --json=v2 --cask <t>`; '' on any parse error."""
+    try:
+        cask = json.loads(text)["casks"][0]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return ""
+    version = str(cask.get("version") or "")
+    installed = str(cask.get("installed") or "")
+    return "|".join((version, installed, ";".join(app_targets(cask))))
+
+
+def cask_primary_app(text: str) -> str:
+    """First app target name ('X.app') or ''."""
+    try:
+        targets = app_targets(json.loads(text)["casks"][0])
+    except (ValueError, KeyError, IndexError, TypeError):
+        return ""
+    return targets[0] if targets else ""
 
 
 def app_targets(cask: dict) -> list[str]:
