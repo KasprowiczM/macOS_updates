@@ -427,6 +427,152 @@ exit 0
         self.assertTrue(log_file.is_file())
         self.assertIn("upgrade --cask bar", log_file.read_text(encoding="utf-8"))
 
+    def test_brew_outdated_casks_rc1_empty_stderr_success(self) -> None:
+        brew_script = """#!/usr/bin/env bash
+if [ "$1" = "outdated" ] && [ "$2" = "--cask" ]; then
+    echo "brave-browser"
+    exit 1
+fi
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = os.environ.copy()
+        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
+
+        script = f"""
+. "{REPO_ROOT}/lib/brew.sh"
+brew_outdated_casks "brave-browser"
+"""
+        proc = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, msg=f"Expected 0, got {proc.returncode}. stderr: {proc.stderr}")
+        self.assertIn("brave-browser", proc.stdout)
+
+    def test_brew_outdated_casks_rc1_with_stderr_fails(self) -> None:
+        brew_script = """#!/usr/bin/env bash
+if [ "$1" = "outdated" ] && [ "$2" = "--cask" ]; then
+    echo "Error: Cask 'x' is unavailable" >&2
+    exit 1
+fi
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = os.environ.copy()
+        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
+
+        script = f"""
+. "{REPO_ROOT}/lib/brew.sh"
+brew_outdated_casks "x"
+"""
+        proc = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("Error: Cask 'x' is unavailable", proc.stderr)
+
+    def test_brew_outdated_formulae_rc1_empty_stderr_success(self) -> None:
+        log_file = self.tmp / "brew_formula_calls.log"
+        brew_script = f"""#!/usr/bin/env bash
+echo "$@" >> "{log_file}"
+if [ "$1" = "outdated" ] && [ "$2" = "--formula" ]; then
+    echo "wget"
+    exit 1
+fi
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = os.environ.copy()
+        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
+
+        script = f"""
+. "{REPO_ROOT}/lib/brew.sh"
+brew_outdated_formulae "wget"
+"""
+        proc = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, msg=f"Expected 0, got {proc.returncode}. stderr: {proc.stderr}")
+        self.assertIn("wget", proc.stdout)
+        self.assertIn("outdated --formula wget", log_file.read_text(encoding="utf-8"))
+
+    def test_brew_outdated_formulae_rc1_with_stderr_fails(self) -> None:
+        brew_script = """#!/usr/bin/env bash
+if [ "$1" = "outdated" ] && [ "$2" = "--formula" ]; then
+    echo "Error: Formula 'x' is unavailable" >&2
+    exit 1
+fi
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = os.environ.copy()
+        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
+
+        script = f"""
+. "{REPO_ROOT}/lib/brew.sh"
+brew_outdated_formulae "x"
+"""
+        proc = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("Error: Formula 'x' is unavailable", proc.stderr)
+
+    def test_update_brew_upgrades_greedy_cask_on_rc1_empty_stderr(self) -> None:
+        (self.tmp / "Applications" / "Brave Browser.app").mkdir(parents=True, exist_ok=True)
+        log_file = self.session_dir / "brew_upgrade_calls.log"
+
+        brew_script = f"""#!/usr/bin/env bash
+case "$1" in
+    update)
+        exit 0
+        ;;
+    list)
+        if [ "$2" = "--cask" ]; then
+            echo "brave-browser"
+            exit 0
+        fi
+        ;;
+    outdated)
+        if [ "$2" = "--formula" ]; then
+            exit 0
+        fi
+        if [ "$2" = "--cask" ]; then
+            for arg in "$@"; do
+                if [ "$arg" = "--greedy-auto-updates" ]; then
+                    echo "brave-browser (1.0) < 2.0"
+                    exit 1
+                fi
+            done
+            exit 0
+        fi
+        ;;
+    info)
+        cat <<'EOF'
+{{"casks":[
+    {{"token":"brave-browser","version":"2.0","installed":"1.0","artifacts":[{{"app":["Brave Browser.app"]}}]}}
+]}}
+EOF
+        exit 0
+        ;;
+    upgrade)
+        echo "$@" >> "{log_file}"
+        exit 0
+        ;;
+esac
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = shell_env(
+            PATH=f"{self.bin_dir}:{os.environ.get('PATH', '')}",
+            MAC_UPDATE_SESSION_DIR=str(self.session_dir),
+            MAC_UPDATE_YES="1",
+            MAC_UPDATE_LANG="en",
+            HOME=str(self.tmp),
+        )
+        proc = subprocess.run(
+            ["bash", str(REPO_ROOT / "update_brew.sh")],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertTrue(log_file.is_file(), msg=f"Upgrade log file not found. stdout: {proc.stdout}\nstderr: {proc.stderr}")
+        calls = log_file.read_text(encoding="utf-8")
+        self.assertIn("upgrade --cask brave-browser", calls)
+
 
 if __name__ == "__main__":
     unittest.main()
+
