@@ -31,6 +31,18 @@ APP_ALIASES: dict[str, list[str]] = {
     "Keynote Creator Studio": ["Keynote Creator Studio", "Keynote"],
     "Numbers Creator Studio": ["Numbers Creator Studio", "Numbers"],
     "Pages Creator Studio": ["Pages Creator Studio", "Pages"],
+    "Google Chrome": ["Google Chrome", "Chrome"],
+    "Chrome": ["Chrome", "Google Chrome"],
+    "Microsoft Word": ["Microsoft Word", "Word"],
+    "Word": ["Word", "Microsoft Word"],
+    "Microsoft Excel": ["Microsoft Excel", "Excel"],
+    "Excel": ["Excel", "Microsoft Excel"],
+    "Microsoft PowerPoint": ["Microsoft PowerPoint", "PowerPoint"],
+    "PowerPoint": ["PowerPoint", "Microsoft PowerPoint"],
+    "Microsoft Outlook": ["Microsoft Outlook", "Outlook"],
+    "Outlook": ["Outlook", "Microsoft Outlook"],
+    "Microsoft OneNote": ["Microsoft OneNote", "OneNote"],
+    "OneNote": ["OneNote", "Microsoft OneNote"],
 }
 
 SYSTEM_APP_FRAGMENTS: list[str] = [

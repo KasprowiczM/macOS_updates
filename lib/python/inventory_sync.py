@@ -237,13 +237,24 @@ def sync_mas_group(
     return new_md, added_ids, removed_ids
 
 
+def refresh_system_line(md: str, os_label: str, build: str) -> str:
+    """Replace the first `> **System:** ...` line with `> **System:** {os_label} (Build {build})`."""
+    return re.sub(
+        r'^>\s*\*\*System:\*\*.*$',
+        f'> **System:** {os_label} (Build {build})',
+        md,
+        count=1,
+        flags=re.MULTILINE,
+    )
+
+
 def sync_ipad_section(
     md: str,
-    ipad_apps: Optional[List[Tuple[str, str, str]]],
+    ipad_apps: Optional[List[Tuple]],
 ) -> Tuple[str, int]:
     """Sync the iPad applications subsection inside GRUPA 2.
 
-    ipad_apps: list of (name, app_id, version).
+    ipad_apps: list of (app_name, app_id, version[, item_name]).
     Returns (new_md, count).
     """
     if ipad_apps is None:
@@ -251,7 +262,10 @@ def sync_ipad_section(
 
     sorted_apps = sorted(ipad_apps, key=lambda a: a[0].lower())
     rows = ["| Nazwa | App ID | Wersja |", "|-------|--------|--------|"]
-    for name, aid, ver in sorted_apps:
+    for item in sorted_apps:
+        name = item[0]
+        aid = item[1]
+        ver = item[2]
         rows.append(f"| {name} | {aid} | {ver} |")
 
     table_text = "\n".join(rows)
@@ -495,7 +509,9 @@ def rebuild_cli_section(
             notes.append(line)
 
     notes_str = "\n\n" + "\n".join(notes) if notes else ""
-    new_sub = f"{header_line}\n\n{new_table}{notes_str}\n"
+    sep_m = re.search(r'\n+---\s*$', sub_text)
+    sep_str = "\n\n---\n" if sep_m else "\n"
+    new_sub = f"{header_line}\n\n{new_table}{notes_str}{sep_str}"
 
     sec_text = sec_text[:s_start] + new_sub + sec_text[s_end:]
     new_md = md[:start] + sec_text + md[end:]
@@ -646,6 +662,22 @@ def legend_rows(
     auto_apps: List[str] = []
     mau_apps: List[str] = []
 
+    norm_installed = {norm_name(n) for n in installed_names if n}
+
+    def _is_app_installed(app: str) -> bool:
+        if not norm_installed:
+            return True
+        if norm_name(app) in norm_installed:
+            return True
+        for key, val_list in APP_ALIASES.items():
+            if app == key or app in val_list:
+                if norm_name(key) in norm_installed:
+                    return True
+                for a in val_list:
+                    if norm_name(a) in norm_installed:
+                        return True
+        return False
+
     for line in methods_rows:
         line = line.strip()
         if not line or line.startswith('#'):
@@ -655,20 +687,25 @@ def legend_rows(
             continue
         app = parts[0]
         method = parts[1]
+        if not _is_app_installed(app):
+            continue
         if method == "msupdate":
             mau_apps.append(app)
         elif method not in ("mas", "appstore_gui", "brew_cask", "manual"):
             if app not in auto_apps:
                 auto_apps.append(app)
 
-    # Filter to apps that are actually installed or defined
     rows: List[Tuple[str, str]] = []
     if auto_apps:
         rows.append(("🤖 Auto (Skrypt `update_internet_apps.sh`)", ", ".join(auto_apps)))
     if mau_apps:
         rows.append(("💼 Microsoft AutoUpdate (`msupdate`)", ", ".join(mau_apps)))
     if mas_names:
-        rows.append(("🛍️ App Store / `sudo mas upgrade`", ", ".join(mas_names)))
+        sorted_mas = sorted(mas_names, key=lambda s: s.lower())
+        rows.append(("🛍️ App Store / `sudo mas upgrade`", ", ".join(sorted_mas)))
+    if ipad_names:
+        sorted_ipad = sorted(ipad_names, key=lambda s: s.lower())
+        rows.append(("📱 App Store — iPad (Track 2 GUI / ręcznie)", ", ".join(sorted_ipad)))
     if cli_names:
         rows.append(("🧰 Native CLI + npm (`update_npm_cli.sh`)", ", ".join(cli_names)))
     rows.append(("🍺 Homebrew `brew upgrade`", "Wszystkie formulae i casks"))
@@ -768,33 +805,43 @@ def gather_facts(
     try:
         res = run(["mas", "list", "--json"], capture_output=True, text=True, timeout=30)
         mas_dict: Dict[str, Tuple[str, str]] = {}
-        if res.returncode == 0 and res.stdout.strip():
-            # NDJSON or JSON array
+        parsed_any = False
+        if res.returncode == 0:
             raw_out = res.stdout.strip()
-            if raw_out.startswith('['):
-                arr = json.loads(raw_out)
-                for item in arr:
-                    aid = str(item.get("id", ""))
-                    name = str(item.get("name", ""))
-                    ver = str(item.get("version", "?"))
-                    if aid:
-                        mas_dict[aid] = (name, ver)
+            if not raw_out:
+                facts["mas"] = {}
             else:
-                for line in raw_out.splitlines():
-                    if not line.strip():
-                        continue
+                if raw_out.startswith('['):
                     try:
-                        obj = json.loads(line)
-                        aid = str(obj.get("id", ""))
-                        name = str(obj.get("name", ""))
-                        ver = str(obj.get("version", "?"))
-                        if aid:
-                            mas_dict[aid] = (name, ver)
+                        arr = json.loads(raw_out)
+                        for item in arr:
+                            aid = str(item.get("adamID") or item.get("id") or "")
+                            name = str(item.get("name", ""))
+                            ver = str(item.get("version", "?"))
+                            if aid:
+                                mas_dict[aid] = (name, ver)
+                                parsed_any = True
                     except json.JSONDecodeError:
                         pass
-            facts["mas"] = mas_dict
-        elif res.returncode != 0:
-            # Fallback text mas list
+                else:
+                    for line in raw_out.splitlines():
+                        if not line.strip():
+                            continue
+                        try:
+                            obj = json.loads(line)
+                            aid = str(obj.get("adamID") or obj.get("id") or "")
+                            name = str(obj.get("name", ""))
+                            ver = str(obj.get("version", "?"))
+                            if aid:
+                                mas_dict[aid] = (name, ver)
+                                parsed_any = True
+                        except json.JSONDecodeError:
+                            pass
+                if parsed_any:
+                    facts["mas"] = mas_dict
+
+        # If returncode != 0 or returncode == 0 with non-empty stdout but 0 items parsed: fallback to text mas list
+        if facts["mas"] is None:
             res_txt = run(["mas", "list"], capture_output=True, text=True, timeout=30)
             if res_txt.returncode == 0:
                 mas_dict = {}
@@ -803,8 +850,10 @@ def gather_facts(
                     if m:
                         mas_dict[m.group(1)] = (m.group(2).strip(), m.group(3).strip())
                 facts["mas"] = mas_dict
+            else:
+                facts["mas"] = None
     except Exception:
-        pass
+        facts["mas"] = None
 
     # 2. formulae (brew list --formula)
     try:
@@ -840,7 +889,7 @@ def gather_facts(
     facts["clis"] = detect_cli_versions(manifest_path, home, run=run)
 
     # 5. iPad apps from /Applications and ~/Applications
-    ipad_apps: List[Tuple[str, str, str]] = []
+    ipad_apps: List[Tuple[str, str, str, str]] = []
     app_dirs = ["/Applications", os.path.join(home, "Applications")]
     installed_names: Set[str] = set()
 
@@ -860,9 +909,9 @@ def gather_facts(
                             meta = plistlib.load(fp)
                         item_id = str(meta.get("itemId", ""))
                         ver = str(meta.get("bundleShortVersionString", ""))
-                        display_name = str(meta.get("itemName") or meta.get("bundleDisplayName") or app_name)
+                        item_name = str(meta.get("itemName") or meta.get("bundleDisplayName") or "")
                         if item_id:
-                            ipad_apps.append((display_name, item_id, ver))
+                            ipad_apps.append((app_name, item_id, ver, item_name))
                     except Exception:
                         pass
         except OSError:
@@ -933,8 +982,10 @@ def sync_all(
         for aid, (name, _) in mas_apps.items():
             names_to_remove_from_g3.add(name)
     if ipad_apps:
-        for name, aid, ver in ipad_apps:
-            names_to_remove_from_g3.add(name)
+        for item in ipad_apps:
+            names_to_remove_from_g3.add(item[0])
+            if len(item) > 3 and item[3]:
+                names_to_remove_from_g3.add(item[3])
 
     casks_nonorphan = facts.get("casks_nonorphan")
     if casks_nonorphan:

@@ -812,3 +812,4 @@ L_NPM_TOOLCHAIN_NOT_INSTALLED="Zarządzany toolchain Node nie jest zainstalowany
 L_NPM_PRUNED_FMT="Usunięto %s starych wersji %s (zwolniono %s MB)"
 L_PRESCAN_REMOVED_FROM_GROUP_FMT="Usunięto %s wpisów, których już nie ma na Macu, z %s"
 L_PRESCAN_IPAD_SECTION_SYNCED_FMT="Sekcja aplikacji iPad zsynchronizowana (%s)"
+L_PRESCAN_GROUP_SYNC_SKIPPED_FMT="Grupa inwentarza %s nie została zsynchronizowana: źródło danych nic nie zwróciło (bez zmian)"
