@@ -814,3 +814,4 @@ L_NPM_TOOLCHAIN_NOT_INSTALLED="Managed Node toolchain not installed — skipping
 L_NPM_PRUNED_FMT="Removed %s old %s versions (freed %s MB)"
 L_PRESCAN_REMOVED_FROM_GROUP_FMT="Removed %s entries that are no longer installed from %s"
 L_PRESCAN_IPAD_SECTION_SYNCED_FMT="iPad apps section synced (%s apps)"
+L_PRESCAN_GROUP_SYNC_SKIPPED_FMT="Inventory group %s was not synchronized: its data source returned nothing (kept unchanged)"

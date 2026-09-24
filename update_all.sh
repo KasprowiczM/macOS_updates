@@ -706,8 +706,8 @@ facts = gather_facts(script_dir, home_dir)
 
 SKIP_DISCOVERY_APPS = load_exclusions(os.path.join(script_dir, 'config', 'inventory_exclusions.txt'))
 SKIP_DISCOVERY_APPS.update(load_appstore_gui_apps(os.path.join(script_dir, 'config', 'internet_app_methods.txt')))
-for ipad_name, _, _ in (facts.get('ipad') or []):
-    SKIP_DISCOVERY_APPS.add(ipad_name)
+for item in (facts.get('ipad') or []):
+    SKIP_DISCOVERY_APPS.add(item[0])
 
 print("  Skanowanie /Applications...")
 
@@ -1159,6 +1159,9 @@ if report["clis_removed"]:
 if report.get("ipad_count", 0) > 0:
     fmt = os.environ.get('L_PRESCAN_IPAD_SECTION_SYNCED_FMT', 'iPad apps section synced (%s apps)')
     print("  📱  " + (fmt % report["ipad_count"]))
+for grp in report.get("skipped_groups", []):
+    fmt = os.environ.get('L_PRESCAN_GROUP_SYNC_SKIPPED_FMT', 'Inventory group %s was not synchronized: its data source returned nothing (kept unchanged)')
+    print("  ⚠️  " + (fmt % grp))
 
 if content != original_content:
     atomic_write_text(programy_md_path, content)
@@ -1689,9 +1692,8 @@ try:
             r'^# 📱 ZAINSTALOWANE APLIKACJE — MacBook .*$',
             f'# 📱 ZAINSTALOWANE APLIKACJE — MacBook {_mac_user} ({_os_label})',
             content, count=1, flags=re.MULTILINE)
-        content = re.sub(
-            r'(\*\*System:\*\* macOS )[\d.]+(?: [A-Za-z ]+)? \(Build [A-Z0-9]+\)',
-            r'\g<1>' + _os_label + f' (Build {_bv})', content)
+        from inventory_sync import refresh_system_line
+        content = refresh_system_line(content, _os_label, _bv)
         content = re.sub(
             r'(\| macOS )[\d.]+(?: [A-Za-z ]+)?( arm64)',
             lambda m: m.group(1) + _pv + (f' {_codename}' if _codename else '') + m.group(2), content)
@@ -1748,6 +1750,9 @@ if npm_cli_new:
 from inventory_sync import gather_facts, sync_all
 fresh_facts = gather_facts(script_dir, os.path.expanduser('~'))
 content, post_report = sync_all(content, fresh_facts)
+for grp in post_report.get("skipped_groups", []):
+    fmt = os.environ.get('L_PRESCAN_GROUP_SYNC_SKIPPED_FMT', 'Inventory group %s was not synchronized: its data source returned nothing (kept unchanged)')
+    print("  ⚠️  " + (fmt % grp))
 
 atomic_write_text(programy_md_path, content)
 

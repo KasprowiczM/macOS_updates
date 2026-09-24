@@ -246,6 +246,149 @@ class InventorySyncTests(unittest.TestCase):
         self.assertIn("Build 26B50", auto_tpl)
         self.assertIn("### 📱 Aplikacje iPad na Apple Silicon (App Store)", auto_tpl)
 
+    def test_gather_facts_parses_mas7_ndjson(self) -> None:
+        ndjson_fixture = (SCRIPT_DIR / "tests" / "fixtures" / "inventory" / "mas7_list.ndjson").read_text(encoding="utf-8")
+
+        class MockRes:
+            def __init__(self, stdout: str, returncode: int = 0) -> None:
+                self.stdout = stdout
+                self.returncode = returncode
+
+        def mock_run(cmd: list[str], **kwargs) -> MockRes:
+            if cmd == ["mas", "list", "--json"]:
+                return MockRes(ndjson_fixture)
+            return MockRes("", returncode=1)
+
+        facts = inventory_sync.gather_facts(str(SCRIPT_DIR), "/tmp/home", run=mock_run)
+        self.assertIsNotNone(facts["mas"])
+        self.assertIn("409183694", facts["mas"])
+        self.assertEqual(facts["mas"]["409183694"], ("Keynote", "14.0"))
+        self.assertIn("409201541", facts["mas"])
+        self.assertEqual(facts["mas"]["409201541"], ("Pages", "14.0"))
+        self.assertIn("409203825", facts["mas"])
+        self.assertEqual(facts["mas"]["409203825"], ("Numbers", "14.0"))
+
+    def test_gather_facts_mas_unparseable_falls_back_to_text(self) -> None:
+        class MockRes:
+            def __init__(self, stdout: str, returncode: int = 0) -> None:
+                self.stdout = stdout
+                self.returncode = returncode
+
+        def mock_run(cmd: list[str], **kwargs) -> MockRes:
+            if cmd == ["mas", "list", "--json"]:
+                return MockRes("not-json-content-at-all\n", returncode=0)
+            if cmd == ["mas", "list"]:
+                return MockRes("409183694 Keynote (14.0)\n", returncode=0)
+            return MockRes("", returncode=1)
+
+        facts = inventory_sync.gather_facts(str(SCRIPT_DIR), "/tmp/home", run=mock_run)
+        self.assertIsNotNone(facts["mas"])
+        self.assertIn("409183694", facts["mas"])
+        self.assertEqual(facts["mas"]["409183694"], ("Keynote", "14.0"))
+
+    def test_ipad_rows_use_bundle_name_and_remove_both_names(self) -> None:
+        sample = """## GRUPA 2 — Aplikacje z App Store 🛍️
+
+| Nazwa | App ID |
+|-------|--------|
+| Keynote | 409183694 |
+
+---
+
+## GRUPA 3 — Aplikacje pobrane z Internetu 🌐
+
+| Nazwa | Wersja | Strona aktualizacji |
+|-------|--------|---------------------|
+| IPMIView | 2.20 | https://example.com |
+| OtherApp | 1.0 | https://example.com |
+
+### 🆕 Nowo wykryte aplikacje
+
+| Nazwa | Wersja |
+|-------|--------|
+| TrackMan.Go.Ios | 4.6.1 |
+
+---
+
+## GRUPA 4 — Homebrew 🍺
+"""
+        facts = {
+            "ipad": [
+                ("TrackMan.Go.Ios", "1192720039", "4.6.1", "TrackMan Golf Pro"),
+                ("IPMIView", "123456", "2.20", "Supermicro IPMIView"),
+            ],
+            "mas": None,
+            "formulae": None,
+            "casks_nonorphan": None,
+            "clis": None,
+        }
+        res_md, report = inventory_sync.sync_all(sample, facts)
+        self.assertIn("TrackMan.Go.Ios", res_md)
+        self.assertIn("| TrackMan.Go.Ios | 1192720039 | 4.6.1 |", res_md)
+        self.assertIn("| IPMIView | 123456 | 2.20 |", res_md)
+        # Verify both names removed from Group 3 and 🆕
+        self.assertNotIn("| IPMIView | 2.20 |", res_md)
+        self.assertNotIn("| TrackMan.Go.Ios | 4.6.1 |", res_md)
+        self.assertIn("| OtherApp | 1.0 |", res_md)
+
+    def test_refresh_system_line(self) -> None:
+        md = "# Header\n\n> **System:** macOS 26.5F71)\n> **Arch:** arm64\n"
+        res = inventory_sync.refresh_system_line(md, "macOS 27.0 Golden Gate", "27A5000")
+        self.assertIn("> **System:** macOS 27.0 Golden Gate (Build 27A5000)\n", res)
+        self.assertNotIn("26.5F71", res)
+
+    def test_separator_before_summary_preserved(self) -> None:
+        md = self.sample_md
+        self.assertIn("\n---\n\n## Podsumowanie", md)
+        facts = {
+            "clis": [("bun", "1.4.2")],
+            "mas": None,
+            "formulae": None,
+            "casks_nonorphan": None,
+            "ipad": None,
+        }
+        out, _ = inventory_sync.sync_all(md, facts, self.methods_rows)
+        self.assertIn("\n---\n\n## Podsumowanie", out)
+
+    def test_legend_filters_uninstalled_and_has_ipad_row(self) -> None:
+        methods = [
+            "Chrome | silent_launch",
+            "Slack | silent_launch",
+            "Word | msupdate",
+            "Excel | msupdate",
+        ]
+        # Only Chrome and Word are installed; Slack and Excel are uninstalled
+        installed = {"Google Chrome"}  # Note: alias of Chrome
+        rows = inventory_sync.legend_rows(
+            methods_rows=methods,
+            installed_names=installed,
+            casks=set(),
+            mas_names=["Pages", "Keynote"],
+            ipad_names=["WiFiman", "IPMIView"],
+            cli_names=["bun"],
+        )
+        methods_in_legend = [r[0] for r in rows]
+        apps_in_legend = {r[0]: r[1] for r in rows}
+
+        self.assertIn("🤖 Auto (Skrypt `update_internet_apps.sh`)", methods_in_legend)
+        self.assertEqual(apps_in_legend["🤖 Auto (Skrypt `update_internet_apps.sh`)"], "Chrome")
+        self.assertNotIn("Slack", apps_in_legend.get("🤖 Auto (Skrypt `update_internet_apps.sh`)", ""))
+
+        self.assertNotIn("💼 Microsoft AutoUpdate (`msupdate`)", methods_in_legend)
+
+        # Order: Auto, MAU, App Store, iPad, CLI, Homebrew
+        expected_keys = [
+            "🤖 Auto (Skrypt `update_internet_apps.sh`)",
+            "🛍️ App Store / `sudo mas upgrade`",
+            "📱 App Store — iPad (Track 2 GUI / ręcznie)",
+            "🧰 Native CLI + npm (`update_npm_cli.sh`)",
+            "🍺 Homebrew `brew upgrade`",
+        ]
+        self.assertEqual(methods_in_legend, expected_keys)
+        # Sorted names
+        self.assertEqual(apps_in_legend["🛍️ App Store / `sudo mas upgrade`"], "Keynote, Pages")
+        self.assertEqual(apps_in_legend["📱 App Store — iPad (Track 2 GUI / ręcznie)"], "IPMIView, WiFiman")
+
 
 if __name__ == "__main__":
     unittest.main()

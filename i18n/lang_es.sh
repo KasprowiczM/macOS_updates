@@ -815,3 +815,4 @@ L_NPM_TOOLCHAIN_NOT_INSTALLED="Toolchain de Node administrado no instalado — o
 L_NPM_PRUNED_FMT="Se eliminaron %s versiones antiguas de %s (se liberaron %s MB)"
 L_PRESCAN_REMOVED_FROM_GROUP_FMT="Se eliminaron %s entradas que ya no están instaladas de %s"
 L_PRESCAN_IPAD_SECTION_SYNCED_FMT="Sección de apps de iPad sincronizada (%s apps)"
+L_PRESCAN_GROUP_SYNC_SKIPPED_FMT="El grupo de inventario %s no se sincronizó: su fuente de datos no devolvió nada (sin cambios)"
