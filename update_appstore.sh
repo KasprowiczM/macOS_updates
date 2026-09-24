@@ -318,18 +318,23 @@ else
         MAS_TOR1_LEFT_IDS="$(mas_outdated_ids "$MAS_TOR1_LEFT")"
         if [ -n "$MAS_TOR1_LEFT_IDS" ]; then
             print_warn "sudo mas upgrade left these App Store updates pending; retrying in the user session:"
-            printf '%s\n' "$MAS_TOR1_LEFT"
+            printf '%s\n' "$MAS_TOR1_LEFT" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }'
             for MAS_RETRY_ID in $MAS_TOR1_LEFT_IDS; do
+                retry_line="$(printf '%s\n' "$MAS_TOR1_LEFT" | grep "^[[:space:]]*$MAS_RETRY_ID" | head -n 1)"
+                [ -z "$retry_line" ] && retry_line="$MAS_RETRY_ID"
+                print_step "$(printf "$L_APPSTORE_RETRY_ITEM_FMT" "$retry_line")"
                 MAS_RETRY_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
                     env MAS_NO_AUTO_INDEX=1 mas upgrade "$MAS_RETRY_ID" 2>&1)
                 MAS_RETRY_EXIT=$?
-                printf '%s\n' "$MAS_RETRY_OUT"
+                if [ -n "$MAS_RETRY_OUT" ]; then
+                    printf '%s\n' "$MAS_RETRY_OUT"
+                fi
                 if [ "$MAS_RETRY_EXIT" -ne 0 ]; then
                     print_warn "User-session retry failed for App Store id $MAS_RETRY_ID (exit=$MAS_RETRY_EXIT)"
                 fi
                 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
                     {
-                        echo "=== TRACK 1 user-session retry: $MAS_RETRY_ID (exit=$MAS_RETRY_EXIT) ==="
+                        echo "=== TRACK 1 user-session retry: $retry_line (exit=$MAS_RETRY_EXIT) ==="
                         printf '%s\n' "$MAS_RETRY_OUT"
                     } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
                 fi
@@ -674,7 +679,9 @@ if [ -z "$STILL_OUTDATED" ] && [ "$HARD_FAIL" -eq 0 ] && [ "$SOFT_FAIL" -eq 0 ];
     print_ok "$L_APPSTORE_NO_UPDATES"
 elif [ -n "$STILL_OUTDATED" ]; then
     print_warn "$L_STILL_OUTDATED"
-    echo "$STILL_OUTDATED"
+    printf '%s\n' "$STILL_OUTDATED" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }'
+    formatted_still="$(printf '%s\n' "$STILL_OUTDATED" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }')"
+    print_warn "$(printf "$L_APPSTORE_STILL_PENDING_MANUAL_FMT" "$formatted_still")"
     SOFT_FAIL=1
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
         {
@@ -754,7 +761,10 @@ elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
     # banner, so the three states are kept distinct here exactly as update_all.sh
     # does: clean / warnings / errors.
     print_header "⚠️  SCRIPT 2 FINISHED WITH WARNINGS"
-    if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
+    if [ -n "$STILL_OUTDATED" ]; then
+        formatted_still="$(printf '%s\n' "$STILL_OUTDATED" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }')"
+        print_warn "$(printf "$L_APPSTORE_STILL_PENDING_MANUAL_FMT" "$formatted_still")"
+    elif [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
         print_info "App Store is still installing in the background; mas cannot confirm those apps until it finishes. Re-run later to verify."
     else
         print_info "Some App Store state could not be verified; review the diagnostics above. Nothing was left mid-install."
