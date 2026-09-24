@@ -586,6 +586,148 @@ exit 0
         self.assertIn("com.test.appC was launched for update and did not exit within 60s", proc.stdout)
         self.assertIn("SOFT_FAIL=1", proc.stdout)
 
+    def test_opencode_vendor_feed_equal_does_not_launch(self):
+        open_log = os.path.join(self.tmpdir, "open.log")
+        fake_app = os.path.join(self.tmpdir, "OpenCode.app")
+        os.makedirs(fake_app, exist_ok=True)
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/vendor_feeds.sh"
+        . "{REPO_ROOT}/lib/vendor_direct.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+        . "{REPO_ROOT}/lib/internet_apps.sh"
+        . "{REPO_ROOT}/lib/internet_app_updates.sh"
+
+        print_header() {{ :; }}
+        print_info() {{ :; }}
+        print_warn() {{ :; }}
+        print_step() {{ :; }}
+        print_ok() {{ :; }}
+        internet_msg() {{ printf "%s %s %s" "$@"; }}
+        silent_launch_app() {{ echo "$@" >> "{open_log}"; return 0; }}
+        app_version() {{ echo "1.18.32"; }}
+        internet_app_path() {{ echo "{fake_app}"; }}
+        vendor_feed_lookup() {{ echo "1.18.32|https://example.com/opencode.tar.gz|-|-|tar.gz|example.com"; }}
+
+        STATUS_OPENCODE=""
+        iu_opencode_desktop
+        echo "STATUS_OPENCODE=$STATUS_OPENCODE"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("STATUS_OPENCODE=", proc.stdout)
+        self.assertIn("1.18.32", proc.stdout)
+        self.assertIn("vendor feed", proc.stdout.lower())
+        self.assertFalse(os.path.exists(open_log), "silent_launch_app was called for OpenCode when feed is equal")
+
+    def test_teams_cask_oracle_equal_does_not_launch(self):
+        open_log = os.path.join(self.tmpdir, "open.log")
+        fake_app = os.path.join(self.tmpdir, "Microsoft Teams.app")
+        os.makedirs(fake_app, exist_ok=True)
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/brew.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+        . "{REPO_ROOT}/lib/internet_apps.sh"
+        . "{REPO_ROOT}/lib/internet_app_updates.sh"
+
+        print_header() {{ :; }}
+        print_info() {{ :; }}
+        print_warn() {{ :; }}
+        print_step() {{ :; }}
+        print_ok() {{ :; }}
+        internet_msg() {{ printf "%s %s %s" "$@"; }}
+        silent_launch_app() {{ echo "$@" >> "{open_log}"; return 0; }}
+        app_version() {{ echo "24.100.0"; }}
+        internet_app_path() {{ echo "{fake_app}"; }}
+        brew_cask_latest_versions() {{ printf "microsoft-teams\t24.100.0\n"; }}
+
+        STATUS_TEAMS=""
+        iu_microsoft_teams
+        echo "STATUS_TEAMS=$STATUS_TEAMS"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("STATUS_TEAMS=", proc.stdout)
+        self.assertIn("cask", proc.stdout.lower())
+        self.assertFalse(os.path.exists(open_log), "silent_launch_app was called for Teams when cask oracle is equal")
+
+    def test_teams_cask_oracle_newer_launches_app(self):
+        open_log = os.path.join(self.tmpdir, "open.log")
+        fake_app = os.path.join(self.tmpdir, "Microsoft Teams.app")
+        os.makedirs(fake_app, exist_ok=True)
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/brew.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+        . "{REPO_ROOT}/lib/internet_apps.sh"
+        . "{REPO_ROOT}/lib/internet_app_updates.sh"
+
+        print_header() {{ :; }}
+        print_info() {{ :; }}
+        print_warn() {{ :; }}
+        print_step() {{ :; }}
+        print_ok() {{ :; }}
+        internet_msg() {{ printf "%s %s %s" "$@"; }}
+        silent_launch_app() {{ echo "$@" >> "{open_log}"; return 0; }}
+        app_version() {{ echo "24.100.0"; }}
+        internet_app_path() {{ echo "{fake_app}"; }}
+        brew_cask_latest_versions() {{ printf "microsoft-teams\t24.200.0\n"; }}
+
+        STATUS_TEAMS=""
+        iu_microsoft_teams
+        echo "STATUS_TEAMS=$STATUS_TEAMS"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(os.path.exists(open_log), "silent_launch_app was NOT called when Teams is behind")
+        self.assertIn("unverified", proc.stdout.lower())
+
+    def test_teams_mau_verified_does_not_launch(self):
+        open_log = os.path.join(self.tmpdir, "open.log")
+        fake_app = os.path.join(self.tmpdir, "Microsoft Teams.app")
+        os.makedirs(fake_app, exist_ok=True)
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/brew.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+        . "{REPO_ROOT}/lib/internet_apps.sh"
+        . "{REPO_ROOT}/lib/internet_app_updates.sh"
+
+        print_header() {{ :; }}
+        print_info() {{ :; }}
+        print_warn() {{ :; }}
+        print_step() {{ :; }}
+        print_ok() {{ :; }}
+        internet_msg() {{ printf "%s %s %s" "$@"; }}
+        silent_launch_app() {{ echo "$@" >> "{open_log}"; return 0; }}
+        app_version() {{ echo "24.100.0"; }}
+        internet_app_path() {{ echo "{fake_app}"; }}
+        # Cask oracle returns nothing (e.g. offline)
+        brew_cask_latest_versions() {{ return 1; }}
+
+        # MAU listed updates, TEAMS21 was not offered, and MAU status is current
+        MAU_LISTED=1
+        MAU_TEAMS21_OFFERED=0
+        STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+
+        STATUS_TEAMS=""
+        iu_microsoft_teams
+        echo "STATUS_TEAMS=$STATUS_TEAMS"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(os.path.exists(open_log), "silent_launch_app was called for Teams when MAU verified current")
+        self.assertIn("MAU verified", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
