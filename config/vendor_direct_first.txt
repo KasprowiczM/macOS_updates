@@ -1,0 +1,8 @@
+# ============================================================
+# config/vendor_direct_first.txt — bypass updater launch cycle
+# Apps listed here skip the silent launch and stage-wait cycle
+# when idle, jumping directly to vendor_direct_install.
+# One app name per line (must match vendor_feeds.txt / registry).
+# Comments start with #.
+# ============================================================
+Cursor
