@@ -10,12 +10,12 @@ cd ~/Dev_Env/macOS_updates && bash update_all.sh
 
 Steps (see VERSION):
 0. Prescan → `APPLICATIONS.md` (installed apps on **this** Mac only)
-1. macOS (`softwareupdate -ia -R`)
-2. App Store (`sudo mas upgrade` + AppleScript for iPad apps)
-3. Native Node/Bun + npm global CLI
-4. Homebrew upgrade + cleanup
-5. Internet apps (only if installed — see `config/internet_apps.txt`)
-6. Postupdate → `APPLICATIONS.md`, `UPDATES.md`
+1. App Store (`sudo mas upgrade` + AppleScript GUI for iPad apps)
+2. Native CLI + npm global CLI
+3. Homebrew formulae & casks (`brew upgrade`)
+4. Internet apps (vendor truth feeds & app updaters)
+5. Inventory update (`APPLICATIONS.md`, `UPDATES.md`)
+6. macOS system (`softwareupdate -i <label> -R`)
 
 Before running, remind the user:
 - ≥ 10 GB free disk space

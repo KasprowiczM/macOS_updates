@@ -4,6 +4,41 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [1.5.0] — 2026-09-24
+
+Vendor truth release: version comparison against vendor release feeds, only installed applications and toolchains updated, orphan Homebrew cask detection, and drift-free inventory synchronization across all groups.
+
+### Added
+
+- **Vendor Feeds & Three-way Version Comparison (T1):**
+  - Integrated `lib/python/vendor_feeds.py`, `lib/vendor_feeds.sh`, and `config/vendor_feeds.txt` to parse official vendor feeds (Sparkle RSS, JSON, YAML, Key-Value) with standard normalization and comparison (`version_cmp` in `lib/version.sh`).
+- **Verified Vendor Direct Downloads & Atomic Bundle Swap (T2):**
+  - Added `lib/vendor_direct.sh` implementing `copy_verified_app` with Gatekeeper verification (`spctl --assess`), CFBundleIdentifier and Apple Team ID validation, staged temporary swap, and automatic rollback on failure.
+- **Sparkle & JSON Vendor Feed Integration (T3):**
+  - Wired vendor feeds into internet app updates for ChatGPT, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, and Docker Desktop.
+- **Remote Desktop Manager Vendor Feed & Direct Verified Upgrade (T4):**
+  - Added Devolutions productinfo Key-Value parsing and verified DMG download for Remote Desktop Manager.
+- **Chromium & Google Updaters Live Status Check via Omaha Logs (T5):**
+  - Re-routed Google Chrome and Gemini through Google Keystone, and Comet through `chromium_updater`, evaluating live Omaha updatecheck status (`noupdate`, `ok`, `error`).
+- **Google Chrome VersionHistory Public Feed & Rollout Hold (T6):**
+  - Integrated Google Chrome VersionHistory API to classify staged vendor rollouts (`rollout_hold`) cleanly without false failure alarms.
+- **App Store iTunes Lookup Gate for Track 2 iPad Apps (T7):**
+  - Added `lib/appstore_ios.sh` querying the public iTunes Lookup API to skip Track 2 AppleScript GUI automation cleanly when all iPad apps are already up to date.
+- **Standardized Machine-Readable Internet Status Codes (T8):**
+  - Standardized status codes (`ok`, `behind`, `current`, `feed_stale`, `rollout_hold`, etc.) exported to `$SESSION_DIR/internet_status_codes.txt`.
+- **Orphan Homebrew Cask Detection & Interactive Cleanup (T9):**
+  - Added orphan cask detection in `lib/python/brew_casks.py` (`find_orphan_casks`); orphan casks whose `.app` targets were manually deleted are skipped during upgrades and prompted for removal.
+- **Only-Installed Native CLI Toolchains & Version Retention (T10):**
+  - Gated CLI installations to only existing CLIs, invoking native `update` subcommands (`claude update`, `codex update`, `agent update`, `agy update`). Added `--bootstrap-cli` flag and automatic version retention pruning.
+- **Drift-Free Inventory Synchronization Across All Groups (T11):**
+  - Created `lib/python/inventory_sync.py` to synchronize all inventory groups (MAS, iPad, Internet, Formulae, Casks, CLI) without drift and recompute summary counts accurately.
+- **Attribution of Between-Step Background Updates (T12):**
+  - Added background update tracking in `lib/python/run_summary.py` comparing snapshots to attribute updates performed outside toolkit steps.
+- **System Step Per-Label Installation & Batch Restart (T13):**
+  - Split system updates into non-restart labels (installed individually with `-R`) and restart-required labels (installed in one batch call with `-R`). Filtered session snapshot dumps on degraded runs.
+- **Vendor Feeds Diagnostic Tool (T14):**
+  - Added `scripts/check_vendor_feeds.sh` for read-only inspection of vendor feeds, relations, and live Omaha updater logs in table and JSON formats.
+
 ## [1.4.6] — 2026-09-16
 
 macOS 27 Golden Gate adaptation release. Upgrade to macOS 27 and Homebrew 7.0 revealed

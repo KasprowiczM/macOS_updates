@@ -1,6 +1,6 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.4.6 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.5.0 · **Apple Silicon, macOS 13+**
 
 ## Co robi ten zestaw
 

@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.6** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–27**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.0** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–27**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
+
+**Verdade do fornecedor (v1.5.0):** a versão de cada aplicativo é verificada em relação ao feed do próprio fornecedor antes de qualquer execução. Aplicativos atualizados permanecem intactos; os desatualizados são atualizados pelo próprio atualizador do fornecedor ou instalados do fornecedor com verificação de assinatura e Team ID. Apenas o software que está instalado é atualizado (`--bootstrap-cli` instala deliberadamente as CLIs ausentes). Aplicativos removidos manualmente são detectados e nunca reinstalados. Verifique o status do fornecedor em modo somente leitura com `bash scripts/check_vendor_feeds.sh`.
 
 **Repositório público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 

@@ -12,7 +12,7 @@
 #   MAC_UPDATE_REPO=git URL         (default: GitHub repo below)
 #   MAC_UPDATE_LANG=en              (skip language picker: en|pl|de|fr|es|it|pt)
 #   MAC_UPDATE_SKIP_INVENTORY=1     (skip build_inventory.sh)
-#   MAC_UPDATE_REF=v1.4.6           (tested tag, branch, or SHA; default clone branch)
+#   MAC_UPDATE_REF=v1.5.0           (tested tag, branch, or SHA; default clone branch)
 #
 # Flow: pre-clone checks in English → clone → language picker (EN menu) →
 #       localized messages for setup, inventory, and coverage report.
