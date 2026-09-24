@@ -343,4 +343,35 @@ Zgodnie z bezwzględną zasadą read-only na żywym środowisku:
 - `env -u PYTHONPATH bash -c 'source lib/brew.sh; brew_outdated_casks brave-browser capcut; echo rc=$?'`: zwraca nazwy i `rc=0`.
 - Brak prywatnych ścieżek `/Users/` w commitach H1–H7 (`git log -p fedbf13..HEAD | grep '^+[^+]' | grep '/Users/'` = 0).
 
+---
+
+## 8. Poprawki v5 (I1–I2)
+
+### 8.1. Tabela statusu zadań
+
+| Zadanie | Priorytet | Status | Commit | Test, który padł (TDD RED) | Testy po |
+|---|---|---|---|---|---|
+| I1 | P1 | ✅ OK | `46c549f` | `test_brew_outdated_casks_rc1_progress_chatter_stderr_success`, `test_brew_outdated_formulae_rc1_progress_chatter_stderr_success` | 476 |
+| I2 | P3 | ✅ OK | `a258498` | `test_remote_desktop_manager_vendor_direct_first_multi_word_trimmed` | 477 |
+
+### 8.2. Podsumowanie realizacji zadań v5
+
+- **I1 (P1 — Homebrew: kod 1 bez "Error:" to nie błąd):**
+  - `lib/brew.sh`: W `brew_outdated_casks` (zarówno przy standardowym zapytaniu `--cask`, jak i wywołaniu ze śledzeniem `--greedy-auto-updates`) oraz w `brew_outdated_formulae` zmieniono warunek ewaluacji kodu wyjścia 1.
+  - Kod 1 jest traktowany jako sukces (`rc=0`) z listą nieaktualnych pakietów na stdout, jeśli `stderr` **nie zawiera linii zaczynającej się od `Error:`** (`! grep -q '^[[:space:]]*Error:' "$err_file"`).
+  - Informacyjne komunikaty postępu Homebrew na stderr (np. `==> Downloading Homebrew API data`, `✔︎ JSON API packages.jws.json`) oraz ostrzeżenia `Warning: ...` nie powodują fałszywego odrzucenia wyniku jako błędu.
+  - Jeśli stderr zawiera błąd krytyczny (np. `Error: Cask 'x' is unavailable`), funkcja nadal raportuje błąd i zwraca kod błędu.
+
+- **I2 (P3 — vendor_direct_first: przycinanie wyłącznie skrajnych spacji):**
+  - `lib/internet_handlers.sh`: W pętli czytającej `config/vendor_direct_first.txt` zastąpiono destrukcyjne `tr -d '[:space:]'` idiomatycznym dla Bash 3.2 przycinaniem spacji wyłącznie na początku i końcu linii (`line="${line#"${line%%[![:space:]]*}"}"`; `line="${line%"${line##*[![:space:]]}"}"`).
+  - Wpisy wielowyrazowe (np. `Remote Desktop Manager`) zachowują wewnętrzne odstępy i prawidłowo dopasowują się do nazwy aplikacji (`$app`), umożliwiając bezpośrednią instalację w trybie bezczynności bez uruchamiania aplikacji.
+
+---
+
+### 8.3. Weryfikacja końcowa v5
+- `bash run_tests.sh`: 477 testów zakończonych sukcesem (34 testy statyczne/bezpieczeństwa + 443 testy jednostkowe/integracyjne Python), kompilacja modułów i heredoców bez błędów.
+- `shellcheck --severity=warning`: 0 ostrzeżeń we wszystkich skryptach projektu.
+- Brak prywatnych ścieżek `/Users/` dodanych w commitach I1–I2.
+
+
 
