@@ -322,6 +322,7 @@ copy_verified_app() {
 }
 
 . "$SCRIPT_DIR/lib/proc.sh"
+. "$SCRIPT_DIR/lib/vendor_feeds.sh"
 
 # silent_launch_app — trigger a Mac app's built-in auto-updater without
 # bringing windows to the foreground.
@@ -639,6 +640,11 @@ if [ -f "$SCRIPT_DIR/config/cask_oracles.txt" ] && command -v brew >/dev/null 2>
         _o_token="$(echo "$_o_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         [ -n "$_o_token" ] || continue
 
+        # v1.5.0 (T3): Skip apps that have a vendor feed in config/vendor_feeds.txt
+        if vendor_feed_row "$_o_app" >/dev/null 2>&1; then
+            continue
+        fi
+
         _o_var=""
         while IFS='|' read -r _m_app _m_meth _m_var; do
             case "$_m_app" in '#'*|'') continue ;; esac
@@ -672,6 +678,11 @@ if [ -f "$SCRIPT_DIR/config/cask_oracles.txt" ] && command -v brew >/dev/null 2>
             _o_app="$(echo "$_o_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             _o_token="$(echo "$_o_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             [ -n "$_o_token" ] || continue
+
+            # v1.5.0 (T3): Skip apps that have a vendor feed in config/vendor_feeds.txt
+            if vendor_feed_row "$_o_app" >/dev/null 2>&1; then
+                continue
+            fi
 
             _o_var=""
             while IFS='|' read -r _m_app _m_meth _m_var; do
@@ -707,19 +718,20 @@ if [ -f "$SCRIPT_DIR/config/cask_oracles.txt" ] && command -v brew >/dev/null 2>
                 ''|'unknown'|'nieznana'|'null'|"${L_INTERNET_VERSION_UNKNOWN:-unknown}") continue ;;
             esac
 
-            _cask_rel="$(app_vs_package_version_relation "$_cask_ver" "$_bundle_ver" 2>/dev/null || echo "unknown")"
+            _cask_rel="$(version_cmp "$_cask_ver" "$_bundle_ver")"
 
             if [ "$_cask_rel" = "newer" ]; then
                 eval "${_o_var}=\"\$(internet_msg \"\$L_INTERNET_STATUS_CASK_BEHIND_FMT\" \"\$_bundle_ver\" \"\$_cask_ver\")\""
                 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
                     printf "%s|%s|%s\n" "$_o_app" "$_bundle_ver" "$_cask_ver" >> "$MAC_UPDATE_SESSION_DIR/internet_behind_apps.txt"
                 fi
-            elif [ "$_cask_rel" = "current" ]; then
+            elif [ "$_cask_rel" = "equal" ]; then
                 eval "${_o_var}=\"\$L_INTERNET_STATUS_CASK_CURRENT\""
                 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
                     printf "%s|%s\n" "$_o_app" "$_bundle_ver" >> "$MAC_UPDATE_SESSION_DIR/internet_verified_apps.txt"
                 fi
             fi
+            # older / unknown -> no change of status (remains ⏳)
         done < "$SCRIPT_DIR/config/cask_oracles.txt"
     fi
 fi

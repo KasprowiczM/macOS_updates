@@ -8,10 +8,8 @@
 ChatGPT / Codex|chatgpt
 Claude|claude
 Claude Desktop|claude
-Comet|comet
-Comet (Perplexity Browser)|comet
-Gemini|gemini
-Gemini Desktop|gemini
+# 2026-09-24: Removed Gemini (cask 'gemini' is MacPaw Gemini com.macpaw.site.Gemini2)
+# and Comet (cask is stale: 145.x vs 152.x). Both have vendor feeds in v1.5.0.
 Antigravity|antigravity
 Antigravity IDE|antigravity-ide
 OpenCode|opencode-desktop
