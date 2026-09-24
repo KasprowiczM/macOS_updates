@@ -260,6 +260,26 @@ def collect_run_items(
     items: list[dict[str, Any]] = []
     seen_updated_apps: set[str] = set()
 
+    def get_alias_keys(app_name: str) -> set[str]:
+        keys = {normalize_app_key(app_name)}
+        try:
+            from inventory import APP_ALIASES
+            norm = normalize_app_key(app_name)
+            for k, aliases in APP_ALIASES.items():
+                if normalize_app_key(k) == norm or app_name.lower() in [a.lower() for a in aliases]:
+                    keys.add(normalize_app_key(k))
+                    for a in aliases:
+                        keys.add(normalize_app_key(a))
+        except Exception:
+            pass
+        return keys
+
+    def is_seen_updated(app_name: str) -> bool:
+        return bool(get_alias_keys(app_name) & seen_updated_apps)
+
+    def mark_seen_updated(app_name: str) -> None:
+        seen_updated_apps.update(get_alias_keys(app_name))
+
     # 1. App Store (only if both before and after snapshots exist)
     mas_before_file = sdir / "mas_before.txt"
     mas_after_file = sdir / "mas_after.txt"
@@ -272,9 +292,8 @@ def collect_run_items(
             old_ver = old_data.get("version") if old_data else None
             app_id = data.get("id") or (old_data.get("id") if old_data else name)
             if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
-                app_key = normalize_app_key(name)
-                if app_key not in seen_updated_apps:
-                    seen_updated_apps.add(app_key)
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
                     items.append({
                         "name": name,
                         "id": app_id,
@@ -294,9 +313,8 @@ def collect_run_items(
         for name, new_ver in brew_form_after.items():
             old_ver = brew_form_before.get(name)
             if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
-                app_key = normalize_app_key(name)
-                if app_key not in seen_updated_apps:
-                    seen_updated_apps.add(app_key)
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
                     items.append({
                         "name": name,
                         "id": name,
@@ -316,9 +334,8 @@ def collect_run_items(
         for name, new_ver in brew_cask_after.items():
             old_ver = brew_cask_before.get(name)
             if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
-                app_key = normalize_app_key(name)
-                if app_key not in seen_updated_apps:
-                    seen_updated_apps.add(app_key)
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
                     items.append({
                         "name": name,
                         "id": name,
@@ -341,9 +358,8 @@ def collect_run_items(
             old_ver = old_data.get("version") if old_data else None
             cli_id = data.get("id") or (old_data.get("id") if old_data else name)
             if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
-                app_key = normalize_app_key(name)
-                if app_key not in seen_updated_apps:
-                    seen_updated_apps.add(app_key)
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
                     items.append({
                         "name": name,
                         "id": cli_id,
@@ -363,9 +379,8 @@ def collect_run_items(
         for name, new_ver in inet_after.items():
             old_ver = inet_before.get(name)
             if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
-                app_key = normalize_app_key(name)
-                if app_key not in seen_updated_apps:
-                    seen_updated_apps.add(app_key)
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
                     items.append({
                         "name": name,
                         "id": name,
@@ -394,9 +409,8 @@ def collect_run_items(
                 old_s = p[0].strip()
                 new_s = p[1].strip()
             if is_valid_version(new_s) and (old_s is None or (is_valid_version(old_s) and old_s != new_s)):
-                app_key = normalize_app_key("macOS")
-                if app_key not in seen_updated_apps:
-                    seen_updated_apps.add(app_key)
+                if not is_seen_updated("macOS"):
+                    mark_seen_updated("macOS")
                     items.append({
                         "name": "macOS",
                         "id": "macos",
@@ -410,9 +424,8 @@ def collect_run_items(
         old_sys = sys_before_path.read_text(encoding="utf-8", errors="replace").strip()
         new_sys = sys_after_path.read_text(encoding="utf-8", errors="replace").strip()
         if is_valid_version(old_sys) and is_valid_version(new_sys) and old_sys != new_sys:
-            app_key = normalize_app_key("macOS")
-            if app_key not in seen_updated_apps:
-                seen_updated_apps.add(app_key)
+            if not is_seen_updated("macOS"):
+                mark_seen_updated("macOS")
                 items.append({
                     "name": "macOS",
                     "id": "macos",
@@ -422,6 +435,47 @@ def collect_run_items(
                     "status": "updated",
                     "details": None,
                 })
+
+    # 6b. Background updates (detected between steps or outside toolkit steps)
+    bg_scan_file = sdir / "installed_apps_scan.txt"
+    bg_after_file = sdir / "installed_apps_after.txt"
+    if bg_scan_file.is_file() and bg_after_file.is_file():
+        bg_before = read_kv_versions(bg_scan_file, sep="|")
+        bg_after = read_kv_versions(bg_after_file, sep="|")
+        for name, new_ver in bg_after.items():
+            old_ver = bg_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "background",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": "updated outside toolkit steps (vendor updater / App Store)",
+                    })
+
+    ios_before_file = sdir / "appstore_ios_before.txt"
+    ios_after_file = sdir / "appstore_ios_after.txt"
+    if ios_before_file.is_file() and ios_after_file.is_file():
+        ios_before = read_kv_versions(ios_before_file, sep="|")
+        ios_after = read_kv_versions(ios_after_file, sep="|")
+        for name, new_ver in ios_after.items():
+            old_ver = ios_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "background",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": "updated outside toolkit steps (vendor updater / App Store)",
+                    })
 
     # 7. Pending / Remaining items
     mau_reason = None
