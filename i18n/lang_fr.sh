@@ -339,6 +339,7 @@ L_INTERNET_LAUNCHING_HIDDEN="Lancement de %s en arrière-plan (masqué) — le p
 L_INTERNET_LAUNCHING_KEYSTONE="Démarrage de Google Keystone Updater (Omaha)..."
 L_INTERNET_LAUNCHING_KEYSTONE_DRIVE="Démarrage de Google Keystone Updater pour Google Drive..."
 L_INTERNET_KEYSTONE_STARTED="Keystone démarré — %s sera mis à jour automatiquement en arrière-plan"
+L_INTERNET_KEYSTONE_CHECK_FAILED_FMT="Le programme de mise à jour Google n'a pas pu rechercher les mises à jour de %s"
 L_INTERNET_MANUAL_VERIFY="Vérification manuelle : %s"
 L_INTERNET_DOWNLOAD_MANUALLY="Télécharger manuellement : %s"
 L_INTERNET_DOWNLOAD_FROM="Télécharger depuis : %s"

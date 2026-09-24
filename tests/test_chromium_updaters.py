@@ -156,5 +156,137 @@ exit 1
             self.assertIn("VERIFIED=1", res.stdout)
 
 
+    def test_google_keystone_waits_for_specific_appid(self) -> None:
+        """google_keystone_check does not terminate on another app's updatecheck."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            user_log = Path(tmpdir) / "updater.log"
+            user_log.touch()
+            mock_agent = Path(tmpdir) / "GoogleSoftwareUpdateAgent"
+            mock_agent.write_text(f"""#!/usr/bin/env bash
+# First write Drive response only
+cat >> "$HOME/Library/Application Support/Google/GoogleUpdater/updater.log" <<'EOF'
+{{"response":{{"apps":[{{"appid":"com.google.drivefs","status":"ok","ping":{{"status":"ok"}},"updatecheck":{{"status":"noupdate"}}}}]}}}}
+EOF
+exit 0
+""", encoding="utf-8")
+            mock_agent.chmod(mock_agent.stat().st_mode | stat.S_IEXEC)
+
+            cmd = f"""
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                _LIB_DIR="{REPO_ROOT}/lib"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                app_version() {{ echo "130.0.6723.69"; }}
+                curl() {{ exit 1; }}
+                print_info() {{ :; }}
+                print_step() {{ :; }}
+                print_ok() {{ :; }}
+                print_warn() {{ :; }}
+                internet_msg() {{ printf "$@"; }}
+                # Mock HOME so user_log is picked up
+                export HOME="{tmpdir}"
+                mkdir -p "$HOME/Library/Application Support/Google/GoogleUpdater"
+                mv "{user_log}" "$HOME/Library/Application Support/Google/GoogleUpdater/updater.log"
+                # Mock sleep: on 2nd sleep call, append Chrome updatecheck
+                sleep_count=0
+                sleep() {{
+                    sleep_count=$((sleep_count + 1))
+                    if [ "$sleep_count" -ge 2 ]; then
+                        cat >> "$HOME/Library/Application Support/Google/GoogleUpdater/updater.log" <<'EOF'
+{{"response":{{"apps":[{{"appid":"com.google.chrome","status":"ok","ping":{{"status":"ok"}},"updatecheck":{{"status":"noupdate"}}}}]}}}}
+EOF
+                    fi
+                }}
+                MAC_UPDATE_OMAHA_WAIT=10
+                google_keystone_check "{mock_agent}" "com.google.chrome"
+                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "$GOOGLE_OMAHA_INC" "com.google.chrome"
+                echo "STATUS=$INTERNET_LAST_STATUS"
+                echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("STATUS=✅ Up to date (vendor updater: no update)", res.stdout)
+            self.assertEqual(res.stdout.count("VERIFIED=1"), 1)
+
+    def test_google_keystone_wakes_updater_only_once_per_session(self) -> None:
+        """Three apps in one session wake the updater stub exactly once."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            session_dir = Path(tmpdir) / "session"
+            session_dir.mkdir()
+            agent_calls = Path(tmpdir) / "agent_calls.log"
+            user_log = Path(tmpdir) / "Library/Application Support/Google/GoogleUpdater/updater.log"
+            user_log.parent.mkdir(parents=True)
+            user_log.touch()
+
+            mock_agent = Path(tmpdir) / "GoogleSoftwareUpdateAgent"
+            mock_agent.write_text(f"""#!/usr/bin/env bash
+echo "called" >> "{agent_calls}"
+cat >> "{user_log}" <<'EOF'
+{{"response":{{"apps":[
+  {{"appid":"com.google.chrome","status":"ok","ping":{{"status":"ok"}},"updatecheck":{{"status":"noupdate"}}}},
+  {{"appid":"com.google.geminimacos","status":"ok","ping":{{"status":"ok"}},"updatecheck":{{"status":"noupdate"}}}},
+  {{"appid":"com.google.drivefs","status":"ok","ping":{{"status":"ok"}},"updatecheck":{{"status":"noupdate"}}}}
+]}}}}
+EOF
+exit 0
+""", encoding="utf-8")
+            mock_agent.chmod(mock_agent.stat().st_mode | stat.S_IEXEC)
+
+            # In subshell 1: Chrome runs
+            cmd_chrome = f"""
+                export HOME="{tmpdir}"
+                export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                _LIB_DIR="{REPO_ROOT}/lib"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                google_keystone_check "{mock_agent}" "com.google.chrome"
+            """
+            subprocess.run(["bash", "-c", cmd_chrome], capture_output=True, text=True, check=True)
+
+            # In subshell 2: Gemini runs
+            cmd_gemini = f"""
+                export HOME="{tmpdir}"
+                export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                _LIB_DIR="{REPO_ROOT}/lib"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                google_keystone_check "{mock_agent}" "com.google.geminimacos"
+            """
+            subprocess.run(["bash", "-c", cmd_gemini], capture_output=True, text=True, check=True)
+
+            # In subshell 3: Drive runs
+            cmd_drive = f"""
+                export HOME="{tmpdir}"
+                export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                _LIB_DIR="{REPO_ROOT}/lib"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                google_keystone_check "{mock_agent}" "com.google.drivefs"
+            """
+            subprocess.run(["bash", "-c", cmd_drive], capture_output=True, text=True, check=True)
+
+            calls = agent_calls.read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(len(calls), 1, f"Expected agent to be called exactly once, got {len(calls)}")
+            self.assertTrue((session_dir / "google_omaha_init.txt").exists(), "google_omaha_init.txt was not created")
+
+
 if __name__ == "__main__":
     unittest.main()

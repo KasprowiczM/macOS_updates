@@ -365,6 +365,7 @@ L_INTERNET_LAUNCHING_HIDDEN="Launching %s in background (hidden) — built-in up
 L_INTERNET_LAUNCHING_KEYSTONE="Starting Google Keystone Updater (Omaha)..."
 L_INTERNET_LAUNCHING_KEYSTONE_DRIVE="Starting Google Keystone Updater for Google Drive..."
 L_INTERNET_KEYSTONE_STARTED="Keystone started — %s will update automatically in the background"
+L_INTERNET_KEYSTONE_CHECK_FAILED_FMT="Google updater could not check %s for updates"
 L_INTERNET_MANUAL_VERIFY="Manual verification: %s"
 L_INTERNET_DOWNLOAD_MANUALLY="Download manually: %s"
 L_INTERNET_DOWNLOAD_FROM="Download from: %s"
