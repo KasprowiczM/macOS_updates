@@ -49,8 +49,8 @@ native_installer_bootstrap_args() {
 # Vendor self-update subcommand once a binary already exists.
 native_installer_existing_update_cmd() {
     case "$1" in
-        claude|agy) printf '%s' "update" ;;
-        *)          printf '%s' "" ;;
+        claude|agy|codex|agent) printf '%s' "update" ;;
+        *)                      printf '%s' "" ;;
     esac
 }
 
@@ -147,3 +147,56 @@ repair_broken_opencode() {
     fi
     return "$_repair_rc"
 }
+
+# Prune old vendor CLI versions (Codex releases, cursor-agent versions, agy backups).
+# Skips when MAC_UPDATE_DRY_RUN=1 or MAC_UPDATE_KEEP_CLI_VERSIONS=1.
+prune_vendor_cli_versions() {
+    if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_KEEP_CLI_VERSIONS:-0}" = "1" ]; then
+        return 0
+    fi
+
+    local py_bin
+    py_bin="$(command -v python3 2>/dev/null || true)"
+    [ -n "$py_bin" ] || return 0
+
+    local agy_ok=0
+    if [ -x "$HOME/.local/bin/agy" ] && "$HOME/.local/bin/agy" --version </dev/null >/dev/null 2>&1; then
+        agy_ok=1
+    fi
+
+    local prune_output
+    prune_output="$(PYTHONPATH="$_NATIVE_INSTALLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" "$py_bin" - "$HOME" "$agy_ok" <<'PYEOF_PRUNE'
+import os
+import sys
+from cli_retention import prune_all
+
+home = sys.argv[1]
+agy_ok = sys.argv[2] == "1"
+
+for name, count, mb in prune_all(home, is_agy_working=agy_ok):
+    if count > 0:
+        print(f"{count}|{name}|{mb}")
+PYEOF_PRUNE
+)"
+
+    [ -n "$prune_output" ] || return 0
+
+    local count name mb
+    while IFS='|' read -r count name mb; do
+        [ -n "$count" ] || continue
+        if [ -z "${L_NPM_PRUNED_FMT:-}" ]; then
+            L_NPM_PRUNED_FMT="Removed %s old %s versions (freed %s MB)"
+        fi
+        if type print_info >/dev/null 2>&1; then
+            # shellcheck disable=SC2059
+            print_info "$(printf "$L_NPM_PRUNED_FMT" "$count" "$name" "$mb")"
+        else
+            # shellcheck disable=SC2059
+            printf '%s\n' "$(printf "$L_NPM_PRUNED_FMT" "$count" "$name" "$mb")"
+        fi
+    done <<EOF
+$prune_output
+EOF
+    return 0
+}
+
