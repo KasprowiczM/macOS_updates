@@ -361,7 +361,8 @@ print_header "$L_TOR_2_HEADER"
 _IOS_SCAN="$(ios_apps_scan 2>/dev/null || true)"
 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
     printf '%s\n' "$_IOS_SCAN" | while IFS='|' read -r name id ver path; do
-        [ -n "$name" ] && echo "$name|$ver"
+        n="$(basename "$path" .app)"
+        [ -n "$n" ] && echo "$n|$ver"
     done > "$MAC_UPDATE_SESSION_DIR/appstore_ios_before.txt"
 fi
 
@@ -635,7 +636,8 @@ fi
 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
     _IOS_SCAN_AFTER="$(ios_apps_scan 2>/dev/null || true)"
     printf '%s\n' "$_IOS_SCAN_AFTER" | while IFS='|' read -r name id ver path; do
-        [ -n "$name" ] && echo "$name|$ver"
+        n="$(basename "$path" .app)"
+        [ -n "$n" ] && echo "$n|$ver"
     done > "$MAC_UPDATE_SESSION_DIR/appstore_ios_after.txt"
 fi
 
