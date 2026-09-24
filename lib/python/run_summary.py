@@ -328,6 +328,19 @@ def collect_run_items(
     # 3. Homebrew Casks (only if both snapshots exist)
     brew_cask_before_file = sdir / "brew_casks_before.txt"
     brew_cask_after_file = sdir / "brew_casks_after.txt"
+    cask_targets_file = sdir / "brew_cask_targets.txt"
+    cask_app_targets: dict[str, list[str]] = {}
+    if cask_targets_file.is_file():
+        for line in cask_targets_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or "|" not in line:
+                continue
+            cask_token, target_app = line.split("|", 1)
+            target_clean = target_app.strip()
+            if target_clean.endswith(".app"):
+                target_clean = target_clean[:-4]
+            cask_app_targets.setdefault(cask_token.strip(), []).append(target_clean)
+
     if brew_cask_before_file.is_file() and brew_cask_after_file.is_file():
         brew_cask_before = read_kv_versions(brew_cask_before_file)
         brew_cask_after = read_kv_versions(brew_cask_after_file)
@@ -336,6 +349,8 @@ def collect_run_items(
             if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
                 if not is_seen_updated(name):
                     mark_seen_updated(name)
+                    for target_app in cask_app_targets.get(name, []):
+                        mark_seen_updated(target_app)
                     items.append({
                         "name": name,
                         "id": name,
@@ -436,6 +451,27 @@ def collect_run_items(
                     "details": None,
                 })
 
+    # 6a. App Store (iPad) — Track 2
+    ios_before_file = sdir / "appstore_ios_before.txt"
+    ios_after_file = sdir / "appstore_ios_after.txt"
+    if ios_before_file.is_file() and ios_after_file.is_file():
+        ios_before = read_kv_versions(ios_before_file, sep="|")
+        ios_after = read_kv_versions(ios_after_file, sep="|")
+        for name, new_ver in ios_after.items():
+            old_ver = ios_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "appstore",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": "App Store (iPad) — Track 2",
+                    })
+
     # 6b. Background updates (detected between steps or outside toolkit steps)
     bg_scan_file = sdir / "installed_apps_scan.txt"
     bg_after_file = sdir / "installed_apps_after.txt"
@@ -444,26 +480,6 @@ def collect_run_items(
         bg_after = read_kv_versions(bg_after_file, sep="|")
         for name, new_ver in bg_after.items():
             old_ver = bg_before.get(name)
-            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
-                if not is_seen_updated(name):
-                    mark_seen_updated(name)
-                    items.append({
-                        "name": name,
-                        "id": name,
-                        "category": "background",
-                        "old_version": old_ver,
-                        "new_version": new_ver,
-                        "status": "updated",
-                        "details": "updated outside toolkit steps (vendor updater / App Store)",
-                    })
-
-    ios_before_file = sdir / "appstore_ios_before.txt"
-    ios_after_file = sdir / "appstore_ios_after.txt"
-    if ios_before_file.is_file() and ios_after_file.is_file():
-        ios_before = read_kv_versions(ios_before_file, sep="|")
-        ios_after = read_kv_versions(ios_after_file, sep="|")
-        for name, new_ver in ios_after.items():
-            old_ver = ios_before.get(name)
             if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
                 if not is_seen_updated(name):
                     mark_seen_updated(name)
