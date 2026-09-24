@@ -8,6 +8,16 @@ if [ -f "$_LIB_DIR/version.sh" ]; then
 elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/version.sh" ]; then
     . "$SCRIPT_DIR/lib/version.sh"
 fi
+if [ -f "$_LIB_DIR/vendor_feeds.sh" ]; then
+    . "$_LIB_DIR/vendor_feeds.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/vendor_feeds.sh" ]; then
+    . "$SCRIPT_DIR/lib/vendor_feeds.sh"
+fi
+if [ -f "$_LIB_DIR/proc.sh" ]; then
+    . "$_LIB_DIR/proc.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/proc.sh" ]; then
+    . "$SCRIPT_DIR/lib/proc.sh"
+fi
 
 GOOGLE_KEYSTONE_RAN=0
 GOOGLE_KEYSTONE_EXIT=1
@@ -1993,42 +2003,118 @@ iu_docker_desktop() {
         VER=$(app_version "/Applications/Docker.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        # Docker Desktop CLI (available from v4.37+)
-        if command -v docker >/dev/null 2>&1 && run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
-            print_step "$L_INTERNET_DOCKER_CHECKING"
-            # Check if an update is available first (non-destructive)
-            if run_with_timeout 60 docker desktop update --check-only --quiet 2>/dev/null; then
-                print_info "Update available — applying..."
-                if run_with_timeout 600 docker desktop update --quiet 2>/dev/null; then
-                    print_ok "$L_INTERNET_DOCKER_CLI_OK"
-                    STATUS_DOCKER="$L_INTERNET_STATUS_CHECKED_CLI"
-                else
-                    print_warn "Docker desktop update command failed"
-                    STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-                fi
-            else
-                print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Docker Desktop" "$VER")"
-                STATUS_DOCKER="$L_INTERNET_STATUS_CURRENT"
-            fi
+        local feed_row
+        feed_row="$(vendor_feed_lookup "Docker Desktop" 2>/dev/null || true)"
+        if [ -z "$feed_row" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        local R
+        R="$(printf '%s' "$feed_row" | cut -d'|' -f1)"
+        if [ -z "$R" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        local rel
+        rel="$(version_cmp "$R" "$VER")"
+        if [ "$rel" = "equal" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$VER")"
+            INTERNET_LAST_VERIFIED=1
+            print_ok "$STATUS_DOCKER"
+            return 0
+        elif [ "$rel" = "older" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$VER")"
+            INTERNET_LAST_VERIFIED=0
+            print_warn "$STATUS_DOCKER"
+            return 0
+        elif [ "$rel" = "unknown" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        # newer:
+        if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$STATUS_DOCKER"
+            return 0
+        fi
+
+        if ! command -v docker >/dev/null 2>&1; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_warn "$STATUS_DOCKER (docker CLI not found)"
+            return 0
+        fi
+
+        local was_running=0
+        if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+            was_running=1
         else
-            # No CLI, or the CLI plugin is present but the Docker Desktop app
-            # isn't running -- "docker desktop status" fails in that case too,
-            # and --check-only's exit code must not be misread as "no update
-            # available" when it really means "couldn't check at all".
-            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Docker Desktop")"
-            if open -a Docker 2>/dev/null; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Docker icon w menu bar → Software updates")"
-                STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-            else
-                STATUS_DOCKER="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            print_step "Starting Docker Desktop..."
+            run_with_timeout 180 docker desktop start >/dev/null 2>&1 || true
+            local started=0
+            local elapsed=0
+            while [ "$elapsed" -lt 120 ]; do
+                sleep 5
+                elapsed=$((elapsed + 5))
+                if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+                    started=1
+                    break
+                fi
+            done
+            if [ "$started" -eq 0 ]; then
+                STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
+                INTERNET_LAST_VERIFIED=1
+                print_warn "Could not start Docker Desktop to apply update"
+                return 0
             fi
         fi
+
+        print_step "Updating Docker Desktop..."
+        run_with_timeout 900 docker desktop update -q 2>/dev/null || true
+
+        if [ "$was_running" -eq 0 ]; then
+            run_with_timeout 120 docker desktop stop >/dev/null 2>&1 || true
+        fi
+
+        local elapsed=0
+        local new_ver="$VER"
+        local check_rel
+        while [ "$elapsed" -lt 300 ]; do
+            new_ver="$(app_version "/Applications/Docker.app")"
+            check_rel="$(version_cmp "$R" "$new_ver")"
+            if [ "$check_rel" = "equal" ] || [ "$check_rel" = "older" ]; then
+                STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$new_ver")"
+                INTERNET_LAST_VERIFIED=1
+                print_ok "$STATUS_DOCKER"
+                return 0
+            fi
+            sleep 10
+            elapsed=$((elapsed + 10))
+        done
+
+        STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$new_ver" "$R")"
+        INTERNET_LAST_VERIFIED=1
+        print_warn "$STATUS_DOCKER"
+        return 0
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Docker Desktop")"
     fi
-
-    # ── 22. WARP ──────────────────────────────────────────────────
 }
+    # ── 22. WARP ──────────────────────────────────────────────────
+
 
 iu_warp() {
     internet_dispatch_silent_launch "⚡ Warp" "Warp" "STATUS_WARP" "Warp" "Warp → Warp → O Warp / Check for Updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Warp")"
