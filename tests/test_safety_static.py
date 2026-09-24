@@ -3005,7 +3005,47 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
         excluded_apps = [a["app"] for a in data.get("classifications", {}).get("excluded", [])]
         self.assertIn("Ascendo", excluded_apps)
 
+    def test_tracked_files_have_no_personal_home_paths(self) -> None:
+        """Tracked files must not contain personal /Users/<username> paths."""
+        try:
+            res = subprocess.run(
+                ["git", "ls-files"],
+                cwd=str(REPO_ROOT),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except Exception as exc:
+            self.skipTest(f"git ls-files not available: {exc}")
+
+        allowlist = {"USER", "test", "testuser", "fake", "runner_user", "Shared"}
+        pattern = re.compile(r"/Users/([A-Za-z0-9._-]+)")
+        violations: list[str] = []
+
+        for rel_path in res.stdout.splitlines():
+            file_path = REPO_ROOT / rel_path
+            if not file_path.is_file():
+                continue
+            try:
+                content = file_path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+
+            for lineno, line in enumerate(content.splitlines(), start=1):
+                for match in pattern.finditer(line):
+                    username = match.group(1)
+                    if username not in allowlist:
+                        violations.append(f"{rel_path}:{lineno}: /Users/{username}")
+
+        self.assertEqual(
+            violations,
+            [],
+            "Tracked files contain personal /Users/<username> home paths:\n"
+            + "\n".join(violations),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

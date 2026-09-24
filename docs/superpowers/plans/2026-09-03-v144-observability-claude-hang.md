@@ -621,7 +621,7 @@ agentic handoff -p macos-updates "<one paragraph: v1.4.4 landed; Claude update p
 
 ## Execution notes for the next session
 
-- Work in `/Users/mk/Dev_Env/macOS_updates`, not the vault.
+- Work in `~/Dev_Env/macOS_updates`, not the vault.
 - `logs/` is gitignored; use the real directory for Z1 live proof.
 - Today's hung run left Claude at **2.1.259** already. `claude update` should report current unless a newer build shipped.
 - If `claude update` prompts on `/dev/tty`, do not add a timeout bump; keep SIGKILL and record `NIE WYKONANO` for a vendor non-interactive flag that does not exist (`claude install --help` has only `--force`).

@@ -142,6 +142,7 @@ These methods are not equivalent proof levels:
 - GRUPA 2: App Store (mas IDs)
 - GRUPA 3: Internet apps
 - GRUPA 4: Tooling (4a key ⭐, 4b deps, 4c casks, 4d native CLI + npm)
+- Never paste `APPLICATIONS.md`/`UPDATES.md` content or diffs into tracked files — keep them in `scratch/`.
 
 ## 9. Microsoft AutoUpdate version regressions
 
