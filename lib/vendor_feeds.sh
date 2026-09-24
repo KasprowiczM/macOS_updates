@@ -8,12 +8,13 @@ vendor_feed_config_path() {
 }
 
 vendor_feed_row() {
-    local app="$1" cfg
+    local app="$1" cfg row
     cfg="$(vendor_feed_config_path)"
     [ -f "$cfg" ] || return 1
-    local escaped row
-    escaped=$(printf '%s' "$app" | sed 's/[][\/.^$*]/\\&/g')
-    row=$(grep -E "^[[:space:]]*${escaped}[[:space:]]*\\|" "$cfg" 2>/dev/null | head -n 1)
+    row=$(awk -F'|' -v a="$app" '
+        /^[[:space:]]*#/ { next }
+        { n = $1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", n); if (n == a) { print; exit } }
+    ' "$cfg" 2>/dev/null)
     [ -n "$row" ] || return 1
     printf "%s\n" "$row"
 }
