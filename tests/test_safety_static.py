@@ -728,6 +728,48 @@ class StaticShellSafetyTests(unittest.TestCase):
                 msg=f"Method {method!r} configured in internet_app_methods.txt has no handler function in lib/ (expected one of: {handler_names})",
             )
 
+    def test_direct_methods_are_used_and_verify(self) -> None:
+        """Every entry in DIRECT_METHODS must (a) be used in config/internet_app_methods.txt and (b) have a handler."""
+        coverage_script = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
+        match = re.search(r'DIRECT_METHODS\s*=\s*\{([^}]+)\}', coverage_script)
+        self.assertIsNotNone(match, "DIRECT_METHODS definition not found in scripts/report_update_coverage.sh")
+        direct_methods = {m.strip().strip('"').strip("'") for m in match.group(1).split(",") if m.strip()}
+
+        methods_cfg = REPO_ROOT / "config" / "internet_app_methods.txt"
+        used_methods = set()
+        for ln in methods_cfg.read_text(encoding="utf-8").splitlines():
+            ln = ln.split("#", 1)[0].strip()
+            if not ln:
+                continue
+            parts = ln.split("|")
+            if len(parts) >= 2:
+                used_methods.add(parts[1].strip())
+
+        handler_code = (
+            (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
+            + (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
+            + (REPO_ROOT / "lib" / "internet_registry.sh").read_text(encoding="utf-8")
+        )
+
+        for method in sorted(direct_methods):
+            self.assertIn(
+                method, used_methods,
+                msg=f"Direct method {method!r} is not used by any row in config/internet_app_methods.txt",
+            )
+            handler_names = [
+                f"internet_handler_{method}",
+                f"internet_dispatch_{method}",
+                f"internet_handler_{method}_check",
+                f"iu_{method}",
+            ]
+            found = any(h in handler_code for h in handler_names) or method in {
+                "keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"
+            }
+            self.assertTrue(
+                found,
+                msg=f"Direct method {method!r} has no handler function in lib/ (expected one of: {handler_names})",
+            )
+
     @unittest.skipUnless(
         __import__("shutil").which("bash"),
         "bash not available"
