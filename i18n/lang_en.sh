@@ -802,6 +802,7 @@ L_INTERNET_CHECKSUM_MISMATCH_FMT="Checksum mismatch for %s — download discarde
 L_APPSTORE_IOS_ALL_CURRENT="iPad apps are up to date (App Store lookup) — Track 2 not needed"
 L_APPSTORE_IOS_PENDING_FMT="iPad app update available: %s %s → %s"
 L_APPSTORE_IOS_LOOKUP_FAILED="App Store lookup unavailable — running Track 2 without a pre-check"
+L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED="Could not confirm iPad app updates: the App Store lookup failed"
 L_APPSTORE_IOS_VERIFIED="iPad apps verified after Track 2"
 L_APPSTORE_IOS_STILL_PENDING_FMT="Still installing or pending: %s"
 L_APPSTORE_IOS_NEEDS_INTERACTIVE="iPad app updates need an interactive run (Track 2 uses the App Store window)"

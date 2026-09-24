@@ -778,6 +778,7 @@ L_INTERNET_CHECKSUM_MISMATCH_FMT="Prüfsummenfehler für %s — Download verworf
 L_APPSTORE_IOS_ALL_CURRENT="iPad-Apps sind aktuell (App Store Lookup) — Track 2 nicht erforderlich"
 L_APPSTORE_IOS_PENDING_FMT="iPad-App-Update verfügbar: %s %s → %s"
 L_APPSTORE_IOS_LOOKUP_FAILED="App Store Lookup nicht verfügbar — Track 2 wird ohne Vorprüfung ausgeführt"
+L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED="iPad-App-Updates konnten nicht bestätigt werden: die App Store-Abfrage ist fehlgeschlagen"
 L_APPSTORE_IOS_VERIFIED="iPad-Apps nach Track 2 verifiziert"
 L_APPSTORE_IOS_STILL_PENDING_FMT="Wird noch installiert oder steht aus: %s"
 L_APPSTORE_IOS_NEEDS_INTERACTIVE="iPad-App-Updates erfordern einen interaktiven Lauf (Track 2 verwendet das App Store-Fenster)"

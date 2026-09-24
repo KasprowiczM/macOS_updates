@@ -48,6 +48,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 mac_update_require_supported_platform || exit 1
 
 # ── i18n: load language strings ──────────────────────────────
+. "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
@@ -602,11 +603,13 @@ fi
         elapsed=0
         all_verified=0
         still_pending=""
+        _verify_rc=0
         while [ "$elapsed" -lt "$verify_timeout" ]; do
             sleep 15
             elapsed=$((elapsed + 15))
-            still_pending="$(ios_apps_pending 2>/dev/null || true)"
-            if [ -z "$still_pending" ]; then
+            _verify_rc=0
+            still_pending="$(ios_apps_pending 2>/dev/null)" || _verify_rc=$?
+            if [ "$_verify_rc" -eq 0 ] && [ -z "$still_pending" ]; then
                 all_verified=1
                 break
             fi
@@ -615,6 +618,9 @@ fi
         if [ "$all_verified" -eq 1 ]; then
             print_ok "$L_APPSTORE_IOS_VERIFIED"
             APPSTORE_TOR2_BACKGROUND=0
+        elif [ "$_verify_rc" -eq 2 ]; then
+            print_warn "$L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED"
+            SOFT_FAIL=1
         else
             pending_names="$(printf '%s\n' "$still_pending" | cut -d'|' -f1 | paste -sd, -)"
             print_warn "$(printf "$L_APPSTORE_IOS_STILL_PENDING_FMT" "$pending_names")"
