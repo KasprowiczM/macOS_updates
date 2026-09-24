@@ -364,6 +364,7 @@ L_INTERNET_LAUNCHING_HIDDEN="A iniciar %s em segundo plano (oculto) — o atuali
 L_INTERNET_LAUNCHING_KEYSTONE="A iniciar Google Keystone Updater (Omaha)..."
 L_INTERNET_LAUNCHING_KEYSTONE_DRIVE="A iniciar Google Keystone Updater para Google Drive..."
 L_INTERNET_KEYSTONE_STARTED="Keystone iniciado — %s será atualizado automaticamente em segundo plano"
+L_INTERNET_KEYSTONE_CHECK_FAILED_FMT="O atualizador do Google não pôde verificar atualizações do %s"
 L_INTERNET_MANUAL_VERIFY="Verificação manual: %s"
 L_INTERNET_DOWNLOAD_MANUALLY="Transferir manualmente: %s"
 L_INTERNET_DOWNLOAD_FROM="Transferir de: %s"
