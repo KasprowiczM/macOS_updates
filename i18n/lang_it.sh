@@ -798,6 +798,9 @@ L_INTERNET_LAUNCH_CYCLE_FMT="Avvio di %s per consentire al suo updater di instal
 L_INTERNET_VENDOR_DIRECT_FMT="Installazione di %s %s dal produttore (%s) con verifica di firma e Team ID"
 L_INTERNET_VENDOR_HOST_REJECTED_FMT="Rifiuto del download dall'host imprevisto %s per %s"
 L_INTERNET_CHECKSUM_MISMATCH_FMT="Mancata corrispondenza del checksum per %s — download scartato"
+L_INTERNET_DOCKER_STARTING="Avvio di Docker Desktop..."
+L_INTERNET_DOCKER_UPDATING="Aggiornamento di Docker Desktop..."
+L_INTERNET_DOCKER_START_FAILED="Impossibile avviare Docker Desktop per applicare l'aggiornamento"
 
 # ── App Store (v1.5.0) ────────────────────────────────────────
 L_APPSTORE_IOS_ALL_CURRENT="Le app per iPad sono aggiornate (ricerca App Store) — Track 2 non necessario"

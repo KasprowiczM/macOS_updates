@@ -2062,7 +2062,7 @@ iu_docker_desktop() {
         if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
             was_running=1
         else
-            print_step "Starting Docker Desktop..."
+            print_step "$L_INTERNET_DOCKER_STARTING"
             run_with_timeout 180 docker desktop start >/dev/null 2>&1 || true
             local started=0
             local elapsed=0
@@ -2077,33 +2077,39 @@ iu_docker_desktop() {
             if [ "$started" -eq 0 ]; then
                 STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
                 INTERNET_LAST_VERIFIED=1
-                print_warn "Could not start Docker Desktop to apply update"
+                print_warn "$L_INTERNET_DOCKER_START_FAILED"
                 return 0
             fi
         fi
 
-        print_step "Updating Docker Desktop..."
+        print_step "$L_INTERNET_DOCKER_UPDATING"
         run_with_timeout 900 docker desktop update -q 2>/dev/null || true
+
+        local elapsed=0
+        local new_ver="$VER"
+        local check_rel
+        local updated=0
+        while [ "$elapsed" -lt 300 ]; do
+            new_ver="$(app_version "/Applications/Docker.app")"
+            check_rel="$(version_cmp "$R" "$new_ver")"
+            if [ "$check_rel" = "equal" ] || [ "$check_rel" = "older" ]; then
+                updated=1
+                break
+            fi
+            sleep 10
+            elapsed=$((elapsed + 10))
+        done
 
         if [ "$was_running" -eq 0 ]; then
             run_with_timeout 120 docker desktop stop >/dev/null 2>&1 || true
         fi
 
-        local elapsed=0
-        local new_ver="$VER"
-        local check_rel
-        while [ "$elapsed" -lt 300 ]; do
-            new_ver="$(app_version "/Applications/Docker.app")"
-            check_rel="$(version_cmp "$R" "$new_ver")"
-            if [ "$check_rel" = "equal" ] || [ "$check_rel" = "older" ]; then
-                STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$new_ver")"
-                INTERNET_LAST_VERIFIED=1
-                print_ok "$STATUS_DOCKER"
-                return 0
-            fi
-            sleep 10
-            elapsed=$((elapsed + 10))
-        done
+        if [ "$updated" -eq 1 ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$new_ver")"
+            INTERNET_LAST_VERIFIED=1
+            print_ok "$STATUS_DOCKER"
+            return 0
+        fi
 
         STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$new_ver" "$R")"
         INTERNET_LAST_VERIFIED=1

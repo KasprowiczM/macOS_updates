@@ -773,6 +773,9 @@ L_INTERNET_LAUNCH_CYCLE_FMT="Lancement de %s pour que son outil de mise à jour 
 L_INTERNET_VENDOR_DIRECT_FMT="Installation de %s %s depuis le fabricant (%s) avec vérification de signature et Team ID"
 L_INTERNET_VENDOR_HOST_REJECTED_FMT="Téléchargement refusé depuis l'hôte inattendu %s pour %s"
 L_INTERNET_CHECKSUM_MISMATCH_FMT="Incohérence de somme de contrôle pour %s — téléchargement rejeté"
+L_INTERNET_DOCKER_STARTING="Démarrage de Docker Desktop..."
+L_INTERNET_DOCKER_UPDATING="Mise à jour de Docker Desktop..."
+L_INTERNET_DOCKER_START_FAILED="Impossible de démarrer Docker Desktop pour appliquer la mise à jour"
 
 # ── App Store (v1.5.0) ────────────────────────────────────────
 L_APPSTORE_IOS_ALL_CURRENT="Les applications iPad sont à jour (recherche App Store) — Track 2 inutile"
