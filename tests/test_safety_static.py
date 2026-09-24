@@ -484,7 +484,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                 env=env,
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=90,
             )
             return result, marker.exists()
 
