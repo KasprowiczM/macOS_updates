@@ -65,7 +65,7 @@ brew_formula_versions() {
     brew list --formula --versions 2>/dev/null
 }
 
-# brew_outdated_formulae
+# brew_outdated_formulae ["$@"]
 #   Prints only real outdated-formula lines on stdout. `brew outdated`
 #   writes progress chatter ("==> Downloading Homebrew API data",
 #   "✔︎ JSON API ...") to stderr; capturing it with 2>&1 made the
@@ -76,14 +76,20 @@ brew_outdated_formulae() {
     local err_file rc out
     command -v brew >/dev/null 2>&1 || return 1
     err_file="$(mktemp "${TMPDIR:-/tmp}/mac_update_brew_outdated.XXXXXX")" || return 1
-    out="$(brew outdated --formula 2>"$err_file")"
+    out="$(brew outdated --formula "$@" 2>"$err_file")"
     rc=$?
-    if [ "$rc" -ne 0 ]; then
+    if [ "$rc" -eq 0 ]; then
+        :
+    elif [ "$rc" -eq 1 ] && ! grep -q '[^[:space:]]' "$err_file" 2>/dev/null; then
+        :
+    else
         cat "$err_file" >&2
+        rm -f "$err_file" 2>/dev/null || true
+        return "$rc"
     fi
     rm -f "$err_file" 2>/dev/null || true
-    printf '%s' "$out" | grep -v '^==>' | grep -v '^✔' | grep -v '^[[:space:]]*$' || true
-    return "$rc"
+    printf '%s\n' "$out" | grep -v '^==>' | grep -v '^✔' | grep -v '^[[:space:]]*$' || true
+    return 0
 }
 
 # brew_outdated_casks [greedy_tokens...]
@@ -96,7 +102,11 @@ brew_outdated_casks() {
     err_file="$(mktemp "${TMPDIR:-/tmp}/mac_update_brew_outdated_cask.XXXXXX")" || return 1
     out="$(brew outdated --cask 2>"$err_file")"
     rc=$?
-    if [ "$rc" -ne 0 ]; then
+    if [ "$rc" -eq 0 ]; then
+        :
+    elif [ "$rc" -eq 1 ] && ! grep -q '[^[:space:]]' "$err_file" 2>/dev/null; then
+        :
+    else
         cat "$err_file" >&2
         rm -f "$err_file" 2>/dev/null || true
         return "$rc"
@@ -104,7 +114,11 @@ brew_outdated_casks() {
     if [ $# -gt 0 ]; then
         out_greedy="$(brew outdated --cask --greedy-auto-updates "$@" 2>"$err_file")"
         rc=$?
-        if [ "$rc" -ne 0 ]; then
+        if [ "$rc" -eq 0 ]; then
+            :
+        elif [ "$rc" -eq 1 ] && ! grep -q '[^[:space:]]' "$err_file" 2>/dev/null; then
+            :
+        else
             cat "$err_file" >&2
             rm -f "$err_file" 2>/dev/null || true
             return "$rc"
