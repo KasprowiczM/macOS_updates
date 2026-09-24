@@ -2367,6 +2367,13 @@ iu_ipmiview() {
         [ -d "$ipath" ] && IPMI_PATH="$ipath" && break
     done
     if [ -n "$IPMI_PATH" ]; then
+        if command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$IPMI_PATH"; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            STATUS_IPMIVIEW="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            return 0
+        fi
         VER=$(app_version "$IPMI_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         # A vendor that ships no auto-updater is a permanent fact about that vendor, not
