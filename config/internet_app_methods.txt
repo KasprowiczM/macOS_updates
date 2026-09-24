@@ -10,8 +10,8 @@ Firefox Developer Edition|github_dmg|STATUS_FIREFOX
 Brave Browser|brew_cask|STATUS_BRAVE
 ChatGPT / Codex|silent_launch|STATUS_CHATGPT
 Claude|silent_launch|STATUS_CLAUDE_APP
-Comet|silent_launch|STATUS_COMET
-Gemini|silent_launch|STATUS_GEMINI
+Comet|chromium_updater|STATUS_COMET
+Gemini|keystone|STATUS_GEMINI
 Perplexity|brew_cask|STATUS_PERPLEXITY
 Antigravity|silent_launch|STATUS_ANTIGRAVITY
 Antigravity IDE|silent_launch|STATUS_ANTIGRAVITY_IDE

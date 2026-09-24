@@ -52,6 +52,8 @@ METHOD_LABELS = {
         "appstore_gui": "App Store GUI (iPad app)",
         "manual": "manual only",
         "sparkle_appcast": "Sparkle appcast verified",
+        "chromium_updater": "Chromium updater (Omaha)",
+        "vendor_feed": "vendor feed verified",
     },
     "pl": {
         "keystone": "Google Keystone",
@@ -64,6 +66,8 @@ METHOD_LABELS = {
         "appstore_gui": "GUI App Store (aplikacja iPad)",
         "manual": "wyłącznie ręcznie",
         "sparkle_appcast": "weryfikacja Sparkle appcast",
+        "chromium_updater": "updater Chromium (Omaha)",
+        "vendor_feed": "zweryfikowane przez feed producenta",
     },
     "de": {
         "keystone": "Google Keystone",
@@ -76,6 +80,8 @@ METHOD_LABELS = {
         "appstore_gui": "App-Store-GUI (iPad-App)",
         "manual": "nur manuell",
         "sparkle_appcast": "Sparkle Appcast verifiziert",
+        "chromium_updater": "Chromium-Updater (Omaha)",
+        "vendor_feed": "durch Hersteller-Feed verifiziert",
     },
     "fr": {
         "keystone": "Google Keystone",
@@ -88,6 +94,8 @@ METHOD_LABELS = {
         "appstore_gui": "interface App Store (app iPad)",
         "manual": "manuel uniquement",
         "sparkle_appcast": "vérifié par Sparkle appcast",
+        "chromium_updater": "updater Chromium (Omaha)",
+        "vendor_feed": "vérifié par flux éditeur",
     },
     "es": {
         "keystone": "Google Keystone",
@@ -100,6 +108,8 @@ METHOD_LABELS = {
         "appstore_gui": "interfaz de App Store (app iPad)",
         "manual": "solo manual",
         "sparkle_appcast": "verificado por Sparkle appcast",
+        "chromium_updater": "actualizador Chromium (Omaha)",
+        "vendor_feed": "verificado por feed del proveedor",
     },
     "it": {
         "keystone": "Google Keystone",
@@ -112,6 +122,8 @@ METHOD_LABELS = {
         "appstore_gui": "GUI App Store (app iPad)",
         "manual": "solo manuale",
         "sparkle_appcast": "verificato da Sparkle appcast",
+        "chromium_updater": "updater Chromium (Omaha)",
+        "vendor_feed": "verificato da feed del fornitore",
     },
     "pt": {
         "keystone": "Google Keystone",
@@ -124,6 +136,8 @@ METHOD_LABELS = {
         "appstore_gui": "interface da App Store (app iPad)",
         "manual": "apenas manual",
         "sparkle_appcast": "verificado por Sparkle appcast",
+        "chromium_updater": "atualizador Chromium (Omaha)",
+        "vendor_feed": "verificado pelo feed do fornecedor",
     },
 }
 
@@ -138,6 +152,8 @@ METHOD_AI_HINT = {
         "brew_cask": "Manage the app as an installed Homebrew cask.",
         "appstore_gui": "Manage the iPad app in App Store Track 2.",
         "manual": "Keep as a documented manual target until a safe updater exists.",
+        "chromium_updater": "Add a Chromium updater handler with Omaha verification.",
+        "vendor_feed": "Add a verified vendor feed row.",
     },
     "pl": {
         "keystone": "Dodaj wpis keystone i handler.",
@@ -149,6 +165,8 @@ METHOD_AI_HINT = {
         "brew_cask": "Zarządzaj aplikacją jako zainstalowanym caskiem Homebrew.",
         "appstore_gui": "Zarządzaj aplikacją iPad przez Track 2 App Store.",
         "manual": "Pozostaw udokumentowany tryb ręczny do czasu bezpiecznej automatyzacji.",
+        "chromium_updater": "Dodaj handler updatera Chromium z weryfikacją Omaha.",
+        "vendor_feed": "Dodaj zweryfikowany wiersz feedu producenta.",
     },
 }
 
@@ -229,7 +247,7 @@ CLASS_TEXT = {
 # must (a) be used by at least one row of config/internet_app_methods.txt and
 # (b) be backed by a handler that performs a real remote check. Guarded by
 # tests/test_safety_static.py::test_direct_methods_are_used_and_verify.
-DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"}
+DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast", "chromium_updater"}
 TRIGGER_METHODS = {"silent_launch", "mau_fallback_self_update"}
 EXTERNAL_METHODS = {"brew_cask", "appstore_gui"}
 
@@ -407,6 +425,16 @@ def load_registry():
     return registry
 
 
+def load_vendor_feed_targets():
+    cfg = os.path.join(script_dir, "config", "vendor_feeds.txt")
+    targets = set()
+    for line in read_lines(cfg):
+        parts = line.split("|")
+        if parts:
+            targets.add(parts[0].strip())
+    return targets
+
+
 def load_mas_names():
     mas = shutil.which("mas")
     if not mas:
@@ -476,7 +504,7 @@ def parent_manager(installed):
     return ""
 
 
-def classify(installed, target, method, mas_names, brew_apps):
+def classify(installed, target, method, mas_names, brew_apps, vendor_feeds=None):
     normalized_name = normalize(installed["app"])
     parent = parent_manager(installed)
 
@@ -493,6 +521,8 @@ def classify(installed, target, method, mas_names, brew_apps):
         return "externally_managed", "macos_system"
     if parent:
         return "externally_managed", "parent_app:" + parent
+    if vendor_feeds and target in vendor_feeds:
+        return "verified_direct", "vendor_feed"
     if method in DIRECT_METHODS:
         return "verified_direct", method
     if method in TRIGGER_METHODS:
@@ -509,6 +539,7 @@ method_hints = hints_for(lang)
 class_text = class_text_for(lang)
 apps = read_lines(os.path.join(script_dir, "config", "internet_apps.txt"))
 registry = load_registry()
+vendor_feeds = load_vendor_feed_targets()
 mas_names = load_mas_names()
 brew_apps = load_brew_apps()
 installed = scan_installed_apps()
@@ -535,7 +566,7 @@ for item in installed:
     method = registry.get(target, "unknown") if target else "unknown"
     if target:
         installed_targets.add(target)
-    classification, managed_by = classify(item, target, method, mas_names, brew_apps)
+    classification, managed_by = classify(item, target, method, mas_names, brew_apps, vendor_feeds)
     row = dict(item)
     row.update(
         {

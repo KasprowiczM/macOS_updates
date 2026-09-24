@@ -518,4 +518,142 @@ EOF
     fi
 }
 
+# ── Omaha / Chromium Updaters (v1.5.0) ──────────────────────
+omaha_read_increment() {
+    local log_file="$1"
+    local init_size="${2:-0}"
+    [ -f "$log_file" ] || return 0
+    local cur_size
+    cur_size=$(wc -c < "$log_file" 2>/dev/null | tr -d ' ' || echo 0)
+    if [ "$cur_size" -lt "$init_size" ]; then
+        cat "$log_file" 2>/dev/null || true
+    elif [ "$cur_size" -gt "$init_size" ]; then
+        tail -c +$((init_size + 1)) "$log_file" 2>/dev/null || true
+    fi
+}
+
+evaluate_omaha_status() {
+    local app="$1"
+    local app_path="$2"
+    local log_inc="$3"
+    local appid="$4"
+
+    local st=""
+    if [ -n "$log_inc" ]; then
+        st=$(printf '%s\n' "$log_inc" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import omaha_last_status
+log = sys.stdin.read()
+appid = sys.argv[1]
+res = omaha_last_status(log, appid)
+print(res if res else "")
+' "$appid" 2>/dev/null || true)
+    fi
+
+    if [ "$st" = "noupdate" ]; then
+        if [ "$appid" = "com.google.chrome" ]; then
+            local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
+            local vh_json=""
+            vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+            local pub_ver=""
+            if [ -n "$vh_json" ]; then
+                pub_ver="$(printf '%s\n' "$vh_json" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import version_history_public
+print(version_history_public(sys.stdin.read()) or "")
+' 2>/dev/null || true)"
+            fi
+            local inst_ver
+            inst_ver="$(app_version "$app_path")"
+            if [ -n "$pub_ver" ] && [ "$(version_cmp "$pub_ver" "$inst_ver")" = "newer" ]; then
+                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_ROLLOUT_HOLD_FMT" "$inst_ver" "$pub_ver")"
+                INTERNET_LAST_VERIFIED=1
+                return 0
+            fi
+        fi
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_VENDOR_NOUPDATE"
+        INTERNET_LAST_VERIFIED=1
+        return 0
+    elif [ "$st" = "ok" ]; then
+        local initial_ver
+        initial_ver="$(app_version "$app_path")"
+        local cur_ver="$initial_ver"
+        local elapsed=0
+        while [ "$elapsed" -lt 60 ]; do
+            sleep 5
+            elapsed=$((elapsed + 5))
+            cur_ver="$(app_version "$app_path")"
+            if [ "$cur_ver" != "$initial_ver" ] && [ -n "$cur_ver" ]; then
+                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$cur_ver")"
+                INTERNET_LAST_VERIFIED=1
+                return 0
+            fi
+        done
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UPDATE_IN_PROGRESS"
+        INTERNET_LAST_VERIFIED=0
+        return 0
+    else
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UPDATER_TRIGGERED"
+        INTERNET_LAST_VERIFIED=0
+        return 0
+    fi
+}
+
+internet_handler_chromium_updater() {
+    local app="$1"
+    local app_path="$2"
+    local bin="$3"
+    local log="$4"
+    local appid="$5"
+
+    INTERNET_LAST_VERIFIED=0
+    INTERNET_LAST_LAUNCH_OK=0
+
+    if [ ! -d "$app_path" ]; then
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app")"
+        return 0
+    fi
+
+    if [ ! -x "$bin" ]; then
+        internet_handler_silent_launch "$app" "$app" "" "$app_path"
+        return 0
+    fi
+
+    local init_size=0
+    [ -f "$log" ] && init_size=$(wc -c < "$log" 2>/dev/null | tr -d ' ' || echo 0)
+
+    print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app")"
+    if ! run_with_timeout 120 "$bin" --wake-all >/dev/null 2>&1; then
+        print_warn "$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_LAUNCH_OK=0
+        return 0
+    fi
+    INTERNET_LAST_LAUNCH_OK=1
+
+    local wait_limit="${MAC_UPDATE_OMAHA_WAIT:-45}"
+    case "$wait_limit" in ''|*[!0-9]*) wait_limit=45 ;; esac
+    [ "$wait_limit" -lt 0 ] && wait_limit=0
+    [ "$wait_limit" -gt 180 ] && wait_limit=180
+
+    local elapsed=0
+    local inc=""
+    while [ "$elapsed" -lt "$wait_limit" ]; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        inc=$(omaha_read_increment "$log" "$init_size")
+        if echo "$inc" | grep -E -q '"updatecheck"\s*:\s*\{"status"' 2>/dev/null; then
+            break
+        fi
+    done
+    inc=$(omaha_read_increment "$log" "$init_size")
+
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        printf '%s\n' "$inc" >> "$MAC_UPDATE_SESSION_DIR/chromium_updater_log.txt"
+    fi
+
+    evaluate_omaha_status "$app" "$app_path" "$inc" "$appid"
+}
+
+
 

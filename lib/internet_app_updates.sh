@@ -11,6 +11,7 @@ fi
 
 GOOGLE_KEYSTONE_RAN=0
 GOOGLE_KEYSTONE_EXIT=1
+GOOGLE_OMAHA_INC=""
 MAU_TEAMS21_VERIFIED=0
 google_keystone_check() {
     local agent="$1"
@@ -19,13 +20,62 @@ google_keystone_check() {
         return "$GOOGLE_KEYSTONE_EXIT"
     fi
     GOOGLE_KEYSTONE_RAN=1
-    output=$(run_with_timeout 180 "$agent" --runMode ondemand 2>&1)
-    GOOGLE_KEYSTONE_EXIT=$?
-    if [ "$GOOGLE_KEYSTONE_EXIT" -ne 0 ]; then
+
+    local user_log="$HOME/Library/Application Support/Google/GoogleUpdater/updater.log"
+    local sys_log="/Library/Application Support/Google/GoogleUpdater/updater.log"
+    local user_init=0 sys_init=0
+    [ -f "$user_log" ] && user_init=$(wc -c < "$user_log" 2>/dev/null | tr -d ' ' || echo 0)
+    [ -f "$sys_log" ] && sys_init=$(wc -c < "$sys_log" 2>/dev/null | tr -d ' ' || echo 0)
+
+    local triggered=0
+    if [ -n "$agent" ] && [ -f "$agent" ]; then
+        output=$(run_with_timeout 180 "$agent" --runMode ondemand 2>&1)
+        GOOGLE_KEYSTONE_EXIT=$?
+        [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+    fi
+
+    local updater_app="$HOME/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater"
+    if [ "$triggered" -eq 0 ] && [ -x "$updater_app" ]; then
+        output=$(run_with_timeout 120 "$updater_app" --wake-all 2>&1)
+        GOOGLE_KEYSTONE_EXIT=$?
+        [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+    fi
+
+    if [ "$triggered" -eq 0 ]; then
         internet_diag_log "ERROR: Google Keystone check failed (exit=$GOOGLE_KEYSTONE_EXIT)"
         [ -n "$output" ] && printf '%s\n' "$output" | tail -n 20
+        return "$GOOGLE_KEYSTONE_EXIT"
     fi
-    return "$GOOGLE_KEYSTONE_EXIT"
+
+    local wait_limit="${MAC_UPDATE_OMAHA_WAIT:-45}"
+    case "$wait_limit" in ''|*[!0-9]*) wait_limit=45 ;; esac
+    [ "$wait_limit" -lt 0 ] && wait_limit=0
+    [ "$wait_limit" -gt 180 ] && wait_limit=180
+
+    local elapsed=0
+    local combined_inc=""
+    while [ "$elapsed" -lt "$wait_limit" ]; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        local u_inc="" s_inc=""
+        u_inc=$(omaha_read_increment "$user_log" "$user_init")
+        s_inc=$(omaha_read_increment "$sys_log" "$sys_init")
+        combined_inc="${u_inc}${s_inc}"
+        if echo "$combined_inc" | grep -E -q '"updatecheck"\s*:\s*\{"status"' 2>/dev/null; then
+            break
+        fi
+    done
+
+    local u_inc="" s_inc=""
+    u_inc=$(omaha_read_increment "$user_log" "$user_init")
+    s_inc=$(omaha_read_increment "$sys_log" "$sys_init")
+    GOOGLE_OMAHA_INC="${u_inc}${s_inc}"
+
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        printf '%s\n' "$GOOGLE_OMAHA_INC" >> "$MAC_UPDATE_SESSION_DIR/chromium_updater_log.txt"
+    fi
+
+    return 0
 }
 
 iu_google_chrome() {
@@ -33,25 +83,15 @@ iu_google_chrome() {
     if [ -d "/Applications/Google Chrome.app" ]; then
         VER=$(app_version "/Applications/Google Chrome.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        # Keystone (Omaha) — oficjalny updater Google dla macOS
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
-        if [ -f "$KEYSTONE_AGENT" ]; then
-            print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
-            if google_keystone_check "$KEYSTONE_AGENT"; then
-                print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
-                STATUS_CHROME="$L_INTERNET_STATUS_CHECKED_CLI"
-            else
-                print_warn "Google Keystone failed to check for Chrome updates"
-                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
+        if google_keystone_check "$KEYSTONE_AGENT"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
+            evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "$GOOGLE_OMAHA_INC" "com.google.chrome"
+            STATUS_CHROME="$INTERNET_LAST_STATUS"
         else
-            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Chrome")"
-            if silent_launch_app "Google Chrome"; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$L_INTERNET_HINT_CHROME")"
-                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-            else
-                STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+            print_warn "Google Keystone failed to check for Chrome updates"
+            STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Chrome")"
@@ -176,7 +216,23 @@ iu_claude() {
 # silent_launch path: verified when Comet exposes a feed, honestly
 # "⏳ Launched (unverified)" when it does not.
 iu_comet() {
-    internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
+    print_header "☄️  Comet (Perplexity AI)"
+    local app_path="/Applications/Comet.app"
+    [ -d "$app_path" ] || app_path="$(capture_app_path "Comet")"
+    if [ -n "$app_path" ] && [ -d "$app_path" ]; then
+        local ver; ver="$(app_version "$app_path")"
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+        local bin="$HOME/Library/Application Support/Perplexity/CometUpdater/Current/CometUpdater.app/Contents/MacOS/CometUpdater"
+        local log="$HOME/Library/Application Support/Perplexity/CometUpdater/updater.log"
+        if [ -x "$bin" ]; then
+            internet_handler_chromium_updater "Comet" "$app_path" "$bin" "$log" "ai.perplexity.comet"
+            STATUS_COMET="$INTERNET_LAST_STATUS"
+        else
+            internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Comet")"
+    fi
 }
 
 iu_antigravity() {
@@ -188,7 +244,25 @@ iu_antigravity_ide() {
 }
 
 iu_gemini() {
-    internet_dispatch_silent_launch "✨ Gemini" "Gemini" "STATUS_GEMINI" "Gemini" "Gemini → app menu → Check for updates"
+    print_header "✨ Gemini"
+    local app_path="/Applications/Gemini.app"
+    [ -d "$app_path" ] || app_path="$(capture_app_path "Gemini")"
+    if [ -n "$app_path" ] && [ -d "$app_path" ]; then
+        local ver; ver="$(app_version "$app_path")"
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+        KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
+        if google_keystone_check "$KEYSTONE_AGENT"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Gemini")"
+            evaluate_omaha_status "Gemini" "$app_path" "$GOOGLE_OMAHA_INC" "com.google.geminimacos"
+            STATUS_GEMINI="$INTERNET_LAST_STATUS"
+        else
+            print_warn "Google Keystone failed to check for Gemini updates"
+            STATUS_GEMINI="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Gemini")"
+    fi
 }
 
 iu_lm_studio() {
@@ -392,23 +466,14 @@ iu_google_drive() {
         VER=$(app_version "/Applications/Google Drive.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
-        if [ -f "$KEYSTONE_AGENT" ]; then
-            print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
-            if google_keystone_check "$KEYSTONE_AGENT"; then
-                print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_CHECKED_CLI"
-            else
-                print_warn "Google Keystone failed to check for Google Drive updates"
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
+        if google_keystone_check "$KEYSTONE_AGENT"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
+            evaluate_omaha_status "Google Drive" "/Applications/Google Drive.app" "$GOOGLE_OMAHA_INC" "com.google.drivefs"
+            STATUS_GOOGLEDRIVE="$INTERNET_LAST_STATUS"
         else
-            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Google Drive")"
-            if silent_launch_app "Google Drive"; then
-                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Google Drive → O Google Drive")"
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-            else
-                STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-            fi
+            print_warn "Google Keystone failed to check for Google Drive updates"
+            STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
         fi
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Drive")"

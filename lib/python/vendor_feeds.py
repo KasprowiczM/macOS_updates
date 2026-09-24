@@ -431,9 +431,14 @@ def omaha_last_status(log_text: str, appid: str) -> str | None:
     return last_status
 
 
-def version_history_public(obj: dict) -> str | None:
+def version_history_public(obj: dict | str) -> str | None:
     """Google VersionHistory response: max 'version' among releases whose float(fraction) >= 1.0;
     if none, max overall; None if empty."""
+    if isinstance(obj, str):
+        try:
+            obj = json.loads(obj)
+        except Exception:
+            return None
     if not isinstance(obj, dict):
         return None
     releases = obj.get("releases", [])
