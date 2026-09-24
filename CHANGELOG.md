@@ -39,6 +39,22 @@ Vendor truth release: version comparison against vendor release feeds, only inst
 - **Vendor Feeds Diagnostic Tool (T14):**
   - Added `scripts/check_vendor_feeds.sh` for read-only inspection of vendor feeds, relations, and live Omaha updater logs in table and JSON formats.
 
+### Fixed (post-review)
+
+- **F0 — Test harness isolation & syntax safety:** Stop masking missing PYTHONPATH and child-process syntax errors in `run_tests.sh` and `lib/python/test_runner.py`.
+- **F1 — Homebrew cask downgrade guard & .app target tracking:** Resolved Python 3 inline syntax error on multiline strings, corrected awk parser in `brew_cask_versions`, validated cask targets by `.app` bundle directory presence, and emitted `brew_cask_targets.txt`.
+- **F2 — CLI version retention symlink protection:** Canonicalized symlink targets before pruning to prevent accidental deletion of active binary directories (`cursor-agent`, `codex`).
+- **F3 — Drift-free inventory sync & formatting:** Handled Homebrew 7 / mas 1.9+ ndjson parsing, accurate iPad bundle identity detection via `appstore_ios.sh`, system line preservation, and formatting separators in `APPLICATIONS.md`.
+- **F4 — Vendor direct atomic install & diagnostics:** Captured stderr diagnostics during Gatekeeper verification, migrated from `cp -R` to atomic `ditto`, added pre-install version checking, and enforced HTTPS redirects.
+- **F5 — App Store iPad verify error handling:** iTunes Lookup API failure (`lookup_failed`) treated as unverifiable instead of false positive up-to-date success.
+- **F6 — Native CLIs update without managed Node:** Native binary CLIs update independently when managed Node/npm is not installed.
+- **F7 — Internet apps stale days calculation:** Stale threshold does not override verified `CURRENT` and `UPTODATE` statuses in status reporting table.
+- **F8 — Docker Desktop update safety:** Polled version updates before stopping Docker background service to avoid interrupting active installations.
+- **F9 — Google Omaha single wake & app targeting:** Wake Omaha / Google Keystone updater once per session and filter status checks specifically per application ID.
+- **F10 — Run summary attribution & deduplication:** Attributed iPad updates to `appstore` category and deduplicated background entries for casks with alternate `.app` bundle names.
+- **F11 — Documentation, i18n keys, and coverage labels:** Added localized keys across 7 languages, fixed `report_update_coverage.sh` vendor feed labels and exclusions classification, updated step 6 descriptions in all 7 READMEs, and synced environment variable defaults in `docs/agents/scripts.md`.
+- **F12 — Vendor feed row exact field matching:** Replaced regex-based `grep -E` with exact field matching in `awk` to safely handle application names containing regex metacharacters.
+
 ## [1.4.6] — 2026-09-16
 
 macOS 27 Golden Gate adaptation release. Upgrade to macOS 27 and Homebrew 7.0 revealed
