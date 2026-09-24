@@ -12,6 +12,11 @@ _VENDOR_DIRECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/proc.sh
 [ -f "$_VENDOR_DIRECT_DIR/proc.sh" ] && . "$_VENDOR_DIRECT_DIR/proc.sh"
 
+_vd_diag() {
+    command -v internet_diag_log >/dev/null 2>&1 && internet_diag_log "$@"
+    return 0
+}
+
 _vd_valid_bundle_id() {
     case "$1" in
         ''|*[!A-Za-z0-9._-]*) return 1 ;;
@@ -101,7 +106,7 @@ vendor_direct_verify_checksum() {
 }
 
 vendor_direct_install() {
-    local installed_app_path="$1" url="$2" artifact="$3" checksum_kind="$4" checksum="$5" host="$6"
+    local installed_app_path="$1" url="$2" artifact="$3" checksum_kind="$4" checksum="$5" host="$6" expected_version="${7:-}"
 
     # 1. DRY RUN / VERIFY ONLY
     if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
@@ -113,7 +118,7 @@ vendor_direct_install() {
     case "$installed_app_path" in
         /Applications/*) ;;
         *)
-            [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: vendor_direct_install requires /Applications path: $installed_app_path" 2>/dev/null || true
+            _vd_diag "ERROR: vendor_direct_install requires /Applications path: $installed_app_path"
             return 1
             ;;
     esac
@@ -121,7 +126,7 @@ vendor_direct_install() {
     # 3. Host allowlist
     if ! vendor_direct_host_allowed "$url" "$host"; then
         print_warn "$(printf "${L_INTERNET_VENDOR_HOST_REJECTED_FMT:-Host %s rejected for URL %s}" "$host" "$url")" 2>/dev/null || true
-        [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: vendor direct host $host not allowed for $url" 2>/dev/null || true
+        _vd_diag "ERROR: vendor direct host $host not allowed for $url"
         return 1
     fi
 
@@ -129,7 +134,7 @@ vendor_direct_install() {
     local bid
     bid="$(internet_app_bundle_id "$installed_app_path")"
     if [ -n "$bid" ] && internet_app_is_running "$bid"; then
-        [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: app $bid is currently running" 2>/dev/null || true
+        _vd_diag "ERROR: app $bid is currently running"
         return 1
     fi
 
@@ -144,7 +149,7 @@ vendor_direct_install() {
     local dl_file
     dl_file="$(mktemp "$tmp_root/vd.XXXXXX.${ext}")" || return 1
     if ! fetch_to_file "$url" "$dl_file" 1800 4294967296; then
-        [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: fetch_to_file failed for $url" 2>/dev/null || true
+        _vd_diag "ERROR: fetch_to_file failed for $url"
         rm -f "$dl_file"
         return 1
     fi
@@ -152,7 +157,7 @@ vendor_direct_install() {
     # 6. Checksum
     if ! vendor_direct_verify_checksum "$dl_file" "$checksum_kind" "$checksum"; then
         print_warn "$(printf "${L_INTERNET_CHECKSUM_MISMATCH_FMT:-Checksum mismatch: expected %s, got %s}" "$checksum" "mismatch")" 2>/dev/null || true
-        [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: checksum mismatch for $dl_file" 2>/dev/null || true
+        _vd_diag "ERROR: checksum mismatch for $dl_file"
         rm -f "$dl_file"
         return 1
     fi
@@ -163,14 +168,14 @@ vendor_direct_install() {
     case "$artifact" in
         zip)
             if ! ditto -x -k "$dl_file" "$extract_dir" 2>/dev/null; then
-                [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: ditto extract failed for $dl_file" 2>/dev/null || true
+                _vd_diag "ERROR: ditto extract failed for $dl_file"
                 rm -rf "$extract_dir" "$dl_file"
                 return 1
             fi
             ;;
         tar.gz)
             if ! tar -xzf "$dl_file" -C "$extract_dir" 2>/dev/null; then
-                [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: tar extract failed for $dl_file" 2>/dev/null || true
+                _vd_diag "ERROR: tar extract failed for $dl_file"
                 rm -rf "$extract_dir" "$dl_file"
                 return 1
             fi
@@ -178,12 +183,26 @@ vendor_direct_install() {
         dmg)
             local mnt
             mnt="$(mount_verified_dmg "$dl_file")" || {
-                [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: mount_verified_dmg failed for $dl_file" 2>/dev/null || true
+                _vd_diag "ERROR: mount_verified_dmg failed for $dl_file"
                 rm -rf "$extract_dir" "$dl_file"
                 return 1
             }
-            find "$mnt" -maxdepth 3 -type d -name '*.app' -prune -exec cp -R {} "$extract_dir/" \; 2>/dev/null || true
+            local dmg_copy_ok=1
+            while IFS= read -r dmg_app; do
+                [ -n "$dmg_app" ] || continue
+                if ! ditto "$dmg_app" "$extract_dir/$(basename "$dmg_app")" 2>/dev/null; then
+                    _vd_diag "ERROR: ditto failed for $dmg_app from dmg"
+                    dmg_copy_ok=0
+                    break
+                fi
+            done <<EOF_DMG_APPS
+$(find "$mnt" -maxdepth 3 -type d -name '*.app' -prune 2>/dev/null)
+EOF_DMG_APPS
             detach_verified_dmg "$mnt" 2>/dev/null || true
+            if [ "$dmg_copy_ok" -eq 0 ]; then
+                rm -rf "$extract_dir" "$dl_file"
+                return 1
+            fi
             ;;
         *)
             rm -rf "$extract_dir" "$dl_file"
@@ -210,16 +229,38 @@ $(find "$extract_dir" -maxdepth 3 -type d -name '*.app' -prune 2>/dev/null)
 EOF
 
     if [ "$match_count" -ne 1 ] || [ -z "$found" ]; then
-        [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: expected 1 app bundle with id $target_bid, found $match_count" 2>/dev/null || true
+        _vd_diag "ERROR: expected 1 app bundle with id $target_bid, found $match_count"
         rm -rf "$extract_dir"
         return 1
+    fi
+
+    # 8b. Version pre-check before copy
+    if [ -n "$expected_version" ]; then
+        local cand_ver
+        cand_ver="$(app_version "$found")"
+        local installed_ver
+        installed_ver="$(app_version "$installed_app_path")"
+        local exp_rel
+        exp_rel="$(version_cmp "$expected_version" "$cand_ver")"
+        local cur_rel
+        cur_rel="$(version_cmp "$cand_ver" "$installed_ver")"
+        if [ "$exp_rel" != "equal" ] && [ "$exp_rel" != "older" ]; then
+            _vd_diag "ERROR: downloaded bundle version $cand_ver does not satisfy expected $expected_version"
+            rm -rf "$extract_dir"
+            return 1
+        fi
+        if [ "$cur_rel" != "newer" ]; then
+            _vd_diag "ERROR: downloaded bundle version $cand_ver is not newer than installed $installed_ver"
+            rm -rf "$extract_dir"
+            return 1
+        fi
     fi
 
     # 9. copy_verified_app
     local dest_label
     dest_label="$(basename "$installed_app_path")"
     if ! copy_verified_app "$found" "$dest_label"; then
-        [ -n "${internet_diag_log:-}" ] && internet_diag_log "ERROR: copy_verified_app failed for $found -> $dest_label" 2>/dev/null || true
+        _vd_diag "ERROR: copy_verified_app failed for $found -> $dest_label"
         rm -rf "$extract_dir"
         return 3
     fi
