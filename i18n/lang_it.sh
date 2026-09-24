@@ -811,6 +811,9 @@ L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED="Impossibile confermare gli aggiornamenti de
 L_APPSTORE_IOS_VERIFIED="App per iPad verificate dopo Track 2"
 L_APPSTORE_IOS_STILL_PENDING_FMT="Ancora in installazione o in sospeso: %s"
 L_APPSTORE_IOS_NEEDS_INTERACTIVE="Gli aggiornamenti delle app iPad richiedono un'esecuzione interattiva (Track 2 usa la finestra di App Store)"
+L_APPSTORE_IOS_NONE_INSTALLED="Nessuna app iPad installata — salto Track 2"
+L_SYSTEM_INSTALLING_RESTART_BATCH_FMT="Installazione (riavvio richiesto): %s..."
+L_SYSTEM_RESTART_BATCH_FAILED_FMT="Impossibile installare il batch: %s"
 
 # ── Homebrew / CLI / Inventory (v1.5.0) ─────────────────────────
 L_BREW_ORPHAN_CASK_FMT="Cask %s: l'app è stata rimossa manualmente (%s mancante) — salto. Rimuovi il record Homebrew: brew uninstall --cask --force %s"

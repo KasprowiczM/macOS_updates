@@ -175,7 +175,7 @@ instalacją nadal zajmuje się updater producenta.
 | 3 | **Homebrew** — formulae i caski (`brew_cask` + ochrona przed downgrade'em) + cleanup i doctor |
 | 4 | **Aplikacje z Internetu** — zweryfikowane handlery, `sparkle_appcast`, CLI i uczciwe wywołania updaterów |
 | 5 | **Postupdate/historia** — odśwież `APPLICATIONS.md`, dopisz do `UPDATES.md` |
-| 6 | **macOS (końcowy)** — `softwareupdate -ia -R`; pomijany gdy wcześniejszy krok zawiódł |
+| 6 | **macOS (końcowy)** — per-etykieta `softwareupdate -i <label> -R` (wymagające restartu w końcowym pakiecie); pomijany gdy wcześniejszy krok zawiódł |
 
 **Ważne:** Aktualizacje dotyczą wyłącznie oprogramowania już zainstalowanego na Twoim Macu. Końcowy krok macOS może uruchomić komputer ponownie, dlatego działa ostatni i zawsze zachowuje wymagane `-R`. Zgłaszane są braki obsługiwanych aplikacji, ale nie są one instalowane.
 

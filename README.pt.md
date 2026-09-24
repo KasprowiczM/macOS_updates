@@ -36,7 +36,7 @@ O `update_all.sh` executa sete passos:
 | 3 | **Homebrew** — Fórmulas e Casks (`--greedy-auto-updates`) + proteção contra downgrades |
 | 4 | **Aplicações de Internet** — manipuladores verificados, `vendor_latest`, Sparkle Appcast |
 | 5 | **Pós-atualização/Histórico** — atualiza inventário e histórico de forma atómica |
-| 6 | **macOS (final)** — `softwareupdate -ia -R`; ignorado em caso de erro anterior |
+| 6 | **macOS (final)** — por etiqueta `softwareupdate -i <label> -R` (reinício em lote final); ignorado em caso de erro anterior |
 
 ---
 

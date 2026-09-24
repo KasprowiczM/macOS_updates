@@ -36,7 +36,7 @@ Consulte [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTAL
 | 3 | **Homebrew** — Fórmulas y Casks (`--greedy-auto-updates`) + protección contra downgrades |
 | 4 | **Aplicaciones de Internet** — controladores verificados, `vendor_latest`, Sparkle Appcast |
 | 5 | **Post-actualización/Historial** — actualiza inventario e historial de forma atómica |
-| 6 | **macOS (final)** — `softwareupdate -ia -R`; se omite si ocurre un error previo |
+| 6 | **macOS (final)** — por etiqueta `softwareupdate -i <label> -R` (reinicio en lote final); se omite si ocurre un error previo |
 
 ---
 

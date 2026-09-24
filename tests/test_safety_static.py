@@ -2959,6 +2959,52 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
         self.assertIn('export RUN_TIMESTAMP="$LOG_TS"', text)
         self.assertIn('ts_str = os.environ.get("RUN_TIMESTAMP") or str(start_time)', text)
 
+    def test_docs_scripts_md_env_defaults_match_code(self) -> None:
+        """Assert environment variable defaults in docs/agents/scripts.md match the code."""
+        h_txt = (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
+        m_stage = re.search(r"MAC_UPDATE_STAGE_WAIT:-(\d+)", h_txt)
+        self.assertIsNotNone(m_stage, "MAC_UPDATE_STAGE_WAIT default not found in lib/internet_handlers.sh")
+        code_stage = m_stage.group(1)
+
+        app_txt = (REPO_ROOT / "update_appstore.sh").read_text(encoding="utf-8")
+        m_as = re.search(r"MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT:-(\d+)", app_txt)
+        self.assertIsNotNone(m_as, "MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT default not found in update_appstore.sh")
+        code_as = m_as.group(1)
+
+        doc_txt = (REPO_ROOT / "docs" / "agents" / "scripts.md").read_text(encoding="utf-8")
+        m_doc_stage = re.search(r"\|\s*`MAC_UPDATE_STAGE_WAIT`\s*\|\s*`(\d+)`\s*\|", doc_txt)
+        self.assertIsNotNone(m_doc_stage, "MAC_UPDATE_STAGE_WAIT not documented in docs/agents/scripts.md")
+        doc_stage = m_doc_stage.group(1)
+
+        m_doc_as = re.search(r"\|\s*`MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT`\s*\|\s*`(\d+)`\s*\|", doc_txt)
+        self.assertIsNotNone(m_doc_as, "MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT not documented in docs/agents/scripts.md")
+        doc_as = m_doc_as.group(1)
+
+        self.assertEqual(code_stage, doc_stage, f"MAC_UPDATE_STAGE_WAIT mismatch: code={code_stage}, doc={doc_stage}")
+        self.assertEqual(code_as, doc_as, f"MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT mismatch: code={code_as}, doc={doc_as}")
+
+    def test_report_update_coverage_vendor_feed_label_and_exclusions(self) -> None:
+        """Assert report_update_coverage uses vendor feed label and handles exclusions."""
+        env = os.environ.copy()
+        env["MAC_LANG"] = "en"
+        res = subprocess.run(
+            ["bash", str(REPO_ROOT / "scripts" / "report_update_coverage.sh"), "--json"],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=True,
+        )
+        data = json.loads(res.stdout)
+        installed_updatable = {a["app"]: a for a in data.get("installed_updatable", [])}
+        if "Claude" in installed_updatable:
+            claude = installed_updatable["Claude"]
+            self.assertEqual(claude.get("managed_by"), "vendor_feed")
+            self.assertEqual(claude.get("label"), "vendor feed verified")
+
+        self.assertIn("excluded", data.get("classification_counts", {}))
+        excluded_apps = [a["app"] for a in data.get("classifications", {}).get("excluded", [])]
+        self.assertIn("Ascendo", excluded_apps)
+
 
 if __name__ == "__main__":
     unittest.main()
