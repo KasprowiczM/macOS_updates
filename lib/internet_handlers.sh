@@ -471,7 +471,7 @@ EOF
         [ "$WAIT" -gt 600 ] && WAIT=600
 
         if [ "$WAIT" -gt 0 ]; then
-            printf "$L_INTERNET_LAUNCH_CYCLE_FMT\n" "$app" "$WAIT"
+            printf "$L_INTERNET_LAUNCH_CYCLE_FMT\n" "$app" "$R"
             silent_launch_app "$launch_target"
             sleep "$WAIT"
             if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
@@ -505,7 +505,7 @@ EOF
             fi
             if [ "$still_running" -eq 0 ] && command -v vendor_direct_install >/dev/null 2>&1; then
                 printf "$L_INTERNET_VENDOR_DIRECT_FMT\n" "$app" "$R" "$HOST"
-                vendor_direct_install "$app_path" "$URL" "$ART" "$CK" "$CS" "$HOST"
+                vendor_direct_install "$app_path" "$URL" "$ART" "$CK" "$CS" "$HOST" "$R"
                 local vrc=$?
                 if [ "$vrc" -eq 0 ]; then
                     local I3

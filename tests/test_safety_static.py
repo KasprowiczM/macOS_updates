@@ -489,12 +489,14 @@ class StaticShellSafetyTests(unittest.TestCase):
                     "PATH": f"{mock_bin}:/usr/bin:/bin",
                     "SYSTEM_MARKER": str(marker),
                     "MAC_LANG": "en",
+                    "MAC_UPDATE_NO_SUDO": "1",
                 }
             )
             result = subprocess.run(
                 args,
                 cwd=root,
                 env=env,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 timeout=90,
@@ -740,6 +742,15 @@ class StaticShellSafetyTests(unittest.TestCase):
                 found,
                 msg=f"Method {method!r} configured in internet_app_methods.txt has no handler function in lib/ (expected one of: {handler_names})",
             )
+
+    def test_lib_scripts_do_not_use_bare_internet_diag_log_var(self) -> None:
+        """lib/*.sh must not test ${internet_diag_log:-} (it is a function, not a variable)."""
+        bad = []
+        for path in sorted((REPO_ROOT / "lib").glob("*.sh")):
+            text = path.read_text(encoding="utf-8")
+            if "${internet_diag_log" in text:
+                bad.append(path.name)
+        self.assertEqual(bad, [], f"lib scripts using ${{internet_diag_log: {bad}")
 
     def test_direct_methods_are_used_and_verify(self) -> None:
         """Every entry in DIRECT_METHODS must (a) be used in config/internet_app_methods.txt and (b) have a handler."""
