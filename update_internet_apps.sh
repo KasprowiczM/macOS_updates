@@ -323,6 +323,7 @@ copy_verified_app() {
 
 . "$SCRIPT_DIR/lib/proc.sh"
 . "$SCRIPT_DIR/lib/vendor_feeds.sh"
+. "$SCRIPT_DIR/lib/vendor_direct.sh"
 
 # silent_launch_app — trigger a Mac app's built-in auto-updater without
 # bringing windows to the foreground.

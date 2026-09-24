@@ -156,15 +156,8 @@ iu_chatgpt() {
     print_header "🤖 ChatGPT / Codex (OpenAI)"
     OPENAI_APP="$(internet_app_path "ChatGPT / Codex" 2>/dev/null || true)"
     if [ -n "$OPENAI_APP" ] && [ -d "$OPENAI_APP" ]; then
-        VER=$(app_version "$OPENAI_APP")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "bundle: com.openai.codex")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "ChatGPT / Codex")"
-        if silent_launch_app "$OPENAI_APP"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "ChatGPT / Codex → Check for updates")"
-            STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_CHATGPT="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
+        internet_handler_vendor_truth "ChatGPT / Codex" "$OPENAI_APP" "$OPENAI_APP"
+        internet_handler_set_status STATUS_CHATGPT "$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT / Codex (com.openai.codex)")"
     fi
@@ -2211,7 +2204,7 @@ except Exception:
 }
 
 iu_remote_desktop_manager() {
-    internet_dispatch_sparkle_appcast "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager"
+    internet_dispatch_silent_launch "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager"
 }
 
     # ── 34. IPMIVIEW (Supermicro) ────────────────────────────────

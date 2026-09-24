@@ -176,7 +176,9 @@ internet_dispatch_silent_launch() {
     if [ -d "$APP_PATH" ]; then
         INTERNET_LAST_VERIFIED=0
         INTERNET_LAST_LAUNCH_OK=0
-        if internet_feed_source "$APP_PATH" >/dev/null 2>&1; then
+        if command -v vendor_feed_row >/dev/null 2>&1 && vendor_feed_row "$app_display" >/dev/null 2>&1; then
+            internet_handler_vendor_truth "$app_display" "$APP_PATH" "$launch_target"
+        elif internet_feed_source "$APP_PATH" >/dev/null 2>&1; then
             internet_handler_vendor_latest "$app_display" "$APP_PATH" "$launch_target"
             if [ "$INTERNET_LAST_VERIFIED" -ne 1 ]; then
                 # A feed exists but yielded no comparable version (unreachable,
@@ -382,4 +384,138 @@ internet_handler_vendor_latest() {
         INTERNET_LAST_LAUNCH_OK=0
     fi
 }
+
+# ── Vendor Truth Handler (v1.5.0) ───────────────────────────
+# Consults the vendor feed first, launches updater only if needed,
+# and supports vendor direct download/installation when configured.
+internet_handler_vendor_truth() {
+    local app="$1"
+    local app_path="$2"
+    local launch_target="${3:-$app}"
+
+    local I
+    I="$(app_version "$app_path")"
+    INTERNET_LAST_VERIFIED=0
+    INTERNET_LAST_LAUNCH_OK=0
+
+    local row
+    row="$(vendor_feed_lookup "$app" 2>/dev/null || true)"
+    if [ -z "$row" ]; then
+        print_warn "$(printf "${L_INTERNET_VENDOR_FEED_UNREACHABLE_FMT:-Vendor feed for %s unreachable}" "$app")"
+        internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
+        return
+    fi
+
+    local R URL CK CS ART HOST
+    IFS='|' read -r R URL CK CS ART HOST <<EOF
+$row
+EOF
+
+    local rel
+    rel="$(version_cmp "$R" "$I")"
+    if [ "$rel" = "equal" ]; then
+        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$I")"
+        INTERNET_LAST_VERIFIED=1
+        return 0
+    elif [ "$rel" = "older" ]; then
+        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$I")"
+        INTERNET_LAST_VERIFIED=0
+        return 0
+    elif [ "$rel" = "unknown" ]; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        INTERNET_LAST_VERIFIED=0
+        return 0
+    elif [ "$rel" = "newer" ]; then
+        if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$I" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            return 0
+        fi
+
+        local BID=""
+        if command -v internet_app_bundle_id >/dev/null 2>&1; then
+            BID="$(internet_app_bundle_id "$app_path")"
+        fi
+        if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$I" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            return 0
+        fi
+
+        local WAIT="${MAC_UPDATE_STAGE_WAIT:-90}"
+        case "$WAIT" in ''|*[!0-9]*) WAIT=90 ;; esac
+        [ "$WAIT" -lt 0 ] && WAIT=0
+        [ "$WAIT" -gt 600 ] && WAIT=600
+
+        if [ "$WAIT" -gt 0 ]; then
+            printf "$L_INTERNET_LAUNCH_CYCLE_FMT\n" "$app" "$WAIT"
+            silent_launch_app "$launch_target"
+            sleep "$WAIT"
+            if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+                if command -v internet_app_quit_gracefully >/dev/null 2>&1; then
+                    internet_app_quit_gracefully "$BID" 2>/dev/null || true
+                fi
+            fi
+            local poll_elapsed=0
+            local I2="$I"
+            while [ "$poll_elapsed" -lt 60 ]; do
+                I2="$(app_version "$app_path")"
+                if [ "$I2" != "$I" ]; then
+                    break
+                fi
+                sleep 5
+                poll_elapsed=$((poll_elapsed + 5))
+            done
+            local rel2
+            rel2="$(version_cmp "$R" "$I2")"
+            if [ "$rel2" = "equal" ] || [ "$rel2" = "older" ]; then
+                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I2")"
+                INTERNET_LAST_VERIFIED=1
+                return 0
+            fi
+        fi
+
+        if [ "$ART" != "-" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ]; then
+            local still_running=0
+            if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+                still_running=1
+            fi
+            if [ "$still_running" -eq 0 ] && command -v vendor_direct_install >/dev/null 2>&1; then
+                printf "$L_INTERNET_VENDOR_DIRECT_FMT\n" "$app" "$R" "$HOST"
+                vendor_direct_install "$app_path" "$URL" "$ART" "$CK" "$CS" "$HOST"
+                local vrc=$?
+                if [ "$vrc" -eq 0 ]; then
+                    local I3
+                    I3="$(app_version "$app_path")"
+                    local rel3
+                    rel3="$(version_cmp "$R" "$I3")"
+                    if [ "$rel3" = "equal" ] || [ "$rel3" = "older" ]; then
+                        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I3")"
+                        INTERNET_LAST_VERIFIED=1
+                        return 0
+                    else
+                        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$I3" "$R")"
+                        INTERNET_LAST_VERIFIED=1
+                        return 0
+                    fi
+                elif [ "$vrc" -eq 3 ]; then
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_INSTALL_ERROR"
+                    INTERNET_LAST_VERIFIED=0
+                    INTERNET_HARD_FAIL=1
+                    return 1
+                else
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                    INTERNET_LAST_VERIFIED=0
+                    INTERNET_SOFT_FAIL=1
+                    return 0
+                fi
+            fi
+        fi
+
+        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$I" "$R")"
+        INTERNET_LAST_VERIFIED=1
+        return 0
+    fi
+}
+
 
