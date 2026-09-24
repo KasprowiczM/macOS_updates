@@ -609,6 +609,14 @@ while IFS='|' read -r _s_app _s_meth _s_var; do
     _s_meth="$(echo "$_s_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     _s_var="$(echo "$_s_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     if [ "$_s_meth" = "silent_launch" ]; then
+        _s_cur=""
+        eval "_s_cur=\"\${$_s_var}\""
+        _s_code="$(internet_status_code "$_s_cur")"
+        case "$_s_code" in
+            current_verified|current_vendor|updated|behind|needs_restart|feed_stale|update_available|rollout_hold)
+                continue
+                ;;
+        esac
         _s_app_name="$(echo "$_s_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         _s_days="$(internet_get_app_days_unchanged "$_s_app_name")"
         if [ "$_s_days" -gt "$STALE_LIMIT" ]; then

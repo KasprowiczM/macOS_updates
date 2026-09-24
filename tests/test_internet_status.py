@@ -242,6 +242,30 @@ internet_summary_end
         finally:
             shutil.rmtree(tmp_sdir, ignore_errors=True)
 
+    def test_stale_days_does_not_override_verified_statuses(self) -> None:
+        """When an app has a verified status, stale days check does not override it."""
+        from tests._env import shell_env
+        script = f"""
+REPO_ROOT="{REPO_ROOT}"
+. "$REPO_ROOT/i18n/lang_en.sh"
+. "$REPO_ROOT/lib/internet_i18n.sh"
+. "$REPO_ROOT/lib/internet_status.sh"
+
+internet_get_app_days_unchanged() {{ echo 99; }}
+STATUS_CURSOR="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "0.45.0")"
+SCRIPT_DIR="$REPO_ROOT"
+MAC_UPDATE_STALE_DAYS=45
+
+# Run the snippet from update_internet_apps.sh
+eval "$(sed -n '/# ── Stale Days Warning/,/done < "\\$SCRIPT_DIR\\/config\\/internet_app_methods.txt"/p' "$REPO_ROOT/update_internet_apps.sh")"
+
+echo "STATUS_CURSOR=$STATUS_CURSOR"
+"""
+        proc = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=shell_env())
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("vendor feed", proc.stdout)
+        self.assertNotIn("unchanged for 99 days", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
