@@ -1026,8 +1026,14 @@ if os.path.exists(new_apps_file):
                 parts = line.strip().split(None, 1)
                 if len(parts) > 1:
                     name_ver = parts[1].split('(')[0].strip()
-                    handled.add(norm_name(name_ver))
-    unhandled = [a for a in new_app_names if norm_name(a) not in handled]
+    def _is_appstore_app(app_name):
+        p = installed_app_paths.get(app_name, '')
+        if not p:
+            return False
+        return os.path.isfile(os.path.join(p, 'Wrapper', 'iTunesMetadata.plist')) or \
+               os.path.isdir(os.path.join(p, 'Contents', '_MASReceipt'))
+
+    unhandled = [a for a in new_app_names if norm_name(a) not in handled and not _is_appstore_app(a)]
     if unhandled:
         def _format_unhandled_row(app_name):
             app_path = installed_app_paths.get(app_name, '')

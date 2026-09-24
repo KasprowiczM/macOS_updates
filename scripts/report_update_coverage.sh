@@ -54,6 +54,7 @@ METHOD_LABELS = {
         "sparkle_appcast": "Sparkle appcast verified",
         "chromium_updater": "Chromium updater (Omaha)",
         "vendor_feed": "vendor feed verified",
+        "app_store_ios": "App Store (iPad app)",
     },
     "pl": {
         "keystone": "Google Keystone",
@@ -68,6 +69,7 @@ METHOD_LABELS = {
         "sparkle_appcast": "weryfikacja Sparkle appcast",
         "chromium_updater": "updater Chromium (Omaha)",
         "vendor_feed": "zweryfikowane przez feed producenta",
+        "app_store_ios": "App Store (aplikacja iPad)",
     },
     "de": {
         "keystone": "Google Keystone",
@@ -82,6 +84,7 @@ METHOD_LABELS = {
         "sparkle_appcast": "Sparkle Appcast verifiziert",
         "chromium_updater": "Chromium-Updater (Omaha)",
         "vendor_feed": "durch Hersteller-Feed verifiziert",
+        "app_store_ios": "App-Store (iPad-App)",
     },
     "fr": {
         "keystone": "Google Keystone",
@@ -96,6 +99,7 @@ METHOD_LABELS = {
         "sparkle_appcast": "vérifié par Sparkle appcast",
         "chromium_updater": "updater Chromium (Omaha)",
         "vendor_feed": "vérifié par flux éditeur",
+        "app_store_ios": "App Store (app iPad)",
     },
     "es": {
         "keystone": "Google Keystone",
@@ -110,6 +114,7 @@ METHOD_LABELS = {
         "sparkle_appcast": "verificado por Sparkle appcast",
         "chromium_updater": "actualizador Chromium (Omaha)",
         "vendor_feed": "verificado por feed del proveedor",
+        "app_store_ios": "App Store (app iPad)",
     },
     "it": {
         "keystone": "Google Keystone",
@@ -124,6 +129,7 @@ METHOD_LABELS = {
         "sparkle_appcast": "verificato da Sparkle appcast",
         "chromium_updater": "updater Chromium (Omaha)",
         "vendor_feed": "verificato da feed del fornitore",
+        "app_store_ios": "App Store (app iPad)",
     },
     "pt": {
         "keystone": "Google Keystone",
@@ -138,6 +144,7 @@ METHOD_LABELS = {
         "sparkle_appcast": "verificado por Sparkle appcast",
         "chromium_updater": "atualizador Chromium (Omaha)",
         "vendor_feed": "verificado pelo feed do fornecedor",
+        "app_store_ios": "App Store (app iPad)",
     },
 }
 
@@ -151,6 +158,7 @@ METHOD_AI_HINT = {
         "docker_cli": "Use the Docker Desktop CLI update path.",
         "brew_cask": "Manage the app as an installed Homebrew cask.",
         "appstore_gui": "Manage the iPad app in App Store Track 2.",
+        "app_store_ios": "Manage the iPad app in App Store Track 2.",
         "manual": "Keep as a documented manual target until a safe updater exists.",
         "chromium_updater": "Add a Chromium updater handler with Omaha verification.",
         "vendor_feed": "Add a verified vendor feed row.",
@@ -164,6 +172,7 @@ METHOD_AI_HINT = {
         "docker_cli": "Użyj ścieżki aktualizacji Docker Desktop CLI.",
         "brew_cask": "Zarządzaj aplikacją jako zainstalowanym caskiem Homebrew.",
         "appstore_gui": "Zarządzaj aplikacją iPad przez Track 2 App Store.",
+        "app_store_ios": "Zarządzaj aplikacją iPad przez Track 2 App Store.",
         "manual": "Pozostaw udokumentowany tryb ręczny do czasu bezpiecznej automatyzacji.",
         "chromium_updater": "Dodaj handler updatera Chromium z weryfikacją Omaha.",
         "vendor_feed": "Dodaj zweryfikowany wiersz feedu producenta.",
@@ -249,7 +258,7 @@ CLASS_TEXT = {
 # tests/test_safety_static.py::test_direct_methods_are_used_and_verify.
 DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast", "chromium_updater"}
 TRIGGER_METHODS = {"silent_launch", "mau_fallback_self_update"}
-EXTERNAL_METHODS = {"brew_cask", "appstore_gui"}
+EXTERNAL_METHODS = {"brew_cask", "appstore_gui", "app_store_ios"}
 
 # Canonical registry targets whose on-disk bundle names changed or differ from
 # their product name. ChatGPT / Codex is deliberately bundle-ID-only: the
@@ -403,6 +412,7 @@ def scan_installed_apps():
             receipt = (path / "Contents" / "_MASReceipt" / "receipt").is_file()
             if not receipt:
                 receipt = mdls_value(path, "kMDItemAppStoreHasReceipt") == "1"
+            itunes_meta = (path / "Wrapper" / "iTunesMetadata.plist").is_file()
             found.append(
                 {
                     "app": name,
@@ -410,6 +420,7 @@ def scan_installed_apps():
                     "bundle_id": bundle_id,
                     "version": version or "?",
                     "app_store_receipt": receipt,
+                    "itunes_metadata": itunes_meta,
                 }
             )
     return found
@@ -510,6 +521,8 @@ def classify(installed, target, method, mas_names, brew_apps, vendor_feeds=None)
 
     if method == "appstore_gui":
         return "externally_managed", "app_store_gui"
+    if installed.get("itunes_metadata"):
+        return "externally_managed", "app_store_ios"
     if installed["app_store_receipt"] or normalized_name in mas_names:
         return "externally_managed", "app_store_mas"
     if method == "brew_cask":

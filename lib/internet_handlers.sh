@@ -9,6 +9,9 @@
 
 INTERNET_LAST_STATUS=""
 _INTERNET_HANDLERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$_INTERNET_HANDLERS_DIR/appstore_ios.sh" ]; then
+    . "$_INTERNET_HANDLERS_DIR/appstore_ios.sh"
+fi
 
 # INTERNET_LAST_VERIFIED — 1 only when the handler actually compared a remote
 # feed version against the installed one and wrote a version-bearing status
@@ -73,6 +76,12 @@ internet_handler_manual() {
     local app_display="$1"
     local download_url="$2"
     local app_path="$3"
+    if [ -n "$app_path" ] && command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$app_path"; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+        INTERNET_LAST_VERIFIED=1
+        print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+        return 0
+    fi
     local ver
     ver="$(app_version "$app_path")"
     print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
@@ -174,6 +183,13 @@ internet_dispatch_silent_launch() {
         APP_PATH="/Applications/${app_display}.app"
     fi
     if [ -d "$APP_PATH" ]; then
+        if command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$APP_PATH"; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+            return 0
+        fi
         INTERNET_LAST_VERIFIED=0
         INTERNET_LAST_LAUNCH_OK=0
         if command -v vendor_feed_row >/dev/null 2>&1 && vendor_feed_row "$app_display" >/dev/null 2>&1; then
@@ -284,6 +300,13 @@ internet_dispatch_sparkle_appcast() {
         APP_PATH="/Applications/${app_display}.app"
     fi
     if [ -d "$APP_PATH" ]; then
+        if command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$APP_PATH"; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+            return 0
+        fi
         internet_handler_sparkle_check "$app_display" "$APP_PATH" "$launch_target"
         internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
     else
