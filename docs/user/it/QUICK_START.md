@@ -1,6 +1,6 @@
 # Avvio rapido (Italiano)
 
-**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.4.6**
+**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.5.0**
 
 ## Installazione con una riga
 

@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.6** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.0** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+
+**Vérité de l'éditeur (v1.5.0) :** la version de chaque application est comparée au flux de son propre éditeur avant toute exécution. Les applications à jour ne sont pas modifiées ; celles qui sont obsolètes sont mises à jour par leur propre outil de mise à jour ou installées depuis l'éditeur avec vérification de signature et de Team ID. Seuls les logiciels installés sont mis à jour (`--bootstrap-cli` installe volontairement les CLI manquants). Les applications supprimées manuellement sont détectées et ne sont jamais réinstallées. Vérifiez l'état de l'éditeur en lecture seule avec `bash scripts/check_vendor_feeds.sh`.”
 
 **Dépôt public :** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
