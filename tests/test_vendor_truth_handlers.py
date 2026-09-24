@@ -12,6 +12,11 @@ import sys
 import tempfile
 import unittest
 
+try:
+    from ._env import shell_env
+except ImportError:
+    from _env import shell_env
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -26,11 +31,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def _run_bash(self, script: str, extra_env: dict = None) -> subprocess.CompletedProcess:
-        env = dict(os.environ)
-        env["SCRIPT_DIR"] = REPO_ROOT
-        env["PYTHONPATH"] = os.path.join(REPO_ROOT, "lib", "python")
-        if extra_env:
-            env.update(extra_env)
+        env = shell_env(SCRIPT_DIR=REPO_ROOT, **(extra_env or {}))
         return subprocess.run(
             ["bash", "-c", script],
             stdout=subprocess.PIPE,

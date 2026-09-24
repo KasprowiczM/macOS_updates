@@ -79,6 +79,16 @@ for sh_path in sh_files:
             print(f'  ❌ heredoc python syntax error in {sh_path} ({marker}): {comp.stderr.strip()}')
             failed = True
 
+    c_pattern = re.compile(r\"python3\s+(?:-\S+\s+)*-c\s+'([^']*)'\", re.DOTALL)
+    for m in c_pattern.finditer(content):
+        code = m.group(1)
+        line_num = content[:m.start()].count('\n') + 1
+        try:
+            compile(code, sh_path, \"exec\")
+        except SyntaxError as e:
+            print(f\"  ❌ inline python -c syntax error in {sh_path}:{line_num}: {e}\")
+            failed = True
+
 if __import__('shutil').which('ruff'):
     if extracted_files:
         subprocess.run(['ruff', 'check'] + extracted_files, capture_output=True)
@@ -90,13 +100,16 @@ for p in extracted_files:
 if failed:
     sys.exit(1)
 " 2>&1; then
-    ok "all inline heredoc python blocks compile"
+    ok "all inline heredoc and -c python blocks compile"
 else
-    err "heredoc py_compile failed"
+    err "inline python compile failed"
 fi
 
 say "3/4  python3 -m unittest discover tests"
-if PYTHONPATH=dev_sync:lib/python python3 -m unittest discover tests 2>&1; then
+if python3 -c 'import sys, unittest
+sys.path[:0] = ["dev_sync", "lib/python"]
+prog = unittest.main(module=None, argv=["unittest", "discover", "-s", "tests"], exit=False)
+sys.exit(0 if prog.result.wasSuccessful() else 1)' 2>&1; then
     ok "test suite passed"
 else
     err "test suite failed"
