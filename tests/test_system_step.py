@@ -183,6 +183,40 @@ EOF
         self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
         self.assertEqual((self.session_dir / "pending_system").read_text().strip(), "3")
 
+    def test_batch_restart_labels_two_invocations_restart_last(self) -> None:
+        """Listing with one no-restart and two restart labels produces two invocations with both restarts last."""
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+
+        env = dict(os.environ)
+        env["PATH"] = f"{self.bin_dir}:{env['PATH']}"
+        env["MAC_UPDATE_SESSION_DIR"] = str(self.session_dir)
+        env["MAC_UPDATE_YES"] = "1"
+        env["MAC_UPDATE_ALLOW_MAJOR_UPGRADE"] = "1"
+
+        res = subprocess.run(
+            ["bash", str(REPO_ROOT / "update_system.sh")],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"Output:\n{res.stdout}\n{res.stderr}")
+
+        calls = [
+            line.strip()
+            for line in log_file.read_text().splitlines()
+            if line.strip().startswith("softwareupdate -i")
+        ]
+        self.assertEqual(len(calls), 2, f"Expected 2 softwareupdate install calls, got: {calls}")
+        # First call is no-restart
+        self.assertIn("Safari27.0TahoeAuto-27.0", calls[0])
+        self.assertNotIn("26.7", calls[0])
+        self.assertNotIn("macOS 27", calls[0])
+        # Second call is batch restart containing both restart labels
+        self.assertIn("macOS Tahoe 26.7-25G229", calls[1])
+        self.assertIn("macOS 27-26A428", calls[1])
+        self.assertTrue(calls[1].endswith("-R --verbose"))
+
 
 if __name__ == "__main__":
     unittest.main()

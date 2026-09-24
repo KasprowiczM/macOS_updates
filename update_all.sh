@@ -425,24 +425,47 @@ print(json.dumps({
 PYJSON
     fi
     # If we failed or finished degraded, dump session dir snapshots into the run
-    # log before wipe. Soft warnings need diagnostics too: they are exactly the
-    # cases where a vendor updater could not be verified.
-    if [ -d "${SESSION_DIR:-/nonexistent}" ] \
-        && { [ "${OVERALL_EXIT:-0}" -ne 0 ] || [ "${DEGRADED:-0}" -ne 0 ]; }; then
-        {
-            echo ""
-            echo "=========================================="
-            echo "SESSION DIR SNAPSHOTS (preserved on failure)"
-            echo "Path: $SESSION_DIR"
-            echo "=========================================="
-            for f in "$SESSION_DIR"/*.txt "$SESSION_DIR"/appstore_diag.txt; do
-                [ -f "$f" ] || continue
+    # log before wipe. Full dump only when BLOCKING_EXIT!=0 or MAC_UPDATE_DEBUG=1.
+    # On DEGRADED alone attach only *diag*.txt, *pending*.txt,
+    # internet_status_codes.txt, brew_orphan_casks.txt.
+    if [ -d "${SESSION_DIR:-/nonexistent}" ]; then
+        if [ "${BLOCKING_EXIT:-0}" -ne 0 ] || [ "${MAC_UPDATE_DEBUG:-0}" = "1" ]; then
+            {
                 echo ""
-                echo "--- ${f##*/} ---"
-                # Cap each snapshot at 200 lines to keep logs reasonable.
-                head -n 200 "$f" 2>/dev/null
-            done
-        } 2>/dev/null || true
+                echo "=========================================="
+                echo "SESSION DIR SNAPSHOTS (preserved on failure)"
+                echo "Path: $SESSION_DIR"
+                echo "=========================================="
+                for f in "$SESSION_DIR"/*.txt "$SESSION_DIR"/appstore_diag.txt; do
+                    [ -f "$f" ] || continue
+                    echo ""
+                    echo "--- ${f##*/} ---"
+                    # Cap each snapshot at 200 lines to keep logs reasonable.
+                    head -n 200 "$f" 2>/dev/null
+                done
+            } 2>/dev/null || true
+        elif [ "${DEGRADED:-0}" -ne 0 ]; then
+            {
+                echo ""
+                echo "=========================================="
+                echo "SESSION DIR SNAPSHOTS (degraded run)"
+                echo "Path: $SESSION_DIR"
+                echo "=========================================="
+                _seen_dumps=""
+                for f in "$SESSION_DIR"/*diag*.txt "$SESSION_DIR"/*pending*.txt \
+                         "$SESSION_DIR"/internet_status_codes.txt "$SESSION_DIR"/brew_orphan_casks.txt; do
+                    [ -f "$f" ] || continue
+                    fname="${f##*/}"
+                    case " $_seen_dumps " in
+                        *" $fname "*) continue ;;
+                    esac
+                    _seen_dumps="$_seen_dumps $fname"
+                    echo ""
+                    echo "--- $fname ---"
+                    head -n 200 "$f" 2>/dev/null
+                done
+            } 2>/dev/null || true
+        fi
     fi
     case "${SESSION_DIR:-}" in
         "${TMPDIR:-/tmp}"/mac_update.*|/tmp/mac_update.*)

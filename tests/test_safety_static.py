@@ -293,6 +293,19 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("appstore_diag.txt", text)
         self.assertIn("MAS_TOR1_OUT", text)
 
+    def test_degraded_run_does_not_dump_brew_lists(self) -> None:
+        """update_all.sh degraded exit (BLOCKING_EXIT=0, DEGRADED=1) dumps only diagnostics, not brew lists."""
+        text = self.read_script("update_all.sh")
+        self.assertTrue(
+            'BLOCKING_EXIT' in text and 'MAC_UPDATE_DEBUG' in text,
+            "update_all.sh must guard full session dump with BLOCKING_EXIT!=0 or MAC_UPDATE_DEBUG=1",
+        )
+        self.assertIn('elif [ "${DEGRADED:-0}" -ne 0 ]; then', text)
+        self.assertIn('*diag*.txt', text)
+        self.assertIn('*pending*.txt', text)
+        self.assertIn('internet_status_codes.txt', text)
+        self.assertIn('brew_orphan_casks.txt', text)
+
     def test_mas_account_only_inside_version_gate(self) -> None:
         """mas account was removed in mas 5.0 and must only appear inside version gates."""
         for script_path in REPO_ROOT.glob("*.sh"):
