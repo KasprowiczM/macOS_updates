@@ -18,6 +18,16 @@ if [ -f "$_LIB_DIR/proc.sh" ]; then
 elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/proc.sh" ]; then
     . "$SCRIPT_DIR/lib/proc.sh"
 fi
+if [ -f "$_LIB_DIR/brew.sh" ]; then
+    . "$_LIB_DIR/brew.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/brew.sh" ]; then
+    . "$SCRIPT_DIR/lib/brew.sh"
+fi
+if [ -f "$_LIB_DIR/internet_handlers.sh" ]; then
+    . "$_LIB_DIR/internet_handlers.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/internet_handlers.sh" ]; then
+    . "$SCRIPT_DIR/lib/internet_handlers.sh"
+fi
 
 GOOGLE_KEYSTONE_RAN=0
 GOOGLE_KEYSTONE_EXIT=1
@@ -25,6 +35,8 @@ GOOGLE_KEYSTONE_USER_INIT=0
 GOOGLE_KEYSTONE_SYS_INIT=0
 GOOGLE_OMAHA_INC=""
 MAU_TEAMS21_VERIFIED=0
+MAU_TEAMS21_OFFERED=0
+MAU_LISTED=0
 google_keystone_check() {
     local agent="$1"
     local appid="${2:-}"
@@ -353,25 +365,24 @@ iu_opencode_desktop() {
     # Strona: https://opencode.ai | GitHub: sst/opencode
     # Uwaga: npm package `opencode-ai` dostarcza CLI `opencode` (brak .app)
     #        Desktop App: pobierz z https://opencode.ai/download
-    OPENCODE_APP_PATH=""
-    for _oc_path in "/Applications/opencode.app" "/Applications/OpenCode.app" \
-                    "/Applications/Opencode.app" "/Applications/opencode Desktop.app"; do
-        if [ -d "$_oc_path" ]; then
-            OPENCODE_APP_PATH="$_oc_path"
-            break
-        fi
-    done
-    if [ -n "$OPENCODE_APP_PATH" ]; then
+    OPENCODE_APP_PATH="$(internet_app_path "OpenCode" 2>/dev/null || true)"
+    if [ -z "$OPENCODE_APP_PATH" ] || [ ! -d "$OPENCODE_APP_PATH" ]; then
+        OPENCODE_APP_PATH=""
+        for _oc_path in "/Applications/OpenCode.app" "${HOME}/Applications/OpenCode.app" \
+                        "/Applications/opencode.app" "${HOME}/Applications/opencode.app" \
+                        "/Applications/Opencode.app" "${HOME}/Applications/Opencode.app" \
+                        "/Applications/opencode Desktop.app" "${HOME}/Applications/opencode Desktop.app"; do
+            if [ -d "$_oc_path" ]; then
+                OPENCODE_APP_PATH="$_oc_path"
+                break
+            fi
+        done
+    fi
+    if [ -n "$OPENCODE_APP_PATH" ] && [ -d "$OPENCODE_APP_PATH" ]; then
         VER=$(app_version "$OPENCODE_APP_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "$OPENCODE_APP_PATH")"
-        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "OpenCode Desktop")"
-        if silent_launch_app "$OPENCODE_APP_PATH"; then
-            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "https://opencode.ai")"
-            print_info "$L_INTERNET_OPENCODE_CLI_SEPARATE"
-            STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-        else
-            STATUS_OPENCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
-        fi
+        internet_handler_vendor_truth "OpenCode" "$OPENCODE_APP_PATH" "$OPENCODE_APP_PATH"
+        STATUS_OPENCODE="$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED_AS_APP" "OpenCode Desktop")"
         print_info "$(internet_msg "$L_INTERNET_CLI_MANAGED_SEPARATE" "opencode")"
@@ -1450,6 +1461,7 @@ iu_microsoft_365() {
         printf '%s\n' unknown > "$MAC_UPDATE_SESSION_DIR/pending_mau"
     fi
     MAU_TEAMS21_OFFERED=0
+    MAU_LISTED=0
     MAU_CHECK_TIMEOUT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT:-120}" 120)"
     # msupdate's own --wait returns the current install state instead of
     # hanging, so it is the primary bound. run_with_timeout stays strictly
@@ -1533,6 +1545,7 @@ iu_microsoft_365() {
             fi
             STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
         else
+            MAU_LISTED=1
             # Only positively identified product IDs count as pending. The
             # old "every non-blank line" filter counted spinner fragments.
             MAU_PENDING="$(mau_parse_pending "$MAU_LIST")"
@@ -1858,15 +1871,43 @@ iu_microsoft_365() {
 
 iu_microsoft_teams() {
     print_header "💬 Microsoft Teams"
-    if [ -d "/Applications/Microsoft Teams.app" ]; then
-        VER=$(app_version "/Applications/Microsoft Teams.app")
+    local teams_path="/Applications/Microsoft Teams.app"
+    [ -d "$teams_path" ] || teams_path="$(internet_app_path "Microsoft Teams" 2>/dev/null || true)"
+    if [ -n "$teams_path" ] && [ -d "$teams_path" ]; then
+        VER=$(app_version "$teams_path")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
         if [ "$MAU_TEAMS21_VERIFIED" -eq 1 ]; then
             print_ok "Microsoft Teams fallback update verified by MAU (TEAMS21): $VER"
             STATUS_TEAMS="✅ MAU fallback verified ($VER)"
+            return 0
+        fi
+
+        local cask_ver="" cask_rel=""
+        if command -v brew_cask_latest_versions >/dev/null 2>&1; then
+            cask_ver="$(brew_cask_latest_versions "microsoft-teams" 2>/dev/null | awk -F'\t' '$1 == "microsoft-teams" {print $2; exit}')"
+        fi
+        if [ -n "$cask_ver" ]; then
+            cask_rel="$(version_cmp "$cask_ver" "$VER")"
+        fi
+
+        if [ "$cask_rel" = "equal" ] || [ "$cask_rel" = "older" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Microsoft Teams" "$VER (cask: $cask_ver)")"
+            STATUS_TEAMS="$L_INTERNET_STATUS_CASK_CURRENT"
+        elif [ "$cask_rel" = "newer" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$cask_ver" "$VER")"
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Microsoft Teams")"
+            if silent_launch_app "$teams_path"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Microsoft Teams → Check for updates")"
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        elif [ "${MAU_LISTED:-0}" -eq 1 ] && [ "${MAU_TEAMS21_OFFERED:-0}" -eq 0 ] && [ "${STATUS_MICROSOFT:-}" = "$L_INTERNET_STATUS_CURRENT" ]; then
+            print_ok "Microsoft Teams up to date (MAU verified): $VER"
+            STATUS_TEAMS="✅ MAU verified ($VER)"
         else
             print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Microsoft Teams")"
-            if silent_launch_app "/Applications/Microsoft Teams.app"; then
+            if silent_launch_app "$teams_path"; then
                 print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Microsoft Teams → Check for updates")"
                 STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
             else
@@ -1876,9 +1917,9 @@ iu_microsoft_teams() {
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Microsoft Teams")"
     fi
+}
 
     # ── 19. VISUAL STUDIO CODE ────────────────────────────────────
-}
 
 iu_visual_studio_code() {
     print_header "💻 Visual Studio Code"
