@@ -234,3 +234,52 @@ Zgodnie z bezwzględną zasadą read-only na żywym środowisku:
 - Nie uruchamiano mutujących poleceń instalacyjnych `brew upgrade --cask` na żywo.
 - Nie uruchamiano faktycznych instalacji GUI Track 2 ani zamykania aplikacji GUI.
 - Wszystkie te mechanizmy zostały w pełni przetestowane pod izolowanymi mockami i fiksturami w testach jednostkowych / integracyjnych (`tests/`).
+
+---
+
+## 6. Poprawki v3 (G0–G5)
+
+### 6.1. Tabela statusu zadań
+
+| G | Status | Commit | Test, który padł | Testy po |
+|---|--------|--------|-------------------|----------|
+| G0 | ✅ OK | `ef2ed6f` | `test_tracked_files_have_no_personal_home_paths` | 451 |
+| G1 | ✅ OK | `356ae28` | `test_cask_guard_facts_pkg_cask_uses_delete_hint`, `test_orphan_detection_ignores_delete_hints` | 453 |
+| G2 | ✅ OK | `512cc52` | `test_track2_verify_python_error_is_soft_fail_not_empty_pending` | 454 |
+| G3 | ✅ OK | `fa7dc18` | `test_check_vendor_feeds_reads_status_from_updater_log_old`, `test_omaha_read_increment_rotation_in_progress` | 456 |
+| G4 | ✅ OK | `fab2b20` | `test_i18n_lang_files_key_parity` | 456 |
+| G5 | ✅ OK | `HEAD` | Pełny zestaw testów, shellcheck, scan_secrets, check_vendor_feeds | 456 |
+
+### 6.2. Podsumowanie realizacji zadań v3
+
+- **G0 (BLOKADA — Prywatność):**
+  - Zredagowano raporty `IMPLEMENTATION_REPORT_opus55_v1.md` oraz `FIX_REPORT_opus55_v2.md` — usunięto surowe diffy inwentarza `APPLICATIONS.md` i zastąpiono je listami kryteriów akceptacji. Pełne diffy zachowano wyłącznie w katalogu `scratch/` (ignorowanym przez git).
+  - Przepisano lokalną historię gałęzi `feat/vendor-truth-v1.5` (`main..HEAD`) za pomocą `git filter-branch` (kopia zapasowa w `backup/vendor-truth-v1.5-pre-redact`), eliminując z historii commitów wszelkie prywatne ścieżki i fragmenty inwentarza.
+  - Zsanityzowano ścieżki domowe (`/Users/<nazwa>/` -> `~/`) w plikach dokumentacji: `docs/reviews/GEMINI_TASK_2026-09-02.md`, `docs/reviews/ULTRA_REVIEW_2026-06-20.md`, `docs/reviews/ULTRA_REVIEW_2026-08-05.md`, `docs/superpowers/plans/2026-09-03-v144-observability-claude-hang.md` oraz `docs/agents/critical_rules.md`.
+  - Wdrożono test-strażnik `test_tracked_files_have_no_personal_home_paths` w `tests/test_safety_static.py` z allowlistą nazw syntetycznych (`USER`, `test`, `testuser`, `fake`, `runner_user`, `Shared`).
+  - Dodano regułę ochrony prywatności do `docs/agents/critical_rules.md` oraz `docs/agents/handoff.md`.
+
+- **G1 (Cele `.app` dla casków `pkg`):**
+  - Dodano funkcję `pkg_app_hints(cask)` w `lib/python/brew_casks.py` parsującą wpisy `uninstall[].delete` pasujące do `^/Applications/[^/]+\.app$`.
+  - W `cask_guard_facts` trzecie pole pobiera `app_targets(cask)` lub – gdy puste – `pkg_app_hints(cask)` (np. `zoom.us.app` dla casku `zoom`).
+  - `app_targets` oraz `find_orphan_casks` pozostały nienaruszone, eliminując ryzyko fałszywych sierot.
+
+- **G2 (App Store — obsługa każdego błędu weryfikacji iOS):**
+  - W `update_appstore.sh` zmieniono warunek po pętli weryfikacji Track 2 z `elif [ "$_verify_rc" -eq 2 ]` na `elif [ "$_verify_rc" -ne 0 ]`.
+  - Każdy błąd lookupu (w tym błąd Pythona rc 1) raportuje `L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED` i exit code 10, zapobiegając błędnemu raportowaniu „still pending” z pustą listą nazw.
+
+- **G3 (Omaha — rotacja `updater.log`):**
+  - W `scripts/check_vendor_feeds.sh` funkcja `get_omaha_status` odczytuje `updater.log.old`, a następnie `updater.log` (kolejność gwarantuje zachowanie ostatniego statusu).
+  - W `lib/internet_handlers.sh` funkcja `omaha_read_increment` obsługuje rotację w trakcie oczekiwania (`cur_size < init_size`), odczytując tail z `<log>.old` i zawartość nowego `<log>`.
+  - Na żywym systemie macOS statusy Chrome, Gemini, Google Drive i Comet raportują poprawnie `noupdate` zamiast `-`.
+
+- **G4 (Lokalizacja diagnostyki npm CLI):**
+  - Dodano klucze `L_NPM_DIAGNOSTICS_PATH_FMT` oraz `L_NPM_LAST_DIAGNOSTICS` do wszystkich 7 plików językowych (`i18n/lang_*.sh`).
+  - Podmieniono sztywne napisy w `update_npm_cli.sh` na wywołania `printf` ze zlokalizowanymi kluczami.
+
+- **G5 (Weryfikacja końcowa):**
+  - `bash run_tests.sh`: 456 testów zakończonych sukcesem (wzrost z 450), kompilacja modułów i heredoców bez błędów, skanowanie secretów bez uwag.
+  - `shellcheck --severity=warning`: 0 ostrzeżeń we wszystkich skryptach `.sh`.
+  - Brak jakichkolwiek dodanych prywatnych ścieżek użytkownika w historii gałęzi (`git log -p main..HEAD | grep '^+[^+]' | grep -c '/Users/<user>'` = 0).
+  - Live check `bash scripts/check_vendor_feeds.sh`: wszystkie updatere Omaha posiadają zweryfikowany status `noupdate`.
+
