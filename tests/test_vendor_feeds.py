@@ -225,6 +225,33 @@ class TestVendorFeeds(unittest.TestCase):
         self.assertEqual(lines[0], "newer")
         self.assertEqual(lines[1], "older")
 
+    @unittest.skipUnless(shutil.which("bash"), "bash required")
+    def test_vendor_feed_row_exact_match_with_metacharacters(self):
+        cmd = f"""
+        . "{REPO_ROOT}/lib/vendor_feeds.sh"
+        tmp=$(mktemp)
+        cat << "EOF" > "$tmp"
+# Comment line
+Foo+ (Beta)|json|https://example.com/foo|claude|-|example.com
+OtherApp|sparkle|https://example.com/sparkle|-|dmg|example.com
+EOF
+        vendor_feed_config_path() {{ echo "$tmp"; }}
+
+        row_found=$(vendor_feed_row "Foo+ (Beta)")
+        rc_found=$?
+        row_miss=$(vendor_feed_row "Foo" 2>/dev/null || true)
+        rm -f "$tmp"
+        echo "FOUND_RC=$rc_found"
+        echo "FOUND_ROW=$row_found"
+        echo "MISS_ROW=$row_miss"
+        """
+        proc = subprocess.run(["bash", "-c", cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.assertEqual(proc.returncode, 0, f"Stderr: {proc.stderr}")
+        self.assertIn("FOUND_RC=0", proc.stdout)
+        self.assertIn("FOUND_ROW=Foo+ (Beta)|json|https://example.com/foo|claude|-|example.com", proc.stdout)
+        lines = [line.strip() for line in proc.stdout.splitlines()]
+        self.assertIn("MISS_ROW=", lines)
+
 
 if __name__ == "__main__":
     unittest.main()
