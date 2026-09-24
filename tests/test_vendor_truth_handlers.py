@@ -450,6 +450,142 @@ class TestVendorTruthHandlers(unittest.TestCase):
         self.assertIn("2.1.0", proc.stdout)
         self.assertNotIn("90", proc.stdout)
 
+    def test_toolkit_launched_tracking_and_graceful_quit(self):
+        bin_dir = os.path.join(self.tmpdir, "bin")
+        os.makedirs(bin_dir, exist_ok=True)
+        state_dir = os.path.join(self.tmpdir, "running_state")
+        os.makedirs(state_dir, exist_ok=True)
+        session_dir = os.path.join(self.tmpdir, "session")
+        os.makedirs(session_dir, exist_ok=True)
+        quit_log = os.path.join(self.tmpdir, "quit.log")
+        open_log = os.path.join(self.tmpdir, "open.log")
+
+        # Stub osascript
+        osascript_stub = os.path.join(bin_dir, "osascript")
+        with open(osascript_stub, "w", encoding="utf-8") as f:
+            f.write(f"""#!/usr/bin/env bash
+cmd="$*"
+if echo "$cmd" | grep -q "is running"; then
+    bid=$(echo "$cmd" | sed -n 's/.*application id \\"\\([^\\"]*\\)\\".*/\\1/p')
+    if [ -f "{state_dir}/$bid.running" ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
+    exit 0
+fi
+if echo "$cmd" | grep -q "to quit"; then
+    bid=$(echo "$cmd" | sed -n 's/.*tell application id \\"\\([^\\"]*\\)\\".*/\\1/p')
+    echo "quit $bid" >> "{quit_log}"
+    if [ -f "{state_dir}/$bid.fail_quit" ]; then
+        exit 0
+    fi
+    rm -f "{state_dir}/$bid.running"
+    exit 0
+fi
+exit 0
+""")
+        os.chmod(osascript_stub, 0o755)
+
+        # Stub open
+        open_stub = os.path.join(bin_dir, "open")
+        with open(open_stub, "w", encoding="utf-8") as f:
+            f.write(f"""#!/usr/bin/env bash
+echo "$@" >> "{open_log}"
+for arg in "$@"; do
+    case "$arg" in
+        AppA|*AppA.app) touch "{state_dir}/com.test.appA.running" ;;
+        AppB|*AppB.app) touch "{state_dir}/com.test.appB.running" ;;
+        AppC|*AppC.app) touch "{state_dir}/com.test.appC.running" ;;
+    esac
+done
+exit 0
+""")
+        os.chmod(open_stub, 0o755)
+
+        # Pre-seed state:
+        # App A is NOT running
+        # App B IS running
+        Path(os.path.join(state_dir, "com.test.appB.running")).touch()
+        # App C is NOT running, but will fail to quit once launched
+        Path(os.path.join(state_dir, "com.test.appC.fail_quit")).touch()
+
+        script = f"""
+        export PATH="{bin_dir}:$PATH"
+        export MAC_UPDATE_SESSION_DIR="{session_dir}"
+
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/ui.sh" 2>/dev/null || true
+        . "{REPO_ROOT}/lib/proc.sh"
+        . "{REPO_ROOT}/lib/vendor_direct.sh"
+
+        print_info() {{ :; }}
+        print_warn() {{ echo "WARN: $*"; }}
+        print_error() {{ echo "ERROR: $*"; }}
+        print_ok() {{ :; }}
+        sleep() {{ :; }}
+
+        internet_app_path() {{
+            echo "/Applications/$1.app"
+        }}
+        internet_app_bundle_id() {{
+            case "$1" in
+                *AppA*) echo "com.test.appA" ;;
+                *AppB*) echo "com.test.appB" ;;
+                *AppC*) echo "com.test.appC" ;;
+                *) echo "" ;;
+            esac
+        }}
+
+        INTERNET_SOFT_FAIL=0
+
+        # Load silent_launch_app and quit_toolkit_launched_apps from update_internet_apps.sh
+        eval "$(sed -n '/^silent_launch_app()/,/^}}/p' "{REPO_ROOT}/update_internet_apps.sh")"
+        eval "$(sed -n '/^quit_toolkit_launched_apps()/,/^}}/p' "{REPO_ROOT}/update_internet_apps.sh")"
+
+        # App A was NOT running prior to launch -> should record into toolkit_launched.txt
+        silent_launch_app "AppA"
+
+        # Duplicate launch of App A -> should not duplicate in toolkit_launched.txt
+        silent_launch_app "AppA" "com.test.appA"
+
+        # App B WAS running prior to launch -> should NOT record into toolkit_launched.txt
+        silent_launch_app "AppB" "com.test.appB"
+
+        # App C was NOT running prior to launch -> should record into toolkit_launched.txt, will fail quit
+        silent_launch_app "/Applications/AppC.app" "com.test.appC"
+
+        # Settle cleanup
+        quit_toolkit_launched_apps
+
+        echo "SOFT_FAIL=$INTERNET_SOFT_FAIL"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, f"Script failed with stderr:\n{proc.stderr}\nstdout:\n{proc.stdout}")
+
+        # Check toolkit_launched.txt
+        launched_file = os.path.join(session_dir, "toolkit_launched.txt")
+        self.assertTrue(os.path.exists(launched_file), "toolkit_launched.txt was not created")
+        launched_content = Path(launched_file).read_text(encoding="utf-8").splitlines()
+        self.assertIn("com.test.appA", launched_content)
+        self.assertNotIn("com.test.appB", launched_content)
+        self.assertIn("com.test.appC", launched_content)
+        self.assertEqual(launched_content.count("com.test.appA"), 1, "App A should be recorded exactly once")
+
+        # Check quit log
+        self.assertTrue(os.path.exists(quit_log), "quit.log was not created")
+        quit_content = Path(quit_log).read_text(encoding="utf-8")
+        self.assertIn("quit com.test.appA", quit_content)
+        self.assertNotIn("quit com.test.appB", quit_content)
+        self.assertIn("quit com.test.appC", quit_content)
+
+        # App A should no longer be running
+        self.assertFalse(os.path.exists(os.path.join(state_dir, "com.test.appA.running")), "App A should have exited")
+
+        # App C failed to exit within 60s -> warning with L_INTERNET_APP_STILL_RUNNING_FMT
+        self.assertIn("com.test.appC was launched for update and did not exit within 60s", proc.stdout)
+        self.assertIn("SOFT_FAIL=1", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

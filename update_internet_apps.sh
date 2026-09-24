@@ -337,25 +337,81 @@ copy_verified_app() {
 # Accepts either an app name (-a) or a path; falls back if -F is rejected.
 silent_launch_app() {
     local target="$1"
+    local explicit_bid="${2:-}"
     if [ -z "$target" ]; then
         return 1
     fi
+
+    local bid="$explicit_bid"
+    if [ -z "$bid" ]; then
+        local app_path=""
+        case "$target" in
+            /*)
+                app_path="$target"
+                ;;
+            *)
+                if command -v internet_app_path >/dev/null 2>&1; then
+                    app_path="$(internet_app_path "$target" 2>/dev/null || true)"
+                fi
+                ;;
+        esac
+        if [ -n "$app_path" ] && command -v internet_app_bundle_id >/dev/null 2>&1; then
+            bid="$(internet_app_bundle_id "$app_path" 2>/dev/null || true)"
+        fi
+    fi
+
+    local was_running=0
+    if [ -n "$bid" ] && command -v internet_app_is_running >/dev/null 2>&1; then
+        if internet_app_is_running "$bid"; then
+            was_running=1
+        fi
+    fi
+
+    local open_rc=0
     # Path vs name detection: a leading "/" means full path
     case "$target" in
         /*)
             open -gjF "$target" 2>/dev/null \
                 || open -gj "$target" 2>/dev/null \
                 || open "$target" 2>/dev/null \
-                || return 1
+                || open_rc=1
             ;;
         *)
             open -gjF -a "$target" 2>/dev/null \
                 || open -gj -a "$target" 2>/dev/null \
                 || open -a "$target" 2>/dev/null \
-                || return 1
+                || open_rc=1
             ;;
     esac
+
+    if [ "$open_rc" -ne 0 ]; then
+        return 1
+    fi
+
+    if [ "$was_running" -eq 0 ] && [ -n "$bid" ] && [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        local track_file="$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt"
+        mkdir -p "$MAC_UPDATE_SESSION_DIR" 2>/dev/null || true
+        if [ ! -f "$track_file" ] || ! grep -Fqx "$bid" "$track_file" 2>/dev/null; then
+            printf '%s\n' "$bid" >> "$track_file"
+        fi
+    fi
+
     return 0
+}
+
+quit_toolkit_launched_apps() {
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt" ]; then
+        local _t_bid
+        while IFS= read -r _t_bid || [ -n "$_t_bid" ]; do
+            case "$_t_bid" in '#'*|'') continue ;; esac
+            _t_bid="$(echo "$_t_bid" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            [ -n "$_t_bid" ] || continue
+            if ! internet_app_quit_gracefully "$_t_bid"; then
+                print_warn "$(printf "$L_INTERNET_APP_STILL_RUNNING_FMT" "$_t_bid")"
+                INTERNET_SOFT_FAIL="1"
+            fi
+        done < "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt"
+    fi
 }
 
 capture_app_path() {
@@ -574,6 +630,7 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     elif [ "$INTERNET_SETTLE" -gt 0 ]; then
         sleep "$INTERNET_SETTLE"
     fi
+    quit_toolkit_launched_apps
     capture_internet_app_versions "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
     print_ok "$(internet_msg "$L_INTERNET_SNAPSHOTS_SAVED" "$MAC_UPDATE_SESSION_DIR")"
 
