@@ -529,6 +529,38 @@ def collect_run_items(
                 "details": f"{pbc_val} updates pending",
             })
 
+    # Homebrew orphan casks
+    orphan_file = sdir / "brew_orphan_casks.txt"
+    if orphan_file.is_file():
+        for line in orphan_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            tok = line.strip()
+            if tok and not tok.startswith("#"):
+                items.append({
+                    "name": tok,
+                    "id": tok,
+                    "category": "brew_cask",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": f"app removed manually; remove the Homebrew record: brew uninstall --cask --force {tok}",
+                })
+
+    # Homebrew casks needing interactive run
+    sudo_file = sdir / "brew_needs_interactive.txt"
+    if sudo_file.is_file():
+        for line in sudo_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            tok = line.strip()
+            if tok and not tok.startswith("#"):
+                items.append({
+                    "name": tok,
+                    "id": tok,
+                    "category": "brew_cask",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": "needs an interactive run (administrator rights)",
+                })
+
     # App Store pending queue
     pas_file = sdir / "pending_appstore"
     if pas_file.is_file():

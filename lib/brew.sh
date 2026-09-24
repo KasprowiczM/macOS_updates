@@ -12,6 +12,7 @@
 #   helpers below so a single upstream `brew` bug can never turn a
 #   healthy machine into a blocking pipeline failure again.
 # ============================================================
+_BREW_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # brew_cask_versions
 #   Prints one "<cask-token> <version>" line per installed cask.
@@ -85,19 +86,124 @@ brew_outdated_formulae() {
     return "$rc"
 }
 
-# brew_outdated_casks
-#   Same, for `brew outdated --cask --greedy-auto-updates`.
+# brew_outdated_casks [greedy_tokens...]
+#   Queries outdated casks. Runs `brew outdated --cask` plus, when greedy tokens
+#   are provided, `brew outdated --cask --greedy-auto-updates <tokens>`.
+#   Returns unique union by the first field (cask token).
 brew_outdated_casks() {
-    local err_file rc out
+    local err_file rc out out_greedy
     command -v brew >/dev/null 2>&1 || return 1
     err_file="$(mktemp "${TMPDIR:-/tmp}/mac_update_brew_outdated_cask.XXXXXX")" || return 1
-    out="$(brew outdated --cask --greedy-auto-updates 2>"$err_file")"
+    out="$(brew outdated --cask 2>"$err_file")"
     rc=$?
     if [ "$rc" -ne 0 ]; then
         cat "$err_file" >&2
+        rm -f "$err_file" 2>/dev/null || true
+        return "$rc"
+    fi
+    if [ $# -gt 0 ]; then
+        out_greedy="$(brew outdated --cask --greedy-auto-updates "$@" 2>"$err_file")"
+        rc=$?
+        if [ "$rc" -ne 0 ]; then
+            cat "$err_file" >&2
+            rm -f "$err_file" 2>/dev/null || true
+            return "$rc"
+        fi
+    else
+        out_greedy=""
     fi
     rm -f "$err_file" 2>/dev/null || true
-    printf '%s' "$out" | grep -v '^==>' | grep -v '^✔' | grep -v '^[[:space:]]*$' || true
+    printf '%s\n%s\n' "$out" "$out_greedy" | grep -v '^==>' | grep -v '^✔' | grep -v '^[[:space:]]*$' | awk '!seen[$1]++' || true
+    return 0
+}
+
+# brew_orphan_casks
+#   Prints tokens of installed casks whose app targets do not exist in
+#   /Applications or $HOME/Applications.
+#   Returns 0 on success, 1 on query failure (never assumes all are orphans).
+brew_orphan_casks() {
+    command -v brew >/dev/null 2>&1 || return 1
+    local installed_casks
+    installed_casks="$(brew list --cask 2>/dev/null)" || return 1
+    [ -n "$installed_casks" ] || return 0
+
+    local err_file
+    err_file="$(mktemp "${TMPDIR:-/tmp}/mac_update_brew_orphan_err.XXXXXX")" || return 1
+
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$err_file" "$HOME" $installed_casks <<'PYEOF_ORPHANS'
+import json, os, subprocess, sys
+from brew_casks import find_orphan_casks
+
+err_file = sys.argv[1]
+home = sys.argv[2]
+tokens = sys.argv[3:]
+if not tokens:
+    sys.exit(0)
+
+try:
+    with open(err_file, "w", encoding="utf-8") as ef:
+        res = subprocess.run(
+            ["brew", "info", "--json=v2", "--cask"] + tokens,
+            stdout=subprocess.PIPE,
+            stderr=ef,
+            text=True,
+            check=False,
+        )
+    if res.returncode != 0 or not res.stdout.strip():
+        sys.exit(1)
+    data = json.loads(res.stdout)
+    app_dirs = ["/Applications", os.path.join(home, "Applications")]
+    orphans = find_orphan_casks(data, app_dirs)
+    for o in orphans:
+        print(o)
+except Exception:
+    sys.exit(1)
+PYEOF_ORPHANS
+    local rc=$?
+    rm -f "$err_file" 2>/dev/null || true
+    return "$rc"
+}
+
+# brew_casks_requiring_sudo <tokens...>
+#   Prints tokens among the given cask tokens that require administrator / sudo
+#   privileges for installation or uninstallation.
+brew_casks_requiring_sudo() {
+    [ $# -gt 0 ] || return 0
+    command -v brew >/dev/null 2>&1 || return 1
+    local err_file
+    err_file="$(mktemp "${TMPDIR:-/tmp}/mac_update_brew_sudo_err.XXXXXX")" || return 1
+
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$err_file" "$@" <<'PYEOF_SUDO'
+import json, subprocess, sys
+from brew_casks import cask_requires_sudo
+
+err_file = sys.argv[1]
+tokens = sys.argv[2:]
+if not tokens:
+    sys.exit(0)
+
+try:
+    with open(err_file, "w", encoding="utf-8") as ef:
+        res = subprocess.run(
+            ["brew", "info", "--json=v2", "--cask"] + tokens,
+            stdout=subprocess.PIPE,
+            stderr=ef,
+            text=True,
+            check=False,
+        )
+    if res.returncode != 0 or not res.stdout.strip():
+        sys.exit(1)
+    data = json.loads(res.stdout)
+    for c in data.get("casks", []):
+        if cask_requires_sudo(c):
+            tok = c.get("token")
+            if tok:
+                print(tok)
+except Exception:
+    sys.exit(1)
+PYEOF_SUDO
+    local rc=$?
+    rm -f "$err_file" 2>/dev/null || true
     return "$rc"
 }
 
