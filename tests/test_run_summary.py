@@ -250,6 +250,51 @@ class RunItemsAndTerminalSummaryTests(unittest.TestCase):
             self.assertEqual(len(pending_items), 1)
             self.assertEqual(pending_items[0]["name"], "macOS 27.1 Update")
 
+    def test_between_step_changes_are_attributed(self) -> None:
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "installed_apps_scan.txt").write_text(
+                "Claude|2.2553.13\nGoogle Chrome|130.0.6723.69\n", encoding="utf-8"
+            )
+            (tmp_path / "installed_apps_after.txt").write_text(
+                "Claude|2.7032.0\nGoogle Chrome|131.0.6778.86\n", encoding="utf-8"
+            )
+            (tmp_path / "appstore_ios_before.txt").write_text(
+                "Picsart|30.7.2\n", encoding="utf-8"
+            )
+            (tmp_path / "appstore_ios_after.txt").write_text(
+                "Picsart|30.8.2\n", encoding="utf-8"
+            )
+            (tmp_path / "internet_before.txt").write_text(
+                "Google Chrome|130.0.6723.69\n", encoding="utf-8"
+            )
+            (tmp_path / "internet_after.txt").write_text(
+                "Google Chrome|131.0.6778.86\n", encoding="utf-8"
+            )
+
+            items = collect_run_items(tmp_path)
+
+            bg_items = [it for it in items if it.get("category") == "background"]
+            self.assertEqual(len(bg_items), 2)
+            bg_names = {it["name"]: it for it in bg_items}
+            self.assertIn("Claude", bg_names)
+            self.assertEqual(bg_names["Claude"]["old_version"], "2.2553.13")
+            self.assertEqual(bg_names["Claude"]["new_version"], "2.7032.0")
+            self.assertEqual(bg_names["Claude"]["status"], "updated")
+            self.assertEqual(bg_names["Claude"]["details"], "updated outside toolkit steps (vendor updater / App Store)")
+
+            self.assertIn("Picsart", bg_names)
+            self.assertEqual(bg_names["Picsart"]["old_version"], "30.7.2")
+            self.assertEqual(bg_names["Picsart"]["new_version"], "30.8.2")
+            self.assertEqual(bg_names["Picsart"]["status"], "updated")
+            self.assertEqual(bg_names["Picsart"]["details"], "updated outside toolkit steps (vendor updater / App Store)")
+
+            # Google Chrome was already updated in step 5 internet, must NOT be duplicated in background
+            chrome_items = [it for it in items if "Chrome" in it["name"]]
+            self.assertEqual(len(chrome_items), 1)
+            self.assertEqual(chrome_items[0]["category"], "internet")
+
 
 if __name__ == "__main__":
     unittest.main()
