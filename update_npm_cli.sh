@@ -971,7 +971,7 @@ install_latest_npm_packages() {
     if [ "$failures" -ne 0 ]; then
         print_warn "$(printf "$L_NPM_FAILURES_SUMMARY" "$failures")"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
-            print_info "Diagnostyka: $MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"
+            print_info "$(printf "$L_NPM_DIAGNOSTICS_PATH_FMT" "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log")"
         fi
         SOFT_FAIL=1
         return 1
@@ -1005,7 +1005,7 @@ update_native_clis() {
     if [ "$failures" -ne 0 ]; then
         print_warn "$(printf "$L_NPM_FAILURES_SUMMARY" "$failures")"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
-            print_info "Diagnostyka: $MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"
+            print_info "$(printf "$L_NPM_DIAGNOSTICS_PATH_FMT" "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log")"
         fi
         SOFT_FAIL=1
         return 1
@@ -1116,7 +1116,7 @@ fi
 NPM_CLI_EXIT="$(mac_update_severity_exit_code)"
 if [ "$NPM_CLI_EXIT" -ne 0 ]; then
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -s "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
-        print_warn "Ostatnia diagnostyka npm/self-update (sanityzowana):"
+        print_warn "$L_NPM_LAST_DIAGNOSTICS"
         tail -n 20 "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" | sed 's/^/    /'
     fi
     print_header "$L_NPM_HEADER_FINISHED_WITH_ERRORS"
