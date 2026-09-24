@@ -29,7 +29,7 @@ EOF
 
     local py_res
     py_res=$(curl -fsSL --max-time 15 --retry 2 "$url" 2>/dev/null | head -c 5242880 | \
-        PYTHONPATH="$_VENDOR_FEEDS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$kind" "$arg" "$(sw_vers -productVersion 2>/dev/null)" <<'PYEOF_VFL'
+        PYTHONPATH="$_VENDOR_FEEDS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
 from vendor_feeds import evaluate_feed
 
@@ -47,7 +47,7 @@ u = res.get("url") or "-"
 ck = res.get("checksum_kind") or "-"
 cs = res.get("checksum") or "-"
 print(f"{v}|{u}|{ck}|{cs}")
-PYEOF_VFL
+' "$kind" "$arg" "$(sw_vers -productVersion 2>/dev/null)"
     )
     local rc=$?
     [ $rc -eq 0 ] && [ -n "$py_res" ] || return 1

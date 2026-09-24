@@ -8,6 +8,7 @@
 # See: BUG-1 fix (2026-08-05).
 
 INTERNET_LAST_STATUS=""
+_INTERNET_HANDLERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # INTERNET_LAST_VERIFIED — 1 only when the handler actually compared a remote
 # feed version against the installed one and wrote a version-bearing status
@@ -226,31 +227,40 @@ internet_handler_sparkle_check() {
     fi
 
     local remote_ver
-    remote_ver="$(echo "$xml" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
-    if [ -z "$remote_ver" ]; then
-        remote_ver="$(echo "$xml" | sed -n 's/.*<sparkle:shortVersionString>\([^<]*\)<\/sparkle:shortVersionString>.*/\1/p' | head -1 || true)"
-    fi
-    if [ -z "$remote_ver" ]; then
-        remote_ver="$(echo "$xml" | grep -o 'sparkle:version="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
-    fi
-    if [ -z "$remote_ver" ]; then
-        remote_ver="$(echo "$xml" | sed -n 's/.*<sparkle:version>\([^<]*\)<\/sparkle:version>.*/\1/p' | head -1 || true)"
-    fi
+    remote_ver=$(echo "$xml" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import evaluate_feed
+
+body = sys.stdin.read()
+os_ver = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
+res = evaluate_feed("sparkle", body, "-", os_version=os_ver)
+if res and res.get("version"):
+    print(res["version"])
+' "-" "$(sw_vers -productVersion 2>/dev/null)"
+    )
 
     local local_ver
     local_ver="$(app_version "$app_path")"
 
     if [ -z "$remote_ver" ]; then
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        INTERNET_LAST_VERIFIED=0
     else
         local rel
-        rel="$(internet_version_relation "$remote_ver" "$local_ver")"
+        rel="$(version_cmp "$remote_ver" "$local_ver")"
         if [ "$rel" = "newer" ]; then
             INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
-        else
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "equal" ]; then
             INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "older" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_FEED_STALE_FMT" "$remote_ver" "$local_ver")"
+            INTERNET_LAST_VERIFIED=0
+        else
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
         fi
-        INTERNET_LAST_VERIFIED=1
     fi
 
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
@@ -346,15 +356,23 @@ internet_handler_vendor_latest() {
             print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
         fi
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        INTERNET_LAST_VERIFIED=0
     else
         local rel
-        rel="$(internet_version_relation "$remote_ver" "$local_ver")"
+        rel="$(version_cmp "$remote_ver" "$local_ver")"
         if [ "$rel" = "newer" ]; then
             INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
-        else
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "equal" ]; then
             INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "older" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_FEED_STALE_FMT" "$remote_ver" "$local_ver")"
+            INTERNET_LAST_VERIFIED=0
+        else
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
         fi
-        INTERNET_LAST_VERIFIED=1
     fi
 
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"

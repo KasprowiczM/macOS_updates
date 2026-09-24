@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """lib/python/vendor_feeds.py — vendor feeds parsing, evaluation and version comparison (v1.5.0)."""
 
+from __future__ import annotations
+
 import json
 import re
 import xml.etree.ElementTree as ET

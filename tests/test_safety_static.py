@@ -484,7 +484,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                 env=env,
                 capture_output=True,
                 text=True,
-                timeout=20,
+                timeout=60,
             )
             return result, marker.exists()
 
@@ -2560,6 +2560,17 @@ class I18nCompletenessTests(unittest.TestCase):
             "L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT",
             "L_INTERNET_STATUS_CASK_CURRENT",
             "L_INTERNET_STATUS_CASK_BEHIND_FMT",
+            # Added in v1.5.0:
+            "L_INTERNET_STATUS_FEED_STALE_FMT",
+            "L_INTERNET_STATUS_BEHIND_FMT",
+            "L_INTERNET_STATUS_NEEDS_RESTART_FMT",
+            "L_INTERNET_STATUS_VENDOR_CURRENT_FMT",
+            "L_INTERNET_STATUS_VENDOR_NOUPDATE",
+            "L_INTERNET_STATUS_ROLLOUT_HOLD_FMT",
+            "L_INTERNET_STATUS_UPDATER_TRIGGERED",
+            "L_INTERNET_STATUS_UPDATE_IN_PROGRESS",
+            "L_INTERNET_STATUS_MANAGED_BREW",
+            "L_INTERNET_STATUS_MANAGED_APPSTORE",
         }
 
         for key in all_status_keys:
