@@ -238,6 +238,12 @@ not success.
 - **Feed stale guard:** When `remote < local`, the condition is treated as `feed_stale`, preserving the local installed version rather than regressing or downgrading.
 - **Check before action:** Do not launch applications, virtual machines, or vendor updaters if the vendor feed reports the app is already up to date.
 - **Never terminate user-running applications:** Only quit what the toolkit itself launched, and always perform soft graceful termination (`quit`), never forced `kill`.
+  An app that is already open when `update_all.sh` reaches it is in use: it is never quit, relaunched or
+  replaced. The handler reports `NEEDS_RESTART` ("quit the app so its updater can install") and moves on.
+  `silent_launch_app` records only apps that were **not** running before it opened them
+  (`$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt`); `quit_toolkit_launched_apps` quits exactly those after
+  the settle window. `vendor_direct_install` refuses to swap a running app, and Docker Desktop is stopped
+  only when the toolkit started it.
 - **Verified downloads only:** Direct downloads must use `https://`, validate against exact allowlisted hosts (`config/vendor_feeds.txt`), verify checksums (SHA256/SHA512) when published by the vendor, and install via `copy_verified_app` (spctl Gatekeeper check, CFBundleIdentifier and Apple Team ID match, staged atomic swap, and automatic rollback on failure).
 
 ## 16. Only Installed Applications & CLI Toolchains (v1.5.0)

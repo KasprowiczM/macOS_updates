@@ -54,6 +54,15 @@ Vendor truth release: version comparison against vendor release feeds, only inst
 - **F10 — Run summary attribution & deduplication:** Attributed iPad updates to `appstore` category and deduplicated background entries for casks with alternate `.app` bundle names.
 - **F11 — Documentation, i18n keys, and coverage labels:** Added localized keys across 7 languages, fixed `report_update_coverage.sh` vendor feed labels and exclusions classification, updated step 6 descriptions in all 7 READMEs, and synced environment variable defaults in `docs/agents/scripts.md`.
 - **F12 — Vendor feed row exact field matching:** Replaced regex-based `grep -E` with exact field matching in `awk` to safely handle application names containing regex metacharacters.
+- **G0 — Privacy guard:** review reports no longer carry inventory data; `test_tracked_files_have_no_personal_home_paths` blocks real home paths in tracked files.
+- **G1–G4 — Small fixes:** `.app` hints for `pkg` casks (summary de-duplication), any iPad lookup failure is a soft warning, Omaha status also read from `updater.log.old`, npm diagnostics localized.
+- **H1 / I1 — Homebrew step no longer aborts:** `brew outdated <names>` exits 1 when a named cask is outdated; only an `Error:` line on stderr counts as a failure (progress chatter is ignored).
+- **H2 — Apps you have open are never closed:** only apps the toolkit launched itself are recorded and quit gracefully after the settle window; running apps get `NEEDS_RESTART`.
+- **H3 — Check before launch:** OpenCode Desktop uses the vendor feed and Teams is not launched when already current.
+- **H4 — Google Omaha:** one shared wait window for Chrome/Gemini/Drive, GoogleUpdater before the legacy agent, Chrome pre-check via VersionHistory, recent updater check (≤ `MAC_UPDATE_OMAHA_MAX_AGE_H`, default 6 h) accepted as proof.
+- **H5 / I2 — Direct-first apps:** `config/vendor_direct_first.txt` (Cursor) skips the launch cycle and installs the verified vendor artifact when the app is not running.
+- **H6 — App Store retry:** pending IDs are listed, retried in the user session and reported for manual update if still pending.
+- **H7 — Test stability:** MAU process tests stub `pgrep`/`ps`.
 
 ## [1.4.6] — 2026-09-16
 
