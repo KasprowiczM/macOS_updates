@@ -44,15 +44,23 @@ log_paths = sys.argv[2:]
 status = None
 for p_str in log_paths:
     p = Path(p_str)
-    if p.is_file():
+    p_old = Path(f"{p_str}.old")
+    txt_parts = []
+    if p_old.is_file():
         try:
-            txt = p.read_text(encoding="utf-8", errors="replace")
-            st = omaha_last_status(txt, appid)
-            if st:
-                status = st
-                break
+            txt_parts.append(p_old.read_text(encoding="utf-8", errors="replace"))
         except Exception:
             pass
+    if p.is_file():
+        try:
+            txt_parts.append(p.read_text(encoding="utf-8", errors="replace"))
+        except Exception:
+            pass
+    if txt_parts:
+        st = omaha_last_status("".join(txt_parts), appid)
+        if st:
+            status = st
+            break
 
 print(status or "-")
 PYEOF_OMAHA
