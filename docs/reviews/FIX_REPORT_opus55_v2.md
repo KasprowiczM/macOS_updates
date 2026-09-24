@@ -283,3 +283,64 @@ Zgodnie z bezwzględną zasadą read-only na żywym środowisku:
   - Brak jakichkolwiek dodanych prywatnych ścieżek użytkownika w historii gałęzi (`git log -p main..HEAD | grep '^+[^+]' | grep -c '/Users/<user>'` = 0).
   - Live check `bash scripts/check_vendor_feeds.sh`: wszystkie updatere Omaha posiadają zweryfikowany status `noupdate`.
 
+---
+
+## 7. Poprawki v4 (H1–H7)
+
+### 7.1. Tabela statusu zadań
+
+| H | Status | Commit | Test, który padł (TDD RED) | Testy po |
+|---|--------|--------|----------------------------|----------|
+| H1 | ✅ OK | `38907a1` | `test_brew_outdated_casks_returns_zero_on_exit_1_empty_stderr`, `test_update_brew_upgrades_greedy_cask_when_outdated_exit_1` | 459 |
+| H2 | ✅ OK | `7692aa5` | `test_silent_launch_app_tracks_and_quits_newly_launched_apps`, `test_silent_launch_app_does_not_track_already_running_apps`, `test_toolkit_launched_app_fails_to_quit_warns_and_soft_fails` | 462 |
+| H3 | ✅ OK | `3abb4e3` | `test_opencode_vendor_feed_current_does_not_launch`, `test_teams_cask_oracle_current_does_not_launch`, `test_teams_cask_oracle_behind_launches_app`, `test_teams_mau_verified_does_not_launch` | 466 |
+| H4 | ✅ OK | `476d87d` | `test_google_omaha_shared_deadline`, `test_google_updater_wake_all_priority_over_legacy_agent`, `test_chrome_versionhistory_precheck_skips_updater`, `test_omaha_recent_proof_recent_noupdate`, `test_omaha_recent_proof_stale_noupdate_is_unverified` | 471 |
+| H5 | ✅ OK | `a8f6856` | `test_cursor_vendor_direct_first_skips_launch`, `test_cursor_vendor_direct_first_running_app_returns_needs_restart` | 473 |
+| H6 | ✅ OK | `5b39f17` | `test_appstore_user_session_retry_diagnostics_and_soft_fail` | 474 |
+| H7 | ✅ OK | `b73400e` | `test_mau_active_processes_when_none_running`, `test_mau_install_success_requires_version_change_or_clean_listing` (5× z rzędu weryfikacja) | 474 |
+
+### 7.2. Podsumowanie realizacji zadań v4
+
+- **H1 (Homebrew: „outdated” to nie błąd):**
+  - `lib/brew.sh`: `brew_outdated_casks` oraz `brew_outdated_formulae` traktują kod wyjścia 1 z pustym stderr jako poprawny wynik informujący o dostępnych aktualizacjach (`rc=0`). Błędy (`rc >= 2` lub niepusty stderr) nadal zwracają oryginalny kod błędu.
+  - Zweryfikowano działanie na żywo: `brew_outdated_casks brave-browser capcut` zwraca listę i `rc=0`.
+
+- **H2 (Zamykanie aplikacji uruchomionych przez toolkit):**
+  - Dodano klucz `L_INTERNET_APP_STILL_RUNNING_FMT` do wszystkich 7 wersji językowych (`i18n/lang_*.sh`).
+  - W `lib/internet_apps.sh` funkcja `silent_launch_app` sprawdza `internet_app_is_running` przed wywołaniem `open` i rejestruje bundle ID aplikacji uruchomionych w `$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt`.
+  - W `update_internet_apps.sh` po okresie `settle` następuje zamykanie wyłącznie zarejestrowanych aplikacji za pomocą `internet_app_quit_gracefully`. Aplikacje, które nie zamknęły się w ciągu 60s, zgłaszają ostrzeżenie i soft fail (kod 10).
+
+- **H3 (OpenCode Desktop i Teams: weryfikacja przed uruchomieniem):**
+  - `lib/internet_app_updates.sh`: `iu_opencode_desktop` wywołuje `internet_handler_vendor_truth "OpenCode"`, eliminując niepotrzebne wywołania `open` przy zgodności wersji z feedem vendor truth.
+  - `iu_microsoft_teams` sprawdza wyrocznię Homebrew Cask Oracle oraz stan MAU — jeśli wersja zainstalowana jest równa lub nowsza, aplikacja nie jest uruchamiana.
+
+- **H4 (Google Omaha: współdzielone okno i dowód z ostatniej kontroli):**
+  - Dodano `L_INTERNET_STATUS_OMAHA_RECENT_FMT` we wszystkich 7 językach oraz sklasyfikowano jako `current_vendor` w `lib/internet_status.sh` i `tests/test_safety_static.py`.
+  - Wdrożono wspólny termin (`deadline`) dla kolejnych wywołań w sesji zapisywany w `google_omaha_init.txt`, ograniczając łączny czas oczekiwania dla 3 aplikacji Google do `MAC_UPDATE_OMAHA_WAIT`.
+  - Priorytet wyzwalania: `GoogleUpdater --wake-all` (użytkownika, następnie systemowy) z timeoutem 60 s; legacy agent uruchamiany wyłącznie w przypadku braku obu wersji GoogleUpdater.
+  - Przed wywołaniem updatera Chrome porównuje wersję z publicznym VersionHistory (`version_history_public`).
+  - W `lib/python/vendor_feeds.py` dodano `omaha_recent_status` parsujący znaczniki czasu z logu `updater.log`/`.old` (`[pid:tid:MMDD/HHMMSS.usec:...]`) — aktualny status `noupdate` w oknie `MAC_UPDATE_OMAHA_MAX_AGE_H` (domyślnie 6h) potwierdza aktualność. Udokumentowano zmienną w `docs/agents/scripts.md`.
+
+- **H5 (Cursor: vendor_direct_first dla aplikacji nieaktywnych):**
+  - Utworzono plik konfiguracyjny `config/vendor_direct_first.txt` (startowo: `Cursor`).
+  - W `internet_handler_vendor_truth` (`lib/internet_handlers.sh`), jeśli aplikacja znajduje się na liście, nie jest uruchomiona, posiada artefakt instalacyjny (`ART != "-"`) i włączony direct install (`MAC_UPDATE_VENDOR_DIRECT != 0`), pomijany jest cykl uruchamiania i oczekiwania, przechodząc bezpośrednio do `vendor_direct_install`.
+
+- **H6 (App Store: jawne ID i nazwy przy retry w sesji użytkownika):**
+  - Dodano klucze `L_APPSTORE_RETRY_ITEM_FMT` oraz `L_APPSTORE_STILL_PENDING_MANUAL_FMT` w 7 językach.
+  - W `update_appstore.sh` lista oczekujących uaktualnień po `sudo mas upgrade` jest jawnie formatowana z numerem ID i nazwą.
+  - Każde ponowienie w sesji użytkownika (`mas upgrade <id>`) wypisuje krok, wynik, a pełna diagnostyka trafia do `appstore_diag.txt`.
+  - W przypadku trwałego pozostawania aplikacji na liście oczekujących, podsumowanie wymienia nazwy i sugeruje ręczną aktualizację w App Store (soft fail).
+
+- **H7 (Stabilizacja testów procesów MAU):**
+  - W `tests/test_run_log_regressions_20260910.py` wprowadzono izolację `PATH` z atrapami `pgrep` i `ps` (`stub_clean_processes`), eliminując zależność od procesów systemowych hosta deweloperskiego.
+  - Testy wykonano 5-krotnie z rzędu w pętli bez żadnych błędów.
+
+---
+
+### 7.3. Weryfikacja końcowa v4
+- `bash run_tests.sh`: 474 testy zakończone sukcesem (wzrost z 456), kompilacja modułów i heredoców bez błędów, skanowanie secretów bez uwag.
+- `shellcheck --severity=warning`: 0 ostrzeżeń we wszystkich skryptach powłoki.
+- `env -u PYTHONPATH bash -c 'source lib/brew.sh; brew_outdated_casks brave-browser capcut; echo rc=$?'`: zwraca nazwy i `rc=0`.
+- Brak prywatnych ścieżek `/Users/` w commitach H1–H7 (`git log -p fedbf13..HEAD | grep '^+[^+]' | grep '/Users/'` = 0).
+
+
