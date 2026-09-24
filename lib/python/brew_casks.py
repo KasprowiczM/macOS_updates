@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Callable
 
 
@@ -20,7 +21,34 @@ def cask_guard_facts(text: str) -> str:
         return ""
     version = str(cask.get("version") or "")
     installed = str(cask.get("installed") or "")
-    return "|".join((version, installed, ";".join(app_targets(cask))))
+    targets = app_targets(cask) or pkg_app_hints(cask)
+    return "|".join((version, installed, ";".join(targets)))
+
+
+def pkg_app_hints(cask: dict) -> list[str]:
+    """Basenames from uninstall[].delete matching ^/Applications/[^/]+\\.app$."""
+    hints: list[str] = []
+    for art in cask.get("artifacts", []):
+        if not isinstance(art, dict):
+            continue
+        uninst = art.get("uninstall")
+        if uninst is None:
+            continue
+        if isinstance(uninst, dict):
+            uninst = [uninst]
+        if isinstance(uninst, list):
+            for entry in uninst:
+                if isinstance(entry, dict):
+                    deletes = entry.get("delete", [])
+                    if isinstance(deletes, str):
+                        deletes = [deletes]
+                    if isinstance(deletes, list):
+                        for d in deletes:
+                            if isinstance(d, str) and re.match(r"^/Applications/[^/]+\.app$", d):
+                                name = os.path.basename(d)
+                                if name and name not in hints:
+                                    hints.append(name)
+    return hints
 
 
 def cask_primary_app(text: str) -> str:
