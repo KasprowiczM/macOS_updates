@@ -905,10 +905,6 @@ install_latest_npm_packages() {
                 print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
                 failures=$((failures + 1))
             fi
-        elif [ "$method" = "native-installer" ]; then
-            if ! install_native_cli "$display_name" "$command_name"; then
-                failures=$((failures + 1))
-            fi
         elif [ "$method" = "self-update" ]; then
             if command_path="$(resolve_command_path "$command_name")"; then
                 print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "${command_name}")"
@@ -965,6 +961,40 @@ install_latest_npm_packages() {
                 fi
             else
                 print_info "$(printf "$L_NPM_CLI_NOT_INSTALLED" "${display_name}")"
+            fi
+        fi
+    done < "$MANIFEST_PATH"
+
+    export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:$PATH"
+    hash -r 2>/dev/null || true
+
+    if [ "$failures" -ne 0 ]; then
+        print_warn "$(printf "$L_NPM_FAILURES_SUMMARY" "$failures")"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
+            print_info "Diagnostyka: $MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"
+        fi
+        SOFT_FAIL=1
+        return 1
+    fi
+    return 0
+}
+
+update_native_clis() {
+    local display_name
+    local package_name
+    local method
+    local _brew_formula
+    local command_name
+    local failures=0
+
+    while IFS='|' read -r display_name package_name method _brew_formula command_name; do
+        case "$display_name" in
+            ""|\#*) continue ;;
+        esac
+
+        if [ "$method" = "native-installer" ]; then
+            if ! install_native_cli "$display_name" "$command_name"; then
+                failures=$((failures + 1))
             fi
         fi
     done < "$MANIFEST_PATH"
@@ -1070,6 +1100,7 @@ fi
 if [ "$NODE_READY" -eq 1 ]; then
     install_latest_npm_packages || SOFT_FAIL=1
 fi
+update_native_clis || SOFT_FAIL=1
 ensure_latest_bun || HARD_FAIL=1
 remove_legacy_brew_formulas
 prune_vendor_cli_versions

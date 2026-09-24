@@ -600,6 +600,56 @@ class PruneVendorCliVersionsTests(unittest.TestCase):
             self.assertTrue(v3.exists(), "v3 newest must be preserved")
             self.assertFalse(v2.exists(), "v2 must be pruned")
 
+    def test_native_clis_update_when_node_is_absent(self) -> None:
+        """When managed Node is absent (NODE_READY=0), native CLIs like claude still update."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home = tmp_path / "home"
+            local_bin = home / ".local" / "bin"
+            local_bin.mkdir(parents=True)
+            claude_log = tmp_path / "claude_calls.log"
+            claude = local_bin / "claude"
+            claude.write_text(
+                f'#!/bin/sh\n'
+                f'echo "$*" >> "{claude_log}"\n'
+                f'case "$*" in\n'
+                f'  *--version*|-v*) echo "1.2.3"; exit 0 ;;\n'
+                f'  *update*) echo "updated"; exit 0 ;;\n'
+                f'esac\nexit 0\n',
+                encoding="utf-8",
+            )
+            claude.chmod(0o755)
+
+            mock_bin = tmp_path / "bin"
+            mock_bin.mkdir()
+            npm_log = tmp_path / "npm_calls.log"
+            npm = mock_bin / "npm"
+            npm.write_text(f'#!/bin/sh\necho "$*" >> "{npm_log}"\nexit 0\n', encoding="utf-8")
+            npm.chmod(0o755)
+
+            manifest = tmp_path / "manifest.txt"
+            manifest.write_text("Claude Code||native-installer||claude\npnpm|pnpm|npm||pnpm\n", encoding="utf-8")
+
+            from tests._env import shell_env
+            env = shell_env(
+                HOME=str(home),
+                PATH=f"{local_bin}:{mock_bin}:{os.environ.get('PATH', '')}",
+                MANIFEST_PATH=str(manifest),
+                MAC_UPDATE_BOOTSTRAP_CLI="0",
+                MAC_UPDATE_DRY_RUN="0",
+            )
+            res = subprocess.run(
+                ["bash", str(REPO_ROOT / "update_npm_cli.sh")],
+                capture_output=True,
+                text=True,
+                cwd=str(REPO_ROOT),
+                env=env,
+                timeout=20,
+            )
+            self.assertTrue(claude_log.exists(), f"claude was not called. Output: {res.stdout}\nStderr: {res.stderr}")
+            self.assertIn("update", claude_log.read_text(encoding="utf-8"))
+            self.assertFalse(npm_log.exists(), "npm should not be called when Node is absent")
+
 
 if __name__ == "__main__":
     unittest.main()
