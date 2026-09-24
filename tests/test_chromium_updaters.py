@@ -287,6 +287,27 @@ exit 0
             self.assertEqual(len(calls), 1, f"Expected agent to be called exactly once, got {len(calls)}")
             self.assertTrue((session_dir / "google_omaha_init.txt").exists(), "google_omaha_init.txt was not created")
 
+    def test_omaha_read_increment_rotation_in_progress(self) -> None:
+        """When log rotated while waiting (cur_size < init_size), read tail of .old + all of new."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_file = Path(tmpdir) / "updater.log"
+            old_file = Path(tmpdir) / "updater.log.old"
+            # .old has 150 bytes; byte 101 onwards contains the status
+            old_prefix = "A" * 100
+            old_status = "STATUS_IN_OLD\n"
+            old_file.write_text(old_prefix + old_status, encoding="utf-8")
+            # new log has 20 bytes
+            new_log = "NEW_HEADER_LINE\n"
+            log_file.write_text(new_log, encoding="utf-8")
+
+            cmd = f"""
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                omaha_read_increment "{log_file}" "100"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("STATUS_IN_OLD", res.stdout)
+            self.assertIn("NEW_HEADER_LINE", res.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

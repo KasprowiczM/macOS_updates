@@ -549,6 +549,10 @@ omaha_read_increment() {
     local cur_size
     cur_size=$(wc -c < "$log_file" 2>/dev/null | tr -d ' ' || echo 0)
     if [ "$cur_size" -lt "$init_size" ]; then
+        local old_file="${log_file}.old"
+        if [ -f "$old_file" ]; then
+            tail -c +$((init_size + 1)) "$old_file" 2>/dev/null || true
+        fi
         cat "$log_file" 2>/dev/null || true
     elif [ "$cur_size" -gt "$init_size" ]; then
         tail -c +$((init_size + 1)) "$log_file" 2>/dev/null || true
