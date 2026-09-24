@@ -371,7 +371,7 @@ APPSTORE_TOR2_BRANCH="unexpected"
 APPSTORE_TOR2_BACKGROUND=0
 
 if [ -z "$_IOS_SCAN" ]; then
-    print_info "No iPad apps installed — skipping Track 2"
+    print_info "$L_APPSTORE_IOS_NONE_INSTALLED"
     _TRACK2_SKIP_GUI=1
     APPSTORE_TOR2_BRANCH="no_ipad_apps"
 else

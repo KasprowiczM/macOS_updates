@@ -8,7 +8,7 @@
 | `setup.sh` | First-run (public users) — language, deps, paths |
 | `migration_setup.sh` | First-run (owner) — phases 0a–16: language, cloud, deps, paths, app scan |
 | `update_all.sh` | Master: prescan → App Store → npm CLI → Homebrew → internet apps → postupdate/history → macOS final |
-| `update_system.sh` | macOS via `softwareupdate -ia -R --verbose` |
+| `update_system.sh` | per-label `softwareupdate -i <label> -R`, restart-required labels in one final batch |
 | `update_appstore.sh` | `sudo mas upgrade` + AppleScript GUI for iPad apps |
 | `update_internet_apps.sh` | Installed internet apps (see `config/internet_apps.txt`): verified direct handlers, vendor CLIs and honestly reported in-app updater triggers |
 | `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `codex`, `opencode`) + self-updating `agy` |
@@ -46,10 +46,10 @@
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `MAC_UPDATE_BOOTSTRAP_CLI` | `0` | Set to `1` (or pass `--bootstrap-cli`) to install missing native CLIs; by default only installed CLIs are updated |
-| `MAC_UPDATE_STAGE_WAIT` | `4` | Seconds to wait for staging/install before verifying an updated bundle |
+| `MAC_UPDATE_STAGE_WAIT` | `90` | Seconds to wait for staging/install before verifying an updated bundle (0–600, cykl uruchomienia updatera producenta) |
 | `MAC_UPDATE_VENDOR_DIRECT` | `1` | Set to `0` to disable direct vendor installations when apps are behind |
 | `MAC_UPDATE_OMAHA_WAIT` | `45` | Timeout (seconds) waiting for Omaha updater response |
-| `MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT` | `90` | Timeout (seconds) for post-Track-2 iPad app installation verification |
+| `MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT` | `300` | Timeout (seconds) for post-Track-2 iPad app installation verification (0–1800) |
 | `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
@@ -59,7 +59,7 @@
 Step 0: prescan             — scan /Applications + ~/Applications + brew + mas → write installed_apps_scan.txt → atomically update APPLICATIONS.md
 Step 1: update_appstore.sh  — Track 1: sudo mas; Track 2: AppleScript GUI for iPad apps
 Step 2: update_npm_cli.sh   — native Node/Bun + npm global CLI migration/update + `agy update`
-Step 3: update_brew.sh      — Homebrew formulae/casks (--greedy) + cleanup + doctor
+Step 3: update_brew.sh      — formulae + casks (greedy only for brew_cask-designated tokens) + orphan skip + cleanup + doctor
 Step 4: update_internet_apps.sh — installed internet apps; direct updates and honest triggers
 Step 5: postupdate.py       — capture fresh /Applications to installed_apps_after.txt → refresh APPLICATIONS.md and append UPDATES.md
 Step 6: update_system.sh    — macOS via softwareupdate -i <label> -R (per-label no-restart + batch restart); last because it may restart

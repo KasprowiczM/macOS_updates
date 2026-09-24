@@ -187,6 +187,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater triggered — result unverified",
         "externally_managed": "Externally managed",
         "manual": "Manual only (not automatic)",
+        "excluded": "Excluded from inventory/pipeline",
         "unknown": "Unknown / uncovered",
         "known": "Known coverage",
     },
@@ -197,6 +198,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater uruchomiony — wynik niezweryfikowany",
         "externally_managed": "Zarządzane zewnętrznie",
         "manual": "Wyłącznie ręcznie (nie automatycznie)",
+        "excluded": "Wykluczone z inwentarza/potoku",
         "unknown": "Nieznane / bez pokrycia",
         "known": "Znane pokrycie",
     },
@@ -207,6 +209,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater gestartet — Ergebnis nicht verifiziert",
         "externally_managed": "Extern verwaltet",
         "manual": "Nur manuell (nicht automatisch)",
+        "excluded": "Aus Inventar/Pipeline ausgeschlossen",
         "unknown": "Unbekannt / nicht abgedeckt",
         "known": "Bekannte Abdeckung",
     },
@@ -217,6 +220,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Mise à jour déclenchée — résultat non vérifié",
         "externally_managed": "Gérées en externe",
         "manual": "Manuel uniquement (non automatique)",
+        "excluded": "Exclues de l'inventaire/pipeline",
         "unknown": "Inconnues / non couvertes",
         "known": "Couverture connue",
     },
@@ -227,6 +231,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Actualizador iniciado — resultado sin verificar",
         "externally_managed": "Gestionadas externamente",
         "manual": "Solo manual (no automático)",
+        "excluded": "Excluidas del inventario/pipeline",
         "unknown": "Desconocidas / sin cobertura",
         "known": "Cobertura conocida",
     },
@@ -237,6 +242,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Updater avviato — risultato non verificato",
         "externally_managed": "Gestite esternamente",
         "manual": "Solo manuale (non automatico)",
+        "excluded": "Escluse da inventario/pipeline",
         "unknown": "Sconosciute / non coperte",
         "known": "Copertura nota",
     },
@@ -247,6 +253,7 @@ CLASS_TEXT = {
         "triggered_unverified": "Atualizador iniciado — resultado não verificado",
         "externally_managed": "Geridas externamente",
         "manual": "Apenas manual (não automático)",
+        "excluded": "Excluídas do inventário/pipeline",
         "unknown": "Desconhecidas / sem cobertura",
         "known": "Cobertura conhecida",
     },
@@ -515,8 +522,17 @@ def parent_manager(installed):
     return ""
 
 
-def classify(installed, target, method, mas_names, brew_apps, vendor_feeds=None):
+def load_exclusions():
+    path = os.path.join(script_dir, "config", "inventory_exclusions.txt")
+    if not os.path.isfile(path):
+        return set()
+    return {normalize(line) for line in read_lines(path)}
+
+
+def classify(installed, target, method, mas_names, brew_apps, vendor_feeds=None, exclusions=None):
     normalized_name = normalize(installed["app"])
+    if exclusions and (normalized_name in exclusions or (target and normalize(target) in exclusions)):
+        return "excluded", "excluded"
     parent = parent_manager(installed)
 
     if method == "appstore_gui":
@@ -555,6 +571,7 @@ registry = load_registry()
 vendor_feeds = load_vendor_feed_targets()
 mas_names = load_mas_names()
 brew_apps = load_brew_apps()
+exclusions = load_exclusions()
 installed = scan_installed_apps()
 
 classifications = {
@@ -562,6 +579,7 @@ classifications = {
     "triggered_unverified": [],
     "externally_managed": [],
     "manual": [],
+    "excluded": [],
     "unknown": [],
 }
 installed_targets = set()
@@ -579,7 +597,15 @@ for item in installed:
     method = registry.get(target, "unknown") if target else "unknown"
     if target:
         installed_targets.add(target)
-    classification, managed_by = classify(item, target, method, mas_names, brew_apps, vendor_feeds)
+    classification, managed_by = classify(item, target, method, mas_names, brew_apps, vendor_feeds, exclusions)
+    if managed_by == "vendor_feed":
+        label = method_labels.get("vendor_feed", "vendor feed verified")
+    elif classification == "externally_managed":
+        label = managed_by
+    elif classification == "excluded":
+        label = class_text.get("excluded", "excluded")
+    else:
+        label = method_labels.get(method, method)
     row = dict(item)
     row.update(
         {
@@ -587,6 +613,7 @@ for item in installed:
             "method": method,
             "classification": classification,
             "managed_by": managed_by,
+            "label": label,
         }
     )
     classifications[classification].append(row)
@@ -607,11 +634,12 @@ verified_direct_count = len(classifications["verified_direct"])
 triggered_unverified_count = len(classifications["triggered_unverified"])
 externally_managed_count = len(classifications["externally_managed"])
 manual_count = len(classifications["manual"])
+excluded_count = len(classifications["excluded"])
 unknown_count = len(classifications["unknown"])
 installed_unique_count = len(installed)
 supported_count = verified_direct_count + triggered_unverified_count + externally_managed_count
 automatic_count = verified_direct_count + externally_managed_count
-known_count = installed_unique_count - unknown_count
+known_count = supported_count + manual_count
 supported_percent = round((supported_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
 automatic_percent = round((automatic_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
 known_percent = round((known_count * 100.0 / installed_unique_count), 1) if installed_unique_count else 100.0
@@ -640,6 +668,7 @@ report = {
     "triggered_unverified_count": triggered_unverified_count,
     "externally_managed_count": externally_managed_count,
     "manual_count": manual_count,
+    "excluded_count": excluded_count,
     "unknown_count": unknown_count,
     "intel_only_count": len(intel_only_apps),
     "intel_only_apps": sorted(intel_only_apps),
@@ -676,15 +705,18 @@ print(f"  📦 {class_text['unique']}: {installed_unique_count}")
 print(f"  📊 Update Coverage: {supported_count}/{installed_unique_count} ({supported_percent:.1f}%)")
 print(f"  ✅ {class_text['automatic']}: {automatic_count}/{installed_unique_count} ({automatic_percent:.1f}%)")
 print(f"  🧭 {class_text['known']}: {known_count}/{installed_unique_count} ({known_percent:.1f}%)")
+if excluded_count:
+    print(f"  🚫 {class_text['excluded']}: {excluded_count}")
 
 section_icons = {
     "verified_direct": "✅",
     "triggered_unverified": "⏳",
     "externally_managed": "♻️ ",
     "manual": "🛠️ ",
+    "excluded": "🚫",
     "unknown": "❓",
 }
-for key in ("verified_direct", "triggered_unverified", "externally_managed", "manual", "unknown"):
+for key in ("verified_direct", "triggered_unverified", "externally_managed", "manual", "excluded", "unknown"):
     rows = classifications[key]
     print("")
     print(f"  {section_icons[key]} {class_text[key]}: {len(rows)}")
@@ -692,10 +724,7 @@ for key in ("verified_direct", "triggered_unverified", "externally_managed", "ma
         target_suffix = ""
         if row["target"] and normalize(row["target"]) != normalize(row["app"]):
             target_suffix = f" → {row['target']}"
-        if key == "externally_managed":
-            detail = row["managed_by"]
-        else:
-            detail = method_labels.get(row["method"], row["method"])
+        detail = row["label"]
         print(f"       · {row['app']}{target_suffix} ({detail})")
 
 if intel_only_apps:

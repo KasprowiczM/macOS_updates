@@ -36,7 +36,7 @@ Siehe [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.m
 | 3 | **Homebrew** — Formeln und Casks (`--greedy-auto-updates`) + Downgrade-Schutz |
 | 4 | **Internet-Apps** — verifizierte Handler, `vendor_latest`, Sparkle Appcast & direkte Updates |
 | 5 | **Post-Update/Verlauf** — aktualisiert Inventar und Verlauf atomar |
-| 6 | **macOS (zuletzt)** — `softwareupdate -ia -R`; entfällt bei einem früheren Fehler |
+| 6 | **macOS (zuletzt)** — per-Label `softwareupdate -i <label> -R` (Neustart-Pakete in finalem Stapel); entfällt bei einem früheren Fehler |
 
 ---
 

@@ -148,7 +148,7 @@ site, and it is governed by three conditions:
 | 3 | **Homebrew** — formulae and casks (`brew_cask` + downgrade protection) + cleanup and health check |
 | 4 | **Internet apps** — verified direct handlers, `sparkle_appcast`, vendor CLIs and honest update triggers |
 | 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
-| 6 | **macOS (final)** — `softwareupdate -ia -R`; skipped when any earlier step failed |
+| 6 | **macOS (final)** — per-label `softwareupdate -i <label> -R` (restart-required in final batch); skipped when any earlier step failed |
 
 **Important:** Updates only touch software already installed on your Mac. Supported-but-missing apps are reported, not installed. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Unknown installed apps are listed so you (or an AI agent) can add handlers.
 

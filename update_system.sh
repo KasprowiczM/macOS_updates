@@ -253,10 +253,10 @@ done
 
 # Then, install restart-required updates in ONE batch call
 if [ "${#RESTART_LABELS[@]}" -gt 0 ]; then
-    print_step "Installing (restart required): ${RESTART_LABELS[*]}..."
+    print_step "$(printf "$L_SYSTEM_INSTALLING_RESTART_BATCH_FMT" "${RESTART_LABELS[*]}")"
     if ! sudo softwareupdate -i "${RESTART_LABELS[@]}" -R --verbose; then
         INSTALL_FAILED=1
-        print_warn "Failed to install batch: ${RESTART_LABELS[*]}"
+        print_warn "$(printf "$L_SYSTEM_RESTART_BATCH_FAILED_FMT" "${RESTART_LABELS[*]}")"
     else
         if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
             for lbl in "${RESTART_LABELS[@]}"; do
