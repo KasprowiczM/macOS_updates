@@ -49,6 +49,7 @@
 | `MAC_UPDATE_STAGE_WAIT` | `90` | Seconds to wait for staging/install before verifying an updated bundle (0–600, cykl uruchomienia updatera producenta) |
 | `MAC_UPDATE_VENDOR_DIRECT` | `1` | Set to `0` to disable direct vendor installations when apps are behind |
 | `MAC_UPDATE_OMAHA_WAIT` | `45` | Timeout (seconds) waiting for Omaha updater response |
+| `MAC_UPDATE_OMAHA_MAX_AGE_H` | `6` | Maximum age (hours) of previous Omaha noupdate check to accept as current proof |
 | `MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT` | `300` | Timeout (seconds) for post-Track-2 iPad app installation verification (0–1800) |
 | `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |

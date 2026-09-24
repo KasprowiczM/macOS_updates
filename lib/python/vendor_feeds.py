@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import xml.etree.ElementTree as ET
@@ -429,6 +430,59 @@ def omaha_last_status(log_text: str, appid: str) -> str | None:
         if m:
             last_status = m.group(1)
     return last_status
+
+
+def omaha_recent_status(
+    log_text: str,
+    appid: str,
+    max_age_h: float = 6.0,
+    now: datetime.datetime | None = None,
+) -> tuple[str, str] | None:
+    """Find the latest response status for appid from Omaha log lines.
+    Lines start with prefix like [pid:tid:MMDD/HHMMSS.usec:LEVEL:file:line] {"response":...}
+    Returns (status, time_str) if found and within max_age_h, where time_str is 'HH:MM'.
+    If the status is older than max_age_h or not found, returns None.
+    """
+    if not log_text or not appid:
+        return None
+
+    if now is None:
+        now = datetime.datetime.now()
+
+    prefix_re = re.compile(r'\[\d+:\d+:(\d{2})(\d{2})/(\d{2})(\d{2})(\d{2})')
+    app_re = re.compile(
+        r'"appid":"' + re.escape(appid) + r'".{0,600}?"updatecheck":\{"status":"([a-z]+)"'
+    )
+
+    last_match = None
+    for line in log_text.splitlines():
+        if '"updatecheck":{}' in line and '"updatecheck":{"status"' not in line:
+            continue
+        m_app = app_re.search(line)
+        if not m_app:
+            continue
+        m_pre = prefix_re.search(line)
+        if not m_pre:
+            continue
+        month, day, hour, minute, second = map(int, m_pre.groups())
+        status = m_app.group(1)
+        last_match = (month, day, hour, minute, second, status)
+
+    if not last_match:
+        return None
+
+    month, day, hour, minute, second, status = last_match
+    try:
+        log_dt = datetime.datetime(now.year, month, day, hour, minute, second)
+        if log_dt > now + datetime.timedelta(days=1):
+            log_dt = log_dt.replace(year=now.year - 1)
+        age_hours = (now - log_dt).total_seconds() / 3600.0
+        if 0 <= age_hours <= max_age_h:
+            time_str = f"{hour:02d}:{minute:02d}"
+            return (status, time_str)
+    except Exception:
+        pass
+    return None
 
 
 def version_history_public(obj: dict | str) -> str | None:

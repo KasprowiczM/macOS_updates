@@ -33,6 +33,7 @@ GOOGLE_KEYSTONE_RAN=0
 GOOGLE_KEYSTONE_EXIT=1
 GOOGLE_KEYSTONE_USER_INIT=0
 GOOGLE_KEYSTONE_SYS_INIT=0
+GOOGLE_KEYSTONE_DEADLINE=0
 GOOGLE_OMAHA_INC=""
 MAU_TEAMS21_VERIFIED=0
 MAU_TEAMS21_OFFERED=0
@@ -43,7 +44,7 @@ google_keystone_check() {
 
     local user_log="$HOME/Library/Application Support/Google/GoogleUpdater/updater.log"
     local sys_log="/Library/Application Support/Google/GoogleUpdater/updater.log"
-    local user_init=0 sys_init=0
+    local user_init=0 sys_init=0 deadline=0
 
     local init_file=""
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
@@ -51,30 +52,47 @@ google_keystone_check() {
     fi
 
     if [ -n "$init_file" ] && [ -f "$init_file" ]; then
-        read -r user_init sys_init < "$init_file" 2>/dev/null || { user_init=0; sys_init=0; }
+        read -r user_init sys_init deadline < "$init_file" 2>/dev/null || { user_init=0; sys_init=0; deadline=0; }
     elif [ -z "$init_file" ] && [ "$GOOGLE_KEYSTONE_RAN" -eq 1 ]; then
         if [ "$GOOGLE_KEYSTONE_EXIT" -ne 0 ]; then
             return "$GOOGLE_KEYSTONE_EXIT"
         fi
         user_init="$GOOGLE_KEYSTONE_USER_INIT"
         sys_init="$GOOGLE_KEYSTONE_SYS_INIT"
+        deadline="$GOOGLE_KEYSTONE_DEADLINE"
     else
+        local wait_limit="${MAC_UPDATE_OMAHA_WAIT:-45}"
+        case "$wait_limit" in ''|*[!0-9]*) wait_limit=45 ;; esac
+        [ "$wait_limit" -lt 0 ] && wait_limit=0
+        [ "$wait_limit" -gt 180 ] && wait_limit=180
+        deadline=$(( $(date +%s) + wait_limit ))
+
         [ -f "$user_log" ] && user_init=$(wc -c < "$user_log" 2>/dev/null | tr -d ' ' || echo 0)
         [ -f "$sys_log" ] && sys_init=$(wc -c < "$sys_log" 2>/dev/null | tr -d ' ' || echo 0)
 
         local triggered=0
         local output=""
-        if [ -n "$agent" ] && [ -f "$agent" ]; then
-            output=$(run_with_timeout 180 "$agent" --runMode ondemand 2>&1)
+
+        local user_updater="${MAC_UPDATE_GOOGLE_USER_UPDATER-$HOME/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater}"
+        local sys_updater="${MAC_UPDATE_GOOGLE_SYS_UPDATER-/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater}"
+        local updater_timeout=60
+
+        if [ -x "$user_updater" ]; then
+            output=$(run_with_timeout "$updater_timeout" "$user_updater" --wake-all 2>&1)
             GOOGLE_KEYSTONE_EXIT=$?
             [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
         fi
-
-        local updater_app="$HOME/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater"
-        if [ "$triggered" -eq 0 ] && [ -x "$updater_app" ]; then
-            output=$(run_with_timeout 120 "$updater_app" --wake-all 2>&1)
+        if [ "$triggered" -eq 0 ] && [ -x "$sys_updater" ]; then
+            output=$(run_with_timeout "$updater_timeout" "$sys_updater" --wake-all 2>&1)
             GOOGLE_KEYSTONE_EXIT=$?
             [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+        fi
+        if [ ! -x "$user_updater" ] && [ ! -x "$sys_updater" ]; then
+            if [ -n "$agent" ] && [ -f "$agent" ]; then
+                output=$(run_with_timeout "$updater_timeout" "$agent" --runMode ondemand 2>&1)
+                GOOGLE_KEYSTONE_EXIT=$?
+                [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+            fi
         fi
 
         if [ "$triggered" -eq 0 ]; then
@@ -87,20 +105,15 @@ google_keystone_check() {
         GOOGLE_KEYSTONE_RAN=1
         GOOGLE_KEYSTONE_USER_INIT="$user_init"
         GOOGLE_KEYSTONE_SYS_INIT="$sys_init"
+        GOOGLE_KEYSTONE_DEADLINE="$deadline"
 
         if [ -n "$init_file" ]; then
-            printf '%s %s\n' "$user_init" "$sys_init" > "$init_file"
+            printf '%s %s %s\n' "$user_init" "$sys_init" "$deadline" > "$init_file"
         fi
     fi
 
-    local wait_limit="${MAC_UPDATE_OMAHA_WAIT:-45}"
-    case "$wait_limit" in ''|*[!0-9]*) wait_limit=45 ;; esac
-    [ "$wait_limit" -lt 0 ] && wait_limit=0
-    [ "$wait_limit" -gt 180 ] && wait_limit=180
-
-    local elapsed=0
     local combined_inc=""
-    while [ "$elapsed" -lt "$wait_limit" ]; do
+    while [ "$(date +%s)" -lt "$deadline" ]; do
         local u_inc="" s_inc=""
         u_inc=$(omaha_read_increment "$user_log" "$user_init")
         s_inc=$(omaha_read_increment "$sys_log" "$sys_init")
@@ -121,8 +134,11 @@ print(res if res else "")
         elif echo "$combined_inc" | grep -E -q '"updatecheck"\s*:\s*\{"status"' 2>/dev/null; then
             break
         fi
-        sleep 3
-        elapsed=$((elapsed + 3))
+        local now=$(date +%s)
+        [ "$now" -ge "$deadline" ] && break
+        local sleep_dur=3
+        [ $(( deadline - now )) -lt 3 ] && sleep_dur=$(( deadline - now ))
+        [ "$sleep_dur" -gt 0 ] && sleep "$sleep_dur"
     done
 
     local u_inc="" s_inc=""
@@ -142,6 +158,26 @@ iu_google_chrome() {
     if [ -d "/Applications/Google Chrome.app" ]; then
         VER=$(app_version "/Applications/Google Chrome.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
+        local vh_json=""
+        vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+        local pub_ver=""
+        if [ -n "$vh_json" ]; then
+            pub_ver="$(printf '%s\n' "$vh_json" | PYTHONPATH="$_LIB_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import version_history_public
+print(version_history_public(sys.stdin.read()) or "")
+' 2>/dev/null || true)"
+        fi
+        local vh_rel=""
+        [ -n "$pub_ver" ] && vh_rel="$(version_cmp "$VER" "$pub_ver")"
+        if [ "$vh_rel" = "equal" ] || [ "$vh_rel" = "newer" ]; then
+            print_ok "Google Chrome up to date ($VER, Google VersionHistory)"
+            STATUS_CHROME="✅ Up to date ($VER, Google VersionHistory)"
+            return 0
+        fi
+
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
         print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
         if google_keystone_check "$KEYSTONE_AGENT" "com.google.chrome"; then
