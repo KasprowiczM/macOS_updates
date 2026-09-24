@@ -298,6 +298,96 @@ exit 0
             self.assertTrue(pending_file.exists())
             self.assertEqual(pending_file.read_text(encoding="utf-8").strip(), "UniFi|1057750338|10.38.1|10.39.0")
 
+    def test_track2_verify_python_error_is_soft_fail_not_empty_pending(self) -> None:
+        """When python3 fails (rc 1) during Track 2 verification lookup, treat as lookup failed.
+        Expect L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED, exit 10, no empty pending overwrite, no L_APPSTORE_IOS_VERIFIED."""
+        import pty
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "curl").write_text("#!/usr/bin/env bash\necho '{\"resultCount\":1,\"results\":[{\"trackId\":1057750338,\"version\":\"10.39.0\"}]}'\n", encoding="utf-8")
+            (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (bin_dir / "mas").write_text("""#!/usr/bin/env bash
+case "$1" in
+  version) echo "7.0.0" ;;
+  config) echo '{"store":"pl"}' ;;
+  outdated) exit 0 ;;
+  list) echo "497799835 Xcode (15.0)" ;;
+  *) exit 0 ;;
+esac
+""", encoding="utf-8")
+            (bin_dir / "osascript").write_text("""#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then
+    echo "Terminal"
+    exit 0
+fi
+echo "UPDATE_ALL_CLICKED"
+exit 0
+""", encoding="utf-8")
+            (bin_dir / "open").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            # Stub python3: succeed on first ios_apps_pending call (pre-check), fail on subsequent calls (verify loop)
+            count_file = Path(tmpdir) / "py_call_count"
+            (bin_dir / "python3").write_text(f"""#!/usr/bin/env bash
+if [ "$1" = "-" ] && [ "$#" -gt 1 ]; then
+    if [ ! -f "{count_file}" ]; then
+        touch "{count_file}"
+        exec "{sys.executable}" "$@"
+    else
+        echo "Simulated python3 error in ios_apps_pending" >&2
+        exit 1
+    fi
+fi
+exec "{sys.executable}" "$@"
+""", encoding="utf-8")
+            for f in bin_dir.iterdir():
+                f.chmod(f.stat().st_mode | stat.S_IEXEC)
+
+            app_dir = Path(tmpdir) / "Applications"
+            app_dir.mkdir()
+            unifi_app = app_dir / "UniFi.app"
+            wrapper = unifi_app / "Wrapper"
+            wrapper.mkdir(parents=True)
+            plist_data = {
+                "itemId": 1057750338,
+                "bundleShortVersionString": "10.38.1",
+                "itemName": "UniFi",
+            }
+            (wrapper / "iTunesMetadata.plist").write_bytes(plistlib.dumps(plist_data))
+
+            session_dir = Path(tmpdir) / "session"
+            session_dir.mkdir()
+            pending_file = session_dir / "appstore_ios_pending.txt"
+            pending_file.write_text("UniFi|1057750338|10.38.1|10.39.0\n", encoding="utf-8")
+
+            env = dict(os.environ)
+            env.pop("PYTHONPATH", None)
+            orig_path = env.get("PATH", "")
+            env["PATH"] = f"{bin_dir}:{orig_path}"
+            env["MAC_LANG"] = "en"
+            env["MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT"] = "15"
+            env["MAC_UPDATE_NO_SUDO"] = "1"
+            env["MAC_UPDATE_YES"] = "1"
+            env["MAC_UPDATE_SESSION_DIR"] = str(session_dir)
+
+            master, slave = pty.openpty()
+            proc = subprocess.run(
+                ["bash", str(REPO_ROOT / "update_appstore.sh")],
+                stdin=slave,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=20,
+            )
+            os.close(slave)
+            os.close(master)
+
+            self.assertEqual(proc.returncode, 10, f"Expected soft fail 10, got {proc.returncode}\nStdout: {proc.stdout}\nStderr: {proc.stderr}")
+            self.assertNotIn("iPad apps verified after Track 2", proc.stdout)
+            self.assertIn("Could not confirm iPad app updates: the App Store lookup failed", proc.stdout)
+            self.assertNotIn("iPad apps still pending update:", proc.stdout)
+            self.assertTrue(pending_file.exists())
+            self.assertEqual(pending_file.read_text(encoding="utf-8").strip(), "UniFi|1057750338|10.38.1|10.39.0")
+
 
 if __name__ == "__main__":
     unittest.main()
