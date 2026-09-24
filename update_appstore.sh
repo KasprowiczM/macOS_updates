@@ -48,11 +48,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 mac_update_require_supported_platform || exit 1
 
 # ── i18n: load language strings ──────────────────────────────
+. "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
 mac_update_severity_init
 . "$SCRIPT_DIR/lib/proc.sh"
+. "$SCRIPT_DIR/lib/version.sh"
+. "$SCRIPT_DIR/lib/appstore_ios.sh"
 
 # Suppress mas Spotlight auto-indexing warnings
 export MAS_NO_AUTO_INDEX=1
@@ -315,18 +318,23 @@ else
         MAS_TOR1_LEFT_IDS="$(mas_outdated_ids "$MAS_TOR1_LEFT")"
         if [ -n "$MAS_TOR1_LEFT_IDS" ]; then
             print_warn "sudo mas upgrade left these App Store updates pending; retrying in the user session:"
-            printf '%s\n' "$MAS_TOR1_LEFT"
+            printf '%s\n' "$MAS_TOR1_LEFT" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }'
             for MAS_RETRY_ID in $MAS_TOR1_LEFT_IDS; do
+                retry_line="$(printf '%s\n' "$MAS_TOR1_LEFT" | grep "^[[:space:]]*$MAS_RETRY_ID" | head -n 1)"
+                [ -z "$retry_line" ] && retry_line="$MAS_RETRY_ID"
+                print_step "$(printf "$L_APPSTORE_RETRY_ITEM_FMT" "$retry_line")"
                 MAS_RETRY_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
                     env MAS_NO_AUTO_INDEX=1 mas upgrade "$MAS_RETRY_ID" 2>&1)
                 MAS_RETRY_EXIT=$?
-                printf '%s\n' "$MAS_RETRY_OUT"
+                if [ -n "$MAS_RETRY_OUT" ]; then
+                    printf '%s\n' "$MAS_RETRY_OUT"
+                fi
                 if [ "$MAS_RETRY_EXIT" -ne 0 ]; then
                     print_warn "User-session retry failed for App Store id $MAS_RETRY_ID (exit=$MAS_RETRY_EXIT)"
                 fi
                 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
                     {
-                        echo "=== TRACK 1 user-session retry: $MAS_RETRY_ID (exit=$MAS_RETRY_EXIT) ==="
+                        echo "=== TRACK 1 user-session retry: $retry_line (exit=$MAS_RETRY_EXIT) ==="
                         printf '%s\n' "$MAS_RETRY_OUT"
                     } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
                 fi
@@ -355,12 +363,59 @@ fi
 # ============================================================
 print_header "$L_TOR_2_HEADER"
 
-if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ] || [ ! -t 0 ]; then
-    print_info "$L_APPSTORE_NONINTERACTIVE_SKIPPED"
-    print_header "$L_SCRIPT_2_COMPLETE"
-    exit 0
+_IOS_SCAN="$(ios_apps_scan 2>/dev/null || true)"
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    printf '%s\n' "$_IOS_SCAN" | while IFS='|' read -r name id ver path; do
+        n="$(basename "$path" .app)"
+        [ -n "$n" ] && echo "$n|$ver"
+    done > "$MAC_UPDATE_SESSION_DIR/appstore_ios_before.txt"
 fi
 
+_TRACK2_SKIP_GUI=0
+APPSTORE_TOR2_BRANCH="unexpected"
+APPSTORE_TOR2_BACKGROUND=0
+
+if [ -z "$_IOS_SCAN" ]; then
+    print_info "$L_APPSTORE_IOS_NONE_INSTALLED"
+    _TRACK2_SKIP_GUI=1
+    APPSTORE_TOR2_BRANCH="no_ipad_apps"
+else
+    _IOS_PENDING=""
+    _PENDING_RC=0
+    _IOS_PENDING="$(ios_apps_pending 2>/dev/null)" || _PENDING_RC=$?
+
+    if [ "$_PENDING_RC" -eq 2 ]; then
+        print_warn "$L_APPSTORE_IOS_LOOKUP_FAILED"
+    elif [ -z "$_IOS_PENDING" ]; then
+        print_ok "$L_APPSTORE_IOS_ALL_CURRENT"
+        _TRACK2_SKIP_GUI=1
+        APPSTORE_TOR2_BRANCH="all_current"
+        APPSTORE_TOR2_BACKGROUND=0
+    else
+        printf '%s\n' "$_IOS_PENDING" | while IFS='|' read -r p_name p_id p_inst p_store; do
+            [ -n "$p_name" ] && print_info "$(printf "$L_APPSTORE_IOS_PENDING_FMT" "$p_name" "$p_inst" "$p_store")"
+        done
+
+        if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ] || [ ! -t 0 ]; then
+            print_warn "$L_APPSTORE_IOS_NEEDS_INTERACTIVE"
+            SOFT_FAIL=1
+            _TRACK2_SKIP_GUI=1
+            APPSTORE_TOR2_BRANCH="needs_interactive"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                printf '%s\n' "$_IOS_PENDING" > "$MAC_UPDATE_SESSION_DIR/appstore_ios_pending.txt"
+            fi
+        fi
+    fi
+fi
+
+if [ "$_TRACK2_SKIP_GUI" -eq 0 ]; then
+    if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ] || [ ! -t 0 ]; then
+        print_info "$L_APPSTORE_NONINTERACTIVE_SKIPPED"
+        _TRACK2_SKIP_GUI=1
+    fi
+fi
+
+if [ "$_TRACK2_SKIP_GUI" -eq 0 ]; then
 print_info "$L_TOR_2_IPAD_NOTE"
 print_info "$L_TOR_2_SOLUTION"
 echo ""
@@ -545,6 +600,52 @@ if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
     } >> "$MAC_UPDATE_SESSION_DIR/appstore_diag.txt" 2>/dev/null || true
 fi
 
+    if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
+        verify_timeout="${MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT:-300}"
+        case "$verify_timeout" in ''|*[!0-9]*) verify_timeout=300 ;; esac
+        [ "$verify_timeout" -lt 0 ] && verify_timeout=0
+        [ "$verify_timeout" -gt 1800 ] && verify_timeout=1800
+
+        elapsed=0
+        all_verified=0
+        still_pending=""
+        _verify_rc=0
+        while [ "$elapsed" -lt "$verify_timeout" ]; do
+            sleep 15
+            elapsed=$((elapsed + 15))
+            _verify_rc=0
+            still_pending="$(ios_apps_pending 2>/dev/null)" || _verify_rc=$?
+            if [ "$_verify_rc" -eq 0 ] && [ -z "$still_pending" ]; then
+                all_verified=1
+                break
+            fi
+        done
+
+        if [ "$all_verified" -eq 1 ]; then
+            print_ok "$L_APPSTORE_IOS_VERIFIED"
+            APPSTORE_TOR2_BACKGROUND=0
+        elif [ "$_verify_rc" -ne 0 ]; then
+            print_warn "$L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED"
+            SOFT_FAIL=1
+        else
+            pending_names="$(printf '%s\n' "$still_pending" | cut -d'|' -f1 | paste -sd, -)"
+            print_warn "$(printf "$L_APPSTORE_IOS_STILL_PENDING_FMT" "$pending_names")"
+            SOFT_FAIL=1
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                printf '%s\n' "$still_pending" > "$MAC_UPDATE_SESSION_DIR/appstore_ios_pending.txt"
+            fi
+        fi
+    fi
+fi
+
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    _IOS_SCAN_AFTER="$(ios_apps_scan 2>/dev/null || true)"
+    printf '%s\n' "$_IOS_SCAN_AFTER" | while IFS='|' read -r name id ver path; do
+        n="$(basename "$path" .app)"
+        [ -n "$n" ] && echo "$n|$ver"
+    done > "$MAC_UPDATE_SESSION_DIR/appstore_ios_after.txt"
+fi
+
 # ============================================================
 # FINAL VERIFICATION
 # ============================================================
@@ -578,7 +679,9 @@ if [ -z "$STILL_OUTDATED" ] && [ "$HARD_FAIL" -eq 0 ] && [ "$SOFT_FAIL" -eq 0 ];
     print_ok "$L_APPSTORE_NO_UPDATES"
 elif [ -n "$STILL_OUTDATED" ]; then
     print_warn "$L_STILL_OUTDATED"
-    echo "$STILL_OUTDATED"
+    printf '%s\n' "$STILL_OUTDATED" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }'
+    formatted_still="$(printf '%s\n' "$STILL_OUTDATED" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }')"
+    print_warn "$(printf "$L_APPSTORE_STILL_PENDING_MANUAL_FMT" "$formatted_still")"
     SOFT_FAIL=1
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
         {
@@ -658,7 +761,10 @@ elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
     # banner, so the three states are kept distinct here exactly as update_all.sh
     # does: clean / warnings / errors.
     print_header "⚠️  SCRIPT 2 FINISHED WITH WARNINGS"
-    if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
+    if [ -n "$STILL_OUTDATED" ]; then
+        formatted_still="$(printf '%s\n' "$STILL_OUTDATED" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }')"
+        print_warn "$(printf "$L_APPSTORE_STILL_PENDING_MANUAL_FMT" "$formatted_still")"
+    elif [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
         print_info "App Store is still installing in the background; mas cannot confirm those apps until it finishes. Re-run later to verify."
     else
         print_info "Some App Store state could not be verified; review the diagnostics above. Nothing was left mid-install."

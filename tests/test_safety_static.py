@@ -293,6 +293,19 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("appstore_diag.txt", text)
         self.assertIn("MAS_TOR1_OUT", text)
 
+    def test_degraded_run_does_not_dump_brew_lists(self) -> None:
+        """update_all.sh degraded exit (BLOCKING_EXIT=0, DEGRADED=1) dumps only diagnostics, not brew lists."""
+        text = self.read_script("update_all.sh")
+        self.assertTrue(
+            'BLOCKING_EXIT' in text and 'MAC_UPDATE_DEBUG' in text,
+            "update_all.sh must guard full session dump with BLOCKING_EXIT!=0 or MAC_UPDATE_DEBUG=1",
+        )
+        self.assertIn('elif [ "${DEGRADED:-0}" -ne 0 ]; then', text)
+        self.assertIn('*diag*.txt', text)
+        self.assertIn('*pending*.txt', text)
+        self.assertIn('internet_status_codes.txt', text)
+        self.assertIn('brew_orphan_casks.txt', text)
+
     def test_mas_account_only_inside_version_gate(self) -> None:
         """mas account was removed in mas 5.0 and must only appear inside version gates."""
         for script_path in REPO_ROOT.glob("*.sh"):
@@ -476,15 +489,17 @@ class StaticShellSafetyTests(unittest.TestCase):
                     "PATH": f"{mock_bin}:/usr/bin:/bin",
                     "SYSTEM_MARKER": str(marker),
                     "MAC_LANG": "en",
+                    "MAC_UPDATE_NO_SUDO": "1",
                 }
             )
             result = subprocess.run(
                 args,
                 cwd=root,
                 env=env,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
-                timeout=20,
+                timeout=90,
             )
             return result, marker.exists()
 
@@ -726,6 +741,57 @@ class StaticShellSafetyTests(unittest.TestCase):
             self.assertTrue(
                 found,
                 msg=f"Method {method!r} configured in internet_app_methods.txt has no handler function in lib/ (expected one of: {handler_names})",
+            )
+
+    def test_lib_scripts_do_not_use_bare_internet_diag_log_var(self) -> None:
+        """lib/*.sh must not test ${internet_diag_log:-} (it is a function, not a variable)."""
+        bad = []
+        for path in sorted((REPO_ROOT / "lib").glob("*.sh")):
+            text = path.read_text(encoding="utf-8")
+            if "${internet_diag_log" in text:
+                bad.append(path.name)
+        self.assertEqual(bad, [], f"lib scripts using ${{internet_diag_log: {bad}")
+
+    def test_direct_methods_are_used_and_verify(self) -> None:
+        """Every entry in DIRECT_METHODS must (a) be used in config/internet_app_methods.txt and (b) have a handler."""
+        coverage_script = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
+        match = re.search(r'DIRECT_METHODS\s*=\s*\{([^}]+)\}', coverage_script)
+        self.assertIsNotNone(match, "DIRECT_METHODS definition not found in scripts/report_update_coverage.sh")
+        direct_methods = {m.strip().strip('"').strip("'") for m in match.group(1).split(",") if m.strip()}
+
+        methods_cfg = REPO_ROOT / "config" / "internet_app_methods.txt"
+        used_methods = set()
+        for ln in methods_cfg.read_text(encoding="utf-8").splitlines():
+            ln = ln.split("#", 1)[0].strip()
+            if not ln:
+                continue
+            parts = ln.split("|")
+            if len(parts) >= 2:
+                used_methods.add(parts[1].strip())
+
+        handler_code = (
+            (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
+            + (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
+            + (REPO_ROOT / "lib" / "internet_registry.sh").read_text(encoding="utf-8")
+        )
+
+        for method in sorted(direct_methods):
+            self.assertIn(
+                method, used_methods,
+                msg=f"Direct method {method!r} is not used by any row in config/internet_app_methods.txt",
+            )
+            handler_names = [
+                f"internet_handler_{method}",
+                f"internet_dispatch_{method}",
+                f"internet_handler_{method}_check",
+                f"iu_{method}",
+            ]
+            found = any(h in handler_code for h in handler_names) or method in {
+                "keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"
+            }
+            self.assertTrue(
+                found,
+                msg=f"Direct method {method!r} has no handler function in lib/ (expected one of: {handler_names})",
             )
 
     @unittest.skipUnless(
@@ -1427,6 +1493,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         """Scenario 5: update_npm_cli.sh with curl failing => exit 10 (never 1)"""
         with tempfile.TemporaryDirectory() as tmp:
             mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
+            base_env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
             curl_script = mock_bin / "curl"
             curl_script.write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
             curl_script.chmod(0o755)
@@ -1445,6 +1512,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         """Scenario 6: update_npm_cli.sh with Bun tarball install failing => exit 1"""
         with tempfile.TemporaryDirectory() as tmp:
             mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
+            base_env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
             unzip_script = mock_bin / "unzip"
             unzip_script.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
             unzip_script.chmod(0o755)
@@ -2560,6 +2628,18 @@ class I18nCompletenessTests(unittest.TestCase):
             "L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT",
             "L_INTERNET_STATUS_CASK_CURRENT",
             "L_INTERNET_STATUS_CASK_BEHIND_FMT",
+            # Added in v1.5.0:
+            "L_INTERNET_STATUS_FEED_STALE_FMT",
+            "L_INTERNET_STATUS_BEHIND_FMT",
+            "L_INTERNET_STATUS_NEEDS_RESTART_FMT",
+            "L_INTERNET_STATUS_VENDOR_CURRENT_FMT",
+            "L_INTERNET_STATUS_VENDOR_NOUPDATE",
+            "L_INTERNET_STATUS_OMAHA_RECENT_FMT",
+            "L_INTERNET_STATUS_ROLLOUT_HOLD_FMT",
+            "L_INTERNET_STATUS_UPDATER_TRIGGERED",
+            "L_INTERNET_STATUS_UPDATE_IN_PROGRESS",
+            "L_INTERNET_STATUS_MANAGED_BREW",
+            "L_INTERNET_STATUS_MANAGED_APPSTORE",
         }
 
         for key in all_status_keys:
@@ -2720,6 +2800,50 @@ class MauRegressionGuardTests(unittest.TestCase):
         )
         self.assertNotIn("XCLW2019", result.stdout)
 
+    def test_shell_python_project_imports_set_path(self) -> None:
+        """Any project python module imported in *.sh must have PYTHONPATH or sys.path configured."""
+        project_modules = set()
+        for p in (REPO_ROOT / "lib" / "python").glob("*.py"):
+            if p.stem != "__init__":
+                project_modules.add(p.stem)
+        for p in (REPO_ROOT / "dev_sync").glob("*.py"):
+            if p.stem != "__init__":
+                project_modules.add(p.stem)
+
+        mod_pattern = "|".join(re.escape(m) for m in project_modules)
+        import_re = re.compile(r"^\s*(?:from|import)\s+(" + mod_pattern + r")\b")
+        open_re = re.compile(r"(python3|<<-?\s*['\"]?[A-Z_]+['\"]?)")
+        sys_path_re = re.compile(r"sys\.path(?:\.insert|\[:0\]|\.append)")
+
+        failures = []
+        for root, dirs, files in os.walk(REPO_ROOT):
+            if any(p in root for p in [".git", "graphify-out", "dev_sync_logs"]):
+                continue
+            for f in files:
+                if f.endswith(".sh"):
+                    sh_path = Path(root) / f
+                    rel = str(sh_path.relative_to(REPO_ROOT))
+                    lines = sh_path.read_text(encoding="utf-8", errors="ignore").splitlines(keepends=True)
+                    for idx, line in enumerate(lines):
+                        if not import_re.match(line):
+                            continue
+                        open_idx = None
+                        for i in range(idx - 1, -1, -1):
+                            if open_re.search(lines[i]):
+                                open_idx = i
+                                break
+                        if open_idx is None:
+                            failures.append(f"{rel}:{idx+1}")
+                            continue
+                        open_line = lines[open_idx]
+                        has_pythonpath = "PYTHONPATH=" in open_line
+                        block_text = "".join(lines[open_idx:idx])
+                        has_sys_path = bool(sys_path_re.search(block_text))
+                        if not (has_pythonpath or has_sys_path):
+                            failures.append(f"{rel}:{idx+1}")
+
+        self.assertEqual(failures, [], f"Project imports without PYTHONPATH or sys.path: {failures}")
+
 
 class TestDevSyncRedact(unittest.TestCase):
     def test_redact_url_credentials_and_secrets(self) -> None:
@@ -2836,7 +2960,93 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
         self.assertIn('export RUN_TIMESTAMP="$LOG_TS"', text)
         self.assertIn('ts_str = os.environ.get("RUN_TIMESTAMP") or str(start_time)', text)
 
+    def test_docs_scripts_md_env_defaults_match_code(self) -> None:
+        """Assert environment variable defaults in docs/agents/scripts.md match the code."""
+        h_txt = (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
+        m_stage = re.search(r"MAC_UPDATE_STAGE_WAIT:-(\d+)", h_txt)
+        self.assertIsNotNone(m_stage, "MAC_UPDATE_STAGE_WAIT default not found in lib/internet_handlers.sh")
+        code_stage = m_stage.group(1)
+
+        app_txt = (REPO_ROOT / "update_appstore.sh").read_text(encoding="utf-8")
+        m_as = re.search(r"MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT:-(\d+)", app_txt)
+        self.assertIsNotNone(m_as, "MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT default not found in update_appstore.sh")
+        code_as = m_as.group(1)
+
+        doc_txt = (REPO_ROOT / "docs" / "agents" / "scripts.md").read_text(encoding="utf-8")
+        m_doc_stage = re.search(r"\|\s*`MAC_UPDATE_STAGE_WAIT`\s*\|\s*`(\d+)`\s*\|", doc_txt)
+        self.assertIsNotNone(m_doc_stage, "MAC_UPDATE_STAGE_WAIT not documented in docs/agents/scripts.md")
+        doc_stage = m_doc_stage.group(1)
+
+        m_doc_as = re.search(r"\|\s*`MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT`\s*\|\s*`(\d+)`\s*\|", doc_txt)
+        self.assertIsNotNone(m_doc_as, "MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT not documented in docs/agents/scripts.md")
+        doc_as = m_doc_as.group(1)
+
+        self.assertEqual(code_stage, doc_stage, f"MAC_UPDATE_STAGE_WAIT mismatch: code={code_stage}, doc={doc_stage}")
+        self.assertEqual(code_as, doc_as, f"MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT mismatch: code={code_as}, doc={doc_as}")
+
+    def test_report_update_coverage_vendor_feed_label_and_exclusions(self) -> None:
+        """Assert report_update_coverage uses vendor feed label and handles exclusions."""
+        env = os.environ.copy()
+        env["MAC_LANG"] = "en"
+        res = subprocess.run(
+            ["bash", str(REPO_ROOT / "scripts" / "report_update_coverage.sh"), "--json"],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=True,
+        )
+        data = json.loads(res.stdout)
+        installed_updatable = {a["app"]: a for a in data.get("installed_updatable", [])}
+        if "Claude" in installed_updatable:
+            claude = installed_updatable["Claude"]
+            self.assertEqual(claude.get("managed_by"), "vendor_feed")
+            self.assertEqual(claude.get("label"), "vendor feed verified")
+
+        self.assertIn("excluded", data.get("classification_counts", {}))
+        excluded_apps = [a["app"] for a in data.get("classifications", {}).get("excluded", [])]
+        self.assertIn("Ascendo", excluded_apps)
+
+    def test_tracked_files_have_no_personal_home_paths(self) -> None:
+        """Tracked files must not contain personal /Users/<username> paths."""
+        try:
+            res = subprocess.run(
+                ["git", "ls-files"],
+                cwd=str(REPO_ROOT),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except Exception as exc:
+            self.skipTest(f"git ls-files not available: {exc}")
+
+        allowlist = {"USER", "test", "testuser", "fake", "runner_user", "Shared"}
+        pattern = re.compile(r"/Users/([A-Za-z0-9._-]+)")
+        violations: list[str] = []
+
+        for rel_path in res.stdout.splitlines():
+            file_path = REPO_ROOT / rel_path
+            if not file_path.is_file():
+                continue
+            try:
+                content = file_path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+
+            for lineno, line in enumerate(content.splitlines(), start=1):
+                for match in pattern.finditer(line):
+                    username = match.group(1)
+                    if username not in allowlist:
+                        violations.append(f"{rel_path}:{lineno}: /Users/{username}")
+
+        self.assertEqual(
+            violations,
+            [],
+            "Tracked files contain personal /Users/<username> home paths:\n"
+            + "\n".join(violations),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

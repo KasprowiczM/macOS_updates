@@ -11,6 +11,7 @@ Options:
       --dry-run                  Preview steps without mutating the system
       --verify-only              Verify installed app versions against history without mutating
       --json-summary             Emit JSON summary on exit (stdout, after run)
+      --bootstrap-cli            Install missing native CLIs and managed Node/Bun toolchain
       --skip-prescan             Skip step 0 (APPLICATIONS.md prescan)
       --skip-system              Skip final macOS system update
       --skip-appstore            Skip App Store updates
@@ -27,6 +28,7 @@ Options:
 Environment (also set by flags):
   MAC_UPDATE_DRY_RUN=1
   MAC_UPDATE_VERIFY_ONLY=1
+  MAC_UPDATE_BOOTSTRAP_CLI=1
   MAC_UPDATE_MAU_CLEAR_DEFERRALS=1
   MAC_UPDATE_SKIP_*=1
   MAC_UPDATE_NO_SUDO_KEEPALIVE=1
@@ -44,6 +46,7 @@ mac_update_parse_cli() {
             --dry-run) export MAC_UPDATE_DRY_RUN=1 ;;
             --verify-only) export MAC_UPDATE_VERIFY_ONLY=1 ;;
             --json-summary) export MAC_UPDATE_JSON_SUMMARY=1 ;;
+            --bootstrap-cli) export MAC_UPDATE_BOOTSTRAP_CLI=1 ;;
             --skip-prescan) export MAC_UPDATE_SKIP_PRESCAN=1 ;;
             --skip-system) export MAC_UPDATE_SKIP_SYSTEM=1 ;;
             --skip-appstore) export MAC_UPDATE_SKIP_APPSTORE=1 ;;

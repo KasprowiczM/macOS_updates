@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.6** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.5.0** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+
+**Herstellerwahrheit (v1.5.0):** Die Version jeder Anwendung wird vor jeder Ausführung mit dem Feed des Herstellers abgeglichen. Aktuelle Apps bleiben unberührt; veraltete Apps werden durch den herstellereigenen Updater aktualisiert oder vom Hersteller mit Signatur- und Team-ID-Überprüfung installiert. Es wird nur Software aktualisiert, die tatsächlich installiert ist (`--bootstrap-cli` installiert fehlende CLIs gezielt). Manuell entfernte Apps werden erkannt und niemals erneut installiert. Überprüfen Sie den Herstellerstatus schreibgeschützt mit `bash scripts/check_vendor_feeds.sh`.
 
 **Öffentliches Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -34,7 +36,7 @@ Siehe [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.m
 | 3 | **Homebrew** — Formeln und Casks (`--greedy-auto-updates`) + Downgrade-Schutz |
 | 4 | **Internet-Apps** — verifizierte Handler, `vendor_latest`, Sparkle Appcast & direkte Updates |
 | 5 | **Post-Update/Verlauf** — aktualisiert Inventar und Verlauf atomar |
-| 6 | **macOS (zuletzt)** — `softwareupdate -ia -R`; entfällt bei einem früheren Fehler |
+| 6 | **macOS (zuletzt)** — per-Label `softwareupdate -i <label> -R` (Neustart-Pakete in finalem Stapel); entfällt bei einem früheren Fehler |
 
 ---
 

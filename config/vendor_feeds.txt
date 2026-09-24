@@ -1,0 +1,20 @@
+# ============================================================
+# config/vendor_feeds.txt — vendor truth for internet apps (v1.5.0)
+# Format: App Name|kind|feed_url|arg|artifact|allowed_host
+#   kind: sparkle | json | yml | kv
+#   arg:  sparkle -> comma channels or '-' ; json -> selector name ; yml -> '-' ; kv -> productinfo prefix
+#   artifact: zip | dmg | tar.gz | -   ('-' = verify only, never install from vendor)
+#   allowed_host: exact download host, '-' when artifact is '-'
+# The feed is the source of truth; a Homebrew cask may only confirm "behind".
+# URLs mirror each cask's livecheck block (verified 2026-09-23).
+# ============================================================
+ChatGPT / Codex|sparkle|https://persistent.oaistatic.com/codex-app-prod/appcast.xml|-|zip|persistent.oaistatic.com
+Claude|json|https://downloads.claude.ai/releases/darwin/universal/RELEASES.json|claude_releases|zip|downloads.claude.ai
+Cursor|json|https://api2.cursor.sh/updates/api/update/darwin-arm64/cursor/0.0.0/stable|cursor_update|zip|downloads.cursor.com
+Warp|json|https://releases.warp.dev/channel_versions.json|warp_channels|-|-
+Antigravity|yml|https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml|-|zip|storage.googleapis.com
+Antigravity IDE|json|https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin-arm64/stable/latest|antigravity_ide|zip|edgedl.me.gvt1.com
+OpenCode|json|https://github.com/anomalyco/opencode/releases/latest/download/latest.json|tauri_latest|tar.gz|github.com
+Proton Mail|json|https://proton.me/download/mail/macos/version.json|proton_releases|dmg|proton.me
+Docker Desktop|sparkle|https://desktop.docker.com/mac/main/arm64/appcast.xml|-|-|-
+Remote Desktop Manager|kv|https://devolutions.net/productinfo.htm|RDMMacbin|dmg|cdn.devolutions.net

@@ -22,7 +22,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MANIFEST_PATH="$SCRIPT_DIR/config/npm_global_clis.txt"
+MANIFEST_PATH="${MANIFEST_PATH:-$SCRIPT_DIR/config/npm_global_clis.txt}"
 BUN_VERSION_PATH="$SCRIPT_DIR/config/bun_version.txt"
 
 . "$SCRIPT_DIR/lib/platform.sh"
@@ -46,7 +46,7 @@ cleanup_npm_cli() {
     rm -rf "$TOOLCHAIN_HOME"/node.staging.* 2>/dev/null || true
 }
 BUN_HOME="${BUN_INSTALL:-$HOME/.bun}"
-BUN_BIN="$BUN_HOME/bin"
+BUN_BIN="${BUN_BIN:-$BUN_HOME/bin}"
 NPMRC_PATH="$HOME/.npmrc"
 
 print_header() { ui_print_header "$1"; }
@@ -139,7 +139,7 @@ declare_profile_backup() {
     [ -f "$real_target" ] || return 0
 
     local backup_key
-    backup_key="$(echo "$real_target" | tr '/. ' '___')"
+    backup_key="$(echo "$real_target" | tr -c 'a-zA-Z0-9_' '_')"
     local backed_up=0
     eval "backed_up=\${_MACUPD_BACKED_UP_${backup_key}:-0}"
     if [ "$backed_up" -ne 1 ]; then
@@ -569,6 +569,11 @@ ensure_latest_node() {
     local current_node=""
     local n_bin="$NPM_GLOBAL_BIN/n"
 
+    if [ ! -x "$N_PREFIX/bin/node" ] && [ "${MAC_UPDATE_BOOTSTRAP_CLI:-0}" != "1" ]; then
+        print_info "$L_NPM_TOOLCHAIN_NOT_INSTALLED"
+        return 2
+    fi
+
     latest_node="$(detect_latest_node_version)"
     if [ -z "$latest_node" ]; then
         SOFT_FAIL=1
@@ -747,6 +752,11 @@ ensure_latest_bun() {
     local current=""
     local floor_ver
 
+    if [ ! -x "$BUN_BIN/bun" ] && [ "${MAC_UPDATE_BOOTSTRAP_CLI:-0}" != "1" ]; then
+        print_info "$(printf "$L_NPM_CLI_NOT_INSTALLED" "bun")"
+        return 0
+    fi
+
     export BUN_INSTALL="$BUN_HOME"
     mkdir -p "$BUN_HOME" "$BUN_BIN" || return 1
 
@@ -799,20 +809,26 @@ install_native_cli() {
     installer_env="$(native_installer_env "$command_name")"
     bootstrap_args="$(native_installer_bootstrap_args "$command_name")"
     existing_cmd="$(native_installer_existing_update_cmd "$command_name")"
-    print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
+
+    if [ ! -x "$LOCAL_BIN/$command_name" ] && [ "${MAC_UPDATE_BOOTSTRAP_CLI:-0}" != "1" ]; then
+        print_info "$(printf "$L_NPM_CLI_NOT_INSTALLED" "${display_name}")"
+        return 0
+    fi
 
     if [ -n "$existing_cmd" ] && [ -x "$LOCAL_BIN/$command_name" ]; then
+        print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
         # shellcheck disable=SC2086
         if run_quiet_with_error_log \
             "${command_name} ${existing_cmd}" \
             run_with_timeout "$(native_installer_timeout)" \
-            "$LOCAL_BIN/$command_name" $existing_cmd \
+            env $installer_env "$LOCAL_BIN/$command_name" $existing_cmd \
             && verified="$(report_cli_version_or_fail "$display_name" "$LOCAL_BIN/$command_name")"; then
             print_ok "${display_name}: ${verified}"
             return 0
         fi
         print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
-        return 1
+    else
+        print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "native installer")"
     fi
 
     installer_tmp="$(mktemp "${TMPDIR:-/tmp}/mac-update-installer.XXXXXX")" || return 1
@@ -868,6 +884,17 @@ install_latest_npm_packages() {
         esac
 
         if [ "$method" = "npm" ]; then
+            if [ "$package_name" = "npm" ]; then
+                if [ ! -x "$N_PREFIX/bin/node" ] && [ "${MAC_UPDATE_BOOTSTRAP_CLI:-0}" != "1" ]; then
+                    print_info "$(printf "$L_NPM_CLI_NOT_INSTALLED" "${display_name}")"
+                    continue
+                fi
+            else
+                if [ ! -d "$NPM_GLOBAL_PREFIX/lib/node_modules/$package_name" ] && [ ! -x "$NPM_GLOBAL_BIN/$command_name" ] && [ "${MAC_UPDATE_BOOTSTRAP_CLI:-0}" != "1" ]; then
+                    print_info "$(printf "$L_NPM_CLI_NOT_INSTALLED" "${display_name}")"
+                    continue
+                fi
+            fi
             package_spec="${package_name}@latest"
             print_info "$(printf "$L_NPM_UPDATING_PACKAGE_VIA_NPM" "${display_name}" "${package_spec}")"
             if run_quiet_with_error_log \
@@ -876,10 +903,6 @@ install_latest_npm_packages() {
                 print_ok "${display_name}: $(detect_command_version "$display_name" "$NPM_GLOBAL_BIN/$command_name")"
             else
                 print_warn "$(printf "$L_NPM_PACKAGE_UPDATE_FAILED" "${display_name}")"
-                failures=$((failures + 1))
-            fi
-        elif [ "$method" = "native-installer" ]; then
-            if ! install_native_cli "$display_name" "$command_name"; then
                 failures=$((failures + 1))
             fi
         elif [ "$method" = "self-update" ]; then
@@ -948,7 +971,41 @@ install_latest_npm_packages() {
     if [ "$failures" -ne 0 ]; then
         print_warn "$(printf "$L_NPM_FAILURES_SUMMARY" "$failures")"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
-            print_info "Diagnostyka: $MAC_UPDATE_SESSION_DIR/npm_cli_errors.log"
+            print_info "$(printf "$L_NPM_DIAGNOSTICS_PATH_FMT" "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log")"
+        fi
+        SOFT_FAIL=1
+        return 1
+    fi
+    return 0
+}
+
+update_native_clis() {
+    local display_name
+    local package_name
+    local method
+    local _brew_formula
+    local command_name
+    local failures=0
+
+    while IFS='|' read -r display_name package_name method _brew_formula command_name; do
+        case "$display_name" in
+            ""|\#*) continue ;;
+        esac
+
+        if [ "$method" = "native-installer" ]; then
+            if ! install_native_cli "$display_name" "$command_name"; then
+                failures=$((failures + 1))
+            fi
+        fi
+    done < "$MANIFEST_PATH"
+
+    export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:$PATH"
+    hash -r 2>/dev/null || true
+
+    if [ "$failures" -ne 0 ]; then
+        print_warn "$(printf "$L_NPM_FAILURES_SUMMARY" "$failures")"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
+            print_info "$(printf "$L_NPM_DIAGNOSTICS_PATH_FMT" "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log")"
         fi
         SOFT_FAIL=1
         return 1
@@ -1031,17 +1088,22 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
 fi
 
 NODE_READY=1
-if ! ensure_latest_node; then
+_ensure_node_rc=0
+ensure_latest_node || _ensure_node_rc=$?
+if [ "$_ensure_node_rc" -eq 2 ]; then
+    NODE_READY=0
+elif [ "$_ensure_node_rc" -ne 0 ]; then
     HARD_FAIL=1
     NODE_READY=0
+    print_error "$L_NPM_SKIPPING_PACKAGES_NODE_FAILED"
 fi
 if [ "$NODE_READY" -eq 1 ]; then
     install_latest_npm_packages || SOFT_FAIL=1
-else
-    print_error "$L_NPM_SKIPPING_PACKAGES_NODE_FAILED"
 fi
+update_native_clis || SOFT_FAIL=1
 ensure_latest_bun || HARD_FAIL=1
 remove_legacy_brew_formulas
+prune_vendor_cli_versions
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     print_info "$L_NPM_SAVING_POST_SNAPSHOT"
@@ -1054,7 +1116,7 @@ fi
 NPM_CLI_EXIT="$(mac_update_severity_exit_code)"
 if [ "$NPM_CLI_EXIT" -ne 0 ]; then
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -s "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" ]; then
-        print_warn "Ostatnia diagnostyka npm/self-update (sanityzowana):"
+        print_warn "$L_NPM_LAST_DIAGNOSTICS"
         tail -n 20 "$MAC_UPDATE_SESSION_DIR/npm_cli_errors.log" | sed 's/^/    /'
     fi
     print_header "$L_NPM_HEADER_FINISHED_WITH_ERRORS"

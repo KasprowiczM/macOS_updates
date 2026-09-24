@@ -31,6 +31,18 @@ APP_ALIASES: dict[str, list[str]] = {
     "Keynote Creator Studio": ["Keynote Creator Studio", "Keynote"],
     "Numbers Creator Studio": ["Numbers Creator Studio", "Numbers"],
     "Pages Creator Studio": ["Pages Creator Studio", "Pages"],
+    "Google Chrome": ["Google Chrome", "Chrome"],
+    "Chrome": ["Chrome", "Google Chrome"],
+    "Microsoft Word": ["Microsoft Word", "Word"],
+    "Word": ["Word", "Microsoft Word"],
+    "Microsoft Excel": ["Microsoft Excel", "Excel"],
+    "Excel": ["Excel", "Microsoft Excel"],
+    "Microsoft PowerPoint": ["Microsoft PowerPoint", "PowerPoint"],
+    "PowerPoint": ["PowerPoint", "Microsoft PowerPoint"],
+    "Microsoft Outlook": ["Microsoft Outlook", "Outlook"],
+    "Outlook": ["Outlook", "Microsoft Outlook"],
+    "Microsoft OneNote": ["Microsoft OneNote", "OneNote"],
+    "OneNote": ["OneNote", "Microsoft OneNote"],
 }
 
 SYSTEM_APP_FRAGMENTS: list[str] = [
@@ -286,3 +298,11 @@ def scan_installed_app_paths(
         if "|" not in name and not any(ord(char) < 32 or ord(char) == 127 for char in name)
     )
     return installed_app_paths, installed_apps
+
+
+def __getattr__(name: str):
+    """Dynamically re-export inventory_sync functions without circular import."""
+    import inventory_sync
+    if hasattr(inventory_sync, name):
+        return getattr(inventory_sync, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -157,3 +157,12 @@ width = max(len(installed), len(candidate))
 print("newer" if padded(installed, width) > padded(candidate, width) else "current")
 PYEOF_AVP
 }
+
+_VERSION_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# version_cmp A B -> prints: newer (A>B) | equal | older (A<B) | unknown
+version_cmp() { PYTHONPATH="$_VERSION_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" <<'PYEOF_VCMP'
+import sys
+from vendor_feeds import version_compare
+print({None: "unknown", -1: "older", 0: "equal", 1: "newer"}[version_compare(sys.argv[1], sys.argv[2])])
+PYEOF_VCMP
+}

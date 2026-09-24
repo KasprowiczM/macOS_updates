@@ -250,6 +250,91 @@ class RunItemsAndTerminalSummaryTests(unittest.TestCase):
             self.assertEqual(len(pending_items), 1)
             self.assertEqual(pending_items[0]["name"], "macOS 27.1 Update")
 
+    def test_between_step_changes_are_attributed(self) -> None:
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "installed_apps_scan.txt").write_text(
+                "Claude|2.2553.13\nGoogle Chrome|130.0.6723.69\n", encoding="utf-8"
+            )
+            (tmp_path / "installed_apps_after.txt").write_text(
+                "Claude|2.7032.0\nGoogle Chrome|131.0.6778.86\n", encoding="utf-8"
+            )
+            (tmp_path / "appstore_ios_before.txt").write_text(
+                "Picsart|30.7.2\n", encoding="utf-8"
+            )
+            (tmp_path / "appstore_ios_after.txt").write_text(
+                "Picsart|30.8.2\n", encoding="utf-8"
+            )
+            (tmp_path / "internet_before.txt").write_text(
+                "Google Chrome|130.0.6723.69\n", encoding="utf-8"
+            )
+            (tmp_path / "internet_after.txt").write_text(
+                "Google Chrome|131.0.6778.86\n", encoding="utf-8"
+            )
+
+            items = collect_run_items(tmp_path)
+
+            bg_items = [it for it in items if it.get("category") == "background"]
+            self.assertEqual(len(bg_items), 1)
+            bg_names = {it["name"]: it for it in bg_items}
+            self.assertIn("Claude", bg_names)
+            self.assertEqual(bg_names["Claude"]["old_version"], "2.2553.13")
+            self.assertEqual(bg_names["Claude"]["new_version"], "2.7032.0")
+            self.assertEqual(bg_names["Claude"]["status"], "updated")
+            self.assertEqual(bg_names["Claude"]["details"], "updated outside toolkit steps (vendor updater / App Store)")
+
+            appstore_items = [it for it in items if it.get("category") == "appstore"]
+            self.assertEqual(len(appstore_items), 1)
+            self.assertEqual(appstore_items[0]["name"], "Picsart")
+            self.assertEqual(appstore_items[0]["old_version"], "30.7.2")
+            self.assertEqual(appstore_items[0]["new_version"], "30.8.2")
+            self.assertEqual(appstore_items[0]["status"], "updated")
+            self.assertEqual(appstore_items[0]["details"], "App Store (iPad) — Track 2")
+
+            # Google Chrome was already updated in step 5 internet, must NOT be duplicated in background
+            chrome_items = [it for it in items if "Chrome" in it["name"]]
+            self.assertEqual(len(chrome_items), 1)
+            self.assertEqual(chrome_items[0]["category"], "internet")
+
+    def test_ipad_update_during_track2_is_appstore_not_background(self) -> None:
+        """iPad apps updated during Track 2 are attributed to appstore and not duplicated in background."""
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "appstore_ios_before.txt").write_text("Picsart|30.7.2\n", encoding="utf-8")
+            (tmp_path / "appstore_ios_after.txt").write_text("Picsart|30.8.2\n", encoding="utf-8")
+            (tmp_path / "installed_apps_scan.txt").write_text("Picsart|30.7.2\n", encoding="utf-8")
+            (tmp_path / "installed_apps_after.txt").write_text("Picsart|30.8.2\n", encoding="utf-8")
+
+            items = collect_run_items(tmp_path)
+            appstore_items = [it for it in items if it.get("category") == "appstore"]
+            bg_items = [it for it in items if it.get("category") == "background"]
+
+            self.assertEqual(len(appstore_items), 1)
+            self.assertEqual(appstore_items[0]["name"], "Picsart")
+            self.assertEqual(appstore_items[0]["details"], "App Store (iPad) — Track 2")
+            self.assertEqual(len(bg_items), 0, "iPad update should not be duplicated in background")
+
+    def test_cask_with_different_app_name_not_duplicated_as_background(self) -> None:
+        """Cask updates with different .app target names are not duplicated in background."""
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "brew_casks_before.txt").write_text("mycask 5.0\n", encoding="utf-8")
+            (tmp_path / "brew_casks_after.txt").write_text("mycask 5.1\n", encoding="utf-8")
+            (tmp_path / "brew_cask_targets.txt").write_text("mycask|MySpecialApp.app\n", encoding="utf-8")
+            (tmp_path / "installed_apps_scan.txt").write_text("MySpecialApp|5.0\n", encoding="utf-8")
+            (tmp_path / "installed_apps_after.txt").write_text("MySpecialApp|5.1\n", encoding="utf-8")
+
+            items = collect_run_items(tmp_path)
+            cask_items = [it for it in items if it.get("category") == "brew_cask"]
+            bg_items = [it for it in items if it.get("category") == "background"]
+
+            self.assertEqual(len(cask_items), 1)
+            self.assertEqual(cask_items[0]["name"], "mycask")
+            self.assertEqual(len(bg_items), 0, "Cask app target should not be duplicated as background")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -57,6 +57,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/internet_i18n.sh"
 . "$SCRIPT_DIR/lib/version.sh"
 . "$SCRIPT_DIR/lib/platform.sh"
+. "$SCRIPT_DIR/lib/internet_status.sh"
 
 mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/lib/ui.sh"
@@ -322,6 +323,9 @@ copy_verified_app() {
 }
 
 . "$SCRIPT_DIR/lib/proc.sh"
+. "$SCRIPT_DIR/lib/vendor_feeds.sh"
+. "$SCRIPT_DIR/lib/vendor_direct.sh"
+. "$SCRIPT_DIR/lib/appstore_ios.sh"
 
 # silent_launch_app — trigger a Mac app's built-in auto-updater without
 # bringing windows to the foreground.
@@ -333,25 +337,81 @@ copy_verified_app() {
 # Accepts either an app name (-a) or a path; falls back if -F is rejected.
 silent_launch_app() {
     local target="$1"
+    local explicit_bid="${2:-}"
     if [ -z "$target" ]; then
         return 1
     fi
+
+    local bid="$explicit_bid"
+    if [ -z "$bid" ]; then
+        local app_path=""
+        case "$target" in
+            /*)
+                app_path="$target"
+                ;;
+            *)
+                if command -v internet_app_path >/dev/null 2>&1; then
+                    app_path="$(internet_app_path "$target" 2>/dev/null || true)"
+                fi
+                ;;
+        esac
+        if [ -n "$app_path" ] && command -v internet_app_bundle_id >/dev/null 2>&1; then
+            bid="$(internet_app_bundle_id "$app_path" 2>/dev/null || true)"
+        fi
+    fi
+
+    local was_running=0
+    if [ -n "$bid" ] && command -v internet_app_is_running >/dev/null 2>&1; then
+        if internet_app_is_running "$bid"; then
+            was_running=1
+        fi
+    fi
+
+    local open_rc=0
     # Path vs name detection: a leading "/" means full path
     case "$target" in
         /*)
             open -gjF "$target" 2>/dev/null \
                 || open -gj "$target" 2>/dev/null \
                 || open "$target" 2>/dev/null \
-                || return 1
+                || open_rc=1
             ;;
         *)
             open -gjF -a "$target" 2>/dev/null \
                 || open -gj -a "$target" 2>/dev/null \
                 || open -a "$target" 2>/dev/null \
-                || return 1
+                || open_rc=1
             ;;
     esac
+
+    if [ "$open_rc" -ne 0 ]; then
+        return 1
+    fi
+
+    if [ "$was_running" -eq 0 ] && [ -n "$bid" ] && [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        local track_file="$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt"
+        mkdir -p "$MAC_UPDATE_SESSION_DIR" 2>/dev/null || true
+        if [ ! -f "$track_file" ] || ! grep -Fqx "$bid" "$track_file" 2>/dev/null; then
+            printf '%s\n' "$bid" >> "$track_file"
+        fi
+    fi
+
     return 0
+}
+
+quit_toolkit_launched_apps() {
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt" ]; then
+        local _t_bid
+        while IFS= read -r _t_bid || [ -n "$_t_bid" ]; do
+            case "$_t_bid" in '#'*|'') continue ;; esac
+            _t_bid="$(echo "$_t_bid" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            [ -n "$_t_bid" ] || continue
+            if ! internet_app_quit_gracefully "$_t_bid"; then
+                print_warn "$(printf "$L_INTERNET_APP_STILL_RUNNING_FMT" "$_t_bid")"
+                INTERNET_SOFT_FAIL="1"
+            fi
+        done < "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt"
+    fi
 }
 
 capture_app_path() {
@@ -392,22 +452,22 @@ echo ""
 # ── Inicjalizacja statusów (bash 3.2 — bez tablic asocjacyjnych) ──
 STATUS_CHROME="$L_INTERNET_STATUS_SKIPPED"
 STATUS_FIREFOX="$L_INTERNET_STATUS_SKIPPED"
-STATUS_BRAVE="→ managed by Homebrew (update_brew.sh)"
+STATUS_BRAVE="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_CHATGPT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_CLAUDE_APP="$L_INTERNET_STATUS_SKIPPED"
 STATUS_GEMINI="$L_INTERNET_STATUS_SKIPPED"
 STATUS_COMET="$L_INTERNET_STATUS_SKIPPED"
-STATUS_PERPLEXITY="→ managed by Homebrew (update_brew.sh)"
+STATUS_PERPLEXITY="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_ANTIGRAVITY="$L_INTERNET_STATUS_SKIPPED"
 STATUS_ANTIGRAVITY_IDE="$L_INTERNET_STATUS_SKIPPED"
-STATUS_LMSTUDIO="→ managed by Homebrew (update_brew.sh)"
-STATUS_PROTONVPN="→ managed by Homebrew (update_brew.sh)"
+STATUS_LMSTUDIO="$L_INTERNET_STATUS_MANAGED_BREW"
+STATUS_PROTONVPN="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_KEEPASSXC="$L_INTERNET_STATUS_SKIPPED"
 STATUS_PROTONMAIL="$L_INTERNET_STATUS_SKIPPED"
 STATUS_PROTONDRIVE="$L_INTERNET_STATUS_SKIPPED"
-STATUS_ZOOM="→ managed by Homebrew (update_brew.sh)"
+STATUS_ZOOM="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_SKIPPED"
-STATUS_MEGASYNC="→ managed by Homebrew (update_brew.sh)"
+STATUS_MEGASYNC="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_MICROSOFT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_TEAMS="$L_INTERNET_STATUS_SKIPPED"
 STATUS_VSCODE="$L_INTERNET_STATUS_SKIPPED"
@@ -415,20 +475,20 @@ STATUS_CODEEDIT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_DOCKER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_WARP="$L_INTERNET_STATUS_SKIPPED"
 STATUS_CURSOR="$L_INTERNET_STATUS_SKIPPED"
-STATUS_APPCLEANER="→ managed by Homebrew (update_brew.sh)"
-STATUS_OBSIDIAN="→ managed by Homebrew (update_brew.sh)"
-STATUS_SPOTIFY="→ managed by Homebrew (update_brew.sh)"
-STATUS_CAPCUT="→ managed by Homebrew (update_brew.sh)"
+STATUS_APPCLEANER="$L_INTERNET_STATUS_MANAGED_BREW"
+STATUS_OBSIDIAN="$L_INTERNET_STATUS_MANAGED_BREW"
+STATUS_SPOTIFY="$L_INTERNET_STATUS_MANAGED_BREW"
+STATUS_CAPCUT="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_LEDGER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_TREZOR="$L_INTERNET_STATUS_SKIPPED"
 STATUS_IPMIVIEW="$L_INTERNET_STATUS_SKIPPED"
 STATUS_RDMANAGER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_OPENCODE="$L_INTERNET_STATUS_SKIPPED"
-STATUS_INKSCAPE="→ managed by Homebrew (update_brew.sh)"
+STATUS_INKSCAPE="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_DJI="$L_INTERNET_STATUS_SKIPPED"
-STATUS_UNIFI="→ managed by App Store (update_appstore.sh)"
-STATUS_WIFIMAN="→ managed by App Store (update_appstore.sh)"
-STATUS_PICSART="→ managed by App Store (update_appstore.sh)"
+STATUS_UNIFI="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+STATUS_WIFIMAN="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+STATUS_PICSART="$L_INTERNET_STATUS_MANAGED_APPSTORE"
 
 # ============================================================
 # App handlers — config/internet_dispatch_order.txt
@@ -570,6 +630,7 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     elif [ "$INTERNET_SETTLE" -gt 0 ]; then
         sleep "$INTERNET_SETTLE"
     fi
+    quit_toolkit_launched_apps
     capture_internet_app_versions "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
     print_ok "$(internet_msg "$L_INTERNET_SNAPSHOTS_SAVED" "$MAC_UPDATE_SESSION_DIR")"
 
@@ -605,6 +666,14 @@ while IFS='|' read -r _s_app _s_meth _s_var; do
     _s_meth="$(echo "$_s_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     _s_var="$(echo "$_s_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     if [ "$_s_meth" = "silent_launch" ]; then
+        _s_cur=""
+        eval "_s_cur=\"\${$_s_var}\""
+        _s_code="$(internet_status_code "$_s_cur")"
+        case "$_s_code" in
+            current_verified|current_vendor|updated|behind|needs_restart|feed_stale|update_available|rollout_hold)
+                continue
+                ;;
+        esac
         _s_app_name="$(echo "$_s_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         _s_days="$(internet_get_app_days_unchanged "$_s_app_name")"
         if [ "$_s_days" -gt "$STALE_LIMIT" ]; then
@@ -638,6 +707,11 @@ if [ -f "$SCRIPT_DIR/config/cask_oracles.txt" ] && command -v brew >/dev/null 2>
         _o_app="$(echo "$_o_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         _o_token="$(echo "$_o_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
         [ -n "$_o_token" ] || continue
+
+        # v1.5.0 (T3): Skip apps that have a vendor feed in config/vendor_feeds.txt
+        if vendor_feed_row "$_o_app" >/dev/null 2>&1; then
+            continue
+        fi
 
         _o_var=""
         while IFS='|' read -r _m_app _m_meth _m_var; do
@@ -673,6 +747,11 @@ if [ -f "$SCRIPT_DIR/config/cask_oracles.txt" ] && command -v brew >/dev/null 2>
             _o_token="$(echo "$_o_token" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             [ -n "$_o_token" ] || continue
 
+            # v1.5.0 (T3): Skip apps that have a vendor feed in config/vendor_feeds.txt
+            if vendor_feed_row "$_o_app" >/dev/null 2>&1; then
+                continue
+            fi
+
             _o_var=""
             while IFS='|' read -r _m_app _m_meth _m_var; do
                 case "$_m_app" in '#'*|'') continue ;; esac
@@ -707,19 +786,20 @@ if [ -f "$SCRIPT_DIR/config/cask_oracles.txt" ] && command -v brew >/dev/null 2>
                 ''|'unknown'|'nieznana'|'null'|"${L_INTERNET_VERSION_UNKNOWN:-unknown}") continue ;;
             esac
 
-            _cask_rel="$(app_vs_package_version_relation "$_cask_ver" "$_bundle_ver" 2>/dev/null || echo "unknown")"
+            _cask_rel="$(version_cmp "$_cask_ver" "$_bundle_ver")"
 
             if [ "$_cask_rel" = "newer" ]; then
                 eval "${_o_var}=\"\$(internet_msg \"\$L_INTERNET_STATUS_CASK_BEHIND_FMT\" \"\$_bundle_ver\" \"\$_cask_ver\")\""
                 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
                     printf "%s|%s|%s\n" "$_o_app" "$_bundle_ver" "$_cask_ver" >> "$MAC_UPDATE_SESSION_DIR/internet_behind_apps.txt"
                 fi
-            elif [ "$_cask_rel" = "current" ]; then
+            elif [ "$_cask_rel" = "equal" ]; then
                 eval "${_o_var}=\"\$L_INTERNET_STATUS_CASK_CURRENT\""
                 if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
                     printf "%s|%s\n" "$_o_app" "$_bundle_ver" >> "$MAC_UPDATE_SESSION_DIR/internet_verified_apps.txt"
                 fi
             fi
+            # older / unknown -> no change of status (remains ⏳)
         done < "$SCRIPT_DIR/config/cask_oracles.txt"
     fi
 fi
@@ -728,6 +808,11 @@ fi
 _cnt_verified=0
 _cnt_behind=0
 _cnt_unverified=0
+_soft_fail_from_codes=0
+
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+    rm -f "$MAC_UPDATE_SESSION_DIR/internet_status_codes.txt" 2>/dev/null || true
+fi
 
 while IFS='|' read -r _c_app _c_meth _c_var; do
     case "$_c_app" in '#'*|'') continue ;; esac
@@ -735,15 +820,24 @@ while IFS='|' read -r _c_app _c_meth _c_var; do
     [ -n "$_c_var" ] || continue
     _v_st=""
     eval "_v_st=\$$_c_var"
-    case "$_v_st" in
-        *"⏳"*)
-            _cnt_unverified=$((_cnt_unverified + 1))
+    _code="$(internet_status_code "$_v_st")"
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        printf "%s|%s|%s\n" "$_c_app" "$_code" "$_v_st" >> "$MAC_UPDATE_SESSION_DIR/internet_status_codes.txt"
+    fi
+    case "$_code" in
+        current_verified|current_vendor|updated)
+            _cnt_verified=$((_cnt_verified + 1))
             ;;
-        *"w tyle"*|*"behind"*|*"im Rückstand"*|*"en retard"*|*"atrás"*|*"indietro"*|*"atrasada"*)
+        behind|needs_restart)
             _cnt_behind=$((_cnt_behind + 1))
             ;;
-        *"cask)"*|*"Cask)"*)
-            _cnt_verified=$((_cnt_verified + 1))
+        unverified)
+            _cnt_unverified=$((_cnt_unverified + 1))
+            ;;
+    esac
+    case "$_code" in
+        behind|needs_restart|feed_stale)
+            _soft_fail_from_codes=1
             ;;
     esac
 done < "$SCRIPT_DIR/config/internet_app_methods.txt"
@@ -784,79 +878,69 @@ fi
 # ============================================================
 print_header "$L_INTERNET_SUMMARY_TITLE"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_BROWSERS${NC}"
-printf "  %-32s %s\n" "Google Chrome:"            "$STATUS_CHROME"
-printf "  %-32s %s\n" "Firefox Dev Edition:"      "$STATUS_FIREFOX"
-printf "  %-32s %s\n" "Brave Browser:"            "$STATUS_BRAVE"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_BROWSERS"
+internet_summary_row "Google Chrome:"            "$STATUS_CHROME"        "Google Chrome"
+internet_summary_row "Firefox Dev Edition:"      "$STATUS_FIREFOX"       "Firefox Developer Edition"
+internet_summary_row "Brave Browser:"            "$STATUS_BRAVE"         "Brave Browser"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_AI${NC}"
-printf "  %-32s %s\n" "ChatGPT / Codex:"          "$STATUS_CHATGPT"
-printf "  %-32s %s\n" "Claude Desktop:"           "$STATUS_CLAUDE_APP"
-printf "  %-32s %s\n" "Gemini Desktop:"           "$STATUS_GEMINI"
-printf "  %-32s %s\n" "Comet (Perplexity Browser):" "$STATUS_COMET"
-printf "  %-32s %s\n" "Perplexity Desktop:"       "$STATUS_PERPLEXITY"
-printf "  %-32s %s\n" "Antigravity:"              "$STATUS_ANTIGRAVITY"
-printf "  %-32s %s\n" "Antigravity IDE:"          "$STATUS_ANTIGRAVITY_IDE"
-printf "  %-32s %s\n" "LM Studio:"                "$STATUS_LMSTUDIO"
-printf "  %-32s %s\n" "OpenCode Desktop:"         "$STATUS_OPENCODE"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_AI"
+internet_summary_row "ChatGPT / Codex:"          "$STATUS_CHATGPT"       "ChatGPT / Codex"
+internet_summary_row "Claude Desktop:"           "$STATUS_CLAUDE_APP"    "Claude"
+internet_summary_row "Gemini Desktop:"           "$STATUS_GEMINI"        "Gemini"
+internet_summary_row "Comet (Perplexity Browser):" "$STATUS_COMET"       "Comet"
+internet_summary_row "Perplexity Desktop:"       "$STATUS_PERPLEXITY"    "Perplexity"
+internet_summary_row "Antigravity:"              "$STATUS_ANTIGRAVITY"   "Antigravity"
+internet_summary_row "Antigravity IDE:"          "$STATUS_ANTIGRAVITY_IDE" "Antigravity IDE"
+internet_summary_row "LM Studio:"                "$STATUS_LMSTUDIO"      "LM Studio"
+internet_summary_row "OpenCode Desktop:"         "$STATUS_OPENCODE"      "OpenCode"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_VPN${NC}"
-printf "  %-32s %s\n" "ProtonVPN:"                "$STATUS_PROTONVPN"
-printf "  %-32s %s\n" "KeePassXC:"                "$STATUS_KEEPASSXC"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_VPN"
+internet_summary_row "ProtonVPN:"                "$STATUS_PROTONVPN"     "ProtonVPN"
+internet_summary_row "KeePassXC:"                "$STATUS_KEEPASSXC"     "KeePassXC"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_MAIL${NC}"
-printf "  %-32s %s\n" "Proton Mail:"              "$STATUS_PROTONMAIL"
-printf "  %-32s %s\n" "Zoom:"                     "$STATUS_ZOOM"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_MAIL"
+internet_summary_row "Proton Mail:"              "$STATUS_PROTONMAIL"    "Proton Mail"
+internet_summary_row "Zoom:"                     "$STATUS_ZOOM"          "zoom.us"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_CLOUD${NC}"
-printf "  %-32s %s\n" "Google Drive:"             "$STATUS_GOOGLEDRIVE"
-printf "  %-32s %s\n" "MEGAsync:"                 "$STATUS_MEGASYNC"
-printf "  %-32s %s\n" "Proton Drive:"             "$STATUS_PROTONDRIVE"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_CLOUD"
+internet_summary_row "Google Drive:"             "$STATUS_GOOGLEDRIVE"   "Google Drive"
+internet_summary_row "MEGAsync:"                 "$STATUS_MEGASYNC"      "MEGAsync"
+internet_summary_row "Proton Drive:"             "$STATUS_PROTONDRIVE"   "Proton Drive"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_MICROSOFT${NC}"
-printf "  %-32s %s\n" "Microsoft AutoUpdate:" "$STATUS_MICROSOFT"
-printf "  %-32s %s\n" "Microsoft Teams (hybrid):" "$STATUS_TEAMS"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_MICROSOFT"
+internet_summary_row "Microsoft AutoUpdate:"     "$STATUS_MICROSOFT"     "Microsoft AutoUpdate"
+internet_summary_row "Microsoft Teams (hybrid):" "$STATUS_TEAMS"         "Microsoft Teams"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_DEV${NC}"
-printf "  %-32s %s\n" "Visual Studio Code:"       "$STATUS_VSCODE"
-printf "  %-32s %s\n" "CodeEdit:"                 "$STATUS_CODEEDIT"
-printf "  %-32s %s\n" "Docker Desktop:"           "$STATUS_DOCKER"
-printf "  %-32s %s\n" "Warp:"                     "$STATUS_WARP"
-printf "  %-32s %s\n" "Cursor:"                   "$STATUS_CURSOR"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_DEV"
+internet_summary_row "Visual Studio Code:"       "$STATUS_VSCODE"        "Visual Studio Code"
+internet_summary_row "CodeEdit:"                 "$STATUS_CODEEDIT"      "CodeEdit"
+internet_summary_row "Docker Desktop:"           "$STATUS_DOCKER"        "Docker Desktop"
+internet_summary_row "Warp:"                     "$STATUS_WARP"          "Warp"
+internet_summary_row "Cursor:"                   "$STATUS_CURSOR"        "Cursor"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_PRODUCTIVITY${NC}"
-printf "  %-32s %s\n" "AppCleaner:"               "$STATUS_APPCLEANER"
-printf "  %-32s %s\n" "Obsidian:"                 "$STATUS_OBSIDIAN"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_PRODUCTIVITY"
+internet_summary_row "AppCleaner:"               "$STATUS_APPCLEANER"    "AppCleaner"
+internet_summary_row "Obsidian:"                 "$STATUS_OBSIDIAN"      "Obsidian"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_MULTIMEDIA${NC}"
-printf "  %-32s %s\n" "Spotify:"                  "$STATUS_SPOTIFY"
-printf "  %-32s %s\n" "CapCut:"                   "$STATUS_CAPCUT"
-printf "  %-32s %s\n" "Inkscape:"                 "$STATUS_INKSCAPE"
-printf "  %-32s %s\n" "Picsart:"                  "$STATUS_PICSART"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_MULTIMEDIA"
+internet_summary_row "Spotify:"                  "$STATUS_SPOTIFY"       "Spotify"
+internet_summary_row "CapCut:"                   "$STATUS_CAPCUT"        "CapCut"
+internet_summary_row "Inkscape:"                 "$STATUS_INKSCAPE"      "Inkscape"
+internet_summary_row "Picsart:"                  "$STATUS_PICSART"       "Picsart"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_CRYPTO${NC}"
-printf "  %-32s %s\n" "Ledger Live/Wallet:"       "$STATUS_LEDGER"
-printf "  %-32s %s\n" "Trezor Suite:"             "$STATUS_TREZOR"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_CRYPTO"
+internet_summary_row "Ledger Live/Wallet:"       "$STATUS_LEDGER"        "Ledger Live"
+internet_summary_row "Trezor Suite:"             "$STATUS_TREZOR"        "Trezor Suite"
 
-echo -e "  ${BOLD}$L_INTERNET_SECTION_NETWORK${NC}"
-printf "  %-32s %s\n" "Remote Desktop Manager:"   "$STATUS_RDMANAGER"
-printf "  %-32s %s\n" "IPMIView:"                 "$STATUS_IPMIVIEW"
-printf "  %-32s %s\n" "DJI Assistant 2:"          "$STATUS_DJI"
-echo ""
+internet_summary_section "$L_INTERNET_SECTION_NETWORK"
+internet_summary_row "Remote Desktop Manager:"   "$STATUS_RDMANAGER"     "Remote Desktop Manager"
+internet_summary_row "IPMIView:"                 "$STATUS_IPMIVIEW"      "IPMIView"
+internet_summary_row "DJI Assistant 2:"          "$STATUS_DJI"           "DJI Assistant 2"
 
-echo -e "  ${BOLD}IoT / iPad on Apple Silicon${NC}"
-printf "  %-32s %s\n" "UniFi:"                    "$STATUS_UNIFI"
-printf "  %-32s %s\n" "WiFiman:"                  "$STATUS_WIFIMAN"
+internet_summary_section "IoT / iPad on Apple Silicon"
+internet_summary_row "UniFi:"                    "$STATUS_UNIFI"         "UniFi"
+internet_summary_row "WiFiman:"                  "$STATUS_WIFIMAN"       "WiFiman"
+internet_summary_end
 
 echo ""
 echo -e "  ${YELLOW}──────────────────────────────────────────────────────${NC}"
@@ -909,6 +993,7 @@ do
             ;;
     esac
 done
+[ "$_soft_fail_from_codes" -ne 0 ] && INTERNET_SOFT_FAIL=1
 
 if [ "$INTERNET_HARD_FAIL" -ne 0 ]; then
     INTERNET_EXIT=1

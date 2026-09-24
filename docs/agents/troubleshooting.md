@@ -21,6 +21,11 @@
 | `opencode --version` says postinstall was not run, or the log shows `opencode-cli: ?` | npm 12 only runs lifecycle scripts for packages on the user `allow-scripts` allowlist. Repair is scoped to the managed prefix (`~/.local/share/mac-update/npm-global`) with `--allow-scripts=opencode-ai`; do not add a global `~/.npmrc` exception. Re-run `bash update_npm_cli.sh` |
 | Log shows `✅ codex-cli: codex-cli` instead of a version | The vendor prints `codex-cli 0.153.4`. Fixed in v1.4.5 (`report_cli_version_or_fail`) |
 | Postupdate “total version changes” looks larger than what actually updated | Inventory table field edits are not installs. v1.4.5 prints inventory fields changed vs observed package/CLI changes separately |
+| Cask app removed manually (orphan) | The app was removed from `/Applications` but the Homebrew cask record remained. The toolkit detects and skips orphan casks without re-downloading. Remove the stale record: `brew uninstall --cask --force <slug>` |
+| Status: quit the app so its updater can install | An app update was staged/downloaded in the background by its vendor updater, but cannot finish installing while the application is running. Quit the app and re-run `update_all.sh` |
+| Vendor feed stale | The vendor's appcast or release feed is serving a version older than what is currently installed locally (`remote < local`). The toolkit leaves the installed version intact without regressing |
+| Chrome: vendor staged rollout | Google Chrome is rolling out in cohorts: the latest public version is released, but Google Omaha has not offered it to this Mac yet (`noupdate`). No action needed — will update once offered |
+| CLI not installed — skipping | The toolkit only updates CLI tools that are already installed on the Mac. Run with `--bootstrap-cli` (or `MAC_UPDATE_BOOTSTRAP_CLI=1`) to intentionally install missing CLIs |
 | `mas upgrade` fails | `sudo mas upgrade` (CVE-2025-43411) |
 | iPad apps "not allowed" error | System Settings → Privacy → Accessibility → add terminal |
 | Wrong language | Edit `.mac_update_prefs` → `MAC_LANG=en` |

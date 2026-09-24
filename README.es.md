@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.4.6** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–27**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
+> **v1.5.0** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–27**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
+
+**Verdad del proveedor (v1.5.0):** la versión de cada aplicación se compara con el feed de su propio proveedor antes de ejecutar cualquier acción. Las aplicaciones actualizadas no se tocan; las desactualizadas se actualizan mediante el actualizador del propio proveedor o se instalan desde el proveedor con verificación de firma y Team ID. Solo se actualiza el software que ya está instalado (`--bootstrap-cli` instala deliberadamente las CLI faltantes). Las aplicaciones eliminadas manualmente se detectan y nunca se reinstalan. Compruebe el estado del proveedor en modo de solo lectura con `bash scripts/check_vendor_feeds.sh`.
 
 **Repositorio público:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Release: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md)
 
@@ -34,7 +36,7 @@ Consulte [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTAL
 | 3 | **Homebrew** — Fórmulas y Casks (`--greedy-auto-updates`) + protección contra downgrades |
 | 4 | **Aplicaciones de Internet** — controladores verificados, `vendor_latest`, Sparkle Appcast |
 | 5 | **Post-actualización/Historial** — actualiza inventario e historial de forma atómica |
-| 6 | **macOS (final)** — `softwareupdate -ia -R`; se omite si ocurre un error previo |
+| 6 | **macOS (final)** — por etiqueta `softwareupdate -i <label> -R` (reinicio en lote final); se omite si ocurre un error previo |
 
 ---
 

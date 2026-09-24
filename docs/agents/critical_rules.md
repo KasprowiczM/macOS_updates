@@ -63,10 +63,10 @@ genuinely fetches a remote version and compares it to the installed one. Countin
 launch-and-hope method as verified inflates the coverage metric — the single number used to
 judge this project — and hides apps that have silently stopped updating.
 
-Corollary: `keystone` is valid **only** for Google products (Chrome, Google Drive). The
+Corollary: `keystone` is valid **only** for Google products (Chrome, Google Drive, Gemini). The
 Google Software Update agent serves no other vendor. Classifying a non-Google app as
-`keystone` produces a green "Checked via CLI" for a check that never happened; Comet was
-mislabelled this way and reported as verified while nothing verified it.
+`keystone` produces a green "Checked via CLI" for a check that never happened; Comet is a
+Chromium-based browser that ships its own updater and uses `chromium_updater`.
 
 ## 6c. Never call interactive `sudo` without a controlling TTY
 
@@ -101,13 +101,14 @@ Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 |--------|------|
 | Mozilla product-details/download + DMG | Firefox Dev |
 | GitHub API / Official Metadata + DMG | KeePassXC, CodeEdit, Trezor Suite, Ledger Wallet / Live |
-| Google Keystone | Chrome, Google Drive |
+| Google Keystone | Chrome, Google Drive, Gemini |
+| Chromium Updater | Comet (Perplexity AI) |
 | msupdate CLI | Word, Excel, PowerPoint, Outlook, OneNote; observed `TEAMS21` fallback when MAU offers it |
 | Vendor self-updater + MAU fallback | Microsoft Teams normally owns its cadence; MAU may recover a failed Teams updater |
 | Docker CLI | Docker Desktop v4.37+ |
-| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI |
-| Homebrew cask --greedy-auto-updates | Brave, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
-| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT/Codex desktop, Claude, Comet, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian |
+| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
+| Homebrew cask (greedy only for brew_cask-designated tokens) | Brave, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
+| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT/Codex desktop, Claude, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian |
 | Hybrid self-update + MAU fallback | Teams (`TEAMS21` is accepted only when surfaced by MAU and is verified by a final `msupdate --list`) |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
 | Manual only | IPMIView, DJI Assistant 2 |
@@ -141,6 +142,7 @@ These methods are not equivalent proof levels:
 - GRUPA 2: App Store (mas IDs)
 - GRUPA 3: Internet apps
 - GRUPA 4: Tooling (4a key ⭐, 4b deps, 4c casks, 4d native CLI + npm)
+- Never paste `APPLICATIONS.md`/`UPDATES.md` content or diffs into tracked files — keep them in `scratch/`.
 
 ## 9. Microsoft AutoUpdate version regressions
 
@@ -230,4 +232,28 @@ not success.
 - **TCC.db Inaccessibility:** Direct read or query of `TCC.db` is blocked by SIP on macOS 27. Permission checks (such as Accessibility for Track 2 App Store updates) must use API/AppleScript probes (`osascript`) rather than SQLite inspection.
 - **TLS 1.2+ / ATS for Update Handlers:** Network requests and sparkle/vendor feed downloads must comply with App Transport Security and TLS 1.2+ minimums.
 
+## 15. Vendor Truth (v1.5.0)
 
+- **Source of truth:** The vendor's own release feed (`config/vendor_feeds.txt`) or live Omaha updater query is the authoritative truth for version comparison. Homebrew cask version is only a second voice: it may confirm that an app is behind, but equality confirms "current" only when no vendor feed is configured (`current_cask_only`).
+- **Feed stale guard:** When `remote < local`, the condition is treated as `feed_stale`, preserving the local installed version rather than regressing or downgrading.
+- **Check before action:** Do not launch applications, virtual machines, or vendor updaters if the vendor feed reports the app is already up to date.
+- **Never terminate user-running applications:** Only quit what the toolkit itself launched, and always perform soft graceful termination (`quit`), never forced `kill`.
+  An app that is already open when `update_all.sh` reaches it is in use: it is never quit, relaunched or
+  replaced. The handler reports `NEEDS_RESTART` ("quit the app so its updater can install") and moves on.
+  `silent_launch_app` records only apps that were **not** running before it opened them
+  (`$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt`); `quit_toolkit_launched_apps` quits exactly those after
+  the settle window. `vendor_direct_install` refuses to swap a running app, and Docker Desktop is stopped
+  only when the toolkit started it.
+- **Verified downloads only:** Direct downloads must use `https://`, validate against exact allowlisted hosts (`config/vendor_feeds.txt`), verify checksums (SHA256/SHA512) when published by the vendor, and install via `copy_verified_app` (spctl Gatekeeper check, CFBundleIdentifier and Apple Team ID match, staged atomic swap, and automatic rollback on failure).
+
+## 16. Only Installed Applications & CLI Toolchains (v1.5.0)
+
+- The update pipeline updates **only** what is already installed on the Mac.
+- Missing native CLI tools (`claude`, `codex`, `opencode`, `agent`, `agy`) and node toolchains are skipped without error.
+- Missing CLIs are installed only when explicitly requested via the `--bootstrap-cli` flag (`MAC_UPDATE_BOOTSTRAP_CLI=1`).
+
+## 17. Orphan Homebrew Casks (v1.5.0)
+
+- Casks whose `.app` bundles have been deleted manually from `/Applications` or `~/Applications` are classified as orphan casks.
+- Orphan casks are skipped during `brew upgrade --cask` (protecting against ghost reinstallations) and recorded in `$MAC_UPDATE_SESSION_DIR/brew_orphan_casks.txt`.
+- In interactive mode, the user is prompted to clean up the stale Homebrew record via `brew uninstall --cask --force <token>`.
