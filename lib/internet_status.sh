@@ -45,6 +45,7 @@ internet_status_code() {
         "updated|$L_INTERNET_STATUS_UPDATED_FMT" \
         "current_verified|$L_INTERNET_STATUS_CURRENT_FMT" \
         "current_verified|$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" \
+        "current_vendor|$L_INTERNET_STATUS_OMAHA_RECENT_FMT" \
         "rollout_hold|$L_INTERNET_STATUS_ROLLOUT_HOLD_FMT" \
         "update_available|$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" \
         "behind|$L_INTERNET_STATUS_BEHIND_FMT" \

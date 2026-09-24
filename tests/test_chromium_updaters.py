@@ -99,6 +99,8 @@ EOF
             source "{REPO_ROOT}/lib/version.sh"
             source "{REPO_ROOT}/lib/internet_handlers.sh"
             _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+            export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
+            export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
             app_version() {{ echo "153.0.8010.53"; }}
             evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
             echo "STATUS=$INTERNET_LAST_STATUS"
@@ -189,6 +191,7 @@ exit 0
                 internet_msg() {{ printf "$@"; }}
                 # Mock HOME so user_log is picked up
                 export HOME="{tmpdir}"
+                export MAC_UPDATE_GOOGLE_SYS_UPDATER=""
                 mkdir -p "$HOME/Library/Application Support/Google/GoogleUpdater"
                 mv "{user_log}" "$HOME/Library/Application Support/Google/GoogleUpdater/updater.log"
                 # Mock sleep: on 2nd sleep call, append Chrome updatecheck
@@ -239,6 +242,7 @@ exit 0
             cmd_chrome = f"""
                 export HOME="{tmpdir}"
                 export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                export MAC_UPDATE_GOOGLE_SYS_UPDATER=""
                 source "{REPO_ROOT}/i18n/lang_en.sh"
                 source "{REPO_ROOT}/lib/version.sh"
                 source "{REPO_ROOT}/lib/proc.sh"
@@ -255,6 +259,7 @@ exit 0
             cmd_gemini = f"""
                 export HOME="{tmpdir}"
                 export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                export MAC_UPDATE_GOOGLE_SYS_UPDATER=""
                 source "{REPO_ROOT}/i18n/lang_en.sh"
                 source "{REPO_ROOT}/lib/version.sh"
                 source "{REPO_ROOT}/lib/proc.sh"
@@ -271,6 +276,7 @@ exit 0
             cmd_drive = f"""
                 export HOME="{tmpdir}"
                 export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                export MAC_UPDATE_GOOGLE_SYS_UPDATER=""
                 source "{REPO_ROOT}/i18n/lang_en.sh"
                 source "{REPO_ROOT}/lib/version.sh"
                 source "{REPO_ROOT}/lib/proc.sh"
@@ -307,6 +313,199 @@ exit 0
             res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
             self.assertIn("STATUS_IN_OLD", res.stdout)
             self.assertIn("NEW_HEADER_LINE", res.stdout)
+
+    def test_google_omaha_shared_deadline(self) -> None:
+        """Three apps in one session have total sleep duration bounded by MAC_UPDATE_OMAHA_WAIT."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            session_dir = Path(tmpdir) / "session"
+            session_dir.mkdir()
+            sleep_log = Path(tmpdir) / "sleep.log"
+            user_log = Path(tmpdir) / "Library/Application Support/Google/GoogleUpdater/updater.log"
+            user_log.parent.mkdir(parents=True)
+            user_log.touch()
+
+            mock_agent = Path(tmpdir) / "GoogleSoftwareUpdateAgent"
+            mock_agent.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            mock_agent.chmod(mock_agent.stat().st_mode | stat.S_IEXEC)
+
+            cmd = f"""
+                export HOME="{tmpdir}"
+                export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                export MAC_UPDATE_GOOGLE_SYS_UPDATER=""
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                _LIB_DIR="{REPO_ROOT}/lib"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                MAC_UPDATE_OMAHA_WAIT=4
+                sim_now=$(/bin/date +%s)
+                date() {{
+                    if [ "$1" = "+%s" ]; then
+                        echo "$sim_now"
+                    else
+                        command date "$@"
+                    fi
+                }}
+                sleep() {{
+                    echo "$1" >> "{sleep_log}"
+                    sim_now=$(( sim_now + $1 ))
+                }}
+                google_keystone_check "{mock_agent}" "com.google.chrome"
+                google_keystone_check "{mock_agent}" "com.google.geminimacos"
+                google_keystone_check "{mock_agent}" "com.google.drivefs"
+            """
+            subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+
+            durations = [int(x) for x in sleep_log.read_text(encoding="utf-8").strip().splitlines() if x.isdigit()]
+            total_sleep = sum(durations)
+            self.assertLessEqual(total_sleep, 4, f"Total sleep was {total_sleep}s, expected <= 4s")
+
+    def test_google_updater_wake_all_priority_over_legacy_agent(self) -> None:
+        """When GoogleUpdater exists, it is called with --wake-all and legacy agent is skipped."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            user_updater = Path(tmpdir) / "Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater"
+            user_updater.parent.mkdir(parents=True)
+            updater_calls = Path(tmpdir) / "updater_calls.log"
+            user_updater.write_text(f"""#!/usr/bin/env bash
+echo "$@" >> "{updater_calls}"
+exit 0
+""", encoding="utf-8")
+            user_updater.chmod(user_updater.stat().st_mode | stat.S_IEXEC)
+
+            mock_agent = Path(tmpdir) / "GoogleSoftwareUpdateAgent"
+            agent_calls = Path(tmpdir) / "agent_calls.log"
+            mock_agent.write_text(f"""#!/usr/bin/env bash
+echo "legacy called" >> "{agent_calls}"
+exit 0
+""", encoding="utf-8")
+            mock_agent.chmod(mock_agent.stat().st_mode | stat.S_IEXEC)
+
+            cmd = f"""
+                export HOME="{tmpdir}"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                _LIB_DIR="{REPO_ROOT}/lib"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                MAC_UPDATE_OMAHA_WAIT=0
+                google_keystone_check "{mock_agent}" "com.google.chrome"
+            """
+            subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+
+            self.assertTrue(updater_calls.exists(), "GoogleUpdater was not called")
+            self.assertIn("--wake-all", updater_calls.read_text(encoding="utf-8"))
+            self.assertFalse(agent_calls.exists(), "Legacy agent should not have been called when GoogleUpdater exists")
+
+    def test_chrome_versionhistory_precheck_skips_updater(self) -> None:
+        """When Chrome installed >= VersionHistory public version, updater is not triggered."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chrome_app = Path(tmpdir) / "Google Chrome.app"
+            chrome_app.mkdir()
+            updater_calls = Path(tmpdir) / "updater.log"
+
+            vh_fixture = (REPO_ROOT / "tests" / "fixtures" / "vendor_feeds" / "versionhistory.json").read_text(encoding="utf-8")
+            bin_dir = Path(tmpdir) / "bin"
+            bin_dir.mkdir()
+            mock_curl = bin_dir / "curl"
+            mock_curl.write_text(f"""#!/usr/bin/env bash
+cat <<'EOF'
+{vh_fixture}
+EOF
+""", encoding="utf-8")
+            mock_curl.chmod(mock_curl.stat().st_mode | stat.S_IEXEC)
+
+            cmd = f"""
+                export PATH="{bin_dir}:$PATH"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_apps.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                _LIB_DIR="{REPO_ROOT}/lib"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                print_header() {{ :; }}
+                print_info() {{ :; }}
+                print_step() {{ :; }}
+                print_ok() {{ :; }}
+                print_warn() {{ :; }}
+                internet_msg() {{ printf "$@"; }}
+                app_version() {{ echo "154.0.8037.58"; }}
+                google_keystone_check() {{ echo "CALLED" >> "{updater_calls}"; return 0; }}
+
+                STATUS_CHROME=""
+                iu_google_chrome
+                echo "STATUS_CHROME=$STATUS_CHROME"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("STATUS_CHROME=✅ Up to date (154.0.8037.58, Google VersionHistory)", res.stdout)
+            self.assertFalse(updater_calls.exists(), "Keystone/Omaha updater should not have been called")
+
+    def test_omaha_recent_proof_recent_noupdate(self) -> None:
+        """When no response in window, but updater.log has noupdate within max age, report recent check."""
+        import datetime
+        now = datetime.datetime.now()
+        two_hours_ago = now - datetime.timedelta(hours=2)
+        prefix = f"[{1}:{2}:{two_hours_ago.strftime('%m%d/%H%M%S')}.100000:VERBOSE2:test.cc:100]"
+        log_line = f'{prefix} {{"response":{{"apps":[{{"appid":"com.google.chrome","status":"ok","updatecheck":{{"status":"noupdate"}}}}]}}}}'
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            user_log = Path(tmpdir) / "updater.log"
+            user_log.write_text(log_line + "\n", encoding="utf-8")
+
+            cmd = f"""
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                export MAC_UPDATE_GOOGLE_USER_LOG="{user_log}"
+                export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
+                export MAC_UPDATE_OMAHA_MAX_AGE_H=6
+                app_version() {{ echo "153.0.8010.53"; }}
+                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                echo "STATUS=$INTERNET_LAST_STATUS"
+                echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            expected_time = two_hours_ago.strftime("%H:%M")
+            self.assertIn(f"STATUS=✅ Up to date (Google updater check at {expected_time})", res.stdout)
+            self.assertIn("VERIFIED=1", res.stdout)
+
+    def test_omaha_recent_proof_stale_noupdate_is_unverified(self) -> None:
+        """When noupdate is older than max age, report unverified triggered status."""
+        import datetime
+        now = datetime.datetime.now()
+        eight_hours_ago = now - datetime.timedelta(hours=8)
+        prefix = f"[{1}:{2}:{eight_hours_ago.strftime('%m%d/%H%M%S')}.100000:VERBOSE2:test.cc:100]"
+        log_line = f'{prefix} {{"response":{{"apps":[{{"appid":"com.google.chrome","status":"ok","updatecheck":{{"status":"noupdate"}}}}]}}}}'
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            user_log = Path(tmpdir) / "updater.log"
+            user_log.write_text(log_line + "\n", encoding="utf-8")
+
+            cmd = f"""
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                export MAC_UPDATE_GOOGLE_USER_LOG="{user_log}"
+                export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
+                export MAC_UPDATE_OMAHA_MAX_AGE_H=6
+                app_version() {{ echo "153.0.8010.53"; }}
+                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                echo "STATUS=$INTERNET_LAST_STATUS"
+                echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("STATUS=⏳ Vendor updater triggered (no response recorded)", res.stdout)
+            self.assertIn("VERIFIED=0", res.stdout)
 
 
 if __name__ == "__main__":

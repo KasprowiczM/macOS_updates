@@ -620,6 +620,50 @@ print(version_history_public(sys.stdin.read()) or "")
         INTERNET_LAST_VERIFIED=0
         return 0
     else
+        local user_log="${MAC_UPDATE_GOOGLE_USER_LOG:-$HOME/Library/Application Support/Google/GoogleUpdater/updater.log}"
+        local sys_log="${MAC_UPDATE_GOOGLE_SYS_LOG:-/Library/Application Support/Google/GoogleUpdater/updater.log}"
+        local max_age="${MAC_UPDATE_OMAHA_MAX_AGE_H:-6}"
+        local recent_result=""
+        recent_result=$(PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys, os
+from vendor_feeds import omaha_recent_status
+
+user_log = sys.argv[1]
+sys_log = sys.argv[2]
+appid = sys.argv[3]
+try:
+    max_age = float(sys.argv[4])
+except Exception:
+    max_age = 6.0
+log_inc = sys.argv[5] if len(sys.argv) > 5 else ""
+
+chunks = []
+for p in [user_log + ".old", user_log, sys_log + ".old", sys_log]:
+    if os.path.isfile(p):
+        try:
+            with open(p, "r", encoding="utf-8", errors="replace") as f:
+                chunks.append(f.read())
+        except Exception:
+            pass
+if log_inc:
+    chunks.append(log_inc)
+
+full_text = "\n".join(chunks)
+res = omaha_recent_status(full_text, appid, max_age_h=max_age)
+if res:
+    print(f"{res[0]} {res[1]}")
+' "$user_log" "$sys_log" "$appid" "$max_age" "$log_inc" 2>/dev/null || true)
+
+        if [ -n "$recent_result" ]; then
+            local r_st="${recent_result%% *}"
+            local r_time="${recent_result#* }"
+            if [ "$r_st" = "noupdate" ]; then
+                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OMAHA_RECENT_FMT" "$r_time")"
+                INTERNET_LAST_VERIFIED=1
+                return 0
+            fi
+        fi
+
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UPDATER_TRIGGERED"
         INTERNET_LAST_VERIFIED=0
         return 0
