@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import re
 import tempfile
 import uuid
 from pathlib import Path
@@ -620,6 +621,21 @@ def collect_run_items(
                 })
 
     # Internet apps behind cask oracle
+    seen_internet_keys: set[str] = set()
+
+    def get_all_alias_keys(name: str) -> set[str]:
+        keys = {normalize_app_key(name)}
+        try:
+            from inventory import APP_ALIASES
+            for k, aliases in APP_ALIASES.items():
+                if normalize_app_key(k) == normalize_app_key(name) or name.lower() in [a.lower() for a in aliases]:
+                    keys.add(normalize_app_key(k))
+                    for a in aliases:
+                        keys.add(normalize_app_key(a))
+        except Exception:
+            pass
+        return keys
+
     inet_behind_file = sdir / "internet_behind_apps.txt"
     if inet_behind_file.is_file():
         for line in inet_behind_file.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -629,6 +645,7 @@ def collect_run_items(
             parts = line.split("|")
             if len(parts) >= 3:
                 b_name, b_old, b_new = parts[0].strip(), parts[1].strip(), parts[2].strip()
+                seen_internet_keys.update(get_all_alias_keys(b_name))
                 items.append({
                     "name": b_name,
                     "id": b_name,
@@ -637,6 +654,74 @@ def collect_run_items(
                     "new_version": b_new or None,
                     "status": "pending",
                     "details": f"Behind cask ({b_old} < {b_new})",
+                })
+
+    # Internet status codes (v1.5.0)
+    inet_codes_file = sdir / "internet_status_codes.txt"
+    if inet_codes_file.is_file():
+        for line in inet_codes_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|", 2)
+            if len(parts) < 3:
+                continue
+            app_name, code, text = parts[0].strip(), parts[1].strip(), parts[2].strip()
+            app_keys = get_all_alias_keys(app_name)
+            if app_keys & seen_internet_keys:
+                continue
+
+            if code in ("behind", "needs_restart", "feed_stale", "update_available", "rollout_hold"):
+                seen_internet_keys.update(app_keys)
+                old_ver = None
+                new_ver = None
+                details = None
+
+                if code == "needs_restart":
+                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*→\s*([0-9][0-9a-zA-Z._-]*)', text)
+                    if m:
+                        old_ver, new_ver = m.group(1), m.group(2)
+                        details = f"vendor {new_ver} > installed {old_ver} — quit the app so its updater can install it"
+                    else:
+                        details = "update pending — quit the app so its updater can install it"
+                elif code == "behind":
+                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*<\s*([0-9][0-9a-zA-Z._-]*)', text)
+                    if m:
+                        old_ver, new_ver = m.group(1), m.group(2)
+                        details = f"vendor {new_ver} > installed {old_ver}"
+                    else:
+                        details = "behind vendor version"
+                elif code == "feed_stale":
+                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*<\s*.*?([0-9][0-9a-zA-Z._-]*)', text)
+                    if m:
+                        old_ver, new_ver = m.group(2), m.group(1)
+                        details = f"vendor feed stale (feed {new_ver} < installed {old_ver})"
+                    else:
+                        details = "vendor feed stale"
+                elif code == "update_available":
+                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)', text)
+                    if m:
+                        new_ver = m.group(1)
+                        details = f"update available: {new_ver}"
+                    else:
+                        details = "update available"
+                elif code == "rollout_hold":
+                    vers = re.findall(r'[0-9]+(?:\.[0-9]+)+[a-zA-Z0-9._-]*', text)
+                    if len(vers) >= 2:
+                        old_ver = vers[0]
+                        pub_ver = vers[1]
+                        details = f"vendor staged rollout (public {pub_ver})"
+                    else:
+                        details = "vendor staged rollout"
+
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": old_ver,
+                    "new_version": new_ver,
+                    "status": "pending",
+                    "details": details,
                 })
 
     # 8. Unconfirmed or degraded steps from step_results
