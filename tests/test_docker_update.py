@@ -245,6 +245,82 @@ exit 0
                 calls = open_log.read_text(encoding="utf-8").strip()
                 self.assertEqual(calls, "", f"Expected open not to be called, got: {calls}")
 
+    def test_docker_stop_is_called_after_version_polling_loop(self) -> None:
+        """docker desktop stop must be called AFTER version polling completes, not before."""
+        docker_xml = (self.fixtures_dir / "docker_attr.xml").read_text(encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            bin_dir.mkdir()
+            mock_curl = bin_dir / "curl"
+            mock_curl.write_text(f"""#!/usr/bin/env bash\ncat <<'EOF'\n{docker_xml}\nEOF\n""", encoding="utf-8")
+            mock_curl.chmod(mock_curl.stat().st_mode | stat.S_IEXEC)
+
+            events_log = Path(tmpdir) / "events.log"
+            status_file = Path(tmpdir) / "running.state"
+            mock_docker = bin_dir / "docker"
+            mock_docker.write_text(f"""#!/usr/bin/env bash
+if [ "$1" = "desktop" ] && [ "$2" = "status" ]; then
+    if [ -f "{status_file}" ]; then exit 0; else exit 1; fi
+elif [ "$1" = "desktop" ] && [ "$2" = "start" ]; then
+    touch "{status_file}"
+    exit 0
+elif [ "$1" = "desktop" ] && [ "$2" = "stop" ]; then
+    echo "docker_stop" >> "{events_log}"
+    rm -f "{status_file}"
+    exit 0
+fi
+exit 0
+""", encoding="utf-8")
+            mock_docker.chmod(mock_docker.stat().st_mode | stat.S_IEXEC)
+
+            docker_app = Path(tmpdir) / "Applications" / "Docker.app"
+            docker_app.mkdir(parents=True)
+
+            cnt_file = Path(tmpdir) / "cnt.txt"
+            cmd = f"""
+                export PATH="{bin_dir}:$PATH"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/vendor_feeds.sh"
+                source "{REPO_ROOT}/lib/proc.sh"
+                source "{REPO_ROOT}/lib/internet_app_updates.sh"
+                print_header() {{ :; }}
+                print_info() {{ :; }}
+                print_ok() {{ :; }}
+                print_warn() {{ :; }}
+                print_step() {{ :; }}
+                internet_msg() {{ printf "$@"; }}
+                sleep() {{ :; }}
+                app_version() {{
+                    local c=0
+                    if [ -f "{cnt_file}" ]; then
+                        c="$(cat "{cnt_file}")"
+                    fi
+                    c=$((c + 1))
+                    echo "$c" > "{cnt_file}"
+                    if [ "$c" -le 2 ]; then
+                        echo "app_version:4.91.0" >> "{events_log}"
+                        echo "4.91.0"
+                    else
+                        echo "app_version:4.92.0" >> "{events_log}"
+                        echo "4.92.0"
+                    fi
+                }}
+                sed_iu_docker="$(declare -f iu_docker_desktop | sed 's|/Applications/Docker.app|{docker_app}|g')"
+                eval "$sed_iu_docker"
+                iu_docker_desktop
+                echo "STATUS=$STATUS_DOCKER"
+            """
+            from tests._env import shell_env
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True, env=shell_env())
+            self.assertIn("Updated to 4.92.0", res.stdout)
+            self.assertTrue(events_log.exists())
+            events = events_log.read_text(encoding="utf-8").strip().splitlines()
+            # docker_stop must be the LAST event
+            self.assertEqual(events[-1], "docker_stop", f"docker_stop was not last: {events}")
+            self.assertIn("app_version:4.92.0", events[:-1])
+
 
 if __name__ == "__main__":
     unittest.main()
