@@ -465,14 +465,40 @@ EOF
             return 0
         fi
 
-        local WAIT="${MAC_UPDATE_STAGE_WAIT:-90}"
-        case "$WAIT" in ''|*[!0-9]*) WAIT=90 ;; esac
-        [ "$WAIT" -lt 0 ] && WAIT=0
-        [ "$WAIT" -gt 600 ] && WAIT=600
+        local is_vdf=0
+        local vdf_file="${_INTERNET_HANDLERS_DIR}/../config/vendor_direct_first.txt"
+        if [ -f "$vdf_file" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+                line="${line%%#*}"
+                line="$(printf '%s' "$line" | tr -d '[:space:]')"
+                [ -z "$line" ] && continue
+                if [ "$line" = "$app" ]; then
+                    is_vdf=1
+                    break
+                fi
+            done < "$vdf_file"
+        fi
 
-        if [ "$WAIT" -gt 0 ]; then
-            printf "$L_INTERNET_LAUNCH_CYCLE_FMT\n" "$app" "$R"
-            silent_launch_app "$launch_target"
+        local bypass_launch=0
+        if [ "$is_vdf" -eq 1 ] && [ "$ART" != "-" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ]; then
+            local app_running=0
+            if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+                app_running=1
+            fi
+            if [ "$app_running" -eq 0 ]; then
+                bypass_launch=1
+            fi
+        fi
+
+        if [ "$bypass_launch" -eq 0 ]; then
+            local WAIT="${MAC_UPDATE_STAGE_WAIT:-90}"
+            case "$WAIT" in ''|*[!0-9]*) WAIT=90 ;; esac
+            [ "$WAIT" -lt 0 ] && WAIT=0
+            [ "$WAIT" -gt 600 ] && WAIT=600
+
+            if [ "$WAIT" -gt 0 ]; then
+                printf "$L_INTERNET_LAUNCH_CYCLE_FMT\n" "$app" "$R"
+                silent_launch_app "$launch_target"
             sleep "$WAIT"
             if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
                 if command -v internet_app_quit_gracefully >/dev/null 2>&1; then
@@ -497,6 +523,7 @@ EOF
                 return 0
             fi
         fi
+    fi
 
         if [ "$ART" != "-" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ]; then
             local still_running=0

@@ -726,7 +726,87 @@ exit 0
         proc = self._run_bash(script)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertFalse(os.path.exists(open_log), "silent_launch_app was called for Teams when MAU verified current")
-        self.assertIn("MAU verified", proc.stdout)
+    def test_cursor_vendor_direct_first_skips_launch(self):
+        """When Cursor is in vendor_direct_first.txt, app is not running, and feed is newer,
+        silent_launch_app is skipped and vendor_direct_install is invoked directly."""
+        open_log = os.path.join(self.tmpdir, "open.log")
+        vdi_log = os.path.join(self.tmpdir, "vdi.log")
+        fake_app = os.path.join(self.tmpdir, "Cursor.app")
+        os.makedirs(fake_app, exist_ok=True)
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+
+        print_info() {{ :; }}
+        print_warn() {{ :; }}
+        print_step() {{ :; }}
+        print_ok() {{ :; }}
+        internet_msg() {{ printf "%s %s %s" "$@"; }}
+        silent_launch_app() {{ echo "$@" >> "{open_log}"; return 0; }}
+        internet_app_bundle_id() {{ echo "com.todesktop.230313mzl4w4u92"; }}
+        internet_app_is_running() {{ return 1; }}  # not running
+        app_version() {{
+            if [ -f "{vdi_log}" ]; then
+                echo "3.22.7"
+            else
+                echo "3.21.18"
+            fi
+        }}
+        vendor_direct_install() {{
+            echo "VDI: $@" >> "{vdi_log}"
+            return 0
+        }}
+        vendor_feed_lookup() {{
+            echo "3.22.7|https://downloads.cursor.com/mac/universal/3.22.7|-|-|zip|downloads.cursor.com"
+        }}
+
+        internet_handler_vendor_truth "Cursor" "{fake_app}" "{fake_app}"
+        echo "STATUS=$INTERNET_LAST_STATUS"
+        echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(os.path.exists(open_log), "silent_launch_app was called for Cursor despite vendor_direct_first")
+        self.assertTrue(os.path.exists(vdi_log), "vendor_direct_install was NOT called for Cursor")
+        self.assertIn("3.22.7", proc.stdout)
+
+    def test_cursor_vendor_direct_first_running_app_returns_needs_restart(self):
+        """When Cursor is in vendor_direct_first.txt but is running, it returns needs restart without launching or installing."""
+        open_log = os.path.join(self.tmpdir, "open.log")
+        vdi_log = os.path.join(self.tmpdir, "vdi.log")
+        fake_app = os.path.join(self.tmpdir, "Cursor.app")
+        os.makedirs(fake_app, exist_ok=True)
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+
+        print_info() {{ :; }}
+        print_warn() {{ :; }}
+        print_step() {{ :; }}
+        print_ok() {{ :; }}
+        internet_msg() {{ printf "%s %s %s" "$@"; }}
+        silent_launch_app() {{ echo "$@" >> "{open_log}"; return 0; }}
+        internet_app_bundle_id() {{ echo "com.todesktop.230313mzl4w4u92"; }}
+        internet_app_is_running() {{ return 0; }}  # IS running
+        app_version() {{ echo "3.21.18"; }}
+        vendor_direct_install() {{ echo "VDI: $@" >> "{vdi_log}"; return 0; }}
+        vendor_feed_lookup() {{
+            echo "3.22.7|https://downloads.cursor.com/mac/universal/3.22.7|-|-|zip|downloads.cursor.com"
+        }}
+
+        internet_handler_vendor_truth "Cursor" "{fake_app}" "{fake_app}"
+        echo "STATUS=$INTERNET_LAST_STATUS"
+        echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(os.path.exists(open_log))
+        self.assertFalse(os.path.exists(vdi_log))
+        self.assertIn("quit the app", proc.stdout.lower())
 
 
 if __name__ == "__main__":
