@@ -2788,6 +2788,50 @@ class MauRegressionGuardTests(unittest.TestCase):
         )
         self.assertNotIn("XCLW2019", result.stdout)
 
+    def test_shell_python_project_imports_set_path(self) -> None:
+        """Any project python module imported in *.sh must have PYTHONPATH or sys.path configured."""
+        project_modules = set()
+        for p in (REPO_ROOT / "lib" / "python").glob("*.py"):
+            if p.stem != "__init__":
+                project_modules.add(p.stem)
+        for p in (REPO_ROOT / "dev_sync").glob("*.py"):
+            if p.stem != "__init__":
+                project_modules.add(p.stem)
+
+        mod_pattern = "|".join(re.escape(m) for m in project_modules)
+        import_re = re.compile(r"^\s*(?:from|import)\s+(" + mod_pattern + r")\b")
+        open_re = re.compile(r"(python3|<<-?\s*['\"]?[A-Z_]+['\"]?)")
+        sys_path_re = re.compile(r"sys\.path(?:\.insert|\[:0\]|\.append)")
+
+        failures = []
+        for root, dirs, files in os.walk(REPO_ROOT):
+            if any(p in root for p in [".git", "graphify-out", "dev_sync_logs"]):
+                continue
+            for f in files:
+                if f.endswith(".sh"):
+                    sh_path = Path(root) / f
+                    rel = str(sh_path.relative_to(REPO_ROOT))
+                    lines = sh_path.read_text(encoding="utf-8", errors="ignore").splitlines(keepends=True)
+                    for idx, line in enumerate(lines):
+                        if not import_re.match(line):
+                            continue
+                        open_idx = None
+                        for i in range(idx - 1, -1, -1):
+                            if open_re.search(lines[i]):
+                                open_idx = i
+                                break
+                        if open_idx is None:
+                            failures.append(f"{rel}:{idx+1}")
+                            continue
+                        open_line = lines[open_idx]
+                        has_pythonpath = "PYTHONPATH=" in open_line
+                        block_text = "".join(lines[open_idx:idx])
+                        has_sys_path = bool(sys_path_re.search(block_text))
+                        if not (has_pythonpath or has_sys_path):
+                            failures.append(f"{rel}:{idx+1}")
+
+        self.assertEqual(failures, [], f"Project imports without PYTHONPATH or sys.path: {failures}")
+
 
 class TestDevSyncRedact(unittest.TestCase):
     def test_redact_url_credentials_and_secrets(self) -> None:
