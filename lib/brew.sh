@@ -285,3 +285,21 @@ PYEOF
     return "$rc"
 }
 
+# brew_cask_guard_facts — stdin: `brew info --json=v2 --cask <token>`; stdout: version|installed|targets
+brew_cask_guard_facts() {
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from brew_casks import cask_guard_facts
+print(cask_guard_facts(sys.stdin.read()))
+' 2>/dev/null
+}
+
+# brew_cask_primary_app — same stdin; stdout: X.app or empty
+brew_cask_primary_app() {
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from brew_casks import cask_primary_app
+print(cask_primary_app(sys.stdin.read()))
+' 2>/dev/null
+}
+

@@ -212,17 +212,7 @@ ORPHAN_CASKS="$(brew_orphan_casks 2>/dev/null || true)"
 if [ -n "$ORPHAN_CASKS" ]; then
     for orph in $ORPHAN_CASKS; do
         [ -n "$orph" ] || continue
-        expected_app="$(brew info --json=v2 --cask "$orph" 2>/dev/null | python3 -c '
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    from brew_casks import app_targets
-    targets = app_targets(data["casks"][0])
-    if targets:
-        print(targets[0])
-except Exception:
-    pass
-' 2>/dev/null || true)"
+        expected_app="$(brew info --json=v2 --cask "$orph" 2>/dev/null | brew_cask_primary_app || true)"
         [ -n "$expected_app" ] || expected_app="${orph}.app"
 
         print_info "$(printf "$L_BREW_ORPHAN_CASK_FMT" "$orph" "$expected_app" "$orph")"
@@ -354,19 +344,7 @@ if [ -n "$OUTDATED_CASKS" ]; then
         cask_recorded_ver=""
         targets_str=""
         if [ -n "$cask_json" ]; then
-            parsed=$(python3 -c '
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    c = d["casks"][0]
-    v = c.get("version", "")
-    installed = c.get("installed") or ""
-    from brew_casks import app_targets
-    targets = app_targets(c)
-    print(f"{v}|{installed}|{\";\".join(targets)}")
-except Exception:
-    pass
-' <<< "$cask_json" 2>/dev/null || true)
+            parsed="$(printf '%s' "$cask_json" | brew_cask_guard_facts || true)"
             cask_ver=$(echo "$parsed" | cut -d'|' -f1)
             cask_recorded_ver=$(echo "$parsed" | cut -d'|' -f2)
             targets_str=$(echo "$parsed" | cut -d'|' -f3)
@@ -425,6 +403,16 @@ EOF_TARGETS
             fi
         fi
         UPGRADEABLE_CASKS="$UPGRADEABLE_CASKS $cask"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+            if [ -n "$targets_str" ]; then
+                while IFS= read -r t_target; do
+                    [ -n "$t_target" ] || continue
+                    echo "$cask|$t_target" >> "$MAC_UPDATE_SESSION_DIR/brew_cask_targets.txt"
+                done <<EOF_SESSION_TARGETS
+$(echo "$targets_str" | tr ';' '\n')
+EOF_SESSION_TARGETS
+            fi
+        fi
     done
 fi
 

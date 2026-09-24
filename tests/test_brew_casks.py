@@ -11,9 +11,20 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
+try:
+    from ._env import shell_env
+except ImportError:
+    from _env import shell_env
 
-from brew_casks import app_targets, cask_requires_sudo, find_orphan_casks
+sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))  # explicit: simulates caller
+
+from brew_casks import (
+    app_targets,
+    cask_guard_facts,
+    cask_primary_app,
+    cask_requires_sudo,
+    find_orphan_casks,
+)
 
 
 class BrewCasksPureTests(unittest.TestCase):
@@ -38,6 +49,21 @@ class BrewCasksPureTests(unittest.TestCase):
             ],
         }
         self.assertEqual(app_targets(cask_mixed), ["First.app", "Second.app"])
+
+    def test_cask_guard_facts_parses_and_joins_targets(self) -> None:
+        raw = '{"casks": [{"token": "my-app", "version": "2.0", "installed": "1.0", "artifacts": [{"app": ["MyApp.app", "Helper.app"]}]}]}'
+        self.assertEqual(cask_guard_facts(raw), "2.0|1.0|MyApp.app;Helper.app")
+
+    def test_cask_guard_facts_bad_json_is_empty(self) -> None:
+        self.assertEqual(cask_guard_facts(""), "")
+        self.assertEqual(cask_guard_facts("{bad json"), "")
+        self.assertEqual(cask_guard_facts('{"casks": []}'), "")
+
+    def test_cask_primary_app(self) -> None:
+        raw = '{"casks": [{"token": "my-app", "artifacts": [{"app": ["Primary.app", "Secondary.app"]}]}]}'
+        self.assertEqual(cask_primary_app(raw), "Primary.app")
+        self.assertEqual(cask_primary_app('{"casks": [{"artifacts": []}]}'), "")
+        self.assertEqual(cask_primary_app("not-json"), "")
 
     def test_orphan_when_all_targets_missing(self) -> None:
         info_json = {
@@ -280,6 +306,82 @@ exit 0
 
         if log_file.is_file():
             self.assertNotIn("pkg-cask", log_file.read_text(encoding="utf-8"))
+
+    def test_update_brew_downgrade_guard_blocks_upgrade(self) -> None:
+        log_file = self.session_dir / "brew_calls.log"
+        brew_script = f"""#!/usr/bin/env bash
+case "$1" in
+    outdated)
+        echo "foo (2.0) < 1.0"
+        exit 0
+        ;;
+    info)
+        cat <<'EOF'
+{{"casks":[
+    {{"token":"foo","version":"1.0","installed":"2.0","artifacts":[{{"app":["Foo.app"]}}]}}
+]}}
+EOF
+        exit 0
+        ;;
+    upgrade)
+        echo "$@" >> "{log_file}"
+        exit 0
+        ;;
+esac
+exit 0
+"""
+        self._make_brew_stub(brew_script)
+        env = shell_env(
+            PATH=f"{self.bin_dir}:{os.environ.get('PATH', '')}",
+            MAC_UPDATE_SESSION_DIR=str(self.session_dir),
+            MAC_UPDATE_YES="1",
+            MAC_UPDATE_LANG="en",
+            HOME=str(self.tmp),
+        )
+        proc = subprocess.run(
+            ["bash", str(REPO_ROOT / "update_brew.sh")],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn("downgrade", proc.stdout.lower() + proc.stderr.lower())
+        if log_file.is_file():
+            self.assertNotIn("upgrade --cask foo", log_file.read_text(encoding="utf-8"))
+
+        # Case 2: installed < version -> upgrade --cask bar is in log
+        if log_file.is_file():
+            log_file.unlink()
+        brew_script_up = f"""#!/usr/bin/env bash
+case "$1" in
+    outdated)
+        echo "bar (1.0) < 2.0"
+        exit 0
+        ;;
+    info)
+        cat <<'EOF'
+{{"casks":[
+    {{"token":"bar","version":"2.0","installed":"1.0","artifacts":[{{"app":["Bar.app"]}}]}}
+]}}
+EOF
+        exit 0
+        ;;
+    upgrade)
+        echo "$@" >> "{log_file}"
+        exit 0
+        ;;
+esac
+exit 0
+"""
+        self._make_brew_stub(brew_script_up)
+        (self.tmp / "Applications" / "Bar.app").mkdir(parents=True, exist_ok=True)
+        proc2 = subprocess.run(
+            ["bash", str(REPO_ROOT / "update_brew.sh")],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        self.assertTrue(log_file.is_file())
+        self.assertIn("upgrade --cask bar", log_file.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
