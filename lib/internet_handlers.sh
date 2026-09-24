@@ -470,7 +470,8 @@ EOF
         if [ -f "$vdf_file" ]; then
             while IFS= read -r line || [ -n "$line" ]; do
                 line="${line%%#*}"
-                line="$(printf '%s' "$line" | tr -d '[:space:]')"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
                 [ -z "$line" ] && continue
                 if [ "$line" = "$app" ]; then
                     is_vdf=1

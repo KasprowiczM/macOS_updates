@@ -808,7 +808,59 @@ exit 0
         self.assertFalse(os.path.exists(vdi_log))
         self.assertIn("quit the app", proc.stdout.lower())
 
+    def test_remote_desktop_manager_vendor_direct_first_multi_word_trimmed(self):
+        """When multi-word app name like 'Remote Desktop Manager' is in vendor_direct_first.txt,
+        whitespace trimming preserves internal spaces so the app matches and skips silent_launch_app."""
+        vdf_path = Path(REPO_ROOT) / "config" / "vendor_direct_first.txt"
+        orig_content = vdf_path.read_text(encoding="utf-8")
+        self.addCleanup(lambda: vdf_path.write_text(orig_content, encoding="utf-8"))
+        vdf_path.write_text(orig_content + "\n  Remote Desktop Manager  # test entry\n", encoding="utf-8")
+
+        open_log = os.path.join(self.tmpdir, "open.log")
+        vdi_log = os.path.join(self.tmpdir, "vdi.log")
+        fake_app = os.path.join(self.tmpdir, "Remote Desktop Manager.app")
+        os.makedirs(fake_app, exist_ok=True)
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+
+        print_info() {{ :; }}
+        print_warn() {{ :; }}
+        print_step() {{ :; }}
+        print_ok() {{ :; }}
+        internet_msg() {{ printf "%s %s %s" "$@"; }}
+        silent_launch_app() {{ echo "$@" >> "{open_log}"; return 0; }}
+        internet_app_bundle_id() {{ echo "com.devolutions.remotedesktopmanager"; }}
+        internet_app_is_running() {{ return 1; }}  # not running
+        app_version() {{
+            if [ -f "{vdi_log}" ]; then
+                echo "2026.2.0.0"
+            else
+                echo "2026.1.0.0"
+            fi
+        }}
+        vendor_direct_install() {{
+            echo "VDI: $@" >> "{vdi_log}"
+            return 0
+        }}
+        vendor_feed_lookup() {{
+            echo "2026.2.0.0|https://cdn.devolutions.net/rdm.dmg|-|-|dmg|cdn.devolutions.net"
+        }}
+
+        internet_handler_vendor_truth "Remote Desktop Manager" "{fake_app}" "{fake_app}"
+        echo "STATUS=$INTERNET_LAST_STATUS"
+        echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+        """
+        proc = self._run_bash(script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertFalse(os.path.exists(open_log), "silent_launch_app was called for Remote Desktop Manager despite vendor_direct_first")
+        self.assertTrue(os.path.exists(vdi_log), "vendor_direct_install was NOT called for Remote Desktop Manager")
+        self.assertIn("2026.2.0.0", proc.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
