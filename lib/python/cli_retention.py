@@ -5,12 +5,27 @@ from __future__ import annotations
 import os
 import re
 import shutil
-from typing import List, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 
 CODEX_RELEASE_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+-[a-z0-9_]+-apple-darwin$")
 CURSOR_AGENT_VERSION_RE = re.compile(r"^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9a-f]+$")
 AGY_OLD_RE = re.compile(r"^agy\.[0-9]+\.old$")
+
+
+def _protected_version_dirs(root_real: str, link_paths: List[str]) -> Optional[Set[str]]:
+    """Top-level version dirs under root that any link resolves into.
+    Returns None when a link exists but resolves outside root (caller must then prune nothing)."""
+    protected: Set[str] = set()
+    for p in link_paths:
+        if not (os.path.exists(p) or os.path.islink(p)):
+            continue
+        target = os.path.realpath(p)
+        if not target.startswith(root_real + os.sep):
+            return None
+        first = os.path.relpath(target, root_real).split(os.sep, 1)[0]
+        protected.add(os.path.join(root_real, first))
+    return protected
 
 
 def get_dir_size(path: str) -> int:
@@ -45,9 +60,9 @@ def prune_codex(home: str) -> Tuple[int, int]:
 
     root_real = os.path.realpath(root)
     current_symlink = os.path.join(home, ".codex", "packages", "standalone", "current")
-    protected: Set[str] = set()
-    if os.path.exists(current_symlink) or os.path.islink(current_symlink):
-        protected.add(os.path.realpath(current_symlink))
+    protected = _protected_version_dirs(root_real, [current_symlink])
+    if protected is None:
+        return 0, 0
 
     candidates: List[Tuple[float, str, str]] = []
     try:
@@ -112,11 +127,13 @@ def prune_cursor_agent(home: str) -> Tuple[int, int]:
         return 0, 0
 
     root_real = os.path.realpath(root)
-    protected: Set[str] = set()
-    for bin_name in ("cursor-agent", "agent"):
-        bin_path = os.path.join(home, ".local", "bin", bin_name)
-        if os.path.exists(bin_path) or os.path.islink(bin_path):
-            protected.add(os.path.realpath(bin_path))
+    bin_paths = [
+        os.path.join(home, ".local", "bin", "cursor-agent"),
+        os.path.join(home, ".local", "bin", "agent"),
+    ]
+    protected = _protected_version_dirs(root_real, bin_paths)
+    if protected is None:
+        return 0, 0
 
     candidates: List[Tuple[float, str, str]] = []
     try:

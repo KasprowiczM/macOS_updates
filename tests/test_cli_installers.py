@@ -487,6 +487,119 @@ class PruneVendorCliVersionsTests(unittest.TestCase):
             self.assertEqual(res2.returncode, 0, res2.stderr)
             self.assertTrue(old3.exists(), "agy old files must not be pruned when agy --version fails")
 
+    def test_prune_cursor_agent_file_symlink_preserves_active_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home = tmp_path / "home"
+            versions = home / ".local" / "share" / "cursor-agent" / "versions"
+            versions.mkdir(parents=True)
+            local_bin = home / ".local" / "bin"
+            local_bin.mkdir(parents=True)
+
+            v_a = versions / "2026.07.01-aaa111"
+            v_b = versions / "2026.08.01-bbb222"
+            v_c = versions / "2026.09.01-ccc333"
+
+            for i, v in enumerate((v_a, v_b, v_c), start=1):
+                v.mkdir()
+                binary = v / "cursor-agent"
+                binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                binary.chmod(0o755)
+                os.utime(v, (i * 100, i * 100))
+
+            # Active is oldest A (symlink points to executable file inside A)
+            (local_bin / "agent").symlink_to(v_a / "cursor-agent")
+            (local_bin / "cursor-agent").symlink_to(v_a / "cursor-agent")
+
+            env = {"HOME": str(home)}
+            res = _run_npm_cli("prune_vendor_cli_versions", env=env)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertTrue(v_a.exists(), "active version A must be preserved")
+            self.assertTrue(v_c.exists(), "newest version C must be preserved")
+            self.assertFalse(v_b.exists(), "middle version B must be pruned")
+
+    def test_prune_cursor_agent_active_newest_keeps_previous(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home = tmp_path / "home"
+            versions = home / ".local" / "share" / "cursor-agent" / "versions"
+            versions.mkdir(parents=True)
+            local_bin = home / ".local" / "bin"
+            local_bin.mkdir(parents=True)
+
+            v_a = versions / "2026.07.01-aaa111"
+            v_b = versions / "2026.08.01-bbb222"
+            v_c = versions / "2026.09.01-ccc333"
+
+            for i, v in enumerate((v_a, v_b, v_c), start=1):
+                v.mkdir()
+                binary = v / "cursor-agent"
+                binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                binary.chmod(0o755)
+                os.utime(v, (i * 100, i * 100))
+
+            # Active is newest C
+            (local_bin / "agent").symlink_to(v_c / "cursor-agent")
+            (local_bin / "cursor-agent").symlink_to(v_c / "cursor-agent")
+
+            env = {"HOME": str(home)}
+            res = _run_npm_cli("prune_vendor_cli_versions", env=env)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertTrue(v_c.exists(), "active newest C must be preserved")
+            self.assertTrue(v_b.exists(), "previous newest B must be preserved")
+            self.assertFalse(v_a.exists(), "oldest A must be pruned")
+
+    def test_prune_link_outside_root_aborts_pruning(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home = tmp_path / "home"
+            versions = home / ".local" / "share" / "cursor-agent" / "versions"
+            versions.mkdir(parents=True)
+            local_bin = home / ".local" / "bin"
+            local_bin.mkdir(parents=True)
+
+            v_a = versions / "2026.07.01-aaa111"
+            v_b = versions / "2026.08.01-bbb222"
+            v_a.mkdir()
+            v_b.mkdir()
+
+            outside = tmp_path / "outside-agent"
+            outside.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            (local_bin / "cursor-agent").symlink_to(outside)
+
+            env = {"HOME": str(home)}
+            res = _run_npm_cli("prune_vendor_cli_versions", env=env)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertTrue(v_a.exists(), "v_a must not be pruned when link points outside root")
+            self.assertTrue(v_b.exists(), "v_b must not be pruned when link points outside root")
+
+    def test_prune_codex_supports_dir_and_file_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            home = tmp_path / "home"
+            releases = home / ".codex" / "packages" / "standalone" / "releases"
+            releases.mkdir(parents=True)
+            pkg_root = home / ".codex" / "packages" / "standalone"
+
+            v1 = releases / "0.153.0-arm64-apple-darwin"
+            v2 = releases / "0.154.0-arm64-apple-darwin"
+            v3 = releases / "0.155.0-arm64-apple-darwin"
+            for i, v in enumerate((v1, v2, v3), start=1):
+                (v / "bin").mkdir(parents=True)
+                (v / "bin" / "codex").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                os.utime(v, (i * 100, i * 100))
+
+            # current pointing to bin/codex inside oldest v1
+            current = pkg_root / "current"
+            current.symlink_to(v1 / "bin" / "codex")
+
+            env = {"HOME": str(home)}
+            res = _run_npm_cli("prune_vendor_cli_versions", env=env)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertTrue(v1.exists(), "v1 active via file symlink must be preserved")
+            self.assertTrue(v3.exists(), "v3 newest must be preserved")
+            self.assertFalse(v2.exists(), "v2 must be pruned")
+
 
 if __name__ == "__main__":
     unittest.main()
