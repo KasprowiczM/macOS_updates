@@ -1469,6 +1469,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         """Scenario 5: update_npm_cli.sh with curl failing => exit 10 (never 1)"""
         with tempfile.TemporaryDirectory() as tmp:
             mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
+            base_env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
             curl_script = mock_bin / "curl"
             curl_script.write_text("#!/bin/sh\nexit 7\n", encoding="utf-8")
             curl_script.chmod(0o755)
@@ -1487,6 +1488,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         """Scenario 6: update_npm_cli.sh with Bun tarball install failing => exit 1"""
         with tempfile.TemporaryDirectory() as tmp:
             mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
+            base_env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
             unzip_script = mock_bin / "unzip"
             unzip_script.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
             unzip_script.chmod(0o755)
