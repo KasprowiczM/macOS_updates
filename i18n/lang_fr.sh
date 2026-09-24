@@ -104,6 +104,8 @@ L_APPSTORE_MANUAL_UPDATE="Ouverture de l'App Store → Mises à jour manuellemen
 
 L_FINAL_CHECK="✅ Vérification — mas outdated (applications natives):"
 L_STILL_OUTDATED="mas affiche toujours:"
+L_APPSTORE_RETRY_ITEM_FMT="Nouvelle tentative de mise à jour App Store dans la session utilisateur: %s"
+L_APPSTORE_STILL_PENDING_MANUAL_FMT="Les mises à jour App Store suivantes sont toujours en attente — mettez à jour manuellement dans l'App Store:\n%s"
 
 L_SNAPSHOT_BEFORE="Sauvegarde de la liste des applications de l'App Store avant la mise à jour..."
 L_SNAPSHOT_AFTER="Sauvegarde de la liste des applications de l'App Store après la mise à jour..."

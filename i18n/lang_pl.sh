@@ -120,6 +120,8 @@ L_APPSTORE_MANUAL_UPDATE="Otwieranie App Store → Uaktualnienia ręcznie..."
 # ── Final check / Sprawdzenie końcowe ────────────────────────
 L_FINAL_CHECK="✅ Weryfikacja — mas outdated (natywne apps):"
 L_STILL_OUTDATED="mas widzi jeszcze:"
+L_APPSTORE_RETRY_ITEM_FMT="Ponawianie uaktualnienia App Store w sesji użytkownika: %s"
+L_APPSTORE_STILL_PENDING_MANUAL_FMT="Następujące uaktualnienia App Store nadal oczekują — zaktualizuj ręcznie w App Store:\n%s"
 
 # ── Snapshots / Snapshoty ────────────────────────────────────
 L_SNAPSHOT_BEFORE="Zapisuję listę aplikacji App Store przed aktualizacją..."

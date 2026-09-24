@@ -119,6 +119,8 @@ L_APPSTORE_MANUAL_UPDATE="Opening App Store → Updates manually..."
 # ── Final check ────────────────────────────────────────────────
 L_FINAL_CHECK="✅ Verification — mas outdated (native apps):"
 L_STILL_OUTDATED="mas still shows:"
+L_APPSTORE_RETRY_ITEM_FMT="Retrying App Store update in user session: %s"
+L_APPSTORE_STILL_PENDING_MANUAL_FMT="The following App Store updates remain pending — update manually in App Store:\n%s"
 
 # ── Snapshots ──────────────────────────────────────────────────
 L_SNAPSHOT_BEFORE="Saving App Store app list before update..."

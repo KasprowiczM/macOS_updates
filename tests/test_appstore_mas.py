@@ -90,6 +90,74 @@ esac
             account_calls = [inv for inv in invocations if inv.startswith("account")]
             self.assertEqual(account_calls, [], "mas account should not be called for mas >= 5")
 
+    def test_appstore_user_session_retry_diagnostics_and_soft_fail(self):
+        log_file = os.path.join(self.temp_dir, "mas_invocations.log")
+        mas_script = f"""
+echo "$@" >> "{log_file}"
+case "$1" in
+    version)
+        echo "7.0.0"
+        exit 0
+        ;;
+    list)
+        echo "6446904124 Whisper Transcription (15.1.1)"
+        exit 0
+        ;;
+    outdated)
+        echo "6446904124 Whisper Transcription (15.1.1 -> 15.2.1)"
+        exit 0
+        ;;
+    upgrade)
+        echo "upgrade called with: $@"
+        exit 0
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+"""
+        self._create_mock_bin("mas", mas_script)
+        self._create_mock_bin("brew", 'echo "Homebrew 7.0.2"; exit 0')
+        self._create_mock_bin("osascript", 'exit 0')
+        sudo_script = """
+if [ "$1" = "-v" ]; then
+    exit 0
+fi
+if [ "$1" = "-n" ]; then
+    shift
+fi
+"$@"
+"""
+        self._create_mock_bin("sudo", sudo_script)
+
+        sdir = Path(self.temp_dir) / "session"
+        sdir.mkdir(parents=True, exist_ok=True)
+
+        env = dict(os.environ)
+        env["MAC_UPDATE_SESSION_DIR"] = str(sdir)
+        env["MAC_UPDATE_NONINTERACTIVE"] = "1"
+        env["MAC_UPDATE_YES"] = "1"
+        env["MAC_LANG"] = "en"
+
+        res = subprocess.run(
+            ["bash", str(REPO_ROOT / "update_appstore.sh")],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(res.returncode, 10, f"Expected soft exit (10), got {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
+        self.assertIn("6446904124", res.stdout)
+        self.assertIn("Whisper Transcription", res.stdout)
+        # Verify retry is recorded in appstore_diag.txt
+        diag_file = sdir / "appstore_diag.txt"
+        self.assertTrue(diag_file.exists(), "appstore_diag.txt was not created")
+        diag_content = diag_file.read_text(encoding="utf-8")
+        self.assertIn("TRACK 1 user-session retry", diag_content)
+        self.assertIn("Whisper Transcription", diag_content)
+        # Verify manual update hint in output
+        self.assertIn("manual", res.stdout.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
