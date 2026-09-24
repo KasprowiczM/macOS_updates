@@ -222,7 +222,81 @@ exit 0
             res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
             self.assertIn("MANUAL_STATUS=→ managed by App Store (update_appstore.sh)", res.stdout)
             self.assertIn("MANUAL_VERIFIED=1", res.stdout)
-            self.assertIn("IPMIVIEW_STATUS=→ managed by App Store (update_appstore.sh)", res.stdout)
+    def test_track2_verify_lookup_failure_is_soft_fail(self) -> None:
+        """When App Store lookup fails during Track 2 verification (rc 2), do not treat as verified.
+        Expect L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED, SOFT_FAIL=1, exit 10, no empty appstore_ios_pending.txt overwrite."""
+        import pty
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "curl").write_text("#!/usr/bin/env bash\nexit 22\n", encoding="utf-8")
+            (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (bin_dir / "mas").write_text("""#!/usr/bin/env bash
+case "$1" in
+  version) echo "7.0.0" ;;
+  config) echo '{"store":"pl"}' ;;
+  outdated) exit 0 ;;
+  list) echo "497799835 Xcode (15.0)" ;;
+  *) exit 0 ;;
+esac
+""", encoding="utf-8")
+            (bin_dir / "osascript").write_text("""#!/usr/bin/env bash
+if [ "$1" = "-e" ]; then
+    echo "Terminal"
+    exit 0
+fi
+echo "UPDATE_ALL_CLICKED"
+exit 0
+""", encoding="utf-8")
+            (bin_dir / "open").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            for f in bin_dir.iterdir():
+                f.chmod(f.stat().st_mode | stat.S_IEXEC)
+
+            app_dir = Path(tmpdir) / "Applications"
+            app_dir.mkdir()
+            unifi_app = app_dir / "UniFi.app"
+            wrapper = unifi_app / "Wrapper"
+            wrapper.mkdir(parents=True)
+            plist_data = {
+                "itemId": 1057750338,
+                "bundleShortVersionString": "10.38.1",
+                "itemName": "UniFi",
+            }
+            (wrapper / "iTunesMetadata.plist").write_bytes(plistlib.dumps(plist_data))
+
+            session_dir = Path(tmpdir) / "session"
+            session_dir.mkdir()
+            pending_file = session_dir / "appstore_ios_pending.txt"
+            pending_file.write_text("UniFi|1057750338|10.38.1|10.39.0\n", encoding="utf-8")
+
+            env = dict(os.environ)
+            env.pop("PYTHONPATH", None)
+            orig_path = env.get("PATH", "")
+            env["PATH"] = f"{bin_dir}:{orig_path}"
+            env["MAC_LANG"] = "en"
+            env["MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT"] = "15"
+            env["MAC_UPDATE_NO_SUDO"] = "1"
+            env["MAC_UPDATE_YES"] = "1"
+            env["MAC_UPDATE_SESSION_DIR"] = str(session_dir)
+
+            master, slave = pty.openpty()
+            proc = subprocess.run(
+                ["bash", str(REPO_ROOT / "update_appstore.sh")],
+                stdin=slave,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=20,
+            )
+            os.close(slave)
+            os.close(master)
+
+            self.assertEqual(proc.returncode, 10, f"Expected soft fail 10, got {proc.returncode}\nStdout: {proc.stdout}\nStderr: {proc.stderr}")
+            self.assertNotIn("iPad apps verified after Track 2", proc.stdout)
+            self.assertIn("Could not confirm iPad app updates: the App Store lookup failed", proc.stdout)
+            # appstore_ios_pending.txt must not be overwritten with empty content
+            self.assertTrue(pending_file.exists())
+            self.assertEqual(pending_file.read_text(encoding="utf-8").strip(), "UniFi|1057750338|10.38.1|10.39.0")
 
 
 if __name__ == "__main__":

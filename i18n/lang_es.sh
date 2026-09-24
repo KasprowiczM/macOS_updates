@@ -803,6 +803,7 @@ L_INTERNET_CHECKSUM_MISMATCH_FMT="Discrepancia de suma de comprobación para %s 
 L_APPSTORE_IOS_ALL_CURRENT="Las aplicaciones de iPad están al día (búsqueda de App Store) — Track 2 no necesario"
 L_APPSTORE_IOS_PENDING_FMT="Actualización de app de iPad disponible: %s %s → %s"
 L_APPSTORE_IOS_LOOKUP_FAILED="Búsqueda en App Store no disponible — ejecutando Track 2 sin comprobación previa"
+L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED="No se pudieron confirmar las actualizaciones de apps de iPad: la consulta de App Store falló"
 L_APPSTORE_IOS_VERIFIED="Aplicaciones de iPad verificadas después de Track 2"
 L_APPSTORE_IOS_STILL_PENDING_FMT="Aún instalándose o pendiente: %s"
 L_APPSTORE_IOS_NEEDS_INTERACTIVE="Las actualizaciones de apps de iPad requieren ejecución interactiva (Track 2 usa la ventana de App Store)"

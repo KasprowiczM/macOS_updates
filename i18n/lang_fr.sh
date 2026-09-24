@@ -778,6 +778,7 @@ L_INTERNET_CHECKSUM_MISMATCH_FMT="Incohérence de somme de contrôle pour %s —
 L_APPSTORE_IOS_ALL_CURRENT="Les applications iPad sont à jour (recherche App Store) — Track 2 inutile"
 L_APPSTORE_IOS_PENDING_FMT="Mise à jour d'application iPad disponible : %s %s → %s"
 L_APPSTORE_IOS_LOOKUP_FAILED="Recherche App Store indisponible — exécution de Track 2 sans vérification préalable"
+L_APPSTORE_IOS_VERIFY_LOOKUP_FAILED="Impossible de confirmer les mises à jour des apps iPad : la requête App Store a échoué"
 L_APPSTORE_IOS_VERIFIED="Applications iPad vérifiées après Track 2"
 L_APPSTORE_IOS_STILL_PENDING_FMT="Toujours en cours d'installation ou en attente : %s"
 L_APPSTORE_IOS_NEEDS_INTERACTIVE="Les mises à jour d'apps iPad nécessitent une exécution interactive (Track 2 utilise la fenêtre App Store)"
