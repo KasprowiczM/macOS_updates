@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -24,6 +25,7 @@ from brew_casks import (
     cask_primary_app,
     cask_requires_sudo,
     find_orphan_casks,
+    pkg_app_hints,
 )
 
 
@@ -53,6 +55,48 @@ class BrewCasksPureTests(unittest.TestCase):
     def test_cask_guard_facts_parses_and_joins_targets(self) -> None:
         raw = '{"casks": [{"token": "my-app", "version": "2.0", "installed": "1.0", "artifacts": [{"app": ["MyApp.app", "Helper.app"]}]}]}'
         self.assertEqual(cask_guard_facts(raw), "2.0|1.0|MyApp.app;Helper.app")
+
+    def test_cask_guard_facts_pkg_cask_uses_delete_hint(self) -> None:
+        raw = json.dumps({
+            "casks": [{
+                "token": "zoom",
+                "version": "6.2.11.43576",
+                "installed": "6.2.11.43576",
+                "artifacts": [
+                    {"pkg": ["zoomus.pkg"]},
+                    {
+                        "uninstall": [
+                            {
+                                "delete": [
+                                    "/Applications/zoom.us.app",
+                                    "/Library/Audio/Plug-Ins/HAL/ZoomAudioDevice.driver",
+                                    "~/Library/Application Support/zoom.us",
+                                ]
+                            }
+                        ]
+                    }
+                ],
+            }]
+        })
+        facts = cask_guard_facts(raw)
+        self.assertEqual(facts, "6.2.11.43576|6.2.11.43576|zoom.us.app")
+
+    def test_orphan_detection_ignores_delete_hints(self) -> None:
+        info_json = {
+            "casks": [{
+                "token": "zoom",
+                "artifacts": [
+                    {"pkg": ["zoomus.pkg"]},
+                    {
+                        "uninstall": [
+                            {"delete": ["/Applications/zoom.us.app"]}
+                        ]
+                    }
+                ]
+            }]
+        }
+        orphans = find_orphan_casks(info_json, ["/Applications"], exists=lambda p: False)
+        self.assertEqual(orphans, [], "Orphan detection must ignore delete hints")
 
     def test_cask_guard_facts_bad_json_is_empty(self) -> None:
         self.assertEqual(cask_guard_facts(""), "")
