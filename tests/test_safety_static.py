@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import plistlib
 import re
 import shutil
 import subprocess
@@ -2986,25 +2987,40 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
 
     def test_report_update_coverage_vendor_feed_label_and_exclusions(self) -> None:
         """Assert report_update_coverage uses vendor feed label and handles exclusions."""
-        env = os.environ.copy()
-        env["MAC_LANG"] = "en"
-        res = subprocess.run(
-            ["bash", str(REPO_ROOT / "scripts" / "report_update_coverage.sh"), "--json"],
-            capture_output=True,
-            text=True,
-            env=env,
-            check=True,
-        )
-        data = json.loads(res.stdout)
-        installed_updatable = {a["app"]: a for a in data.get("installed_updatable", [])}
-        if "Claude" in installed_updatable:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_apps = Path(tmpdir) / "Applications"
+            tmp_apps.mkdir()
+            # Mock Ascendo.app (excluded)
+            ascendo_contents = tmp_apps / "Ascendo.app" / "Contents"
+            ascendo_contents.mkdir(parents=True)
+            with (ascendo_contents / "Info.plist").open("wb") as f:
+                plistlib.dump({"CFBundleIdentifier": "com.ascendo.dataVault", "CFBundleShortVersionString": "7.0"}, f)
+            # Mock Claude.app (vendor_feed)
+            claude_contents = tmp_apps / "Claude.app" / "Contents"
+            claude_contents.mkdir(parents=True)
+            with (claude_contents / "Info.plist").open("wb") as f:
+                plistlib.dump({"CFBundleIdentifier": "com.anthropic.claude", "CFBundleShortVersionString": "2.0.0"}, f)
+
+            env = os.environ.copy()
+            env["MAC_LANG"] = "en"
+            env["MAC_UPDATE_APP_DIRS"] = str(tmp_apps)
+            res = subprocess.run(
+                ["bash", str(REPO_ROOT / "scripts" / "report_update_coverage.sh"), "--json"],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=True,
+            )
+            data = json.loads(res.stdout)
+            installed_updatable = {a["app"]: a for a in data.get("installed_updatable", [])}
+            self.assertIn("Claude", installed_updatable)
             claude = installed_updatable["Claude"]
             self.assertEqual(claude.get("managed_by"), "vendor_feed")
             self.assertEqual(claude.get("label"), "vendor feed verified")
 
-        self.assertIn("excluded", data.get("classification_counts", {}))
-        excluded_apps = [a["app"] for a in data.get("classifications", {}).get("excluded", [])]
-        self.assertIn("Ascendo", excluded_apps)
+            self.assertIn("excluded", data.get("classification_counts", {}))
+            excluded_apps = [a["app"] for a in data.get("classifications", {}).get("excluded", [])]
+            self.assertIn("Ascendo", excluded_apps)
 
     def test_tracked_files_have_no_personal_home_paths(self) -> None:
         """Tracked files must not contain personal /Users/<username> paths."""
@@ -3065,8 +3081,56 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
             "Files missing from docs/agents/scripts.md:\n" + "\n".join(missing),
         )
 
+    def test_tests_do_not_read_real_applications_dir(self) -> None:
+        """Tests must not reference literal /Applications/ except for allowable fixtures/contracts."""
+        # Allowlist of (filename, exact_line_content, rationale).
+        # Ensures tests do not secretly depend on host /Applications.
+        allowed_entries = {
+            # test_brew_casks.py: Mock Cask metadata fixtures
+            ("test_brew_casks.py", '"/Applications/zoom.us.app",'): "Homebrew cask artifact metadata fixture",
+            ("test_brew_casks.py", '{"delete": ["/Applications/zoom.us.app"]}'): "Homebrew cask zap artifact fixture",
+            # test_mau_dead_deferral.py: MAU AppVersions preference dictionary key
+            ("test_mau_dead_deferral.py", '"/Applications/Microsoft Teams.app": "26225.1706.5101.3140"'): "Mock MAU AppVersions preference dictionary key",
+            # test_run_log_regressions_20260902.py: Verification of mock find_teams_bundle output
+            ("test_run_log_regressions_20260902.py", 'self.assertEqual(out.stdout.strip(), "/Applications/Microsoft Teams.app")'): "Verification of mock find_teams_bundle output",
+            # test_vendor_truth_handlers.py: vendor_direct_install contract requires /Applications/ path
+            ("test_vendor_truth_handlers.py", 'vendor_direct_install "/Applications/Test.app" "https://example.com/app.zip" "zip" "-" "-" "example.com"'): "vendor_direct_install requires /Applications/ path",
+            ("test_vendor_truth_handlers.py", 'if [[ "$1" == *"/Applications/"* ]]; then'): "Mock test checking /Applications/ path validation",
+            ("test_vendor_truth_handlers.py", 'vendor_direct_install "/Applications/Dummy.app" "https://example.com/dummy.zip" "zip" "-" "-" "example.com" "2.0"'): "vendor_direct_install requires /Applications/ path",
+            ("test_vendor_truth_handlers.py", 'vendor_direct_install "/Applications/Dummy.app" "https://bad.com/d.zip" "zip" "-" "-" "good.com" "2.0"'): "vendor_direct_install requires /Applications/ path",
+            ("test_vendor_truth_handlers.py", 'echo "/Applications/$1.app"'): "Mock bundle path helper in silent launch test",
+            ("test_vendor_truth_handlers.py", 'silent_launch_app "/Applications/AppC.app" "com.test.appC"'): "Mock silent launch app argument",
+            ("test_vendor_truth_handlers.py", 'internet_handler_sparkle_check "Remote Desktop Manager" "/Applications/Remote Desktop Manager.app" "Remote Desktop Manager"'): "Mock sparkle handler test parameter",
+            ("test_vendor_truth_handlers.py", 'internet_handler_sparkle_check "Docker Desktop" "/Applications/Docker.app" "Docker"'): "Mock sparkle handler test parameter",
+            ("test_vendor_truth_handlers.py", 'internet_handler_vendor_truth "Claude" "/Applications/Claude.app" "Claude"'): "Mock vendor truth handler test parameter",
+            # test_xcode_license_gate.py: Mock xcode-select developer path
+            ("test_xcode_license_gate.py", 'xcode-select() {{ echo "/Applications/Xcode.app/Contents/Developer"; }}'): "Mock xcode-select developer path",
+            ("test_xcode_license_gate.py", 'self.create_mock_script("xcode-select", \'echo "/Applications/Xcode.app/Contents/Developer"\')'): "Mock xcode-select developer path",
+        }
+
+        violations: list[str] = []
+        tests_dir = REPO_ROOT / "tests"
+        for py_file in sorted(tests_dir.glob("*.py")):
+            if py_file.name == "test_safety_static.py":
+                continue
+            content = py_file.read_text(encoding="utf-8")
+            for lineno, line in enumerate(content.splitlines(), start=1):
+                if '"/Applications/' in line:
+                    stripped = line.strip()
+                    key = (py_file.name, stripped)
+                    if key not in allowed_entries:
+                        violations.append(f"{py_file.name}:{lineno}: {stripped}")
+
+        self.assertEqual(
+            violations,
+            [],
+            "Disallowed '/Applications/' literal found in tests (tests must be hermetic):\n"
+            + "\n".join(violations),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

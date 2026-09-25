@@ -4,6 +4,11 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [Unreleased]
+
+### Fixed
+- **CI: hermetic tests (M1–M3):** Removed test suite dependencies on the runner host's `/Applications` directory, system architecture (`uname -m`), and macOS-only CLI binaries (`plutil`, `ditto`, `osascript`). Added `MAC_UPDATE_APP_DIRS` environment override for app scanning, stubbed platform calls in integration tests, and established static guard `test_tests_do_not_read_real_applications_dir`.
+
 ## [1.5.1] — 2026-09-25
 
 ### Fixed

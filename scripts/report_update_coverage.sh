@@ -391,7 +391,11 @@ def plist_metadata(path):
 def scan_installed_apps():
     found = []
     seen = set()
-    roots = [Path("/Applications"), Path.home() / "Applications"]
+    override = os.environ.get("MAC_UPDATE_APP_DIRS", "").strip()
+    if override:
+        roots = [Path(p) for p in override.split(":") if p]
+    else:
+        roots = [Path("/Applications"), Path.home() / "Applications"]
     for root in roots:
         if not root.is_dir():
             continue

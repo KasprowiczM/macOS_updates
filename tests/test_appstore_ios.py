@@ -40,9 +40,9 @@ class AppStoreLookupTests(unittest.TestCase):
     def test_pending_ios_only_when_store_newer(self) -> None:
         """pending_ios only includes apps where store version is newer than installed."""
         installed = [
-            {"name": "UniFi", "itemId": "1057750338", "version": "10.38.1", "path": "/Applications/UniFi.app"},
-            {"name": "WiFiman", "itemId": "1385561119", "version": "0.33.0", "path": "/Applications/WiFiman.app"},
-            {"name": "Picsart", "itemId": "587366035", "version": "27.5.0", "path": "/Applications/Picsart.app"},
+            {"name": "UniFi", "itemId": "1057750338", "version": "10.38.1", "path": "/mock/Applications/UniFi.app"},
+            {"name": "WiFiman", "itemId": "1385561119", "version": "0.33.0", "path": "/mock/Applications/WiFiman.app"},
+            {"name": "Picsart", "itemId": "587366035", "version": "27.5.0", "path": "/mock/Applications/Picsart.app"},
         ]
         store = {
             "1057750338": "10.38.1",  # equal -> not pending
@@ -155,6 +155,7 @@ exit 0
                 export PATH="{bin_dir}:$PATH"
                 export HOME="{tmpdir}"
                 export MAC_UPDATE_SESSION_DIR="{session_dir}"
+                export MAC_UPDATE_APP_DIRS="{app_dir}"
                 source "{REPO_ROOT}/i18n/lang_en.sh"
                 source "{REPO_ROOT}/lib/version.sh"
                 source "{REPO_ROOT}/lib/proc.sh"
@@ -231,6 +232,9 @@ exit 0
             bin_dir.mkdir()
             (bin_dir / "curl").write_text("#!/usr/bin/env bash\nexit 22\n", encoding="utf-8")
             (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (bin_dir / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+            (bin_dir / "sw_vers").write_text("#!/bin/sh\necho 26.0\n", encoding="utf-8")
+            (bin_dir / "brew").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             (bin_dir / "mas").write_text("""#!/usr/bin/env bash
 case "$1" in
   version) echo "7.0.0" ;;
@@ -274,6 +278,7 @@ exit 0
             orig_path = env.get("PATH", "")
             env["PATH"] = f"{bin_dir}:{orig_path}"
             env["MAC_LANG"] = "en"
+            env["MAC_UPDATE_APP_DIRS"] = str(app_dir)
             env["MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT"] = "15"
             env["MAC_UPDATE_NO_SUDO"] = "1"
             env["MAC_UPDATE_YES"] = "1"
@@ -307,6 +312,9 @@ exit 0
             bin_dir.mkdir()
             (bin_dir / "curl").write_text("#!/usr/bin/env bash\necho '{\"resultCount\":1,\"results\":[{\"trackId\":1057750338,\"version\":\"10.39.0\"}]}'\n", encoding="utf-8")
             (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (bin_dir / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+            (bin_dir / "sw_vers").write_text("#!/bin/sh\necho 26.0\n", encoding="utf-8")
+            (bin_dir / "brew").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             (bin_dir / "mas").write_text("""#!/usr/bin/env bash
 case "$1" in
   version) echo "7.0.0" ;;
@@ -364,6 +372,7 @@ exec "{sys.executable}" "$@"
             orig_path = env.get("PATH", "")
             env["PATH"] = f"{bin_dir}:{orig_path}"
             env["MAC_LANG"] = "en"
+            env["MAC_UPDATE_APP_DIRS"] = str(app_dir)
             env["MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT"] = "15"
             env["MAC_UPDATE_NO_SUDO"] = "1"
             env["MAC_UPDATE_YES"] = "1"
