@@ -17,7 +17,11 @@ import os
 import plistlib
 from appstore_lookup import read_itunes_metadata
 
-roots = ["/Applications", os.path.expanduser("~/Applications")]
+override = os.environ.get("MAC_UPDATE_APP_DIRS", "").strip()
+if override:
+    roots = [p for p in override.split(":") if p]
+else:
+    roots = ["/Applications", os.path.expanduser("~/Applications")]
 seen = set()
 for root in roots:
     if not os.path.isdir(root):

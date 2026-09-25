@@ -77,6 +77,10 @@ class XcodeLicenseGateTests(unittest.TestCase):
         """When xcodebuild returns 69, update_brew.sh exits 10, writes unknown + reason, no brew update."""
         log_file = self.work_dir / "calls.log"
 
+        # Mock platform checks
+        self.create_mock_script("uname", 'echo "arm64"')
+        self.create_mock_script("sw_vers", 'echo "26.0"')
+
         # Atrapa xcode-select
         self.create_mock_script("xcode-select", 'echo "/Applications/Xcode.app/Contents/Developer"')
 

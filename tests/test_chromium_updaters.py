@@ -46,7 +46,7 @@ class ChromiumUpdatersTests(unittest.TestCase):
 {fixture}
 EOF
 )
-                evaluate_omaha_status "Gemini" "/Applications/Gemini.app" "$log_inc" "com.google.geminimacos"
+                evaluate_omaha_status "Gemini" "{tmpdir}/Gemini.app" "$log_inc" "com.google.geminimacos"
                 echo "STATUS=$INTERNET_LAST_STATUS"
                 echo "VERIFIED=$INTERNET_LAST_VERIFIED"
             """
@@ -84,7 +84,7 @@ EOF
 {omaha_log}
 EOF
 )
-                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "$log_inc" "com.google.chrome"
+                evaluate_omaha_status "Google Chrome" "{tmpdir}/Google Chrome.app" "$log_inc" "com.google.chrome"
                 echo "STATUS=$INTERNET_LAST_STATUS"
                 echo "VERIFIED=$INTERNET_LAST_VERIFIED"
             """
@@ -120,7 +120,7 @@ EOF
                 export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
                 export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
                 app_version() {{ echo "153.0.8010.53"; }}
-                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                evaluate_omaha_status "Google Chrome" "{tmpdir}/Google Chrome.app" "" "com.google.chrome"
                 echo "STATUS=$INTERNET_LAST_STATUS"
                 echo "VERIFIED=$INTERNET_LAST_VERIFIED"
                 code="$(internet_status_code "$INTERNET_LAST_STATUS")"
@@ -168,7 +168,7 @@ EOF
                 export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
                 export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
                 app_version() {{ echo "154.0.8037.58"; }}
-                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                evaluate_omaha_status "Google Chrome" "{tmpdir}/Google Chrome.app" "" "com.google.chrome"
                 echo "STATUS=$INTERNET_LAST_STATUS"
                 echo "VERIFIED=$INTERNET_LAST_VERIFIED"
                 code="$(internet_status_code "$INTERNET_LAST_STATUS")"
@@ -181,22 +181,23 @@ EOF
 
     def test_google_no_response_is_unverified(self) -> None:
         """Empty or unrelated Omaha log with no VersionHistory results in L_INTERNET_STATUS_UPDATER_TRIGGERED and verified=0."""
-        cmd = f"""
-            source "{REPO_ROOT}/i18n/lang_en.sh"
-            source "{REPO_ROOT}/lib/version.sh"
-            source "{REPO_ROOT}/lib/internet_handlers.sh"
-            _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
-            curl() {{ return 1; }}
-            export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
-            export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
-            app_version() {{ echo "153.0.8010.53"; }}
-            evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
-            echo "STATUS=$INTERNET_LAST_STATUS"
-            echo "VERIFIED=$INTERNET_LAST_VERIFIED"
-        """
-        res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
-        self.assertIn("STATUS=⏳ Vendor updater triggered (no response recorded)", res.stdout)
-        self.assertIn("VERIFIED=0", res.stdout)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cmd = f"""
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                curl() {{ return 1; }}
+                export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
+                export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
+                app_version() {{ echo "153.0.8010.53"; }}
+                evaluate_omaha_status "Google Chrome" "{tmpdir}/Google Chrome.app" "" "com.google.chrome"
+                echo "STATUS=$INTERNET_LAST_STATUS"
+                echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("STATUS=⏳ Vendor updater triggered (no response recorded)", res.stdout)
+            self.assertIn("VERIFIED=0", res.stdout)
 
     def test_comet_uses_its_own_updater_log(self) -> None:
         """Comet updater triggers its own binary with --wake-all and reads its own updater.log."""
@@ -294,7 +295,7 @@ EOF
                 }}
                 MAC_UPDATE_OMAHA_WAIT=10
                 google_keystone_check "{mock_agent}" "com.google.chrome"
-                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "$GOOGLE_OMAHA_INC" "com.google.chrome"
+                evaluate_omaha_status "Google Chrome" "{tmpdir}/Google Chrome.app" "$GOOGLE_OMAHA_INC" "com.google.chrome"
                 echo "STATUS=$INTERNET_LAST_STATUS"
                 echo "VERIFIED=$INTERNET_LAST_VERIFIED"
             """
@@ -419,7 +420,8 @@ exit 0
             cmd = f"""
                 export HOME="{tmpdir}"
                 export MAC_UPDATE_SESSION_DIR="{session_dir}"
-                export MAC_UPDATE_GOOGLE_SYS_UPDATER=""
+                export MAC_UPDATE_GOOGLE_USER_UPDATER="/nonexistent/user"
+                export MAC_UPDATE_GOOGLE_SYS_UPDATER="/nonexistent/sys"
                 source "{REPO_ROOT}/i18n/lang_en.sh"
                 source "{REPO_ROOT}/lib/version.sh"
                 source "{REPO_ROOT}/lib/proc.sh"
@@ -428,6 +430,7 @@ exit 0
                 source "{REPO_ROOT}/lib/internet_app_updates.sh"
                 _LIB_DIR="{REPO_ROOT}/lib"
                 _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                run_with_timeout() {{ shift; "$@"; }}
                 MAC_UPDATE_OMAHA_WAIT=4
                 sim_now=$(/bin/date +%s)
                 date() {{
@@ -529,6 +532,8 @@ EOF
                 google_keystone_check() {{ echo "CALLED" >> "{updater_calls}"; return 0; }}
 
                 STATUS_CHROME=""
+                sed_iu_chrome="$(declare -f iu_google_chrome | sed 's|/Applications/Google Chrome.app|{chrome_app}|g')"
+                eval "$sed_iu_chrome"
                 iu_google_chrome
                 echo "STATUS_CHROME=$STATUS_CHROME"
             """
@@ -557,7 +562,7 @@ EOF
                 export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
                 export MAC_UPDATE_OMAHA_MAX_AGE_H=6
                 app_version() {{ echo "153.0.8010.53"; }}
-                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                evaluate_omaha_status "Google Chrome" "{tmpdir}/Google Chrome.app" "" "com.google.chrome"
                 echo "STATUS=$INTERNET_LAST_STATUS"
                 echo "VERIFIED=$INTERNET_LAST_VERIFIED"
             """
@@ -588,7 +593,7 @@ EOF
                 export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
                 export MAC_UPDATE_OMAHA_MAX_AGE_H=6
                 app_version() {{ echo "153.0.8010.53"; }}
-                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                evaluate_omaha_status "Google Chrome" "{tmpdir}/Google Chrome.app" "" "com.google.chrome"
                 echo "STATUS=$INTERNET_LAST_STATUS"
                 echo "VERIFIED=$INTERNET_LAST_VERIFIED"
             """
