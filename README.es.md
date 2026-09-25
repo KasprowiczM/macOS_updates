@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.0** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–27**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
+> **v1.5.1** — Orquestador de actualizaciones en un solo comando listo para producción en **Macs con Apple Silicon en macOS 13–27**. Coordina actualizaciones verificadas para aplicaciones instaladas en este Mac. **Multilingüe** (7 idiomas). Capa privada opcional en la nube vía [`dev_sync/`](dev_sync/README.md).
 
 **Verdad del proveedor (v1.5.0):** la versión de cada aplicación se compara con el feed de su propio proveedor antes de ejecutar cualquier acción. Las aplicaciones actualizadas no se tocan; las desactualizadas se actualizan mediante el actualizador del propio proveedor o se instalan desde el proveedor con verificación de firma y Team ID. Solo se actualiza el software que ya está instalado (`--bootstrap-cli` instala deliberadamente las CLI faltantes). Las aplicaciones eliminadas manualmente se detectan y nunca se reinstalan. **Las aplicaciones que tienes abiertas nunca se cierran: el kit de herramientas solo cierra lo que inició por sí mismo.** Compruebe el estado del proveedor en modo de solo lectura con `bash scripts/check_vendor_feeds.sh`.
 

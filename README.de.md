@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.0** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.5.1** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
 
 **Herstellerwahrheit (v1.5.0):** Die Version jeder Anwendung wird vor jeder Ausführung mit dem Feed des Herstellers abgeglichen. Aktuelle Apps bleiben unberührt; veraltete Apps werden durch den herstellereigenen Updater aktualisiert oder vom Hersteller mit Signatur- und Team-ID-Überprüfung installiert. Es wird nur Software aktualisiert, die tatsächlich installiert ist (`--bootstrap-cli` installiert fehlende CLIs gezielt). Manuell entfernte Apps werden erkannt und niemals erneut installiert. **Apps, die Sie geöffnet haben, werden niemals geschlossen — das Toolkit schließt nur das, was es selbst gestartet hat.** Überprüfen Sie den Herstellerstatus schreibgeschützt mit `bash scripts/check_vendor_feeds.sh`.
 

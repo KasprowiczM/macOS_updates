@@ -4,7 +4,7 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
-## [Unreleased]
+## [1.5.1] — 2026-09-25
 
 ### Fixed
 - **Chrome staged rollout status (K1):** Report staged vendor rollout (`rollout_hold`) instead of missing Omaha response when Google VersionHistory indicates a newer public release not yet offered to the local Mac; avoids misleading unverified updater warnings.
