@@ -234,6 +234,7 @@ exit 0
             (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             (bin_dir / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
             (bin_dir / "sw_vers").write_text("#!/bin/sh\necho 26.0\n", encoding="utf-8")
+            (bin_dir / "brew").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             (bin_dir / "mas").write_text("""#!/usr/bin/env bash
 case "$1" in
   version) echo "7.0.0" ;;
@@ -313,6 +314,7 @@ exit 0
             (bin_dir / "sleep").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             (bin_dir / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
             (bin_dir / "sw_vers").write_text("#!/bin/sh\necho 26.0\n", encoding="utf-8")
+            (bin_dir / "brew").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             (bin_dir / "mas").write_text("""#!/usr/bin/env bash
 case "$1" in
   version) echo "7.0.0" ;;
