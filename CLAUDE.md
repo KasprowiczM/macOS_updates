@@ -10,6 +10,7 @@ bash build_inventory.sh               # Build APPLICATIONS.md from this Mac only
 bash update_all.sh                    # Full update (all 7 steps)
 bash update_all.sh --dry-run          # Preview without mutations
 bash scripts/report_update_coverage.sh # Supported vs missing apps (by category)
+bash scripts/check_vendor_feeds.sh    # Vendor truth table (read-only)
 bash dev_sync/dev-sync-import.sh      # Restore private overlay (owners only)
 bash run_tests.sh                     # bash -n + py_compile + unittest
 bash -n update_all.sh                 # Syntax check
