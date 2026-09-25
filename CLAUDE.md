@@ -1,6 +1,6 @@
 # macOS Updates
 
-Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–27, 7 languages, v**1.5.0**, multi-cloud private overlay via `dev_sync/`.
+Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–27, 7 languages, v**1.5.1**, multi-cloud private overlay via `dev_sync/`.
 
 ## Quick Commands
 
@@ -10,6 +10,7 @@ bash build_inventory.sh               # Build APPLICATIONS.md from this Mac only
 bash update_all.sh                    # Full update (all 7 steps)
 bash update_all.sh --dry-run          # Preview without mutations
 bash scripts/report_update_coverage.sh # Supported vs missing apps (by category)
+bash scripts/check_vendor_feeds.sh    # Vendor truth table (read-only)
 bash dev_sync/dev-sync-import.sh      # Restore private overlay (owners only)
 bash run_tests.sh                     # bash -n + py_compile + unittest
 bash -n update_all.sh                 # Syntax check
@@ -46,6 +47,7 @@ Load only when relevant to your task:
 - @docs/agents/architecture.md — Bash 3.2 constraints, session dir, Python inline heredocs, i18n, Homebrew prefix detection, cloud sync
 - @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (macOS 15.7.2+/14.8.2+/26.1+ entitlement change), App Store two-track, version detection, update methods per app
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
+- @docs/agents/acceptance_checklist.md — live acceptance paths for v1.5.x
 - @docs/agents/handoff.md — how to create handoff files between sessions and preserve context
 - @docs/agents/security.md — secret handling, deny rules, .claudeignore policy
 

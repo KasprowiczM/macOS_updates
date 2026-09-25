@@ -4,9 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.1** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
-**Vendor truth (v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
+**Vendor truth (v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. **Apps you have open are never closed — the toolkit only quits what it launched itself.** Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
 
 **Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
 
@@ -294,6 +294,7 @@ Root `dev-sync-*.sh` wrappers call the same scripts in `dev_sync/`.
 
 ## Test
 
+The test suite covers bash syntax, Python compilation, static safety contracts, and unit tests (480 automated tests).
 Pull requests run Ubuntu ShellCheck, portable Python tests, and the secret scan.
 The full `run_tests.sh` suite on a macOS runner runs only on `workflow_dispatch` or a `v*` tag — not on every push.
 

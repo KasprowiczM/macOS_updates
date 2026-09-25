@@ -92,13 +92,101 @@ EOF
             self.assertIn("Vendor rollout: 153.0.8010.53 installed, 154.0.8037.58 public", res.stdout)
             self.assertIn("VERIFIED=1", res.stdout)
 
+    def test_chrome_staged_rollout_when_no_omaha_response(self) -> None:
+        """Chrome with no Omaha response and newer VersionHistory reports rollout hold without soft fail."""
+        vh_fixture = (REPO_ROOT / "tests" / "fixtures" / "vendor_feeds" / "versionhistory.json").read_text(encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            bin_dir.mkdir()
+            mock_curl = bin_dir / "curl"
+            mock_curl.write_text(
+                f"""#!/usr/bin/env bash
+cat <<'EOF'
+{vh_fixture}
+EOF
+""",
+                encoding="utf-8",
+            )
+            mock_curl.chmod(mock_curl.stat().st_mode | stat.S_IEXEC)
+
+            cmd = f"""
+                export PATH="{bin_dir}:$PATH"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_status.sh"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
+                export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
+                app_version() {{ echo "153.0.8010.53"; }}
+                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                echo "STATUS=$INTERNET_LAST_STATUS"
+                echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+                code="$(internet_status_code "$INTERNET_LAST_STATUS")"
+                echo "CODE=$code"
+                INTERNET_SOFT_FAIL=0
+                case "$code" in
+                    behind|needs_restart|feed_stale)
+                        INTERNET_SOFT_FAIL=1
+                        ;;
+                esac
+                echo "SOFT_FAIL=$INTERNET_SOFT_FAIL"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("Vendor rollout: 153.0.8010.53 installed, 154.0.8037.58 public", res.stdout)
+            self.assertIn("VERIFIED=1", res.stdout)
+            self.assertIn("CODE=rollout_hold", res.stdout)
+            self.assertIn("SOFT_FAIL=0", res.stdout)
+
+
+    def test_chrome_installed_ge_public_when_no_omaha_response(self) -> None:
+        """Chrome with no Omaha response but installed >= public VersionHistory reports current."""
+        vh_fixture = (REPO_ROOT / "tests" / "fixtures" / "vendor_feeds" / "versionhistory.json").read_text(encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bin_dir = Path(tmpdir) / "bin"
+            bin_dir.mkdir()
+            mock_curl = bin_dir / "curl"
+            mock_curl.write_text(
+                f"""#!/usr/bin/env bash
+cat <<'EOF'
+{vh_fixture}
+EOF
+""",
+                encoding="utf-8",
+            )
+            mock_curl.chmod(mock_curl.stat().st_mode | stat.S_IEXEC)
+
+            cmd = f"""
+                export PATH="{bin_dir}:$PATH"
+                source "{REPO_ROOT}/i18n/lang_en.sh"
+                source "{REPO_ROOT}/lib/version.sh"
+                source "{REPO_ROOT}/lib/internet_handlers.sh"
+                source "{REPO_ROOT}/lib/internet_status.sh"
+                _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
+                export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
+                app_version() {{ echo "154.0.8037.58"; }}
+                evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "" "com.google.chrome"
+                echo "STATUS=$INTERNET_LAST_STATUS"
+                echo "VERIFIED=$INTERNET_LAST_VERIFIED"
+                code="$(internet_status_code "$INTERNET_LAST_STATUS")"
+                echo "CODE=$code"
+            """
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("STATUS=✅ Up to date (154.0.8037.58, Google VersionHistory)", res.stdout)
+            self.assertIn("VERIFIED=1", res.stdout)
+            self.assertIn("CODE=current_verified", res.stdout)
+
     def test_google_no_response_is_unverified(self) -> None:
-        """Empty or unrelated Omaha log results in L_INTERNET_STATUS_UPDATER_TRIGGERED and verified=0."""
+        """Empty or unrelated Omaha log with no VersionHistory results in L_INTERNET_STATUS_UPDATER_TRIGGERED and verified=0."""
         cmd = f"""
             source "{REPO_ROOT}/i18n/lang_en.sh"
             source "{REPO_ROOT}/lib/version.sh"
             source "{REPO_ROOT}/lib/internet_handlers.sh"
             _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+            curl() {{ return 1; }}
             export MAC_UPDATE_GOOGLE_USER_LOG="/dev/null"
             export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
             app_version() {{ echo "153.0.8010.53"; }}
@@ -495,6 +583,7 @@ EOF
                 source "{REPO_ROOT}/lib/version.sh"
                 source "{REPO_ROOT}/lib/internet_handlers.sh"
                 _INTERNET_HANDLERS_DIR="{REPO_ROOT}/lib"
+                curl() {{ return 1; }}
                 export MAC_UPDATE_GOOGLE_USER_LOG="{user_log}"
                 export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
                 export MAC_UPDATE_OMAHA_MAX_AGE_H=6
