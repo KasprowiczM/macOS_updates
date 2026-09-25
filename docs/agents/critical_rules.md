@@ -99,17 +99,17 @@ Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 
 | Method | Apps |
 |--------|------|
-| Mozilla product-details/download + DMG | Firefox Dev |
-| GitHub API / Official Metadata + DMG | KeePassXC, CodeEdit, Trezor Suite, Ledger Wallet / Live |
-| Google Keystone | Chrome, Google Drive, Gemini |
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor (direct-first), Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Remote Desktop Manager |
+| Mozilla product-details/download + DMG | Firefox Developer Edition |
+| GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
+| Google Keystone | Google Chrome, Google Drive, Gemini |
 | Chromium Updater | Comet (Perplexity AI) |
-| msupdate CLI | Word, Excel, PowerPoint, Outlook, OneNote; observed `TEAMS21` fallback when MAU offers it |
-| Vendor self-updater + MAU fallback | Microsoft Teams normally owns its cadence; MAU may recover a failed Teams updater |
+| msupdate CLI | Microsoft Word, Microsoft Excel, Microsoft PowerPoint, Microsoft Outlook, Microsoft OneNote |
+| Vendor self-updater + MAU fallback | Microsoft Teams (normally owns its cadence; MAU may recover a failed Teams updater via `TEAMS21`) |
 | Docker CLI | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
-| Homebrew cask (greedy only for brew_cask-designated tokens) | Brave, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
-| Built-in auto-updater (silent launch, triggered-unverified) | Brave, ChatGPT/Codex desktop, Claude, Perplexity, Antigravity, Antigravity IDE, LM Studio, OpenCode, ProtonVPN, Proton Mail, Proton Drive, MEGAsync, Zoom, Warp, AppCleaner, Spotify, CapCut, Remote Desktop Manager, Cursor, Obsidian |
-| Hybrid self-update + MAU fallback | Teams (`TEAMS21` is accepted only when surfaced by MAU and is verified by a final `msupdate --list`) |
+| Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
+| Built-in auto-updater (silent launch / Sparkle appcast, triggered-unverified) | Proton Drive |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
 | Manual only | IPMIView, DJI Assistant 2 |
 

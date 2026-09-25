@@ -4,6 +4,19 @@ All notable changes to **macOS Updates** are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 semantic-ish versioning tracked in [`VERSION`](VERSION).
 
+## [Unreleased]
+
+### Fixed
+- **Chrome staged rollout status (K1):** Report staged vendor rollout (`rollout_hold`) instead of missing Omaha response when Google VersionHistory indicates a newer public release not yet offered to the local Mac; avoids misleading unverified updater warnings.
+
+### Changed
+- **Documentation synced with v1.5.0 (K2):**
+  - Updated `docs/agents/scripts.md` with complete documentation for all library modules, config mappings, and static guard tests (`test_every_lib_file_is_documented_in_scripts_md`).
+  - Refreshed update methods table in `docs/agents/critical_rules.md` §5 with single-row vendor truth feeds, Homebrew casks, and unverified classifications.
+  - Documented all v1.5.0 session files and lifecycle semantics in `docs/agents/architecture.md`.
+  - Added troubleshooting entries for staged rollouts, open app preservation, Omaha recent check windows, and direct vendor installs in `docs/agents/troubleshooting.md`.
+  - Synchronized core open-application safety principle across all 7 localized README files.
+
 ## [1.5.0] — 2026-09-24
 
 Vendor truth release: version comparison against vendor release feeds, only installed applications and toolchains updated, orphan Homebrew cask detection, and drift-free inventory synchronization across all groups.
