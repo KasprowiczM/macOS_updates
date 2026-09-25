@@ -17,6 +17,7 @@ class CltStatusTests(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp(prefix="macupd_test_clt_")
         self.bin_dir = os.path.join(self.temp_dir, "bin")
         os.makedirs(self.bin_dir, exist_ok=True)
+        self._create_mock_bin("uname", 'echo "arm64"')
         self.old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{self.bin_dir}:{self.old_path}"
 

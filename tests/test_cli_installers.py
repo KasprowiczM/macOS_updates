@@ -164,7 +164,7 @@ def _run_npm_cli(snippet: str, env: dict[str, str] | None = None, timeout: int =
     if env:
         merged.update(env)
     cmd = (
-        f'eval "$(sed \'/^print_header "🧰 Native CLI & npm"/,$d\' "{REPO_ROOT}/update_npm_cli.sh")"; '
+        f'eval "$(sed -e \'/mac_update_require_supported_platform/d\' -e \'/^print_header "🧰 Native CLI & npm"/,$d\' "{REPO_ROOT}/update_npm_cli.sh")"; '
         f'{snippet}'
     )
     return subprocess.run(
@@ -622,6 +622,10 @@ class PruneVendorCliVersionsTests(unittest.TestCase):
 
             mock_bin = tmp_path / "bin"
             mock_bin.mkdir()
+            (mock_bin / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+            (mock_bin / "uname").chmod(0o755)
+            (mock_bin / "sw_vers").write_text("#!/bin/sh\necho 26.0\n", encoding="utf-8")
+            (mock_bin / "sw_vers").chmod(0o755)
             npm_log = tmp_path / "npm_calls.log"
             npm = mock_bin / "npm"
             npm.write_text(f'#!/bin/sh\necho "$*" >> "{npm_log}"\nexit 0\n', encoding="utf-8")

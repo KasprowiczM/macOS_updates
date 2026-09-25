@@ -79,6 +79,7 @@ class SystemStepBehavioralTests(unittest.TestCase):
         return p
 
     def setup_mocks(self, log_file: Path) -> None:
+        self.create_mock_script("uname", "echo arm64")
         self.create_mock_script(
             "sw_vers",
             """
