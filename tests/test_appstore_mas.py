@@ -17,6 +17,8 @@ class AppStoreMasGateTests(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp(prefix="macupd_test_mas_")
         self.bin_dir = os.path.join(self.temp_dir, "bin")
         os.makedirs(self.bin_dir, exist_ok=True)
+        self._create_mock_bin("uname", 'echo "arm64"')
+        self._create_mock_bin("sw_vers", 'echo "26.0"')
         self.old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{self.bin_dir}:{self.old_path}"
 

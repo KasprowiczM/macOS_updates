@@ -176,6 +176,10 @@ class BrewCasksIntegrationTests(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.bin_dir = self.tmp / "bin"
         self.bin_dir.mkdir()
+        (self.bin_dir / "uname").write_text("#!/bin/sh\necho arm64\n", encoding="utf-8")
+        (self.bin_dir / "uname").chmod(0o755)
+        (self.bin_dir / "sw_vers").write_text("#!/bin/sh\necho 26.0\n", encoding="utf-8")
+        (self.bin_dir / "sw_vers").chmod(0o755)
         self.session_dir = self.tmp / "session"
         self.session_dir.mkdir()
         self.fake_apps = self.tmp / "Applications"

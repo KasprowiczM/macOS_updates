@@ -292,6 +292,7 @@ exit 0
                 print_step() {{ :; }}
                 internet_msg() {{ printf "$@"; }}
                 sleep() {{ :; }}
+                run_with_timeout() {{ shift; "$@"; }}
                 app_version() {{
                     local c=0
                     if [ -f "{cnt_file}" ]; then

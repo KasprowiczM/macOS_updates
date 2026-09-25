@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -160,6 +161,7 @@ class QuarantineExpiryTests(unittest.TestCase):
         self.assertLess(verify, forget)
 
 
+@unittest.skipUnless(shutil.which("plutil"), "requires plutil (macOS)")
 class TeamsDeferralVersionTests(unittest.TestCase):
     """A pin at the installed build is MAU bookkeeping, not a stale pin."""
 

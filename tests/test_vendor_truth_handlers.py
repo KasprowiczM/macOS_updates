@@ -330,6 +330,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
         self.assertIn("VERIFIED=1", proc.stdout)
         self.assertFalse(os.path.exists(open_log), "silent_launch_app called in dry run")
 
+    @unittest.skipUnless(shutil.which("ditto"), "requires ditto (macOS)")
     def test_vendor_direct_rejects_older_bundle_version(self):
         copy_log = os.path.join(self.tmpdir, "copy.log")
         zip_path = os.path.join(self.tmpdir, "dummy.zip")
@@ -524,6 +525,7 @@ exit 0
         print_error() {{ echo "ERROR: $*"; }}
         print_ok() {{ :; }}
         sleep() {{ :; }}
+        run_with_timeout() {{ shift; "$@"; }}
 
         internet_app_path() {{
             echo "/Applications/$1.app"

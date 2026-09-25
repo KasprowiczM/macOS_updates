@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import plistlib
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -31,6 +32,7 @@ def run_lib(snippet: str, env: dict[str, str] | None = None) -> subprocess.Compl
     )
 
 
+@unittest.skipUnless(shutil.which("plutil"), "requires plutil (macOS)")
 class MauDeadDeferralTests(unittest.TestCase):
     def test_dead_deferral_version_expires_immediately(self) -> None:
         """When DeferralVersions matches installed build, it expires immediately."""
