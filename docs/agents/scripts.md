@@ -161,3 +161,7 @@ Never copy another user's `APPLICATIONS.md` — use `build_inventory.sh` or pres
 8. `bash run_tests.sh` — handler + dispatch + registry parity tests must pass
 
 `lib/internet_apps.sh` and `migration_setup.sh` phase 14 read the config automatically.
+
+## Production Acceptance
+
+- `docs/agents/acceptance_checklist.md` — Live acceptance paths for v1.5.x covering iPad GUI automation, split system updates, major upgrade guards, orphan casks, vendor direct DMG rollbacks, Chrome staged rollouts, and toolkit-launched application cleanup.

@@ -43,6 +43,7 @@ Load only when relevant to your task:
 - @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (macOS 15.7.2+/14.8.2+/26.1+ entitlement change), App Store two-track, version detection, update methods per app, APPLICATIONS.md structure
 - @docs/agents/exit_codes.md — the 0 / 10 / 1 severity contract and which failures defer the macOS system update
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
+- @docs/agents/acceptance_checklist.md — live acceptance paths for v1.5.x
 - @docs/agents/mcp_setup.md — MCP server absolute path requirement, PATH env fix
 - @docs/agents/handoff.md — how to create handoff files between sessions
 - @docs/agents/security.md — secret handling and deny rules
