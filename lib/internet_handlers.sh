@@ -587,6 +587,18 @@ omaha_read_increment() {
     fi
 }
 
+omaha_chrome_version_history_public() {
+    local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
+    local vh_json=""
+    vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+    [ -n "$vh_json" ] || return 0
+    printf '%s\n' "$vh_json" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import version_history_public
+print(version_history_public(sys.stdin.read()) or "")
+' 2>/dev/null || true
+}
+
 evaluate_omaha_status() {
     local app="$1"
     local app_path="$2"
@@ -607,17 +619,8 @@ print(res if res else "")
 
     if [ "$st" = "noupdate" ]; then
         if [ "$appid" = "com.google.chrome" ]; then
-            local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
-            local vh_json=""
-            vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
             local pub_ver=""
-            if [ -n "$vh_json" ]; then
-                pub_ver="$(printf '%s\n' "$vh_json" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
-import sys
-from vendor_feeds import version_history_public
-print(version_history_public(sys.stdin.read()) or "")
-' 2>/dev/null || true)"
-            fi
+            pub_ver="$(omaha_chrome_version_history_public)"
             local inst_ver
             inst_ver="$(app_version "$app_path")"
             if [ -n "$pub_ver" ] && [ "$(version_cmp "$pub_ver" "$inst_ver")" = "newer" ]; then
@@ -689,6 +692,24 @@ if res:
                 INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OMAHA_RECENT_FMT" "$r_time")"
                 INTERNET_LAST_VERIFIED=1
                 return 0
+            fi
+        fi
+
+        if [ "$appid" = "com.google.chrome" ]; then
+            local pub_ver=""
+            pub_ver="$(omaha_chrome_version_history_public)"
+            if [ -n "$pub_ver" ]; then
+                local inst_ver
+                inst_ver="$(app_version "$app_path")"
+                if [ "$(version_cmp "$pub_ver" "$inst_ver")" = "newer" ]; then
+                    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_ROLLOUT_HOLD_FMT" "$inst_ver" "$pub_ver")"
+                    INTERNET_LAST_VERIFIED=1
+                    return 0
+                else
+                    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_CURRENT_FMT" "$inst_ver, Google VersionHistory")"
+                    INTERNET_LAST_VERIFIED=1
+                    return 0
+                fi
             fi
         fi
 
