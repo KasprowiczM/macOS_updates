@@ -47,6 +47,7 @@ Load only when relevant to your task:
 - @docs/agents/architecture.md — Bash 3.2 constraints, session dir, Python inline heredocs, i18n, Homebrew prefix detection, cloud sync
 - @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (macOS 15.7.2+/14.8.2+/26.1+ entitlement change), App Store two-track, version detection, update methods per app
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
+- @docs/agents/acceptance_checklist.md — live acceptance paths for v1.5.x
 - @docs/agents/handoff.md — how to create handoff files between sessions and preserve context
 - @docs/agents/security.md — secret handling, deny rules, .claudeignore policy
 
