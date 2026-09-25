@@ -4,9 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.0** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–27**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+> **v1.5.1** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–27**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
 
-**Prawda od producenta (v1.5.0):** wersja każdej aplikacji jest porównywana z feedem jej producenta, zanim cokolwiek zostanie uruchomione. Aktualne aplikacje zostają nietknięte; nieaktualne aktualizuje ich własny updater albo instalacja od producenta z weryfikacją podpisu i Team ID. Aktualizowane jest wyłącznie to, co jest zainstalowane (`--bootstrap-cli` celowo instaluje brakujące CLI). Aplikacje usunięte ręcznie są rozpoznawane i nigdy nie wracają. Stan producentów sprawdzisz bez zmian w systemie: `bash scripts/check_vendor_feeds.sh`.
+**Prawda od producenta (v1.5.0):** wersja każdej aplikacji jest porównywana z feedem jej producenta, zanim cokolwiek zostanie uruchomione. Aktualne aplikacje zostają nietknięte; nieaktualne aktualizuje ich własny updater albo instalacja od producenta z weryfikacją podpisu i Team ID. Aktualizowane jest wyłącznie to, co jest zainstalowane (`--bootstrap-cli` celowo instaluje brakujące CLI). Aplikacje usunięte ręcznie są rozpoznawane i nigdy nie wracają. **Aplikacje, które masz otwarte, nigdy nie są zamykane. Skrypt zamyka tylko to, co sam uruchomił.** Stan producentów sprawdzisz bez zmian w systemie: `bash scripts/check_vendor_feeds.sh`.
 
 **Repozytorium publiczne:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Publikacja: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Zmiany: [CHANGELOG.md](CHANGELOG.md)
 
@@ -319,6 +319,7 @@ bash dev_sync/dev-sync-verify-full.sh
 
 ## Testowanie
 
+Zestaw testów obejmuje składnię basha, kompilację Pythona, statyczne kontrakty bezpieczeństwa oraz testy jednostkowe (480 testów automatycznych).
 Pull requesty uruchamiają na Ubuntu ShellCheck, przenośne testy Pythona i skan sekretów.
 Pełna suite `run_tests.sh` na runnerze macOS działa tylko przy `workflow_dispatch` albo tagu `v*` — nie przy każdym pushu.
 

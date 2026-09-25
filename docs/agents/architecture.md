@@ -20,6 +20,15 @@
 - Path: `mktemp -d "${TMPDIR:-/tmp}/mac_update.XXXXXX"` stored in `$MAC_UPDATE_SESSION_DIR`
 - All temp files go here. Guard every use: `[ -n "$MAC_UPDATE_SESSION_DIR" ]`
 - The master script registers cleanup traps and uses mode `700` where supported.
+- **Key session files used in v1.5.0:**
+  - `toolkit_launched.txt` — Records bundle identifiers and names of applications launched by the toolkit during the update session; used to ensure the toolkit only quits what it launched itself and leaves user-opened apps untouched.
+  - `google_omaha_init.txt` — Session-scoped marker indicating Google Keystone / GoogleUpdater daemon was triggered, preventing redundant `--wake-all` wakeups across Chrome, Gemini, and Drive.
+  - `brew_cask_targets.txt` — Maps installed Homebrew casks to their `.app` bundle targets (`cask_token|Target.app`) for target validation and downgrade protection.
+  - `brew_orphan_casks.txt` — Lists installed Homebrew casks whose `.app` bundles are missing from `/Applications` and `~/Applications`, allowing the pipeline to skip them.
+  - `brew_needs_interactive.txt` — Records Homebrew casks requiring administrator/sudo privileges or interactive installers.
+  - `appstore_ios_before.txt` / `appstore_ios_after.txt` — Pre- and post-update snapshots of installed iOS/iPadOS applications and versions for Track 2 GUI verification.
+  - `appstore_ios_pending.txt` — Tracks iOS/iPadOS apps awaiting installation or verification after Track 2 GUI execution.
+  - `internet_status_codes.txt` — Machine-readable status codes (`current_verified`, `current_vendor`, `rollout_hold`, `behind`, `needs_restart`, `feed_stale`, `unverified`, etc.) per internet app for severity and run summary generation.
 
 ## i18n
 - `i18n/loader.sh` reads `MAC_LANG` from `.mac_update_prefs`

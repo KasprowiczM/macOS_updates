@@ -3045,6 +3045,26 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
             + "\n".join(violations),
         )
 
+    def test_every_lib_file_is_documented_in_scripts_md(self) -> None:
+        """Every lib/*.sh and lib/python/*.py (excluding __init__.py) must be documented in docs/agents/scripts.md."""
+        scripts_md = (REPO_ROOT / "docs" / "agents" / "scripts.md").read_text(encoding="utf-8")
+        missing: list[str] = []
+        for p in sorted(REPO_ROOT.glob("lib/**/*.sh")):
+            rel = p.relative_to(REPO_ROOT).as_posix()
+            if rel not in scripts_md:
+                missing.append(rel)
+        for p in sorted(REPO_ROOT.glob("lib/python/**/*.py")):
+            if p.name == "__init__.py":
+                continue
+            rel = p.relative_to(REPO_ROOT).as_posix()
+            if rel not in scripts_md:
+                missing.append(rel)
+        self.assertEqual(
+            missing,
+            [],
+            "Files missing from docs/agents/scripts.md:\n" + "\n".join(missing),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

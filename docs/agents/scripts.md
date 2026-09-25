@@ -31,11 +31,33 @@
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
 | `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
+| `lib/appstore_ios.sh` | iOS and iPad app detection and App Store lookup helpers (Bash 3.2+) |
+| `lib/cli.sh` | Shared CLI flag parsing and usage definitions for orchestrators |
+| `lib/github_release.sh` | GitHub release tag and download asset lookup helpers |
+| `lib/internet_app_updates.sh` | Per-app update handler routines sourced by `update_internet_apps.sh` |
+| `lib/internet_apps.sh` | Canonical internet-app inventory helpers and registry path resolver |
+| `lib/internet_handlers.sh` | Shared internet app update handlers, Omaha status evaluation, and launch verification |
+| `lib/internet_i18n.sh` | Localized printf message formatting helpers for internet app updaters |
+| `lib/internet_registry.sh` | Parser and validator for `config/internet_app_methods.txt` mapping apps to update handlers |
+| `lib/internet_status.sh` | Internet app status code mapping and summary report formatting (v1.5.0) |
+| `lib/platform.sh` | Supported macOS platform and Apple Silicon architecture guards |
+| `lib/proc.sh` | Shared process execution, timeout, and child process management helpers |
+| `lib/severity.sh` | Shared severity classification and exit code contract helpers across orchestrator scripts |
+| `lib/ui.sh` | Terminal UX helpers: formatting, colors, and TTY-aware progress reporting |
+| `lib/version.sh` | Package, bundle, and application version extraction and three-way comparison helpers |
 | `lib/vendor_feeds.sh` | Vendor feed lookup and parsing helper |
 | `lib/vendor_direct.sh` | Verified vendor direct download, Gatekeeper validation, and atomic swap |
+| `lib/python/appstore_lookup.py` | Pure-function helpers for App Store iPad app metadata lookup via iTunes API |
+| `lib/python/brew_casks.py` | Pure helpers for Homebrew casks: app targets parsing, orphan cask detection, and sudo privilege detection |
+| `lib/python/chronic_warnings.py` | Streak detection for trailing non-OK step runs across historical run summary logs |
+| `lib/python/cli_retention.py` | Vendor CLI version retention and pruning helpers |
+| `lib/python/system_updates.py` | Pure-function helpers for softwareupdate catalog parsing, label extraction, and reboot classification |
 | `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha, VersionHistory) |
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
 | `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
+| `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds |
+| `config/cask_oracles.txt` | Read-only Homebrew Cask version oracle mappings for verifying unverified apps |
+| `tests/_env.py` | Helper for test subprocess environments that strips PYTHONPATH so child shell processes do not inherit it |
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 
@@ -139,3 +161,7 @@ Never copy another user's `APPLICATIONS.md` — use `build_inventory.sh` or pres
 8. `bash run_tests.sh` — handler + dispatch + registry parity tests must pass
 
 `lib/internet_apps.sh` and `migration_setup.sh` phase 14 read the config automatically.
+
+## Production Acceptance
+
+- `docs/agents/acceptance_checklist.md` — Live acceptance paths for v1.5.x covering iPad GUI automation, split system updates, major upgrade guards, orphan casks, vendor direct DMG rollbacks, Chrome staged rollouts, and toolkit-launched application cleanup.
