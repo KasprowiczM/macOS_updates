@@ -238,20 +238,33 @@ fi
 # ============================================================
 # STEP 3: CONFIRMATION
 # ============================================================
-echo -e "${YELLOW}  $L_RUN_TWO_TRACKS${NC}"
-echo "    $L_TOR_1_HEADER"
-echo "    $L_TOR_2_HEADER"
-echo ""
-[ -n "$NATIVE_OUTDATED" ] && print_warn "$L_TOR_1_SUDO_MSG"
-print_warn "$L_AX_PERMISSION_CHECK"
-echo ""
-if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
+# Ask only when there is something to do. With no native update pending the
+# question (and the Accessibility warning) is noise: Track 2 decides from the
+# App Store lookup whether the GUI is needed and asks right before using it.
+# (2026-09-28 run: "run both updates? [T/n]" with nothing pending anywhere.)
+APPSTORE_CONFIRMED=0
+appstore_confirm() {
+    [ "${MAC_UPDATE_YES:-0}" = "1" ] && return 0
     read -r -p "  $L_CONFIRM_UPDATE [T/n]: " CONFIRM
     CONFIRM="${CONFIRM:-T}"
-    if [[ "$CONFIRM" =~ ^[Nn] ]]; then
+    case "$CONFIRM" in
+        [Nn]*) return 1 ;;
+    esac
+    return 0
+}
+if [ -n "$NATIVE_OUTDATED" ]; then
+    echo -e "${YELLOW}  $L_RUN_TWO_TRACKS${NC}"
+    echo "    $L_TOR_1_HEADER"
+    echo "    $L_TOR_2_HEADER"
+    echo ""
+    print_warn "$L_TOR_1_SUDO_MSG"
+    print_warn "$L_AX_PERMISSION_CHECK"
+    echo ""
+    if ! appstore_confirm; then
         print_info "$L_UPDATE_CANCELED"
         exit 0
     fi
+    APPSTORE_CONFIRMED=1
 fi
 
 # ============================================================
@@ -412,6 +425,15 @@ if [ "$_TRACK2_SKIP_GUI" -eq 0 ]; then
     if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ] || [ ! -t 0 ]; then
         print_info "$L_APPSTORE_NONINTERACTIVE_SKIPPED"
         _TRACK2_SKIP_GUI=1
+    fi
+fi
+
+if [ "$_TRACK2_SKIP_GUI" -eq 0 ] && [ "$APPSTORE_CONFIRMED" -eq 0 ]; then
+    print_warn "$L_AX_PERMISSION_CHECK"
+    if ! appstore_confirm; then
+        print_info "$L_UPDATE_CANCELED"
+        _TRACK2_SKIP_GUI=1
+        APPSTORE_TOR2_BRANCH="declined"
     fi
 fi
 
@@ -744,12 +766,15 @@ APPSTORE_EXIT="$(mac_update_severity_exit_code)"
 if [ "$APPSTORE_EXIT" -eq 0 ]; then
     print_header "$L_SCRIPT_2_COMPLETE"
     if [ -z "$NATIVE_OUTDATED" ]; then
-        print_info "Track 1 (mas): no pending native updates; sudo was not requested."
+        print_info "$L_APPSTORE_TOR1_NOTHING"
     else
         print_info "$L_SCRIPT_2_SUMMARY_TOR1"
     fi
-    if [ "$APPSTORE_TOR2_BRANCH" = "no_updates" ]; then
-        print_info "Track 2 (App Store UI): no pending GUI updates were found."
+    if [ "$APPSTORE_TOR2_BRANCH" = "no_updates" ] || [ "$APPSTORE_TOR2_BRANCH" = "all_current" ] \
+        || [ "$APPSTORE_TOR2_BRANCH" = "no_ipad_apps" ]; then
+        print_info "$L_APPSTORE_TOR2_NOTHING"
+    elif [ "$APPSTORE_TOR2_BRANCH" = "declined" ]; then
+        print_info "$L_UPDATE_CANCELED"
     else
         print_info "$L_SCRIPT_2_SUMMARY_TOR2"
         print_warn "$L_SCRIPT_2_CHECK_WINDOW"

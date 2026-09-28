@@ -173,8 +173,8 @@ print(version_history_public(sys.stdin.read()) or "")
         local vh_rel=""
         [ -n "$pub_ver" ] && vh_rel="$(version_cmp "$VER" "$pub_ver")"
         if [ "$vh_rel" = "equal" ] || [ "$vh_rel" = "newer" ]; then
-            print_ok "Google Chrome up to date ($VER, Google VersionHistory)"
-            STATUS_CHROME="✅ Up to date ($VER, Google VersionHistory)"
+            STATUS_CHROME="$(printf "$L_INTERNET_STATUS_CURRENT_FMT" "$VER, Google VersionHistory")"
+            print_ok "${STATUS_CHROME#✅ }"
             return 0
         fi
 
@@ -345,6 +345,13 @@ iu_gemini() {
     if [ -n "$app_path" ] && [ -d "$app_path" ]; then
         local ver; ver="$(app_version "$app_path")"
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+        # Check before action: a recent scheduled GoogleUpdater check for this
+        # exact build proves "current" without waking the updater.
+        if omaha_history_proof "com.google.geminimacos" "$app_path" "$(google_updater_logs | sed -n 1p)" "$(google_updater_logs | sed -n 2p)"; then
+            print_ok "${INTERNET_LAST_STATUS#✅ }"
+            STATUS_GEMINI="$INTERNET_LAST_STATUS"
+            return 0
+        fi
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
         print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
         if google_keystone_check "$KEYSTONE_AGENT" "com.google.geminimacos"; then
@@ -559,6 +566,11 @@ iu_google_drive() {
     if [ -d "/Applications/Google Drive.app" ]; then
         VER=$(app_version "/Applications/Google Drive.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        if omaha_history_proof "com.google.drivefs" "/Applications/Google Drive.app" "$(google_updater_logs | sed -n 1p)" "$(google_updater_logs | sed -n 2p)"; then
+            print_ok "${INTERNET_LAST_STATUS#✅ }"
+            STATUS_GOOGLEDRIVE="$INTERNET_LAST_STATUS"
+            return 0
+        fi
         KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
         print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
         if google_keystone_check "$KEYSTONE_AGENT" "com.google.drivefs"; then
@@ -1291,12 +1303,17 @@ mau_quarantine_forget() {
     return 0
 }
 
-# Office IDs whose live DeferralDays entry has outlived the expiry window,
-# or whose DeferralVersions pin matches the currently installed build (dead deferral).
+# Office IDs whose live DeferralDays entry has outlived the expiry window.
 # An entry with no record at all is treated as expired: it predates this
 # bookkeeping, so it is by definition older than the window.
+#
+# DeferralVersions pins are deliberately NOT reported here. A pin at the
+# installed build is MAU's bookkeeping for a self-updating product (Teams):
+# mau_clean_stale_deferrals keeps it because MAU re-creates it within hours.
+# Listing it as "expired" (P2-11) printed "releasing: TEAMS21" on every run
+# while the reconcile correctly released nothing (2026-09-28 run log).
 mau_quarantine_expired_ids() {
-    local active file max cutoff now id armed out="" plist entry val installed
+    local active file max cutoff now id armed out=""
     active="$(mau_active_office_deferrals)"
     if [ -n "$active" ]; then
         file="$(mau_quarantine_state_file)"
@@ -1312,26 +1329,6 @@ mau_quarantine_expired_ids() {
             [ "$armed" -lt "$cutoff" ] && out="$out $id"
         done
     fi
-
-    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || plist=""
-    if [ -n "$plist" ] && mau_prefs_export "$plist"; then
-        while IFS= read -r entry; do
-            [ -n "$entry" ] || continue
-            id="${entry%%=*}"
-            val="${entry#*=}"
-            installed="$(mau_installed_build_for_id "$id")"
-            if [ -n "$val" ] && [ -n "$installed" ] && [ "$val" = "$installed" ]; then
-                case " $out " in
-                    *" $id "*) ;;
-                    *) out="$out $id" ;;
-                esac
-            fi
-        done <<EOF
-$(mau_deferral_entries "$plist" DeferralVersions)
-EOF
-        rm -f "$plist" 2>/dev/null || true
-    fi
-
     printf '%s' "${out# }"
 }
 
@@ -1862,7 +1859,7 @@ iu_microsoft_365() {
                     # it had just removed.
                     MAU_EXPIRED="$(mau_quarantine_expired_ids)"
                     if [ -n "$MAU_EXPIRED" ]; then
-                        print_info "Microsoft AutoUpdate quarantine older than $(mau_quarantine_max_days)d — releasing so the feed can be re-evaluated: $MAU_EXPIRED"
+                        print_info "$(internet_msg "$L_INTERNET_MS_QUARANTINE_EXPIRED_FMT" "$(mau_quarantine_max_days)" "$MAU_EXPIRED")"
                         internet_diag_log "MAU quarantine expiry releasing: $MAU_EXPIRED"
                     fi
                     mau_reconcile_deferrals "" "$MAU_EXPIRED" || true
@@ -2127,8 +2124,10 @@ iu_docker_desktop() {
             return 0
         fi
 
-        local R
-        R="$(printf '%s' "$feed_row" | cut -d'|' -f1)"
+        local R URL CK CS ART HOST
+        IFS='|' read -r R URL CK CS ART HOST <<EOF_DOCKER_ROW
+$feed_row
+EOF_DOCKER_ROW
         if [ -z "$R" ]; then
             print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
             STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
@@ -2142,7 +2141,7 @@ iu_docker_desktop() {
         if [ "$rel" = "equal" ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$VER")"
             INTERNET_LAST_VERIFIED=1
-            print_ok "$STATUS_DOCKER"
+            print_ok "${STATUS_DOCKER#✅ }"
             return 0
         elif [ "$rel" = "older" ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$VER")"
@@ -2165,6 +2164,58 @@ iu_docker_desktop() {
             return 0
         fi
 
+        # Docker Desktop that is already running is the user's: applying an
+        # update restarts the engine and every container with it. Same rule as
+        # every other app (critical_rules §15): never quit, relaunch or replace
+        # what the user has open — report and move on.
+        local docker_running=0
+        if command -v internet_app_is_running >/dev/null 2>&1 \
+            && internet_app_is_running "com.docker.docker"; then
+            docker_running=1
+        elif command -v docker >/dev/null 2>&1 \
+            && run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+            docker_running=1
+        fi
+        if [ "$docker_running" -eq 1 ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_warn "$STATUS_DOCKER"
+            return 0
+        fi
+
+        # Idle Docker: install the verified DMG straight from the appcast.
+        # `docker desktop update` needs the engine started first (~20 s plus a
+        # stop) and on 2026-09-28 failed immediately with "install error:
+        # validating application: validating signature: <APP>: No such file or
+        # directory" — after which the old handler polled the unchanged bundle
+        # for 300 s. The DMG path verifies Gatekeeper, bundle ID and Team ID and
+        # rolls back on failure (vendor_direct_install / copy_verified_app).
+        if [ "$ART" != "-" ] && [ -n "$ART" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ] \
+            && command -v vendor_direct_install >/dev/null 2>&1; then
+            print_step "$(printf "$L_INTERNET_VENDOR_DIRECT_FMT" "Docker Desktop" "$R" "$HOST")"
+            vendor_direct_install "/Applications/Docker.app" "$URL" "$ART" "$CK" "$CS" "$HOST" "$R"
+            local vrc=$?
+            if [ "$vrc" -eq 0 ]; then
+                local vd_ver
+                vd_ver="$(app_version "/Applications/Docker.app")"
+                local vd_rel
+                vd_rel="$(version_cmp "$R" "$vd_ver")"
+                if [ "$vd_rel" = "equal" ] || [ "$vd_rel" = "older" ]; then
+                    STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$vd_ver")"
+                    INTERNET_LAST_VERIFIED=1
+                    print_ok "${STATUS_DOCKER#✅ }"
+                    return 0
+                fi
+            elif [ "$vrc" -eq 3 ]; then
+                STATUS_DOCKER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                INTERNET_LAST_VERIFIED=0
+                INTERNET_HARD_FAIL=1
+                print_warn "$STATUS_DOCKER"
+                return 1
+            fi
+            internet_diag_log "Docker Desktop: vendor direct install rc=$vrc — falling back to docker desktop update"
+        fi
+
         if ! command -v docker >/dev/null 2>&1; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
             INTERNET_LAST_VERIFIED=1
@@ -2172,56 +2223,59 @@ iu_docker_desktop() {
             return 0
         fi
 
-        local was_running=0
-        if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
-            was_running=1
-        else
-            print_step "$L_INTERNET_DOCKER_STARTING"
-            run_with_timeout 180 docker desktop start >/dev/null 2>&1 || true
-            local started=0
-            local elapsed=0
-            while [ "$elapsed" -lt 120 ]; do
-                sleep 5
-                elapsed=$((elapsed + 5))
-                if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
-                    started=1
-                    break
-                fi
-            done
-            if [ "$started" -eq 0 ]; then
-                STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
-                INTERNET_LAST_VERIFIED=1
-                print_warn "$L_INTERNET_DOCKER_START_FAILED"
-                return 0
+        print_step "$L_INTERNET_DOCKER_STARTING"
+        run_with_timeout 180 docker desktop start >/dev/null 2>&1 || true
+        local started=0
+        local elapsed=0
+        while [ "$elapsed" -lt 120 ]; do
+            sleep 5
+            elapsed=$((elapsed + 5))
+            if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+                started=1
+                break
             fi
+        done
+        if [ "$started" -eq 0 ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_warn "$L_INTERNET_DOCKER_START_FAILED"
+            return 0
         fi
 
         print_step "$L_INTERNET_DOCKER_UPDATING"
-        run_with_timeout 900 docker desktop update -q 2>/dev/null || true
+        local upd_out upd_rc
+        upd_out="$(run_with_timeout 900 docker desktop update -q 2>&1)"
+        upd_rc=$?
 
-        local elapsed=0
         local new_ver="$VER"
         local check_rel
         local updated=0
-        while [ "$elapsed" -lt 300 ]; do
-            new_ver="$(app_version "/Applications/Docker.app")"
-            check_rel="$(version_cmp "$R" "$new_ver")"
-            if [ "$check_rel" = "equal" ] || [ "$check_rel" = "older" ]; then
-                updated=1
-                break
-            fi
-            sleep 10
-            elapsed=$((elapsed + 10))
-        done
-
-        if [ "$was_running" -eq 0 ]; then
-            run_with_timeout 120 docker desktop stop >/dev/null 2>&1 || true
+        if [ "$upd_rc" -ne 0 ]; then
+            # The updater reported failure; the bundle will not change, so do
+            # not burn the 300 s poll waiting for it.
+            internet_diag_log "Docker Desktop: docker desktop update -q failed (exit=$upd_rc): $(printf '%s\n' "$upd_out" | grep -v '^Downloading' | tail -n 3 | tr '\n' ' ')"
+        else
+            elapsed=0
+            while [ "$elapsed" -lt 300 ]; do
+                new_ver="$(app_version "/Applications/Docker.app")"
+                check_rel="$(version_cmp "$R" "$new_ver")"
+                if [ "$check_rel" = "equal" ] || [ "$check_rel" = "older" ]; then
+                    updated=1
+                    break
+                fi
+                sleep 10
+                elapsed=$((elapsed + 10))
+            done
         fi
+
+        # Only ever stop what this handler started (it always started it here:
+        # a running Docker returned NEEDS_RESTART above).
+        run_with_timeout 120 docker desktop stop >/dev/null 2>&1 || true
 
         if [ "$updated" -eq 1 ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$new_ver")"
             INTERNET_LAST_VERIFIED=1
-            print_ok "$STATUS_DOCKER"
+            print_ok "${STATUS_DOCKER#✅ }"
             return 0
         fi
 

@@ -498,7 +498,7 @@ EOF
             [ "$WAIT" -gt 600 ] && WAIT=600
 
             if [ "$WAIT" -gt 0 ]; then
-                printf "$L_INTERNET_LAUNCH_CYCLE_FMT\n" "$app" "$R"
+                print_step "$(printf "$L_INTERNET_LAUNCH_CYCLE_FMT" "$app" "$R")"
                 silent_launch_app "$launch_target"
             sleep "$WAIT"
             if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
@@ -532,7 +532,7 @@ EOF
                 still_running=1
             fi
             if [ "$still_running" -eq 0 ] && command -v vendor_direct_install >/dev/null 2>&1; then
-                printf "$L_INTERNET_VENDOR_DIRECT_FMT\n" "$app" "$R" "$HOST"
+                print_step "$(printf "$L_INTERNET_VENDOR_DIRECT_FMT" "$app" "$R" "$HOST")"
                 vendor_direct_install "$app_path" "$URL" "$ART" "$CK" "$CS" "$HOST" "$R"
                 local vrc=$?
                 if [ "$vrc" -eq 0 ]; then
@@ -599,6 +599,71 @@ print(version_history_public(sys.stdin.read()) or "")
 ' 2>/dev/null || true
 }
 
+# ── Omaha proof from updater_history.jsonl (2026-09-28) ─────
+# Chromium updaters (GoogleUpdater, CometUpdater) write a structured
+# updater_history.jsonl next to updater.log. It records every scheduled
+# check's per-app outcome (NO_UPDATE / UPDATED) with the build it saw, which
+# the text log no longer does reliably: GoogleUpdater 156 prints the Omaha
+# response body on its own unprefixed line. The history file for each log is
+# derived from the log path, so tests that point the log at /dev/null stay
+# hermetic.
+omaha_history_files_for_logs() {
+    local log dir
+    for log in "$@"; do
+        [ -n "$log" ] || continue
+        dir="$(dirname "$log")"
+        [ -f "$dir/updater_history.jsonl.old" ] && printf '%s\n' "$dir/updater_history.jsonl.old"
+        [ -f "$dir/updater_history.jsonl" ] && printf '%s\n' "$dir/updater_history.jsonl"
+    done
+    return 0
+}
+
+google_updater_logs() {
+    printf '%s\n' "${MAC_UPDATE_GOOGLE_USER_LOG:-$HOME/Library/Application Support/Google/GoogleUpdater/updater.log}"
+    printf '%s\n' "${MAC_UPDATE_GOOGLE_SYS_LOG:-/Library/Application Support/Google/GoogleUpdater/updater.log}"
+}
+
+# omaha_history_proof <appid> <app_path> <log>...
+# Sets INTERNET_LAST_STATUS / INTERNET_LAST_VERIFIED=1 and returns 0 when the
+# updater recorded NO_UPDATE (or UPDATED) for exactly the installed build
+# within MAC_UPDATE_OMAHA_MAX_AGE_H hours. Returns 1 otherwise, untouched.
+omaha_history_proof() {
+    local appid="$1" app_path="$2"
+    shift 2
+    local files short build max_age res
+    files="$(omaha_history_files_for_logs "$@")"
+    [ -n "$files" ] || return 1
+    short="$(app_version "$app_path")"
+    build=""
+    if command -v app_build_version >/dev/null 2>&1; then
+        build="$(app_build_version "$app_path")"
+    fi
+    max_age="${MAC_UPDATE_OMAHA_MAX_AGE_H:-6}"
+    res="$(printf '%s\n' "$files" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import omaha_history_status
+appid, short, build = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    max_age = float(sys.argv[4])
+except Exception:
+    max_age = 6.0
+chunks = []
+for path in sys.stdin.read().splitlines():
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            chunks.append(fh.read())
+    except Exception:
+        pass
+res = omaha_history_status("\n".join(chunks), appid, [short, build], max_age)
+if res:
+    print(res[1])
+' "$appid" "$short" "$build" "$max_age" 2>/dev/null || true)"
+    [ -n "$res" ] || return 1
+    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OMAHA_RECENT_FMT" "$res")"
+    INTERNET_LAST_VERIFIED=1
+    return 0
+}
+
 evaluate_omaha_status() {
     local app="$1"
     local app_path="$2"
@@ -653,6 +718,14 @@ print(res if res else "")
     else
         local user_log="${MAC_UPDATE_GOOGLE_USER_LOG:-$HOME/Library/Application Support/Google/GoogleUpdater/updater.log}"
         local sys_log="${MAC_UPDATE_GOOGLE_SYS_LOG:-/Library/Application Support/Google/GoogleUpdater/updater.log}"
+        # Structured history first: it survives log rotation and carries the
+        # checked build. $5 names the updater's own log (Comet); default is
+        # both GoogleUpdater scopes (Drive lives in the system one).
+        if [ -n "${5:-}" ]; then
+            omaha_history_proof "$appid" "$app_path" "$5" && return 0
+        else
+            omaha_history_proof "$appid" "$app_path" "$user_log" "$sys_log" && return 0
+        fi
         local max_age="${MAC_UPDATE_OMAHA_MAX_AGE_H:-6}"
         local recent_result=""
         recent_result=$(PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
@@ -739,6 +812,13 @@ internet_handler_chromium_updater() {
         return 0
     fi
 
+    # Check before action: a recent scheduled check for this exact build is
+    # proof enough; waking the updater would only add MAC_UPDATE_OMAHA_WAIT.
+    if omaha_history_proof "$appid" "$app_path" "$log"; then
+        print_ok "${INTERNET_LAST_STATUS#✅ }"
+        return 0
+    fi
+
     local init_size=0
     [ -f "$log" ] && init_size=$(wc -c < "$log" 2>/dev/null | tr -d ' ' || echo 0)
 
@@ -772,7 +852,7 @@ internet_handler_chromium_updater() {
         printf '%s\n' "$inc" >> "$MAC_UPDATE_SESSION_DIR/chromium_updater_log.txt"
     fi
 
-    evaluate_omaha_status "$app" "$app_path" "$inc" "$appid"
+    evaluate_omaha_status "$app" "$app_path" "$inc" "$appid" "$log"
 }
 
 

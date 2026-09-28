@@ -1,6 +1,6 @@
 # Quick Start (English)
 
-**Apple Silicon Mac required** · macOS 13+ · **v1.5.1**
+**Apple Silicon Mac required** · macOS 13+ · **v1.5.2**
 
 ## One-line install (recommended)
 

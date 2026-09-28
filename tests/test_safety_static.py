@@ -389,7 +389,10 @@ class StaticShellSafetyTests(unittest.TestCase):
         text = self.read_script("update_appstore.sh")
         final_block = text[text.rindex("# ── mas snapshot AFTER update") :]
         self.assertIn('if [ "$APPSTORE_EXIT" -eq 0 ]; then', final_block)
-        self.assertIn('if [ "$APPSTORE_TOR2_BRANCH" = "no_updates" ]; then', final_block)
+        self.assertIn('if [ "$APPSTORE_TOR2_BRANCH" = "no_updates" ] || [ "$APPSTORE_TOR2_BRANCH" = "all_current" ]', final_block)
+        # 2026-09-28: "all current" / "no iPad apps" used to fall into the
+        # "installing in the background — check the App Store window" branch.
+        self.assertIn('[ "$APPSTORE_TOR2_BRANCH" = "no_ipad_apps" ]', final_block)
         # Three distinct reporting states, matching update_all.sh: clean / warnings /
         # errors. The banner previously said "ERRORS OR PENDING UPDATES" for a soft
         # exit 10, which is the normal outcome when Track 2 queued background

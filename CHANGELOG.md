@@ -6,8 +6,23 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.5.2] — 2026-09-28
+
+Fixes from the 2026-09-28 live run log (13 min, exit class `warnings`: Docker behind, Gemini / Google Drive / Comet unverified). After the fix the internet-apps step finished in 2 min with every app verified.
+
 ### Fixed
+- **Chromium updater proof from `updater_history.jsonl`:** GoogleUpdater 156+ prints the Omaha response body on its own unprefixed line, so `omaha_recent_status` never found a timestamp and Gemini, Google Drive and Comet reported "vendor updater triggered (no response recorded)" on every run. New `omaha_history_status` (pure, `lib/python/vendor_feeds.py`) reads the structured history both updaters keep, accepting only an outcome for the installed build within `MAC_UPDATE_OMAHA_MAX_AGE_H`; `omaha_history_proof` runs *before* waking the updater (check before action), saving the 45 s Omaha wait per app. The text-log reader now also carries the timestamp of the preceding prefixed line. New `app_build_version` in `lib/version.sh` (Drive: short `131.0`, build `131.0.2`, Omaha `131.0.2.0`).
+- **Docker Desktop:** idle Docker is now updated from the verified DMG in its appcast (`config/vendor_feeds.txt` artifact `dmg`, host `desktop.docker.com`) through `vendor_direct_install` — no engine start/stop. `docker desktop update -q` failed live with `validating signature: <APP>: No such file or directory`; the handler swallowed that and polled the unchanged bundle for 300 s. The CLI fallback now captures exit code and output into `internet_diag.txt` and skips the poll on failure. A **running** Docker is never updated (the update restarts every container) — it reports `NEEDS_RESTART`, per critical rule §15.
+- **OpenCode** added to `config/vendor_direct_first.txt`: its Tauri updater installed nothing in the 90 s stage wait while the verified vendor tarball did.
+- **MAU false "releasing TEAMS21":** `mau_quarantine_expired_ids` reported a `DeferralVersions` pin equal to the installed build as an expired quarantine (P2-11), while `mau_clean_stale_deferrals` deliberately keeps it (MAU re-creates it). Every run printed "releasing: TEAMS21" followed by "released: none". Only Office `DeferralDays` quarantines are listed now.
+- **Chrome status code `unknown`:** the VersionHistory pre-check wrote a hard-coded English string no status mapping recognised; it now uses `L_INTERNET_STATUS_CURRENT_FMT` (`current_verified`, localized).
+- **App Store step:** no "run both updates? [T/n]" prompt or Accessibility warning when nothing native is pending — Track 2 asks right before it needs the GUI. The final banner no longer says "installing in the background — check the App Store window" when Track 2 found everything current.
+- **Run summary:** unverified / failed internet apps are listed by name (e.g. `Gemini — vendor updater triggered …`) instead of the generic `Step: Internet apps` line.
+- **Localization:** new keys `L_APPSTORE_TOR1_NOTHING`, `L_APPSTORE_TOR2_NOTHING`, `L_INTERNET_MS_QUARANTINE_EXPIRED_FMT` in all 7 languages; `L_INTERNET_STATUS_OMAHA_RECENT_FMT` is vendor-neutral (also used for Comet). Duplicate "✅ ✅" in handler output removed.
+
+### Tests
 - **CI: hermetic tests (M1–M3):** Removed test suite dependencies on the runner host's `/Applications` directory, system architecture (`uname -m`), and macOS-only CLI binaries (`plutil`, `ditto`, `osascript`). Added `MAC_UPDATE_APP_DIRS` environment override for app scanning, stubbed platform calls in integration tests, and established static guard `test_tests_do_not_read_real_applications_dir`.
+- New `tests/test_omaha_history.py` (11 tests); Docker, MAU, chromium-updater, run-summary and static tests updated to the new contracts — 496 tests pass.
 
 ## [1.5.1] — 2026-09-25
 
