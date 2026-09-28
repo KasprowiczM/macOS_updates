@@ -1,6 +1,6 @@
 # User Guide (English)
 
-**Version:** 1.5.1 · **Apple Silicon, macOS 13+**
+**Version:** 1.5.2 · **Apple Silicon, macOS 13+**
 
 ## What this toolkit does
 
@@ -52,7 +52,7 @@ Shows five evidence-based states:
 | `silent_launch` | Claude, Cursor, Warp | Triggered-unverified; verify the About/version screen |
 | `msupdate` | Microsoft Office | Shared Office `msupdate` handler |
 | `mau_fallback_self_update` | Microsoft Teams | Teams self-updater plus an observed, verified `TEAMS21` MAU fallback when offered |
-| `docker_cli` | Docker Desktop | `docker desktop update` |
+| `docker_cli` | Docker Desktop | Idle: verified DMG from Docker's appcast; running: left alone (quit it to update); fallback `docker desktop update` |
 | `brew_cask` | Inkscape | Homebrew cask with `--greedy` |
 | `appstore_gui` | UniFi, WiFiman, Picsart | App Store GUI Track 2 |
 | `manual` | IPMIView, DJI Assistant 2 | Notification only |

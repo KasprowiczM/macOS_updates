@@ -1,8 +1,15 @@
-"""Tests for MAU dead deferral expiry (P2-11).
+"""MAU DeferralVersions pins vs. the quarantine expiry (P2-11, revised 2026-09-28).
 
-If OptionalUpdatesDeferrals.DeferralVersions.<ID> matches the installed build
-of the product, the deferral is dead (it points to what is already installed)
-and must be considered expired immediately by mau_quarantine_expired_ids.
+P2-11 made a DeferralVersions pin that equals the installed build count as
+"expired". That contradicted mau_clean_stale_deferrals, which deliberately
+keeps such a pin: it is MAU's own bookkeeping for a self-updating product and
+MAU re-creates it within hours (2026-09-02 regression suite). The result on
+the 2026-09-28 run: "quarantine older than 14d — releasing: TEAMS21" on every
+run, followed by "released: none" and TEAMS21 still in the domain.
+
+mau_quarantine_expired_ids therefore reports only Office DeferralDays entries
+that outlived the window. Version pins are not quarantines this toolkit arms,
+so they never appear in its expiry list.
 """
 
 from __future__ import annotations
@@ -34,8 +41,8 @@ def run_lib(snippet: str, env: dict[str, str] | None = None) -> subprocess.Compl
 
 @unittest.skipUnless(shutil.which("plutil"), "requires plutil (macOS)")
 class MauDeadDeferralTests(unittest.TestCase):
-    def test_dead_deferral_version_expires_immediately(self) -> None:
-        """When DeferralVersions matches installed build, it expires immediately."""
+    def test_pin_at_installed_build_is_not_reported_as_expired(self) -> None:
+        """A pin at the installed build is MAU bookkeeping: never 'released', never reported."""
         with tempfile.NamedTemporaryFile(suffix=".plist", delete=False) as f:
             plist_path = f.name
             plist_data = {
@@ -53,7 +60,7 @@ class MauDeadDeferralTests(unittest.TestCase):
         try:
             out = run_lib("mau_quarantine_expired_ids", {"MAC_UPDATE_MAU_PREFS_FILE": plist_path})
             self.assertEqual(out.returncode, 0, out.stderr)
-            self.assertIn("TEAMS21", out.stdout.split())
+            self.assertNotIn("TEAMS21", out.stdout.split())
         finally:
             if os.path.exists(plist_path):
                 os.unlink(plist_path)
@@ -82,8 +89,8 @@ class MauDeadDeferralTests(unittest.TestCase):
             if os.path.exists(plist_path):
                 os.unlink(plist_path)
 
-    def test_both_deferral_days_and_dead_deferral_version_expire(self) -> None:
-        """Both expired DeferralDays and dead DeferralVersions are returned without duplicates."""
+    def test_expired_deferral_days_reported_without_version_pins(self) -> None:
+        """An expired Office DeferralDays entry is reported; the Teams pin is not."""
         with tempfile.TemporaryDirectory() as tmpdir:
             plist_path = os.path.join(tmpdir, "mau.plist")
             state_path = os.path.join(tmpdir, "quar.tsv")
@@ -112,8 +119,7 @@ class MauDeadDeferralTests(unittest.TestCase):
             )
             self.assertEqual(out.returncode, 0, out.stderr)
             expired = out.stdout.split()
-            self.assertIn("MSWD2019", expired)
-            self.assertIn("TEAMS21", expired)
+            self.assertEqual(expired, ["MSWD2019"])
 
 
 if __name__ == "__main__":

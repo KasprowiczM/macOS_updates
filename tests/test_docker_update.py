@@ -66,8 +66,12 @@ class DockerUpdateTests(unittest.TestCase):
                 calls = log_file.read_text(encoding="utf-8").strip()
                 self.assertEqual(calls, "", f"Expected no docker calls, got: {calls}")
 
-    def test_docker_behind_running_runs_update_quiet(self) -> None:
-        """When behind and Docker is already running, run update -q without starting/stopping engine."""
+    def test_docker_behind_running_is_left_alone(self) -> None:
+        """A running Docker Desktop is the user's: never update (restart) it — report NEEDS_RESTART.
+
+        `docker desktop update` restarts the engine and every container on it,
+        which critical_rules §15 forbids for apps the user already has open.
+        """
         docker_xml = (self.fixtures_dir / "docker_attr.xml").read_text(encoding="utf-8")
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -122,10 +126,9 @@ exit 0
                 echo "STATUS=$STATUS_DOCKER"
             """
             res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
-            self.assertIn("Updated to 4.92.0", res.stdout)
-            self.assertTrue(log_file.exists())
-            calls = log_file.read_text(encoding="utf-8")
-            self.assertIn("desktop update -q", calls)
+            self.assertIn("quit the app so its updater can install it", res.stdout)
+            calls = log_file.read_text(encoding="utf-8") if log_file.exists() else ""
+            self.assertNotIn("desktop update", calls)
             self.assertNotIn("desktop start", calls)
             self.assertNotIn("desktop stop", calls)
 
@@ -179,17 +182,18 @@ exit 0
                 print_step() {{ :; }}
                 internet_msg() {{ printf "$@"; }}
                 sleep() {{ :; }}
-                current_ver="4.91.0"
+                echo "4.91.0" > "{tmpdir}/ver"
                 app_version() {{
-                    echo "$current_ver"
+                    cat "{tmpdir}/ver"
                 }}
                 run_with_timeout() {{
                     shift
                     if [ "$1" = "docker" ] && [ "$2" = "desktop" ] && [ "$3" = "update" ]; then
-                        current_ver="4.92.0"
+                        echo "4.92.0" > "{tmpdir}/ver"
                     fi
                     "$@"
                 }}
+                export MAC_UPDATE_VENDOR_DIRECT=0
                 sed_iu_docker="$(declare -f iu_docker_desktop | sed 's|/Applications/Docker.app|{docker_app}|g')"
                 eval "$sed_iu_docker"
                 iu_docker_desktop
@@ -293,6 +297,7 @@ exit 0
                 internet_msg() {{ printf "$@"; }}
                 sleep() {{ :; }}
                 run_with_timeout() {{ shift; "$@"; }}
+                export MAC_UPDATE_VENDOR_DIRECT=0
                 app_version() {{
                     local c=0
                     if [ -f "{cnt_file}" ]; then
@@ -321,6 +326,88 @@ exit 0
             # docker_stop must be the LAST event
             self.assertEqual(events[-1], "docker_stop", f"docker_stop was not last: {events}")
             self.assertIn("app_version:4.92.0", events[:-1])
+
+
+    def _behind_idle_cmd(self, tmpdir: str, extra: str) -> tuple[str, Path]:
+        docker_xml = (self.fixtures_dir / "docker_attr.xml").read_text(encoding="utf-8")
+        bin_dir = Path(tmpdir) / "bin"
+        bin_dir.mkdir()
+        mock_curl = bin_dir / "curl"
+        mock_curl.write_text(f"""#!/usr/bin/env bash\ncat <<'EOF'\n{docker_xml}\nEOF\n""", encoding="utf-8")
+        mock_curl.chmod(mock_curl.stat().st_mode | stat.S_IEXEC)
+        log_file = Path(tmpdir) / "calls.log"
+        status_file = Path(tmpdir) / "running.state"
+        mock_docker = bin_dir / "docker"
+        mock_docker.write_text(f"""#!/usr/bin/env bash
+echo "docker $*" >> "{log_file}"
+if [ "$2" = "status" ]; then [ -f "{status_file}" ] && exit 0 || exit 1; fi
+if [ "$2" = "start" ]; then touch "{status_file}"; fi
+if [ "$2" = "stop" ]; then rm -f "{status_file}"; fi
+exit 0
+""", encoding="utf-8")
+        mock_docker.chmod(mock_docker.stat().st_mode | stat.S_IEXEC)
+        docker_app = Path(tmpdir) / "Applications" / "Docker.app"
+        docker_app.mkdir(parents=True)
+        cmd = f"""
+            export PATH="{bin_dir}:$PATH"
+            source "{REPO_ROOT}/i18n/lang_en.sh"
+            source "{REPO_ROOT}/lib/version.sh"
+            source "{REPO_ROOT}/lib/vendor_feeds.sh"
+            source "{REPO_ROOT}/lib/proc.sh"
+            source "{REPO_ROOT}/lib/internet_app_updates.sh"
+            print_header() {{ :; }}; print_info() {{ :; }}; print_ok() {{ :; }}
+            print_warn() {{ :; }}; print_step() {{ :; }}
+            internet_msg() {{ printf "$@"; }}
+            internet_diag_log() {{ echo "DIAG: $1" >> "{log_file}"; }}
+            sleep() {{ echo "sleep $1" >> "{log_file}"; }}
+            internet_app_is_running() {{ return 1; }}
+            current_ver="4.91.0"
+            app_version() {{ echo "$current_ver"; }}
+            {extra}
+            sed_iu_docker="$(declare -f iu_docker_desktop | sed 's|/Applications/Docker.app|{docker_app}|g')"
+            eval "$sed_iu_docker"
+            iu_docker_desktop
+            echo "STATUS=$STATUS_DOCKER"
+        """
+        return cmd, log_file
+
+    def test_docker_idle_behind_installs_verified_dmg_without_starting_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cmd, log_file = self._behind_idle_cmd(tmpdir, """
+                vendor_direct_install() {
+                    echo "vdi $2 $3 $6 $7" >> "$(dirname "$1")/../calls.log"
+                    current_ver="$7"; return 0
+                }
+            """)
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("STATUS=✅ Updated to 4.92.0", res.stdout)
+            calls = log_file.read_text(encoding="utf-8")
+            self.assertIn("vdi ", calls)
+            self.assertIn(" dmg desktop.docker.com 4.92.0", calls)
+            self.assertNotIn("desktop start", calls)
+            self.assertNotIn("desktop update", calls)
+
+    def test_docker_failed_cli_update_does_not_poll(self) -> None:
+        """exit!=0 from `docker desktop update` means nothing will change: no 300 s poll."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cmd, log_file = self._behind_idle_cmd(tmpdir, """
+                export MAC_UPDATE_VENDOR_DIRECT=0
+                run_with_timeout() {
+                    shift
+                    if [ "$3" = "update" ]; then
+                        echo "install error: validating application: validating signature: <APP>: No such file or directory"
+                        return 1
+                    fi
+                    "$@"
+                }
+            """)
+            res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
+            self.assertIn("Behind: 4.91.0 < 4.92.0", res.stdout)
+            calls = log_file.read_text(encoding="utf-8")
+            self.assertNotIn("sleep 10", calls)
+            self.assertIn("DIAG: Docker Desktop: docker desktop update -q failed (exit=1)", calls)
+            self.assertIn("validating signature", calls)
+            self.assertIn("docker desktop stop", calls)
 
 
 if __name__ == "__main__":
