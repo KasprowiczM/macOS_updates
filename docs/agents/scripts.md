@@ -52,10 +52,10 @@
 | `lib/python/chronic_warnings.py` | Streak detection for trailing non-OK step runs across historical run summary logs |
 | `lib/python/cli_retention.py` | Vendor CLI version retention and pruning helpers |
 | `lib/python/system_updates.py` | Pure-function helpers for softwareupdate catalog parsing, label extraction, and reboot classification |
-| `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha, VersionHistory) |
+| `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha text log + `updater_history.jsonl`, VersionHistory) |
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
 | `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
-| `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds |
+| `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds (Cursor, OpenCode) |
 | `config/cask_oracles.txt` | Read-only Homebrew Cask version oracle mappings for verifying unverified apps |
 | `tests/_env.py` | Helper for test subprocess environments that strips PYTHONPATH so child shell processes do not inherit it |
 
@@ -71,7 +71,7 @@
 | `MAC_UPDATE_STAGE_WAIT` | `90` | Seconds to wait for staging/install before verifying an updated bundle (0–600, cykl uruchomienia updatera producenta) |
 | `MAC_UPDATE_VENDOR_DIRECT` | `1` | Set to `0` to disable direct vendor installations when apps are behind |
 | `MAC_UPDATE_OMAHA_WAIT` | `45` | Timeout (seconds) waiting for Omaha updater response |
-| `MAC_UPDATE_OMAHA_MAX_AGE_H` | `6` | Maximum age (hours) of previous Omaha noupdate check to accept as current proof |
+| `MAC_UPDATE_OMAHA_MAX_AGE_H` | `6` | Maximum age (hours) of a previous Chromium-updater check (from `updater_history.jsonl`, same build as installed) accepted as current proof — the updater is then not woken |
 | `MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT` | `300` | Timeout (seconds) for post-Track-2 iPad app installation verification (0–1800) |
 | `MAC_UPDATE_APP_DIRS` | `/Applications:$HOME/Applications` | Colon-separated list of application directories for scanning (used in tests and hermetic CI runs) |
 | `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |

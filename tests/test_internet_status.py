@@ -201,6 +201,39 @@ internet_summary_end
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    def test_run_summary_names_unverified_apps_instead_of_the_step(self) -> None:
+        """2026-09-28: the summary said 'Step: Internet apps' instead of naming Gemini/Drive/Comet."""
+        tmp_sdir = Path(tempfile.mkdtemp())
+        try:
+            (tmp_sdir / "internet_status_codes.txt").write_text(
+                "Gemini|unverified|⏳ Vendor updater triggered (no response recorded)\n"
+                "Google Drive|error_soft|⚠️  Download error\n"
+                "Claude|current_verified|✅ Up to date (2.9939.2, vendor feed)\n",
+                encoding="utf-8",
+            )
+            items = collect_run_items(
+                tmp_sdir, step_results={"internet": "Warning completed with warnings (unverified)"}
+            )
+            names = [it["name"] for it in items if it["status"] == "unconfirmed"]
+            self.assertIn("Gemini", names)
+            self.assertIn("Google Drive", names)
+            self.assertNotIn("Claude", names)
+            self.assertFalse(any(n.startswith("Step: Internet") for n in names), names)
+            gem = [it for it in items if it["name"] == "Gemini"][0]
+            self.assertIn("no response recorded", gem["details"])
+        finally:
+            shutil.rmtree(tmp_sdir, ignore_errors=True)
+
+    def test_run_summary_keeps_step_item_when_no_app_explains_it(self) -> None:
+        tmp_sdir = Path(tempfile.mkdtemp())
+        try:
+            items = collect_run_items(
+                tmp_sdir, step_results={"internet": "Warning completed with warnings (unverified)"}
+            )
+            self.assertTrue(any(it["name"] == "Step: Internet apps" for it in items))
+        finally:
+            shutil.rmtree(tmp_sdir, ignore_errors=True)
+
     def test_run_summary_reads_status_codes(self) -> None:
         tmp_sdir = Path(tempfile.mkdtemp())
         try:

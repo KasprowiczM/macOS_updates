@@ -759,6 +759,7 @@ def collect_run_items(
                 })
 
     # Internet status codes (v1.5.0)
+    internet_unconfirmed_apps = 0
     inet_codes_file = sdir / "internet_status_codes.txt"
     if inet_codes_file.is_file():
         for line in inet_codes_file.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -771,6 +772,22 @@ def collect_run_items(
             app_name, code, text = parts[0].strip(), parts[1].strip(), parts[2].strip()
             app_keys = get_all_alias_keys(app_name)
             if app_keys & seen_internet_keys:
+                continue
+
+            if code in ("unverified", "error_soft", "error_hard"):
+                # Name the app, not just the step: "Step: Internet apps" told
+                # the user nothing about WHICH updater went unconfirmed.
+                seen_internet_keys.update(app_keys)
+                internet_unconfirmed_apps += 1
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "unconfirmed",
+                    "details": re.sub(r"^[^\w(]+", "", text).strip() or code,
+                })
                 continue
 
             if code in ("behind", "needs_restart", "feed_stale", "update_available", "rollout_hold"):
@@ -854,6 +871,9 @@ def collect_run_items(
         for step_key, step_val in step_results.items():
             status_code = classify_step_status(step_val)
             if status_code in ("warn", "error", "unconfirmed"):
+                if step_key == "internet" and internet_unconfirmed_apps:
+                    # Already itemised per app above.
+                    continue
                 details = str(step_val)
                 if step_key == "brew" and pending_brew_reason == "xcode_license":
                     if xcode_change:

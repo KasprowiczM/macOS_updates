@@ -106,7 +106,7 @@ Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 | Chromium Updater | Comet (Perplexity AI) |
 | msupdate CLI | Microsoft Word, Microsoft Excel, Microsoft PowerPoint, Microsoft Outlook, Microsoft OneNote |
 | Vendor self-updater + MAU fallback | Microsoft Teams (normally owns its cadence; MAU may recover a failed Teams updater via `TEAMS21`) |
-| Docker CLI | Docker Desktop v4.37+ |
+| Vendor feed + verified DMG (idle only); `docker desktop update` fallback | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
 | Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
 | Built-in auto-updater (silent launch / Sparkle appcast, triggered-unverified) | Proton Drive |
@@ -242,9 +242,20 @@ not success.
   replaced. The handler reports `NEEDS_RESTART` ("quit the app so its updater can install") and moves on.
   `silent_launch_app` records only apps that were **not** running before it opened them
   (`$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt`); `quit_toolkit_launched_apps` quits exactly those after
-  the settle window. `vendor_direct_install` refuses to swap a running app, and Docker Desktop is stopped
-  only when the toolkit started it.
+  the settle window. `vendor_direct_install` refuses to swap a running app. A running Docker Desktop is never
+  updated (the update restarts the engine and all containers) — it reports `NEEDS_RESTART`; the CLI
+  fallback stops Docker only because it started it.
 - **Verified downloads only:** Direct downloads must use `https://`, validate against exact allowlisted hosts (`config/vendor_feeds.txt`), verify checksums (SHA256/SHA512) when published by the vendor, and install via `copy_verified_app` (spctl Gatekeeper check, CFBundleIdentifier and Apple Team ID match, staged atomic swap, and automatic rollback on failure).
+
+- **Chromium updater proof (v1.5.2):** For Chrome, Gemini, Google Drive and Comet, check before
+  action: `omaha_history_proof` reads `updater_history.jsonl` next to each updater's `updater.log`
+  and accepts a `NO_UPDATE`/`UPDATED` outcome only when it is younger than `MAC_UPDATE_OMAHA_MAX_AGE_H`
+  **and** its version equals the installed short or build version (`app_build_version`). Only without
+  that proof is the updater woken (`--wake-all`) and the text log polled. Never accept a `NO_UPDATE`
+  recorded for a different build.
+- **MAU version pins:** `mau_quarantine_expired_ids` lists only Office `DeferralDays` quarantines. A
+  `DeferralVersions` pin equal to the installed build is MAU bookkeeping and must not be reported as
+  released or expired (it contradicted `mau_clean_stale_deferrals` and produced a false message).
 
 ## 16. Only Installed Applications & CLI Toolchains (v1.5.0)
 

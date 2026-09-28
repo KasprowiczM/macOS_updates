@@ -26,6 +26,13 @@ app_version() {
     [ -n "$v" ] && echo "$v" || echo "${L_INTERNET_VERSION_UNKNOWN:-unknown}"
 }
 
+# CFBundleVersion only (empty when absent). Chromium updaters register the
+# build number (Google Drive: short 131.0, build 131.0.2, Omaha 131.0.2.0), so
+# Omaha evidence is compared against both the short version and this one.
+app_build_version() {
+    defaults read "$1/Contents/Info" CFBundleVersion 2>/dev/null || true
+}
+
 # Print "newer" only when the remote version is provably greater than the
 # installed version. "current" includes equality and a local version ahead of
 # the feed; "unknown" prevents replacement when either version is unparseable.

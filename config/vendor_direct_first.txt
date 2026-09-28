@@ -4,5 +4,9 @@
 # when idle, jumping directly to vendor_direct_install.
 # One app name per line (must match vendor_feeds.txt / registry).
 # Comments start with #.
+#
+# OpenCode (2026-09-28): its Tauri updater installed nothing in the 90 s
+# stage wait; the verified vendor tarball did. Launching it only added 150 s.
 # ============================================================
 Cursor
+OpenCode
