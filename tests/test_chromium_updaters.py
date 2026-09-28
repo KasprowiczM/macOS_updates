@@ -568,7 +568,7 @@ EOF
             """
             res = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, check=True)
             expected_time = two_hours_ago.strftime("%H:%M")
-            self.assertIn(f"STATUS=✅ Up to date (Google updater check at {expected_time})", res.stdout)
+            self.assertIn(f"STATUS=✅ Up to date (vendor updater check at {expected_time})", res.stdout)
             self.assertIn("VERIFIED=1", res.stdout)
 
     def test_omaha_recent_proof_stale_noupdate_is_unverified(self) -> None:

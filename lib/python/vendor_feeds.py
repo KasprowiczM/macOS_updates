@@ -455,13 +455,20 @@ def omaha_recent_status(
     )
 
     last_match = None
+    # GoogleUpdater 156+ logs "Omaha response received: )]}'" on a prefixed
+    # line and the JSON body on the NEXT, unprefixed line. The body inherits
+    # the timestamp of the closest preceding prefixed line.
+    last_prefix = None
     for line in log_text.splitlines():
+        m_line_pre = prefix_re.search(line)
+        if m_line_pre and line.startswith("["):
+            last_prefix = m_line_pre
         if '"updatecheck":{}' in line and '"updatecheck":{"status"' not in line:
             continue
         m_app = app_re.search(line)
         if not m_app:
             continue
-        m_pre = prefix_re.search(line)
+        m_pre = prefix_re.search(line) or last_prefix
         if not m_pre:
             continue
         month, day, hour, minute, second = map(int, m_pre.groups())
@@ -483,6 +490,84 @@ def omaha_recent_status(
     except Exception:
         pass
     return None
+
+
+_WIN_EPOCH_OFFSET_S = 11644473600
+
+
+def omaha_history_status(
+    history_text: str,
+    appid: str,
+    installed_versions: list[str],
+    max_age_h: float = 6.0,
+    now: float | None = None,
+) -> tuple[str, str, str] | None:
+    """Latest Omaha outcome for appid from a Chromium updater's updater_history.jsonl.
+
+    UPDATE START events carry the appId, UPDATE END events carry the outcome
+    (last updateStates entry) and nextVersion; both share processToken+eventId.
+    The process START event carries the timestamp (Windows-epoch microseconds).
+    Returns ("noupdate"|"updated", "HH:MM" local, version) only when the latest
+    event is within max_age_h AND its version equals one of installed_versions
+    (a NO_UPDATE for a different build proves nothing). Otherwise None.
+    """
+    if not history_text or not appid:
+        return None
+    if now is None:
+        now = datetime.datetime.now().timestamp()
+
+    proc_ts: dict[str, int] = {}
+    starts: dict[tuple[str, str], str] = {}
+    ends: list[dict] = []
+    for line in history_text.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(ev, dict):
+            continue
+        etype, bound, tok = ev.get("eventType"), ev.get("bound"), ev.get("processToken")
+        if etype == "UPDATER_PROCESS" and bound == "START" and tok:
+            try:
+                proc_ts[tok] = int(str(ev.get("timestamp", "")))
+            except ValueError:
+                pass
+        elif etype == "UPDATE" and bound == "START" and tok:
+            starts[(tok, str(ev.get("eventId")))] = str(ev.get("appId", ""))
+        elif etype == "UPDATE" and bound == "END" and tok:
+            ends.append(ev)
+
+    best: tuple[int, str, str] | None = None
+    for ev in ends:
+        tok = ev.get("processToken")
+        if starts.get((tok, str(ev.get("eventId")))) != appid:
+            continue
+        ts = proc_ts.get(tok)
+        if ts is None:
+            continue
+        states = ev.get("updateStates") or []
+        final = states[-1].get("state") if states and isinstance(states[-1], dict) else ""
+        if best is None or ts >= best[0]:
+            best = (ts, str(final), str(ev.get("nextVersion", "")))
+
+    if best is None:
+        return None
+    ts, final, version = best
+    unix_ts = ts / 1_000_000 - _WIN_EPOCH_OFFSET_S
+    age_h = (now - unix_ts) / 3600.0
+    if age_h < 0 or age_h > max_age_h:
+        return None
+    status = {"NO_UPDATE": "noupdate", "UPDATED": "updated"}.get(final)
+    if status is None:
+        return None
+    vkey = version_key(version)
+    if vkey is None or not any(version_key(v) == vkey for v in installed_versions if v):
+        return None
+    hhmm = datetime.datetime.fromtimestamp(unix_ts).strftime("%H:%M")
+    return (status, hhmm, version)
 
 
 def version_history_public(obj: dict | str) -> str | None:

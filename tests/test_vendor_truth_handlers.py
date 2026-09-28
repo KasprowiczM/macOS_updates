@@ -434,7 +434,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
 
         print_info() {{ :; }}
         print_warn() {{ :; }}
-        print_step() {{ :; }}
+        print_step() {{ echo "$1"; }}
         silent_launch_app() {{ :; }}
         sleep() {{ :; }}
         internet_app_bundle_id() {{ echo "com.anthropic.test"; }}
