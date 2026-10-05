@@ -38,6 +38,25 @@ class CheckVendorFeedsTests(unittest.TestCase):
         self.assertIn("Gemini", app_names)
         self.assertIn("Comet", app_names)
 
+    def test_vendor_lookup_policy_does_not_contaminate_artifact_host(self) -> None:
+        source = (REPO_ROOT / "scripts/check_vendor_feeds.sh").read_text()
+        collect = source[source.index("DATA_LINES=()"):source.index("# Omaha apps:")]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = Path(tmpdir) / "feeds.txt"
+            config.write_text("Proton Mail|json|https://proton.me/feed|proton_releases|dmg|proton.me\n")
+            script = f"""
+            CFG_FILE="{config}"
+            internet_app_path() {{ echo "{tmpdir}"; }}
+            internet_app_snapshot_version() {{ echo 1.0; }}
+            vendor_feed_lookup() {{ echo '2.0|https://proton.me/update.dmg|sha512hex|abc|dmg|proton.me|rollout_hold'; }}
+            version_cmp() {{ echo older; }}
+            {collect}
+            printf '%s\n' "${{DATA_LINES[@]}}"
+            """
+            result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "Proton Mail|1.0|2.0|rollout_hold|proton.me")
+
     def test_check_vendor_feeds_reads_status_from_updater_log_old(self) -> None:
         """Omaha status present only in updater.log.old is detected in check_vendor_feeds."""
         with tempfile.TemporaryDirectory() as tmpdir:

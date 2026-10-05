@@ -25,9 +25,9 @@ In caso di errore, consultare: `logs/update_all_<timestamp>.log` (ultime 30 esec
 | 3 | `update_brew.sh` | `--skip-brew` |
 | 4 | `update_internet_apps.sh` | `--skip-internet` |
 | 5 | postupdate/cronologia → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
-| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+| 6 | `update_system.sh` (`softwareupdate -i <label> -R`) | `--skip-system` |
 
-Il passo 6 viene eseguito per ultimo per il possibile riavvio e viene saltato automaticamente dopo un errore precedente.
+Il passo 6 viene eseguito per ultimo perché può riavviare il Mac. Gli errori bloccanti lo rinviano; gli avvisi non bloccano gli aggiornamenti di sicurezza. Senza autorizzazione viene segnalato il rinvio.
 
 Anteprima senza modifiche: `bash update_all.sh --dry-run -y`
 

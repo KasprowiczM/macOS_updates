@@ -25,9 +25,9 @@ Review on failure: `logs/update_all_<timestamp>.log` (last 30 runs kept).
 | 3 | `update_brew.sh` | `--skip-brew` |
 | 4 | `update_internet_apps.sh` | `--skip-internet` |
 | 5 | postupdate/history → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
-| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+| 6 | `update_system.sh` (`softwareupdate -i <label> -R`) | `--skip-system` |
 
-Step 6 runs last because it may restart the Mac. It is automatically skipped when an earlier selected step fails.
+Step 6 runs last because it may restart the Mac. Blocking hard failures defer it; soft warnings never block system security updates. Without authorization, the system step reports a soft deferral.
 
 Preview without mutations: `bash update_all.sh --dry-run -y`
 

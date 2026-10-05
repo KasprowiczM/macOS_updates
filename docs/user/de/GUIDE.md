@@ -1,18 +1,18 @@
 # Benutzerhandbuch (Deutsch)
 
-**Version:** 1.5.2 · **Apple Silicon, macOS 13+**
+**Version:** 1.5.3 · **Apple Silicon, macOS 13+**
 
 ## Funktion
 
 macOS Updates orchestriert Updates auf **Apple-Silicon-Macs mit macOS 13+**:
 
 1. Vorab-Scan und Inventar
-2. App Store (`sudo mas upgrade` + separater GUI Track 2)
-3. Node/Bun und globale npm-CLIs
+2. App Store (`sudo mas upgrade <app-id>` + separater GUI Track 2)
+3. Bestehende native CLIs zuerst, danach Node/Bun und npm-Fallbacks
 4. Homebrew (`--greedy`)
 5. Installierte Internet-Apps: direkte Handler, CLIs oder Update-Auslöser
 6. Atomarer Post-Update-Verlauf
-7. macOS (`softwareupdate -ia -R`) zuletzt; entfällt nach einem früheren Fehler
+7. macOS (`softwareupdate -i <label> -R`) zuletzt; bei blockierenden Fehlern oder fehlender Autorisierung verschoben
 
 **Installiert keine neuen Apps.** Jeder Mac erstellt zuerst sein eigenes Inventar (`build_inventory.sh`).
 

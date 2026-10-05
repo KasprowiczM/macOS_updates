@@ -15,6 +15,7 @@ Warp|json|https://releases.warp.dev/channel_versions.json|warp_channels|-|-
 Antigravity|yml|https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml|-|zip|storage.googleapis.com
 Antigravity IDE|json|https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin-arm64/stable/latest|antigravity_ide|zip|edgedl.me.gvt1.com
 OpenCode|json|https://github.com/anomalyco/opencode/releases/latest/download/latest.json|tauri_latest|tar.gz|github.com
+Proton Drive|json|https://proton.me/download/drive/macos/version.json|proton_releases|dmg|proton.me
 Proton Mail|json|https://proton.me/download/mail/macos/version.json|proton_releases|dmg|proton.me
 Docker Desktop|sparkle|https://desktop.docker.com/mac/main/arm64/appcast.xml|-|dmg|desktop.docker.com
 Remote Desktop Manager|kv|https://devolutions.net/productinfo.htm|RDMMacbin|dmg|cdn.devolutions.net

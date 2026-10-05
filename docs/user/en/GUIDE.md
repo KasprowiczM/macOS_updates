@@ -1,18 +1,18 @@
 # User Guide (English)
 
-**Version:** 1.5.2 · **Apple Silicon, macOS 13+**
+**Version:** 1.5.3 · **Apple Silicon, macOS 13+**
 
 ## What this toolkit does
 
 macOS Updates orchestrates updates across six layers on **Apple Silicon Macs running macOS 13+**. The full pipeline runs in this order:
 
 1. Prescan and per-Mac inventory
-2. App Store (`sudo mas upgrade` plus a separate GUI Track 2 for iPad apps)
-3. Native Node/Bun and npm global CLIs
+2. App Store (`sudo mas upgrade <app-id>` plus a separate GUI Track 2 for iPad apps)
+3. Existing native CLIs first, then Node/Bun and npm fallbacks
 4. Homebrew formulae and casks (`--greedy`)
 5. Installed internet apps through direct handlers, vendor CLIs or in-app update triggers
 6. Atomic inventory/history postupdate
-7. macOS (`softwareupdate -ia -R`) last; skipped if an earlier step failed
+7. macOS (`softwareupdate -i <label> -R`) last; deferred after a blocking hard failure or unavailable authorization
 
 It **never installs new applications** for you. Each Mac builds its own inventory first (`build_inventory.sh` or prescan in `update_all.sh`).
 
@@ -71,7 +71,7 @@ Shows five evidence-based states:
 | Intel Mac / macOS 12 or older | Not supported — Apple Silicon and macOS 13+ only |
 | Wrong app catalog | `bash build_inventory.sh` — do not use another user's `APPLICATIONS.md` |
 | App not updating | `bash scripts/report_update_coverage.sh` |
-| `mas` fails | Sign in to App Store; use `sudo mas upgrade` |
+| `mas` fails | Sign in to App Store; use `sudo mas upgrade <app-id>` |
 | iPad apps not updating | Grant Accessibility to Terminal |
 | Missing `APPLICATIONS.md` | `bash build_inventory.sh` or `dev_sync/dev-sync-import.sh` (owner) |
 

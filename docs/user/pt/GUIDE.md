@@ -1,18 +1,18 @@
 # Guia do utilizador (Português)
 
-**Versão:** 1.5.2 · **Apple Silicon, macOS 13+**
+**Versão:** 1.5.3 · **Apple Silicon, macOS 13+**
 
 ## O que faz
 
 macOS Updates orquestra atualizações em **Macs Apple Silicon com macOS 13+**:
 
 1. Pré-análise e inventário
-2. App Store (`sudo mas upgrade` + Track 2 GUI separado)
-3. Node/Bun e CLIs npm globais
+2. App Store (`sudo mas upgrade <app-id>` + Track 2 GUI separado)
+3. Primeiro as CLI nativas existentes, depois Node/Bun e alternativas npm
 4. Homebrew (`--greedy`)
 5. Apps instaladas: handlers diretos, CLI ou acionadores integrados
 6. Pós-atualização atómica do inventário/histórico
-7. macOS (`softwareupdate -ia -R`) por último; ignorado após erro anterior
+7. macOS (`softwareupdate -i <label> -R`) no fim; adiado após erro bloqueante ou sem autorização
 
 **Não instala novas aplicações.** Cada Mac constrói o seu inventário (`build_inventory.sh`).
 

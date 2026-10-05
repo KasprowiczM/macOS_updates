@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.2** — Orchestratore di aggiornamenti in un singolo comando pronto per la produzione per **Mac Apple Silicon con macOS 13–27**. Coordina gli aggiornamenti verificati dei pacchetti per i software già installati su questo Mac. **Multilingue** (7 lingue). Layer cloud privato opzionale tramite [`dev_sync/`](dev_sync/README.md).
+> **v1.5.3** — Orchestratore di aggiornamenti in un singolo comando pronto per la produzione per **Mac Apple Silicon con macOS 13–27**. Coordina gli aggiornamenti verificati dei pacchetti per i software già installati su questo Mac. **Multilingue** (7 lingue). Layer cloud privato opzionale tramite [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.3:** ChatGPT usa download verificati del produttore prima di aprire la GUI; i feed già riconosciuti come attuali o obsoleti non avviano un ciclo di apertura e attesa. È supportato il JSON delle versioni Proton, ma un feed precedente resta un avviso esplicito. Gli aggiornamenti CLI nativi precedono Node/npm; le copie npm ridondanti vengono rimosse solo dopo aver verificato un’installazione nativa supportata. Le applicazioni aperte sono protette durante la sostituzione; senza autorizzazione, gli aggiornamenti di sistema vengono rinviati con un avviso.
 
 **Verità del produttore (v1.5.0):** la versione di ciascuna applicazione viene verificata rispetto al feed del rispettivo produttore prima di qualsiasi azione. Le app aggiornate non vengono toccate; quelle obsolete vengono aggiornate tramite il loro updater integrato o installate dal produttore con verifica della firma e del Team ID. Viene aggiornato solo il software effettivamente installato (`--bootstrap-cli` installa intenzionalmente le CLI mancanti). Le app rimosse manualmente vengono rilevate e non vengono mai reinstallate. **Le app aperte non vengono mai chiuse: il toolkit chiude solo ciò che ha avviato esso stesso.** Controlla lo stato del produttore in sola lettura con `bash scripts/check_vendor_feeds.sh`.
 

@@ -148,6 +148,24 @@ class TestVendorFeeds(unittest.TestCase):
         self.assertEqual(res["version"], "1.14.0")
         self.assertEqual(res["checksum_kind"], "sha512hex")
 
+    def test_proton_drive_file_object_has_verified_download(self):
+        result = select_proton_releases({"Releases": [{
+            "CategoryName": "Stable", "Version": "3.0.3",
+            "File": {"Url": "https://proton.me/drive.dmg", "Sha512CheckSum": "abc"},
+        }]})
+        self.assertEqual(result["url"], "https://proton.me/drive.dmg")
+        self.assertEqual(result["checksum_kind"], "sha512hex")
+        self.assertEqual(result["checksum"], "abc")
+
+    def test_proton_respects_minimum_os_and_preserves_rollout(self):
+        body = json.dumps({"Releases": [
+            {"CategoryName": "Stable", "Version": "2.0", "MinimumOsVersion": "28.0"},
+            {"CategoryName": "Stable", "Version": "1.5", "RolloutProportion": 0},
+        ]})
+        result = evaluate_feed("json", body, "proton_releases", os_version="27.0.1")
+        self.assertEqual(result["version"], "1.5")
+        self.assertTrue(result["rollout_hold"])
+
     def test_parse_electron_yml_zip_and_sha512(self):
         text = self._read_fixture("antigravity.yml")
         res = parse_electron_yml(text)

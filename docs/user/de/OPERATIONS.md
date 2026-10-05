@@ -25,9 +25,9 @@ Bei Fehlern prüfen: `logs/update_all_<timestamp>.log` (die letzten 30 Läufe we
 | 3 | `update_brew.sh` | `--skip-brew` |
 | 4 | `update_internet_apps.sh` | `--skip-internet` |
 | 5 | Post-Update/Verlauf → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
-| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+| 6 | `update_system.sh` (`softwareupdate -i <label> -R`) | `--skip-system` |
 
-Schritt 6 läuft wegen eines möglichen Neustarts zuletzt und wird nach einem früheren Fehler automatisch übersprungen.
+Schritt 6 läuft zuletzt, da er den Mac neu starten kann. Blockierende Fehler verschieben ihn; weiche Warnungen blockieren keine Sicherheitsupdates. Ohne Autorisierung meldet der Systemschritt eine Verschiebung.
 
 Vorschau ohne Änderungen: `bash update_all.sh --dry-run -y`
 
