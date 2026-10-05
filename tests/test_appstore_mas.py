@@ -21,9 +21,17 @@ class AppStoreMasGateTests(unittest.TestCase):
         self._create_mock_bin("sw_vers", 'echo "26.0"')
         self.old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{self.bin_dir}:{self.old_path}"
+        self.old_app_dirs = os.environ.get("MAC_UPDATE_APP_DIRS")
+        self.apps_dir = os.path.join(self.temp_dir, "Applications")
+        os.makedirs(self.apps_dir)
+        os.environ["MAC_UPDATE_APP_DIRS"] = self.apps_dir
 
     def tearDown(self):
         os.environ["PATH"] = self.old_path
+        if self.old_app_dirs is None:
+            os.environ.pop("MAC_UPDATE_APP_DIRS", None)
+        else:
+            os.environ["MAC_UPDATE_APP_DIRS"] = self.old_app_dirs
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _create_mock_bin(self, name: str, script_body: str) -> str:
@@ -91,6 +99,36 @@ esac
             invocations = Path(log_file).read_text(encoding="utf-8").splitlines()
             account_calls = [inv for inv in invocations if inv.startswith("account")]
             self.assertEqual(account_calls, [], "mas account should not be called for mas >= 5")
+
+    def test_unparseable_native_queue_never_runs_bare_upgrade(self):
+        log_file = Path(self.temp_dir) / "calls.log"
+        self._create_mock_bin("mas", f'''
+echo "mas $@" >> "{log_file}"
+case "$1" in
+version) echo 7.0.0;;
+list) echo '497799835 Xcode (27.0)';;
+outdated) echo 'unexpected vendor diagnostic';;
+esac
+exit 0
+''')
+        self._create_mock_bin("brew", "exit 0")
+        self._create_mock_bin("osascript", "exit 0")
+        self._create_mock_bin("sudo", '''
+if [ "$1" = "-v" ]; then exit 0; fi
+if [ "$1" = "-n" ]; then shift; fi
+exec "$@"
+''')
+        self._create_mock_bin("sleep", "exit 0")
+        session = Path(self.temp_dir) / "session"
+        session.mkdir()
+        env = dict(os.environ, MAC_UPDATE_SESSION_DIR=str(session),
+                   MAC_UPDATE_NONINTERACTIVE="1", MAC_UPDATE_YES="1")
+        env.pop("MAC_UPDATE_NO_SUDO", None)
+        res = subprocess.run(["bash", str(REPO_ROOT / "update_appstore.sh")],
+                             env=env, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 10, res.stdout + res.stderr)
+        self.assertNotIn("mas upgrade", log_file.read_text())
+        self.assertIn("no valid numeric IDs", res.stdout)
 
     def test_appstore_user_session_retry_diagnostics_and_soft_fail(self):
         log_file = os.path.join(self.temp_dir, "mas_invocations.log")

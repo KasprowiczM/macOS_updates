@@ -2,7 +2,7 @@
 
 Codex is a cloud-based coding agent for this repo — read shared rules before modifying any script.
 
-**Version:** 1.5.2 · **Platform:** Apple Silicon (arm64), macOS 13–27
+**Version:** 1.5.3 · **Platform:** Apple Silicon (arm64), macOS 13–27
 
 ## Shared Rules & Architecture
 
@@ -16,7 +16,7 @@ Load only when relevant:
 - @docs/agents/architecture.md — Bash 3.2, session dir, Python heredocs, i18n
 - @docs/agents/critical_rules.md — softwareupdate -R, sudo mas, update methods
 - @docs/agents/troubleshooting.md — common failures
-- @docs/agents/codex_notes.md — adding internet apps, download URLs
+- @docs/user/en/GUIDE.md — adding internet apps and update methods
 - @docs/INSTALL.md · @docs/UNINSTALL.md — user install/remove
 
 ## Production notes

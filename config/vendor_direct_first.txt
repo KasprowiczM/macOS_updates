@@ -10,3 +10,9 @@
 # ============================================================
 Cursor
 OpenCode
+
+# Verified vendor artifacts avoid an idle GUI staging cycle. Running apps
+# remain untouched, and Proton rollout restrictions are checked separately.
+ChatGPT / Codex
+Proton Mail
+Proton Drive

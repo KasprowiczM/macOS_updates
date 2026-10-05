@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.2** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.3** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.3 :** ChatGPT utilise les téléchargements vérifiés du fabricant avant de lancer son interface ; les flux connus comme actuels ou anciens ne déclenchent aucun cycle de lancement et attente. Le JSON des versions Proton est pris en charge, mais un ancien flux reste un avertissement explicite. Les mises à jour CLI natives précèdent Node/npm ; les copies npm redondantes sont supprimées après vérification d’une installation native prise en charge. Les applications ouvertes sont protégées lors du remplacement ; sans autorisation, les mises à jour système sont différées avec un avertissement.
 
 **Vérité de l'éditeur (v1.5.0) :** la version de chaque application est comparée au flux de son propre éditeur avant toute exécution. Les applications à jour ne sont pas modifiées ; celles qui sont obsolètes sont mises à jour par leur propre outil de mise à jour ou installées depuis l'éditeur avec vérification de signature et de Team ID. Seuls les logiciels installés sont mis à jour (`--bootstrap-cli` installe volontairement les CLI manquants). Les applications supprimées manuellement sont détectées et ne sont jamais réinstallées. **Les applications que vous avez ouvertes ne sont jamais fermées — la boîte à outils ne ferme que ce qu'elle a elle-même lancé.** Vérifiez l'état de l'éditeur en lecture seule avec `bash scripts/check_vendor_feeds.sh`.
 

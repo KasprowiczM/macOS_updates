@@ -818,6 +818,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                     f'SCRIPT_DIR="{REPO_ROOT}"; '
                     f'L_INTERNET_INSTALLED_VERSION="Local: %s"; '
                     f'L_INTERNET_STATUS_UNKNOWN_VERSION="Unknown"; '
+                    f'L_INTERNET_STATUS_LAUNCHED_UNVERIFIED="Launched unverified"; '
                     f'L_INTERNET_LAUNCHING_HIDDEN="Launching %s"; '
                     f'print_info() {{ :; }}; print_step() {{ :; }}; print_warn() {{ :; }}; silent_launch_app() {{ return 0; }}; '
                     f'. "{REPO_ROOT}/lib/version.sh"; '
@@ -830,7 +831,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                 env=dict(os.environ, HOME=os.environ.get("HOME", "/tmp"))
             )
             self.assertEqual(result.returncode, 0)
-            self.assertIn("Unknown", result.stdout.strip())
+            self.assertIn("Launched unverified", result.stdout.strip())
 
     @unittest.skipUnless(
         __import__("shutil").which("bash"),

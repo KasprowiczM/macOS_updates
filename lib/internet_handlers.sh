@@ -196,17 +196,7 @@ internet_dispatch_silent_launch() {
             internet_handler_vendor_truth "$app_display" "$APP_PATH" "$launch_target"
         elif internet_feed_source "$APP_PATH" >/dev/null 2>&1; then
             internet_handler_vendor_latest "$app_display" "$APP_PATH" "$launch_target"
-            if [ "$INTERNET_LAST_VERIFIED" -ne 1 ]; then
-                # A feed exists but yielded no comparable version (unreachable,
-                # or a shape this parser does not understand). Claim only what
-                # actually happened — the launch — so the severity of this step
-                # is unchanged from the pre-verification behaviour.
-                if [ "$INTERNET_LAST_LAUNCH_OK" -eq 1 ]; then
-                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
-                else
-                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
-                fi
-            fi
+
         else
             print_info "$(internet_msg "$L_INTERNET_NO_FEED_FALLBACK" "$app_display")"
             internet_handler_silent_launch "$app_display" "$launch_target" "$verify_hint" "$APP_PATH"
@@ -240,7 +230,7 @@ internet_handler_sparkle_check() {
     xml="$(curl -fsSL --max-time 15 --retry 2 "$feed_url" 2>/dev/null || true)"
     if [ -z "$xml" ]; then
         print_warn "$L_INTERNET_STATUS_OFFLINE"
-        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_OFFLINE"
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
         return
     fi
 
@@ -281,11 +271,26 @@ if res and res.get("version"):
         fi
     fi
 
+    if [ -z "$remote_ver" ] || [ "${rel:-unknown}" = "unknown" ]; then
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
+        return
+    fi
+    [ "$rel" = "newer" ] || return 0
+    local bid=""
+    if command -v internet_app_bundle_id >/dev/null 2>&1; then
+        bid="$(internet_app_bundle_id "$app_path")"
+    fi
+    if [ -n "$bid" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$bid"; then
+        INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$local_ver" "$remote_ver")"
+        return 0
+    fi
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
     if silent_launch_app "$launch_target"; then
         INTERNET_LAST_LAUNCH_OK=1
     else
         INTERNET_LAST_LAUNCH_OK=0
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_VERIFIED=0
     fi
 }
 
@@ -307,7 +312,11 @@ internet_dispatch_sparkle_appcast() {
             internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
             return 0
         fi
-        internet_handler_sparkle_check "$app_display" "$APP_PATH" "$launch_target"
+        if command -v vendor_feed_row >/dev/null 2>&1 && vendor_feed_row "$app_display" >/dev/null 2>&1; then
+            internet_handler_vendor_truth "$app_display" "$APP_PATH" "$launch_target"
+        else
+            internet_handler_sparkle_check "$app_display" "$APP_PATH" "$launch_target"
+        fi
         internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
@@ -400,11 +409,26 @@ internet_handler_vendor_latest() {
         fi
     fi
 
+    if [ -z "$remote_ver" ] || [ "${rel:-unknown}" = "unknown" ]; then
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
+        return
+    fi
+    [ "$rel" = "newer" ] || return 0
+    local bid=""
+    if command -v internet_app_bundle_id >/dev/null 2>&1; then
+        bid="$(internet_app_bundle_id "$app_path")"
+    fi
+    if [ -n "$bid" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$bid"; then
+        INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$local_ver" "$remote_ver")"
+        return 0
+    fi
     print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
     if silent_launch_app "$launch_target"; then
         INTERNET_LAST_LAUNCH_OK=1
     else
         INTERNET_LAST_LAUNCH_OK=0
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_VERIFIED=0
     fi
 }
 
@@ -429,8 +453,8 @@ internet_handler_vendor_truth() {
         return
     fi
 
-    local R URL CK CS ART HOST
-    IFS='|' read -r R URL CK CS ART HOST <<EOF
+    local R URL CK CS ART HOST POLICY
+    IFS='|' read -r R URL CK CS ART HOST POLICY <<EOF
 $row
 EOF
 
@@ -453,6 +477,15 @@ EOF
             INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$I" "$R")"
             INTERNET_LAST_VERIFIED=1
             return 0
+        fi
+
+        # Staged releases may be eligible for this user's vendor-assigned
+        # cohort. Keep the native updater, but never bypass it with a direct
+        # public artifact. This decision is freshly re-evaluated every run.
+        local staged_rollout=0
+        if [ "${POLICY:-eligible}" = "rollout_hold" ]; then
+            staged_rollout=1
+            ART="-"
         fi
 
         local BID=""
@@ -494,37 +527,55 @@ EOF
         if [ "$bypass_launch" -eq 0 ]; then
             local WAIT="${MAC_UPDATE_STAGE_WAIT:-90}"
             case "$WAIT" in ''|*[!0-9]*) WAIT=90 ;; esac
-            [ "$WAIT" -lt 0 ] && WAIT=0
             [ "$WAIT" -gt 600 ] && WAIT=600
-
             if [ "$WAIT" -gt 0 ]; then
                 print_step "$(printf "$L_INTERNET_LAUNCH_CYCLE_FMT" "$app" "$R")"
-                silent_launch_app "$launch_target"
-            sleep "$WAIT"
-            if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
-                if command -v internet_app_quit_gracefully >/dev/null 2>&1; then
+                if ! silent_launch_app "$launch_target"; then
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+                    INTERNET_LAST_VERIFIED=0
+                    return 0
+                fi
+                INTERNET_LAST_LAUNCH_OK=1
+                local elapsed=0 I2="$I" rel2
+                while :; do
+                    I2="$(app_version "$app_path")"
+                    rel2="$(version_cmp "$R" "$I2")"
+                    if [ "$rel2" = "equal" ] || [ "$rel2" = "older" ]; then
+                        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I2")"
+                        INTERNET_LAST_VERIFIED=1
+                        return 0
+                    fi
+                    [ "$elapsed" -ge "$WAIT" ] && break
+                    sleep 1
+                    elapsed=$((elapsed + 1))
+                done
+                # A launch racing with the user opening this app must never
+                # authorize a quit. The launcher records only toolkit ownership.
+                local owned=0
+                if [ -n "$BID" ] && [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] &&
+                    [ -f "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt" ] &&
+                    grep -Fqx "$BID" "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt"; then
+                    owned=1
+                fi
+                if [ "$owned" -eq 1 ] && command -v internet_app_quit_gracefully >/dev/null 2>&1; then
                     internet_app_quit_gracefully "$BID" 2>/dev/null || true
+                    # Some native updaters finalize on quit; stop polling as
+                    # soon as the offered version lands, with a short bound.
+                    elapsed=0
+                    while [ "$elapsed" -lt 10 ]; do
+                        I2="$(app_version "$app_path")"
+                        rel2="$(version_cmp "$R" "$I2")"
+                        if [ "$rel2" = "equal" ] || [ "$rel2" = "older" ]; then
+                            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I2")"
+                            INTERNET_LAST_VERIFIED=1
+                            return 0
+                        fi
+                        sleep 1
+                        elapsed=$((elapsed + 1))
+                    done
                 fi
-            fi
-            local poll_elapsed=0
-            local I2="$I"
-            while [ "$poll_elapsed" -lt 60 ]; do
-                I2="$(app_version "$app_path")"
-                if [ "$I2" != "$I" ]; then
-                    break
-                fi
-                sleep 5
-                poll_elapsed=$((poll_elapsed + 5))
-            done
-            local rel2
-            rel2="$(version_cmp "$R" "$I2")"
-            if [ "$rel2" = "equal" ] || [ "$rel2" = "older" ]; then
-                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I2")"
-                INTERNET_LAST_VERIFIED=1
-                return 0
             fi
         fi
-    fi
 
         if [ "$ART" != "-" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ]; then
             local still_running=0
@@ -549,6 +600,10 @@ EOF
                         INTERNET_LAST_VERIFIED=1
                         return 0
                     fi
+                elif [ "$vrc" -eq 4 ]; then
+                    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$I" "$R")"
+                    INTERNET_LAST_VERIFIED=1
+                    return 0
                 elif [ "$vrc" -eq 3 ]; then
                     INTERNET_LAST_STATUS="$L_INTERNET_STATUS_INSTALL_ERROR"
                     INTERNET_LAST_VERIFIED=0
@@ -558,12 +613,24 @@ EOF
                     INTERNET_LAST_STATUS="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
                     INTERNET_LAST_VERIFIED=0
                     INTERNET_SOFT_FAIL=1
+                    # A failed public download must not remove the vendor's
+                    # supported updater as a recovery path. Report only the
+                    # launch; a later verified version check proves completion.
+                    if [ "$bypass_launch" -eq 1 ]; then
+                        internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
+                    fi
                     return 0
                 fi
             fi
         fi
 
-        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$I" "$R")"
+        if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$I" "$R")"
+        elif [ "$staged_rollout" -eq 1 ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_ROLLOUT_HOLD_FMT" "$I" "$R")"
+        else
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$I" "$R")"
+        fi
         INTERNET_LAST_VERIFIED=1
         return 0
     fi

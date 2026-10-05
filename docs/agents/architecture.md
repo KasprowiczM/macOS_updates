@@ -1,5 +1,9 @@
 # Architecture
 
+v1.5.3 verifies vendor versions before GUI work and uses direct-first vendor artifacts for ChatGPT. Known current/stale feeds avoid launches; unknown feeds retain the native fallback. The final settle loop runs only for toolkit-launched applications. App-copy transactions check running state before staging and immediately before replacement; unknown state defers without closing user apps.
+
+The CLI step updates existing native installations before Node/npm and uses `lib/python/cli_duplicates.py` to discover redundant npm packages conservatively. Package removal requires native version validation, supported location, PATH ownership and process checks; failed migration retains the fallback.
+
 ## Shell
 - **Bash 3.2+ only** — no `declare -A`, no `mapfile`, no `readarray`, no bash 4+ features
 - **No hardcoded paths** — always `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`

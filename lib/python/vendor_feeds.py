@@ -250,7 +250,7 @@ def select_tauri_latest(obj: dict, platform: str = "darwin-aarch64") -> dict | N
     }
 
 
-def select_proton_releases(obj: dict) -> dict | None:
+def select_proton_releases(obj: dict, os_version: str | None = None) -> dict | None:
     if not isinstance(obj, dict):
         return None
     releases = obj.get("Releases", [])
@@ -262,6 +262,9 @@ def select_proton_releases(obj: dict) -> dict | None:
 
     for r in releases:
         if not isinstance(r, dict) or r.get("CategoryName") != "Stable":
+            continue
+        minimum_os = r.get("MinimumOsVersion")
+        if minimum_os and os_version and version_compare(str(minimum_os), os_version) == 1:
             continue
         v = r.get("Version")
         if not v:
@@ -279,15 +282,21 @@ def select_proton_releases(obj: dict) -> dict | None:
     url = None
     checksum = None
     files = best_rel.get("File") or best_rel.get("Files") or []
+    if isinstance(files, dict):
+        files = [files]
     if isinstance(files, list):
         for f in files:
-            if isinstance(f, dict) and f.get("Identifier") == "Apple Disk Image":
+            if isinstance(f, dict) and (f.get("Identifier") == "Apple Disk Image" or
+                                       str(f.get("Url", "")).split("?", 1)[0].endswith(".dmg")):
                 url = f.get("Url")
                 checksum = f.get("Sha512CheckSum")
                 break
 
     return {
         "version": best_rel.get("Version"),
+        # A published release is observable truth, but a staged release is not
+        # permission to bypass the vendor's rollout with a direct installer.
+        "rollout_hold": "RolloutProportion" in best_rel and best_rel["RolloutProportion"] != 1,
         "url": url,
         "checksum_kind": "sha512hex" if checksum else None,
         "checksum": checksum,
@@ -388,7 +397,7 @@ def evaluate_feed(kind: str, body: str, arg: str, os_version: str | None = None)
             if not selector:
                 return None
             data = json.loads(body)
-            res = selector(data)
+            res = selector(data, os_version=os_version) if arg == "proton_releases" else selector(data)
         elif kind == "yml":
             res = parse_electron_yml(body)
         elif kind == "kv":

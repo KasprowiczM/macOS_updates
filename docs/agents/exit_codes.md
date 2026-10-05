@@ -47,6 +47,6 @@ With `MAC_UPDATE_DRY_RUN=1` or `bash update_all.sh --dry-run`, leaf scripts prin
 
 `update_all.sh` attempts a single `sudo -v` pre-authentication before starting execution to ensure credentials are cached for step 6 (`softwareupdate`).
 
-For unattended runs or cron jobs:
-- Either the user stays present for step 6 to enter credentials if the `sudo` timestamp expires during long runs,
-- Or run with `--skip-system` (`bash update_all.sh --skip-system`) and apply macOS system updates interactively at a later time.
+Since v1.5.3, the system leaf honors `MAC_UPDATE_NO_SUDO=1`. With no terminal or in noninteractive mode and no cached authorization, it exits `10` before installation. Authorized installs use `sudo -n` so timestamp expiry fails explicitly instead of prompting. The orchestrator records a soft system deferral as degraded; a deliberate user cancellation remains `skipped_by_user`.
+
+For unattended runs, use `--skip-system` (`bash update_all.sh --skip-system`) and apply macOS system updates interactively later. Existing cached authorization does not replace Apple Silicon volume-owner credentials.

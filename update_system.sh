@@ -235,13 +235,26 @@ print_header "$L_SOFTWAREUPDATE_RUN"
 echo -e "${CYAN}$L_SYSTEM_PLEASE_WAIT${NC}"
 echo ""
 
-sudo -v 2>/dev/null || true
+if [ "${MAC_UPDATE_NO_SUDO:-0}" = "1" ]; then
+    print_warn "System updates deferred: privileged authorization is unavailable."
+    exit 10
+fi
+if ! sudo -n true 2>/dev/null; then
+    if [ ! -t 0 ] || [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = "1" ]; then
+        print_warn "System updates deferred: authenticate interactively and rerun."
+        exit 10
+    fi
+    if ! sudo -v; then
+        print_warn "System updates deferred: sudo authentication failed."
+        exit 10
+    fi
+fi
 INSTALL_FAILED=0
 
 # First, install no-restart updates individually
 for lbl in "${NORESTART_LABELS[@]}"; do
     print_step "Installing: $lbl..."
-    if ! sudo softwareupdate -i "$lbl" -R --verbose; then
+    if ! sudo -n softwareupdate -i "$lbl" -R --verbose; then
         INSTALL_FAILED=1
         print_warn "Failed to install: $lbl"
     else
@@ -254,7 +267,7 @@ done
 # Then, install restart-required updates in ONE batch call
 if [ "${#RESTART_LABELS[@]}" -gt 0 ]; then
     print_step "$(printf "$L_SYSTEM_INSTALLING_RESTART_BATCH_FMT" "${RESTART_LABELS[*]}")"
-    if ! sudo softwareupdate -i "${RESTART_LABELS[@]}" -R --verbose; then
+    if ! sudo -n softwareupdate -i "${RESTART_LABELS[@]}" -R --verbose; then
         INSTALL_FAILED=1
         print_warn "$(printf "$L_SYSTEM_RESTART_BATCH_FAILED_FMT" "${RESTART_LABELS[*]}")"
     else

@@ -1,6 +1,6 @@
 # Szybki start (Polski)
 
-**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.5.2**
+**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.5.3**
 
 ## Instalacja jedną linią
 
