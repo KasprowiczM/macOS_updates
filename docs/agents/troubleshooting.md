@@ -2,6 +2,10 @@
 
 | Problem | Fix |
 |---------|-----|
+| ChatGPT spends time opening and closing before installation | v1.5.3 tries its verified vendor artifact first when an update is known. Unknown feeds still use the native updater fallback; running apps are preserved. |
+| Proton Drive manufacturer feed is older than the installed app | Inspect `bash scripts/check_vendor_feeds.sh`. A stale official feed remains a warning; no downgrade or repeated launch is attempted. |
+| Native and npm CLI copies both exist | Native updates run first. Cleanup requires a supported native executable, an equal or newer version, safe PATH resolution and no active process. Uncertain copies are retained. |
+| System update reports authorization unavailable | Run interactively or apply updates in System Settings. No terminal/authorization means soft deferral, and `sudo -n` prevents hidden prompts. |
 | New Mac — where to start? | `bash install.sh` or `setup.sh` + `build_inventory.sh` |
 | Wrong app catalog / another user's apps | `bash build_inventory.sh` — never copy someone else's `APPLICATIONS.md` |
 | App not auto-updating | `bash scripts/report_update_coverage.sh` — add handler per GUIDE |

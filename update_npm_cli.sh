@@ -33,6 +33,7 @@ mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/i18n/loader.sh"
 . "$SCRIPT_DIR/lib/severity.sh"
 . "$SCRIPT_DIR/lib/github_release.sh"
+. "$SCRIPT_DIR/lib/brew.sh"
 mac_update_severity_init
 
 TOOLCHAIN_HOME="${MAC_UPDATE_TOOLCHAIN_HOME:-$HOME/.local/share/mac-update}"
@@ -378,7 +379,21 @@ resolve_command_path() {
                 return 0
             fi
             ;;
-        npm|pnpm|opencode)
+        opencode)
+            if [ -x "$LOCAL_BIN/opencode" ]; then
+                echo "$LOCAL_BIN/opencode"
+                return 0
+            fi
+            if [ -x "$NPM_GLOBAL_BIN/opencode" ]; then
+                echo "$NPM_GLOBAL_BIN/opencode"
+                return 0
+            fi
+            if [ -x "$HOME/.opencode/bin/opencode" ]; then
+                echo "$HOME/.opencode/bin/opencode"
+                return 0
+            fi
+            ;;
+        npm|pnpm)
             if [ -x "$NPM_GLOBAL_BIN/$command_name" ]; then
                 echo "$NPM_GLOBAL_BIN/$command_name"
                 return 0
@@ -906,7 +921,23 @@ install_latest_npm_packages() {
                 failures=$((failures + 1))
             fi
         elif [ "$method" = "self-update" ]; then
-            if command_path="$(resolve_command_path "$command_name")"; then
+            # Native OpenCode was already checked before Node/npm. Keep the
+            # existing npm distribution only as a fallback if that attempt failed.
+            if [ "$command_name" = "opencode" ] && [ "${OPENCODE_NATIVE_OK:-0}" = "1" ]; then
+                continue
+            fi
+            command_path=""
+            if [ "$command_name" = "opencode" ]; then
+                # The native attempt may have left an older or broken binary.
+                # npm fallback must update an existing npm wrapper, never the
+                # native command and never bootstrap another distribution.
+                if [ -d "$NPM_GLOBAL_PREFIX/lib/node_modules/opencode-ai" ] && [ -x "$NPM_GLOBAL_BIN/opencode" ]; then
+                    command_path="$NPM_GLOBAL_BIN/opencode"
+                fi
+            else
+                command_path="$(resolve_command_path "$command_name" 2>/dev/null || true)"
+            fi
+            if [ -n "$command_path" ]; then
                 print_info "$(printf "$L_NPM_UPDATING_VIA_SELF_UPDATE" "${display_name}" "${command_name}")"
                 # Some vendor self-updaters may shell out to
                 # `npm install -g` internally. Pin the prefix and the
@@ -936,7 +967,9 @@ install_latest_npm_packages() {
                         run_with_timeout 300 "$command_path" "$_self_update_cmd" $_self_update_args ); then
                     _update_ok=1
                 fi
-                command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
+                if [ "$command_name" != "opencode" ]; then
+                    command_path="$(resolve_command_path "$command_name" 2>/dev/null || printf '%s' "$command_path")"
+                fi
                 if ! _verified="$(report_cli_version_or_fail "$display_name" "$command_path")"; then
                     _verified=""
                     if [ "$command_name" = "opencode" ]; then
@@ -977,6 +1010,150 @@ install_latest_npm_packages() {
         return 1
     fi
     return 0
+}
+
+# Prefer the vendor standalone distribution before invoking any npm updater.
+# The live vendor installer uses ~/.opencode/bin (its README currently advertises
+# an install-dir override that the script does not implement).
+update_opencode_native_first() {
+    local old_path old_version="" native_path native_version installer_tmp
+    OPENCODE_NATIVE_OK=0
+    grep -q '^opencode-cli|' "$MANIFEST_PATH" || return 0
+    old_path="$(resolve_command_path opencode 2>/dev/null || true)"
+    if [ -z "$old_path" ] && [ "${MAC_UPDATE_BOOTSTRAP_CLI:-0}" != "1" ]; then
+        return 0
+    fi
+    if [ -n "$old_path" ]; then
+        old_version="$(report_cli_version_or_fail opencode-cli "$old_path" 2>/dev/null || true)"
+    fi
+    native_path="$HOME/.opencode/bin/opencode"
+    if [ -x "$LOCAL_BIN/opencode" ]; then
+        # A user-local symlink may still be npm's wrapper, not a native CLI.
+        # Retain it for explicit review instead of rewriting arbitrary links.
+        if ! PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HOME" "$LOCAL_BIN/opencode" <<'PYEOF_OPENCODE_PATH'
+import sys
+from cli_duplicates import supported_native_path
+sys.exit(0 if supported_native_path(sys.argv[1], 'opencode', sys.argv[2]) else 1)
+PYEOF_OPENCODE_PATH
+        then
+            print_warn "OpenCode user-local command has an unverified installation origin; retaining its existing distribution"
+            return 1
+        fi
+        # Never replace an arbitrary user-owned command with a new symlink.
+        native_path="$LOCAL_BIN/opencode"
+    fi
+    if [ -x "$native_path" ]; then
+        if ! run_quiet_with_error_log "opencode upgrade --method curl" \
+            run_with_timeout 300 "$native_path" upgrade --method curl; then
+            return 1
+        fi
+    else
+        installer_tmp="$(mktemp "${TMPDIR:-/tmp}/mac-update-opencode.XXXXXX")" || return 1
+        if ! download_installer_script "https://opencode.ai/install" "$installer_tmp"; then
+            rm -f "$installer_tmp"
+            return 1
+        fi
+        # Hide npm-installed opencode during migration: the vendor script exits
+        # early if ANY opencode on PATH already has the requested release.
+        if ! run_quiet_with_error_log "opencode native installer" \
+            run_with_timeout "$(native_installer_timeout)" \
+            env PATH="/usr/bin:/bin:/usr/sbin:/sbin" /bin/bash "$installer_tmp" --no-modify-path; then
+            rm -f "$installer_tmp"
+            return 1
+        fi
+        rm -f "$installer_tmp"
+    fi
+    native_version="$(report_cli_version_or_fail opencode-cli "$native_path")" || return 1
+    if [ -n "$old_version" ] && [ "$old_version" != "?" ] && semver_is_newer "$old_version" "$native_version"; then
+        print_warn "OpenCode native release is older than the installed fallback; retaining npm"
+        return 1
+    fi
+    if [ "$native_path" != "$LOCAL_BIN/opencode" ]; then
+        # ln without -f refuses a raced-in user file, including dangling links.
+        if [ ! -e "$LOCAL_BIN/opencode" ] && [ ! -L "$LOCAL_BIN/opencode" ]; then
+            ln -s "$native_path" "$LOCAL_BIN/opencode" || return 1
+        else
+            return 1
+        fi
+    fi
+    export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:$PATH"
+    hash -r 2>/dev/null || true
+    [ "$(command -v opencode)" = "$LOCAL_BIN/opencode" ] || return 1
+    OPENCODE_NATIVE_OK=1
+    print_ok "opencode-cli: $native_version (native)"
+    return 0
+}
+
+cleanup_native_npm_duplicates() {
+    local command_name native_path native_version prefix package_name old_version
+    local candidates brew_prefix="" failures=0 npm_bin
+    npm_bin="$(bootstrap_npm)"
+    [ -n "$npm_bin" ] || return 0
+    if command -v brew >/dev/null 2>&1; then
+        brew_prefix="$(brew --prefix 2>/dev/null || true)"
+    fi
+    for command_name in claude codex opencode; do
+        native_path="$LOCAL_BIN/$command_name"
+        [ -x "$native_path" ] || continue
+        [ "$(command -v "$command_name" 2>/dev/null || true)" = "$native_path" ] || continue
+        native_version="$(report_cli_version_or_fail "$command_name" "$native_path" 2>/dev/null)" || continue
+        candidates="$(PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HOME" "$TOOLCHAIN_HOME" "$brew_prefix" "$command_name" "$native_path" "$native_version" <<'PYEOF_CLI_DUPLICATES'
+import os, subprocess, sys
+from cli_duplicates import known_npm_prefixes, npm_duplicates, removal_allowed, supported_native_path, NATIVE_NPM_PACKAGES
+home, toolchain, brew, command, native, version = sys.argv[1:]
+if not supported_native_path(home, command, native):
+    sys.exit(0)
+try:
+    probe = subprocess.run(['ps', '-axo', 'command='], capture_output=True, text=True, timeout=10)
+    processes = probe.stdout if probe.returncode == 0 else None
+except (OSError, subprocess.TimeoutExpired):
+    processes = None
+for prefix, previous in npm_duplicates(known_npm_prefixes(home, toolchain, brew), command):
+    package_root = prefix / 'lib/node_modules' / NATIVE_NPM_PACKAGES[command]
+    # A symlinked npm wrapper in ~/.local/bin is not a native install.
+    if os.path.realpath(native).startswith(str(package_root.resolve()) + os.sep):
+        continue
+    if removal_allowed(version, previous, processes, command):
+        print(f'{prefix}|{NATIVE_NPM_PACKAGES[command]}|{previous}')
+    else:
+        print(f'Retained npm duplicate {NATIVE_NPM_PACKAGES[command]} {previous}: active process, older native or uncertain state', file=sys.stderr)
+PYEOF_CLI_DUPLICATES
+)" || { failures=$((failures + 1)); continue; }
+        while IFS='|' read -r prefix package_name old_version; do
+            [ -n "$prefix" ] || continue
+            [ "$(command -v "$command_name" 2>/dev/null || true)" = "$native_path" ] || continue
+            native_version="$(report_cli_version_or_fail "$command_name" "$native_path" 2>/dev/null)" || continue
+            # Recheck processes immediately before deletion, after discovery.
+            if ! PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$command_name" "$native_version" "$old_version" <<'PYEOF_CLI_PROCESS'
+import subprocess, sys
+from cli_duplicates import removal_allowed
+try:
+    probe = subprocess.run(['ps', '-axo', 'command='], capture_output=True, text=True, timeout=10)
+    processes = probe.stdout if probe.returncode == 0 else None
+except (OSError, subprocess.TimeoutExpired):
+    processes = None
+sys.exit(0 if removal_allowed(sys.argv[2], sys.argv[3], processes, sys.argv[1]) else 1)
+PYEOF_CLI_PROCESS
+            then
+                print_warn "Retained npm duplicate $package_name: process state changed or is uncertain"
+                continue
+            fi
+            if run_quiet_with_error_log "remove duplicate $package_name ($old_version)" \
+                run_with_timeout 120 "$npm_bin" uninstall -g --prefix "$prefix" --ignore-scripts "$package_name"; then
+                if [ -d "$prefix/lib/node_modules/$package_name" ] \
+                    || ! report_cli_version_or_fail "$command_name" "$native_path" >/dev/null; then
+                    failures=$((failures + 1))
+                else
+                    print_info "Removed npm duplicate $package_name $old_version from $prefix"
+                fi
+            else
+                failures=$((failures + 1))
+            fi
+        done <<EOF
+$candidates
+EOF
+    done
+    [ "$failures" -eq 0 ]
 }
 
 update_native_clis() {
@@ -1024,6 +1201,7 @@ remove_legacy_brew_formulas() {
     local command_name
     local command_path
     local brew_prefix
+    local native_version brew_versions
 
     brew_prefix="$(brew --prefix 2>/dev/null || echo "/opt/homebrew")"
     for formula in opencode bun node; do
@@ -1039,6 +1217,29 @@ remove_legacy_brew_formulas() {
 
         command_path="$(command -v "$command_name" 2>/dev/null || true)"
         if [ -n "$command_path" ] && ! echo "$command_path" | grep -q "^${brew_prefix}/"; then
+            if [ "$formula" = "opencode" ]; then
+                native_version="$(report_cli_version_or_fail opencode-cli "$command_path" 2>/dev/null)" || native_version="?"
+                brew_versions="$(brew_formula_versions | awk '$1 == "opencode" { for (i=2; i<=NF; i++) print $i }')"
+                if ! PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$HOME" "$command_path" "$native_version" "$brew_versions" <<'PYEOF_BREW_OPENCODE'
+import subprocess, sys
+from cli_duplicates import supported_native_path, removal_allowed
+home, executable, native_version, brew_versions = sys.argv[1:]
+try:
+    probe = subprocess.run(['ps', '-axo', 'command='], capture_output=True, text=True, timeout=10)
+    processes = probe.stdout if probe.returncode == 0 else None
+except (OSError, subprocess.TimeoutExpired):
+    processes = None
+versions = brew_versions.split()
+allowed = supported_native_path(home, 'opencode', executable) and bool(versions) and all(
+    removal_allowed(native_version, version, processes, 'opencode') for version in versions
+)
+sys.exit(0 if allowed else 1)
+PYEOF_BREW_OPENCODE
+                then
+                    print_warn "Retained Homebrew OpenCode: native origin/version or inactive process could not be verified"
+                    continue
+                fi
+            fi
             if brew uninstall --formula "$formula" >/dev/null 2>&1; then
                 print_ok "$(printf "$L_NPM_REMOVED_FROM_BREW" "$formula")"
             else
@@ -1087,6 +1288,9 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
     fi
 fi
 
+update_native_clis || SOFT_FAIL=1
+update_opencode_native_first || SOFT_FAIL=1
+
 NODE_READY=1
 _ensure_node_rc=0
 ensure_latest_node || _ensure_node_rc=$?
@@ -1100,7 +1304,7 @@ fi
 if [ "$NODE_READY" -eq 1 ]; then
     install_latest_npm_packages || SOFT_FAIL=1
 fi
-update_native_clis || SOFT_FAIL=1
+cleanup_native_npm_duplicates || SOFT_FAIL=1
 ensure_latest_bun || HARD_FAIL=1
 remove_legacy_brew_formulas
 prune_vendor_cli_versions

@@ -1999,6 +1999,7 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
             else
                 RESULT_SYSTEM="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
                 STATUS_CODE_SYSTEM="warn"
+                DEGRADED=1
             fi
         else
             RESULT_SYSTEM="$L_STATUS_ERROR"

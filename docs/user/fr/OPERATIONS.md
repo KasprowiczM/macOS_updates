@@ -25,9 +25,9 @@ En cas d'échec, consulter : `logs/update_all_<timestamp>.log` (30 dernières ex
 | 3 | `update_brew.sh` | `--skip-brew` |
 | 4 | `update_internet_apps.sh` | `--skip-internet` |
 | 5 | postupdate/historique → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
-| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+| 6 | `update_system.sh` (`softwareupdate -i <label> -R`) | `--skip-system` |
 
-L'étape 6 s'exécute en dernier à cause du redémarrage possible et est automatiquement ignorée après un échec antérieur.
+L’étape 6 s’exécute en dernier car elle peut redémarrer le Mac. Les erreurs bloquantes la reportent ; les avertissements ne bloquent pas les mises à jour de sécurité. Sans autorisation, une mise à jour différée est signalée.
 
 Aperçu sans modifications : `bash update_all.sh --dry-run -y`
 

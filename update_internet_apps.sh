@@ -231,7 +231,22 @@ verify_replacement_identity() {
     return 0
 }
 
+replacement_app_is_idle() {
+    local dest="$1" bid state
+    [ -e "$dest" ] || return 0
+    bid="$(app_bundle_identifier "$dest")"
+    case "$bid" in
+        ''|*[!A-Za-z0-9._-]*) return 1 ;;
+    esac
+    state="$(run_with_timeout 10 osascript \
+        -e 'on run argv' \
+        -e 'return application id (item 1 of argv) is running' \
+        -e 'end run' -- "$bid" 2>/dev/null)" || return 1
+    [ "$state" = "false" ]
+}
+
 copy_verified_app() {
+    INTERNET_COPY_DEFERRED=0
     if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
         print_warn "[DRY-RUN] skip copy: $2"
         return 0
@@ -239,9 +254,16 @@ copy_verified_app() {
     local app_path="$1"
     local app_label="$2"
     local dest="/Applications/$app_label"
-    local app_name
     local staging_root staging backup_root backup rejected
     local had_existing=0
+
+    # Only handlers that own a toolkit launch may request a graceful quit.
+    # This common transaction never closes an application from the user's session.
+    if ! replacement_app_is_idle "$dest"; then
+        INTERNET_COPY_DEFERRED=1
+        print_warn "Application is running or its state is unknown; replacement deferred: $app_label"
+        return 2
+    fi
 
     if ! verify_app_signature "$app_path"; then
         print_warn "$(internet_msg "$L_INTERNET_GATEKEEPER_REJECTED" "$app_label")"
@@ -275,10 +297,14 @@ copy_verified_app() {
         had_existing=1
     fi
 
-    # Quit the running app before replacing its bundle (ignore errors if not running).
-    app_name="${app_label%.app}"
-    osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' -- "$app_name" 2>/dev/null || true
-    sleep 1
+    # Recheck immediately before the swap: the user may have opened it while
+    # the payload was copied and verified. An ambiguous probe also defers.
+    if ! replacement_app_is_idle "$dest"; then
+        INTERNET_COPY_DEFERRED=1
+        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
+        print_warn "Application became active; replacement deferred: $app_label"
+        return 2
+    fi
 
     if [ "$had_existing" -eq 1 ] && ! mv "$dest" "$backup" 2>/dev/null; then
         internet_diag_log "ERROR: could not move existing $dest to rollback backup $backup"
@@ -360,10 +386,10 @@ silent_launch_app() {
         fi
     fi
 
-    local was_running=0
-    if [ -n "$bid" ] && command -v internet_app_is_running >/dev/null 2>&1; then
-        if internet_app_is_running "$bid"; then
-            was_running=1
+    local was_running=1
+    if [ -n "$bid" ] && command -v internet_app_running_state >/dev/null 2>&1; then
+        if [ "$(internet_app_running_state "$bid")" = "false" ]; then
+            was_running=0
         fi
     fi
 
@@ -627,7 +653,9 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
         settle_end=$(date +%s)
         settle_actual=$((settle_end - settle_start))
         print_info "Settle wait: ${settle_actual}s (limit ${INTERNET_SETTLE}s, ${stable_count} stable readings)"
-    elif [ "$INTERNET_SETTLE" -gt 0 ]; then
+    elif [ "$INTERNET_SETTLE" -gt 0 ] && [ -s "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt" ]; then
+        # Known-newer native handlers may have launched an updater without
+        # assigning LAUNCHED_UNVERIFIED. Preserve their grace period too.
         sleep "$INTERNET_SETTLE"
     fi
     quit_toolkit_launched_apps

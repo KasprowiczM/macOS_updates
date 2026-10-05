@@ -308,15 +308,17 @@ else
                 sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS 2>&1)
             MAS_TOR1_EXIT=$?
         else
-            MAS_TOR1_OUT=$(run_with_timeout "$MAS_UPGRADE_TIMEOUT" \
-                sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade 2>&1)
-            MAS_TOR1_EXIT=$?
+            MAS_TOR1_OUT="App Store queue contained no valid numeric IDs; upgrade deferred."
+            MAS_TOR1_EXIT=10
+            SOFT_FAIL=1
         fi
     else
         MAS_TOR1_OUT="sudo authentication failed; native App Store updates were not started"
         MAS_TOR1_EXIT=1
     fi
-    if [ "$MAS_TOR1_EXIT" -eq 0 ]; then
+    if [ "$MAS_TOR1_EXIT" -eq 10 ]; then
+        print_warn "$MAS_TOR1_OUT"
+    elif [ "$MAS_TOR1_EXIT" -eq 0 ]; then
         printf '%s\n' "$MAS_TOR1_OUT"
         print_ok "mas upgrade command completed; the final queue check will verify installation."
 

@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.2** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.3** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.3:** ChatGPT uses verified vendor downloads before GUI launch; known current or stale vendor feeds do not trigger a launch-and-wait cycle. Proton release JSON is supported, but an older manufacturer feed remains an explicit warning. Native CLI updates run before Node/npm work; redundant npm copies are removed only after validating a supported native installation. Running applications are protected at the bundle swap, and system updates without authorization are deferred with a warning.
 
 **Vendor truth (v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. **Apps you have open are never closed — the toolkit only quits what it launched itself.** Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
 

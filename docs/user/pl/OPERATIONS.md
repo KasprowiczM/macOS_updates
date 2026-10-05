@@ -25,9 +25,9 @@ W razie błędu sprawdź: `logs/update_all_<timestamp>.log` (zachowywane są ost
 | 3 | `update_brew.sh` | `--skip-brew` |
 | 4 | `update_internet_apps.sh` | `--skip-internet` |
 | 5 | postupdate/historia → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
-| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+| 6 | `update_system.sh` (`softwareupdate -i <label> -R`) | `--skip-system` |
 
-Krok 6 działa ostatni, ponieważ może uruchomić Maca ponownie. Po błędzie wcześniejszego wybranego kroku jest automatycznie pomijany.
+Krok 6 jest ostatni, ponieważ może zrestartować Maca. Odraczają go blokujące błędy; miękkie ostrzeżenia nie blokują aktualizacji bezpieczeństwa. Bez autoryzacji krok systemowy zgłasza odroczenie.
 
 Podgląd bez zmian: `bash update_all.sh --dry-run -y`
 

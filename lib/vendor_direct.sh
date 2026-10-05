@@ -35,12 +35,26 @@ internet_app_bundle_id() {
     printf '%s\n' "$bid"
 }
 
+# Return a tri-state observation. Only a successful explicit false response
+# proves that the toolkit may claim ownership of a subsequent launch.
+internet_app_running_state() {
+    local bid="$1" out=""
+    if ! _vd_valid_bundle_id "$bid"; then
+        printf 'unknown\n'
+        return 0
+    fi
+    if ! out="$(run_with_timeout 10 osascript -e "application id \"$bid\" is running" 2>/dev/null)"; then
+        printf 'unknown\n'
+        return 0
+    fi
+    case "$out" in
+        true|false) printf '%s\n' "$out" ;;
+        *) printf 'unknown\n' ;;
+    esac
+}
+
 internet_app_is_running() {
-    local bid="$1"
-    _vd_valid_bundle_id "$bid" || return 1
-    local out=""
-    out="$(run_with_timeout 10 osascript -e "application id \"$bid\" is running" 2>/dev/null || true)"
-    [ "$out" = "true" ]
+    [ "$(internet_app_running_state "$1")" = "true" ]
 }
 
 internet_app_quit_gracefully() {
@@ -135,7 +149,7 @@ vendor_direct_install() {
     bid="$(internet_app_bundle_id "$installed_app_path")"
     if [ -n "$bid" ] && internet_app_is_running "$bid"; then
         _vd_diag "ERROR: app $bid is currently running"
-        return 1
+        return 4
     fi
 
     # 5. Fetch to file
@@ -259,9 +273,14 @@ EOF
     # 9. copy_verified_app
     local dest_label
     dest_label="$(basename "$installed_app_path")"
-    if ! copy_verified_app "$found" "$dest_label"; then
-        _vd_diag "ERROR: copy_verified_app failed for $found -> $dest_label"
+    local copy_rc=0
+    copy_verified_app "$found" "$dest_label" || copy_rc=$?
+    if [ "$copy_rc" -ne 0 ]; then
+        _vd_diag "ERROR: copy_verified_app failed for $found -> $dest_label (code $copy_rc)"
         rm -rf "$extract_dir"
+        # The app may have been opened while the download was in flight.
+        # Deferral is a safe, retryable outcome; only copy/validation is hard.
+        [ "$copy_rc" -eq 2 ] && return 4
         return 3
     fi
 

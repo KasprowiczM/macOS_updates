@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.2** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–27**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.3** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–27**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.3:** O ChatGPT usa transferências verificadas do fabricante antes de abrir a interface; feeds conhecidos como atuais ou antigos não iniciam um ciclo de abertura e espera. O JSON de versões do Proton é suportado, mas um feed antigo continua a ser um aviso explícito. As atualizações nativas de CLI precedem Node/npm; cópias npm redundantes só são removidas após verificar uma instalação nativa suportada. As aplicações abertas ficam protegidas durante a substituição; sem autorização, as atualizações do sistema são adiadas com um aviso.
 
 **Verdade do fornecedor (v1.5.0):** a versão de cada aplicativo é verificada em relação ao feed do próprio fornecedor antes de qualquer execução. Aplicativos atualizados permanecem intactos; os desatualizados são atualizados pelo próprio atualizador do fornecedor ou instalados do fornecedor com verificação de assinatura e Team ID. Apenas o software que está instalado é atualizado (`--bootstrap-cli` instala deliberadamente as CLIs ausentes). Aplicativos removidos manualmente são detectados e nunca reinstalados. **As aplicações abertas nunca são fechadas — o kit de ferramentas só fecha o que iniciou por si mesmo.** Verifique o status do fornecedor em modo somente leitura com `bash scripts/check_vendor_feeds.sh`.
 
