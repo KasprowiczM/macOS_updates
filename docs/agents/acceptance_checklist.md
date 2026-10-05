@@ -1,5 +1,13 @@
 # Production Acceptance Checklist — v1.5.x Live Execution Paths
 
+## Live current-software acceptance and v1.5.4 follow-up (2026-10-05)
+
+The user completed a real v1.5.3 Update All run in **108 seconds**: App Store, native CLI, Homebrew, inventory and system checks completed; 25 internet applications verified, zero unverified app updaters, no observed package/app version changes. No GUI application launch was recorded. macOS 27.0.1 offered no update. Proton Drive's stale manufacturer feed was the only degraded result.
+
+v1.5.4 fixes the presentation of that manufacturer warning and Proton Mail's updater label. This live observation validates the current-software path; it does not validate installing a future GUI update, user-open protection during an actual update, an OS update/reboot, or a fresh isolated installation/overlay restore. Those remain explicit acceptance work.
+
+Current follow-up evidence: [v1.5.4 run-log review](../reviews/RUN_LOG_FOLLOWUP_2026-10-05_v154.md). Historical v1.5.3 review and acceptance dates below remain unchanged.
+
 ## v1.5.3 validation (2026-10-05)
 
 - Release gate: **527 tests pass**, shell/Python syntax and secret scan pass; whole-repository warning-level ShellCheck passes.

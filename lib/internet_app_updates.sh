@@ -534,7 +534,7 @@ iu_keepassxc() {
 }
 
 iu_proton_mail() {
-    internet_dispatch_silent_launch "📧 Proton Mail" "Proton Mail" "STATUS_PROTONMAIL" "Proton Mail" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Proton Mail")"
+    internet_dispatch_silent_launch "📧 Proton Mail" "Proton Mail" "STATUS_PROTONMAIL" "Proton Mail" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Proton Mail")"
 }
 
     # ── 15. ZOOM ──────────────────────────────────────────────────

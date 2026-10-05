@@ -699,7 +699,7 @@ L_SETUP_SUMMARY_TITLE="RESUMEN DE CONFIGURACIÓN"
 
 L_ALL_SUMMARY_WARN="ACTUALIZACIÓN COMPLETADA CON ADVERTENCIAS"
 L_ALL_SUMMARY_ERROR="ACTUALIZACIÓN COMPLETADA CON ERRORES"
-L_ALL_RESULT_DEGRADED="completado con advertencias (sin verificar)"
+L_ALL_RESULT_DEGRADED="completado con advertencias"
 L_ALL_WARN_NOT_BLOCKING="Algunas actualizaciones no se pudieron verificar. Esto no bloqueó la actualización del sistema macOS."
 L_ALL_SYSTEM_DEFERRED="⏭️ omitido porque falló un paso de actualización bloqueante"
 L_INTERNET_HARD_FAILURE="Al menos una aplicación de Internet no se pudo descargar o instalar."
@@ -782,7 +782,9 @@ L_INTERNET_MS_RETRY_FAILED_FMT="El reintento de Microsoft AutoUpdate falló (mot
 L_INTERNET_MS_MANUAL_ACTION_FMT="Acción manual requerida: ejecute '%s' o abra Microsoft AutoUpdate manualmente"
 L_ALL_SUMMARY_UPDATED_TITLE="Actualizado"
 L_ALL_SUMMARY_PENDING_TITLE="Aún pendiente / fallido"
-L_ALL_SUMMARY_UNCONFIRMED_TITLE="Actualizador iniciado, pero actualización no confirmada"
+L_ALL_SUMMARY_UNCONFIRMED_TITLE="Operaciones sin confirmar"
+L_ALL_SUMMARY_WARNING_TITLE="Advertencias del fabricante"
+L_ALL_SUMMARY_FEED_WARNING_FMT="El feed del fabricante %s es anterior a la versión instalada %s."
 L_ALL_SUMMARY_INVENTORY_CHANGES="Campos de versión cambiados en el inventario: %s"
 
 # ── Internet (v1.5.0) ──────────────────────────────────────────
