@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.2** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–27**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+> **v1.5.3** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–27**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.3:** ChatGPT korzysta ze zweryfikowanego pobierania od producenta przed uruchomieniem GUI; znany aktualny lub przestarzały feed nie uruchamia cyklu otwierania i czekania. Obsługiwany jest JSON wydań Proton, ale starszy feed producenta pozostaje jawnym ostrzeżeniem. Natywne aktualizacje CLI poprzedzają Node/npm; nadmiarowe kopie npm są usuwane dopiero po weryfikacji wspieranej instalacji natywnej. Działające aplikacje są chronione podczas podmiany, a aktualizacje systemu bez autoryzacji są odraczane z ostrzeżeniem.
 
 **Prawda od producenta (v1.5.0):** wersja każdej aplikacji jest porównywana z feedem jej producenta, zanim cokolwiek zostanie uruchomione. Aktualne aplikacje zostają nietknięte; nieaktualne aktualizuje ich własny updater albo instalacja od producenta z weryfikacją podpisu i Team ID. Aktualizowane jest wyłącznie to, co jest zainstalowane (`--bootstrap-cli` celowo instaluje brakujące CLI). Aplikacje usunięte ręcznie są rozpoznawane i nigdy nie wracają. **Aplikacje, które masz otwarte, nigdy nie są zamykane. Skrypt zamyka tylko to, co sam uruchomił.** Stan producentów sprawdzisz bez zmian w systemie: `bash scripts/check_vendor_feeds.sh`.
 

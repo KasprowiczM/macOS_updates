@@ -43,6 +43,8 @@ Private files are `.gitignore`d and managed by `dev_sync`:
 - `dev_sync` manifest and cleanup-plan relpaths must pass safe relative-path validation. Reject absolute paths, `..`, empty paths, newlines, NUL/control characters, and resolved paths outside the intended root.
 - Private files/configs must use atomic same-directory replacement and restrictive permissions. Cloud imports must stage an allowlisted file set and roll back the transaction after any partial commit failure.
 - Enforce the platform boundary (Apple Silicon arm64 and macOS 13+) before setup or update mutations.
+- Never issue an interactive sudo prompt without a terminal. System installs use `sudo -n` after authorization and defer softly when authorization is unavailable.
+- The common app-copy transaction never quits running applications. Probe before staging and again before the swap; unknown running state defers replacement. Only a handler that owns a recorded toolkit launch may request its graceful shutdown.
 - Avoid commands that dump gigantic logs without redirect; pipe to file and read selectively
 - Output limits: ~200 lines per tool call; redirect long builds to file
 

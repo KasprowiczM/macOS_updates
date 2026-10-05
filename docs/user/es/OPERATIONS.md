@@ -25,9 +25,9 @@ En caso de fallo, revise: `logs/update_all_<timestamp>.log` (se conservan las ú
 | 3 | `update_brew.sh` | `--skip-brew` |
 | 4 | `update_internet_apps.sh` | `--skip-internet` |
 | 5 | postupdate/historial → `APPLICATIONS.md`, `UPDATES.md` | `--skip-postupdate` |
-| 6 | `update_system.sh` (`softwareupdate -ia -R`) | `--skip-system` |
+| 6 | `update_system.sh` (`softwareupdate -i <label> -R`) | `--skip-system` |
 
-El paso 6 se ejecuta al final por el posible reinicio y se omite automáticamente tras un fallo anterior.
+El paso 6 se ejecuta al final porque puede reiniciar el Mac. Los errores bloqueantes lo aplazan; las advertencias leves no bloquean actualizaciones de seguridad. Sin autorización se informa del aplazamiento.
 
 Vista previa sin cambios: `bash update_all.sh --dry-run -y`
 

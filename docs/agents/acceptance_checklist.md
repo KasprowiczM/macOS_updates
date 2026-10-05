@@ -1,5 +1,15 @@
 # Production Acceptance Checklist — v1.5.x Live Execution Paths
 
+## v1.5.3 validation (2026-10-05)
+
+- Release gate: **527 tests pass**, shell/Python syntax and secret scan pass; whole-repository warning-level ShellCheck passes.
+- Read-only vendor feed query confirms ChatGPT's installed version equals the current offer and Proton Mail is current. Proton Drive's official feed remains older than its installed release; this is a manufacturer-data warning, not a verified update.
+- `update_all.sh --dry-run -y --json-summary` exits `0`, all seven steps skipped, no blocked/degraded state. Dry-run validates orchestration and reporting only.
+- Native CLI migration and duplicate cleanup receive targeted live verification; the release review records the observed result. App-copy, no-terminal authorization and warning propagation receive behavioral tests.
+- Pending live acceptance: a future interactive full Update All run for the final v1.5.3 branch, including GUI fallback and authorized system installation. No reboot-capable full run is claimed during release verification.
+
+Current evidence: [v1.5.3 review](../reviews/ULTRA_REVIEW_2026-10-05_v153.md). Historical checked paths below retain their original dates and versions.
+
 This checklist covers critical update and safety paths that have passed static, unit, and integration tests (`run_tests.sh`), but await live observation in a real `update_all.sh` run on macOS hardware.
 
 When running `update_all.sh`, inspect the execution log in `logs/update_all_<YYYYMMDD_HHMMSS>.log` or session diagnostics in `$MAC_UPDATE_SESSION_DIR` to confirm that each path behaves according to specification.

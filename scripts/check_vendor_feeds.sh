@@ -94,7 +94,7 @@ EOF
     art_host="${host:--}"
 
     if [ -n "$vf_res" ]; then
-        IFS='|' read -r v_ver v_url v_ck_kind v_ck v_art v_host <<EOF
+        IFS='|' read -r v_ver v_url v_ck_kind v_ck v_art v_host v_policy <<EOF
 $vf_res
 EOF
         [ -n "$v_ver" ] && [ "$v_ver" != "-" ] && vend_ver="$v_ver"
@@ -105,7 +105,13 @@ EOF
             case "$cmp_res" in
                 newer) relation="feed_stale" ;;
                 equal) relation="equal" ;;
-                older) relation="behind" ;;
+                older)
+                    if [ "${v_policy:-eligible}" = "rollout_hold" ]; then
+                        relation="rollout_hold"
+                    else
+                        relation="behind"
+                    fi
+                    ;;
                 *) relation="unknown" ;;
             esac
         fi

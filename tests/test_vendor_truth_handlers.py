@@ -40,6 +40,95 @@ class TestVendorTruthHandlers(unittest.TestCase):
             env=env,
         )
 
+    def _action_probe(self, app="ChatGPT / Codex", row=None, running=False, launch_rc=0, launch_updates=False, direct_rc=0):
+        action_log = os.path.join(self.tmpdir, "actions")
+        marker = os.path.join(self.tmpdir, "installed")
+        Path(action_log).unlink(missing_ok=True)
+        Path(marker).unlink(missing_ok=True)
+        row = row or "2.0|https://persistent.oaistatic.com/update.zip|-|-|zip|persistent.oaistatic.com|eligible"
+        script = f"""
+        . "{REPO_ROOT}/i18n/lang_en.sh"
+        . "{REPO_ROOT}/lib/version.sh"
+        . "{REPO_ROOT}/lib/internet_i18n.sh"
+        . "{REPO_ROOT}/lib/internet_handlers.sh"
+        print_info() {{ :; }}; print_warn() {{ :; }}; print_step() {{ :; }}
+        internet_app_bundle_id() {{ echo com.openai.codex; }}
+        internet_app_is_running() {{ return {0 if running else 1}; }}
+        app_version() {{ if [ -f "{marker}" ]; then echo 2.0; else echo 1.0; fi; }}
+        vendor_feed_lookup() {{ echo "{row}"; }}
+        silent_launch_app() {{ echo launch >> "{action_log}"; {f'touch "{marker}";' if launch_updates else ''} return {launch_rc}; }}
+        internet_app_quit_gracefully() {{ echo quit >> "{action_log}"; }}
+        sleep() {{ echo wait >> "{action_log}"; }}
+        vendor_direct_install() {{ echo direct >> "{action_log}"; if [ {direct_rc} -eq 0 ]; then touch "{marker}"; fi; return {direct_rc}; }}
+        internet_handler_vendor_truth "{app}" "{self.tmpdir}/Test.app" "Test"
+        echo "STATUS=$INTERNET_LAST_STATUS"
+        """
+        result = self._run_bash(script)
+        actions = Path(action_log).read_text() if Path(action_log).exists() else ""
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout, actions
+
+    def test_chatgpt_fast_direct_does_not_launch_or_wait(self):
+        status, actions = self._action_probe()
+        self.assertEqual(actions, "direct\n")
+        self.assertIn("Updated", status)
+
+    def test_direct_download_failure_retains_native_fallback(self):
+        status, actions = self._action_probe(direct_rc=1)
+        self.assertEqual(actions, "direct\nlaunch\n")
+        self.assertIn("unverified", status.lower())
+        self.assertNotIn("Updated", status)
+
+    def test_direct_defer_is_soft_without_launch(self):
+        status, actions = self._action_probe(direct_rc=4)
+        self.assertEqual(actions, "direct\n")
+        self.assertIn("quit the app", status)
+
+    def test_chatgpt_running_has_no_side_effect(self):
+        status, actions = self._action_probe(running=True)
+        self.assertEqual(actions, "")
+        self.assertIn("quit the app", status)
+
+    def test_native_launch_failure_has_no_wait_or_quit(self):
+        status, actions = self._action_probe(app="Claude", launch_rc=1)
+        self.assertEqual(actions, "launch\n")
+        self.assertIn("failed", status.lower())
+
+    def test_proton_staged_rollout_uses_native_without_forcing_direct(self):
+        for _ in range(2):
+            status, actions = self._action_probe(app="Proton Mail", row="2.0|https://proton.me/update.dmg|-|-|dmg|proton.me|rollout_hold")
+            self.assertIn("launch", actions)
+            self.assertNotIn("direct", actions)
+            self.assertNotIn("quit", actions)  # launch did not establish ownership
+            self.assertIn("rollout", status.lower())
+        status, actions = self._action_probe(app="Proton Mail", row="2.0|https://proton.me/update.dmg|-|-|dmg|proton.me|eligible")
+        self.assertEqual(actions, "direct\n")
+        self.assertIn("Updated", status)
+
+    def test_native_observed_update_finishes_without_sleep(self):
+        status, actions = self._action_probe(app="Claude", launch_updates=True)
+        self.assertEqual(actions, "launch\n")
+        self.assertIn("Updated", status)
+
+    def test_sparkle_equal_and_stale_do_not_launch(self):
+        for installed in ("2.0", "3.0"):
+            script = f"""
+            . "{REPO_ROOT}/i18n/lang_en.sh"
+            . "{REPO_ROOT}/lib/version.sh"
+            . "{REPO_ROOT}/lib/internet_i18n.sh"
+            . "{REPO_ROOT}/lib/internet_handlers.sh"
+            print_info() {{ :; }}; print_warn() {{ :; }}; print_step() {{ :; }}
+            defaults() {{ echo https://example.com/appcast; }}
+            curl() {{ echo '<rss><channel><item><enclosure url="https://example.com/v.zip" sparkle:shortVersionString="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"/></item></channel></rss>'; }}
+            app_version() {{ echo "{installed}"; }}
+            silent_launch_app() {{ echo UNEXPECTED_LAUNCH; }}
+            internet_handler_sparkle_check "Test" "{self.tmpdir}/Test.app" "Test"
+            echo "$INTERNET_LAST_STATUS"
+            """
+            result = self._run_bash(script)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn("UNEXPECTED_LAUNCH", result.stdout)
+
     def test_sparkle_check_stale_feed_is_not_current(self):
         rdm_fixture = os.path.join(self.fixtures_dir, "rdm_ascending.xml")
         script = f"""
@@ -450,6 +539,26 @@ class TestVendorTruthHandlers(unittest.TestCase):
         # Format string expects %s %s -> Claude 2.1.0 (not 90)
         self.assertIn("2.1.0", proc.stdout)
         self.assertNotIn("90", proc.stdout)
+
+    def test_ambiguous_running_probe_never_authorizes_quit(self):
+        session = Path(self.tmpdir) / "session"
+        session.mkdir()
+        for ambiguous in ("timeout", "unexpected"):
+            script = f"""
+            . "{REPO_ROOT}/lib/vendor_direct.sh"
+            eval "$(sed -n '/^silent_launch_app()/,/^}}/p' "{REPO_ROOT}/update_internet_apps.sh")"
+            eval "$(sed -n '/^quit_toolkit_launched_apps()/,/^}}/p' "{REPO_ROOT}/update_internet_apps.sh")"
+            export MAC_UPDATE_SESSION_DIR="{session}"
+            run_with_timeout() {{ if [ "{ambiguous}" = timeout ]; then return 124; else echo garbage; fi; }}
+            open() {{ :; }}
+            internet_app_quit_gracefully() {{ echo UNEXPECTED_QUIT; }}
+            silent_launch_app "Mock" "com.test.ambiguous"
+            quit_toolkit_launched_apps
+            """
+            result = self._run_bash(script)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn("UNEXPECTED_QUIT", result.stdout)
+            self.assertFalse((session / "toolkit_launched.txt").exists())
 
     def test_toolkit_launched_tracking_and_graceful_quit(self):
         bin_dir = os.path.join(self.tmpdir, "bin")

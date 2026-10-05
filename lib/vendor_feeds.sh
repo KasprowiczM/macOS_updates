@@ -47,11 +47,16 @@ v = res.get("version") or "-"
 u = res.get("url") or "-"
 ck = res.get("checksum_kind") or "-"
 cs = res.get("checksum") or "-"
-print(f"{v}|{u}|{ck}|{cs}")
+policy = "rollout_hold" if res.get("rollout_hold") else "eligible"
+print(f"{v}|{u}|{ck}|{cs}|{policy}")
 ' "$kind" "$arg" "$(sw_vers -productVersion 2>/dev/null)"
     )
     local rc=$?
     [ $rc -eq 0 ] && [ -n "$py_res" ] || return 1
 
-    printf "%s|%s|%s\n" "$py_res" "${artifact:--}" "${host:--}"
+    local v u ck cs policy
+    IFS='|' read -r v u ck cs policy <<EOF_RESULT
+$py_res
+EOF_RESULT
+    printf "%s|%s|%s|%s|%s|%s|%s\n" "$v" "$u" "$ck" "$cs" "${artifact:--}" "${host:--}" "$policy"
 }

@@ -96,6 +96,8 @@ class SystemStepBehavioralTests(unittest.TestCase):
             "sudo",
             f"""
             echo "sudo $@" >> "{log_file}"
+            if [ "$1" = "-n" ]; then shift; fi
+            if [ "$1" = "true" ] || [ "$1" = "-v" ]; then exit 0; fi
             cmd="$1"
             shift
             exec "$cmd" "$@"
@@ -183,6 +185,32 @@ EOF
         self.assertEqual(res.returncode, 10, f"Output:\n{res.stdout}\n{res.stderr}")
         self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
         self.assertEqual((self.session_dir / "pending_system").read_text().strip(), "3")
+
+    def test_no_terminal_and_cold_sudo_defers_without_installing(self) -> None:
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        self.create_mock_script("sudo", f'echo "sudo $@" >> "{log_file}"\nexit 1')
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}",
+                   MAC_UPDATE_SESSION_DIR=str(self.session_dir), MAC_UPDATE_YES="1")
+        env.pop("MAC_UPDATE_NO_SUDO", None)
+        res = subprocess.run(["bash", str(REPO_ROOT / "update_system.sh")],
+                             env=env, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 10, res.stdout + res.stderr)
+        calls = log_file.read_text()
+        self.assertIn("sudo -n true", calls)
+        self.assertNotIn("sudo -v", calls)
+        self.assertNotIn("softwareupdate -i", calls)
+
+    def test_no_sudo_policy_skips_even_cached_authorization(self) -> None:
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}",
+                   MAC_UPDATE_SESSION_DIR=str(self.session_dir), MAC_UPDATE_YES="1",
+                   MAC_UPDATE_NO_SUDO="1")
+        res = subprocess.run(["bash", str(REPO_ROOT / "update_system.sh")],
+                             env=env, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 10, res.stdout + res.stderr)
+        self.assertNotIn("sudo", log_file.read_text())
 
     def test_batch_restart_labels_two_invocations_restart_last(self) -> None:
         """Listing with one no-restart and two restart labels produces two invocations with both restarts last."""

@@ -11,11 +11,12 @@
 | `update_system.sh` | per-label `softwareupdate -i <label> -R`, restart-required labels in one final batch |
 | `update_appstore.sh` | `sudo mas upgrade` + AppleScript GUI for iPad apps |
 | `update_internet_apps.sh` | Installed internet apps (see `config/internet_apps.txt`): verified direct handlers, vendor CLIs and honestly reported in-app updater triggers |
-| `update_npm_cli.sh` | Native Node/Bun + npm global CLI (`claude`, `codex`, `opencode`) + self-updating `agy` |
+| `update_npm_cli.sh` | Existing native CLIs first, then Node/Bun and npm fallbacks; conservative redundant npm cleanup after native validation |
 | `update_brew.sh` | `brew upgrade` + cleanup + doctor |
 | `lib/brew.sh` | Resilient Homebrew queries: `brew_cask_versions`, `brew_formula_versions`, `brew_outdated_formulae`, `brew_outdated_casks` |
 | `lib/python/inventory.py` | Pure Python library for inventory normalization, exclusions, and prescan |
-| `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON (format 2) |
+| `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON (format 4) |
+| `lib/python/cli_duplicates.py` | Known-prefix npm duplicate discovery and version/process guards for native CLI cleanup |
 | `lib/python/http_fetch.py` | HTTPS download helper used by tests and the fetch adapter |
 | `lib/python/run_lock.py` | Exclusive run lock (`.mac-update.lock`); `kill(pid,0)` EPERM counts as alive |
 | `lib/fetch.sh` | HTTPS-only download with emptiness and size checks (no curl-pipe-to-sh) |

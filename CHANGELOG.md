@@ -6,6 +6,23 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.5.3] — 2026-10-05
+
+### Fixed
+
+- ChatGPT uses its verified vendor artifact before GUI launch when a newer version is available, avoiding the former 90-second staging and 60-second quit path. Known current or stale feeds skip unnecessary launches; unknown feeds retain the honestly unverified fallback.
+- Proton release JSON supports the vendor's release map, minimum macOS version and rollout information. Proton Drive uses vendor truth rather than repeatedly opening its updater against an older feed; stale manufacturer data remains a warning.
+- Native CLI updates precede Node/npm work. Redundant npm installations are removed only after a supported native executable is validated; fallback installations remain available when native migration fails.
+- Bundle replacements never quit user applications, refuse unknown running state, and recheck before the swap. Legacy direct handlers report deferred replacements as needing a restart.
+- No settle sleep when no application was launched. Absent DJI software is omitted from inventory and handler output.
+- System installation respects no-sudo and unattended authorization boundaries and uses noninteractive sudo after authorization; `softwareupdate -R` is preserved. System warnings propagate into the final degraded summary. Unparseable App Store queues never trigger bare `mas upgrade`.
+- App Store account-version tests use a sandbox application directory instead of depending on installed host apps.
+
+### Validation
+
+- Full suite: **527 tests pass**, shell/Python syntax, warning-level ShellCheck and secret scan pass. Read-only vendor query and orchestrator dry-run pass; targeted native OpenCode migration and duplicate cleanup were verified live.
+- Regression and release evidence: [v1.5.3 review](docs/reviews/ULTRA_REVIEW_2026-10-05_v153.md). No reboot-capable live Update All run or release tag is part of this release validation.
+
 ## [1.5.2] — 2026-09-28
 
 Fixes from the 2026-09-28 live run log (13 min, exit class `warnings`: Docker behind, Gemini / Google Drive / Comet unverified). After the fix the internet-apps step finished in 2 min with every app verified.

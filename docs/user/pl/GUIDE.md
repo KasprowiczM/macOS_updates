@@ -1,18 +1,18 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.5.2 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.5.3 · **Apple Silicon, macOS 13+**
 
 ## Co robi ten zestaw
 
 macOS Updates koordynuje aktualizacje na **Macach Apple Silicon z macOS 13+** w kolejności:
 
 1. Prescan i inwentarz tego Maca
-2. App Store (`sudo mas upgrade` + osobny GUI Track 2 dla aplikacji iPad)
-3. Node/Bun i globalne CLI npm
+2. App Store (`sudo mas upgrade <app-id>` + osobny GUI Track 2 dla aplikacji iPad)
+3. Najpierw istniejące natywne CLI, potem Node/Bun i zapasowe instalacje npm
 4. Homebrew (formuły i caski `--greedy`)
 5. Zainstalowane aplikacje internetowe: bezpośrednie handlery, CLI lub wyzwalanie aktualizatora
 6. Atomowy postupdate inwentarza i historii
-7. macOS (`softwareupdate -ia -R`) na końcu; pomijany po wcześniejszym błędzie
+7. macOS (`softwareupdate -i <label> -R`) na końcu; odraczany po blokującym błędzie lub bez autoryzacji
 
 **Nie instaluje nowych aplikacji.** Każdy Mac buduje własny katalog (`build_inventory.sh` lub prescan w `update_all.sh`).
 

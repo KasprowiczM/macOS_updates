@@ -254,7 +254,11 @@ iu_firefox_developer_edition() {
                             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
                             print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
-                            STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_FIREFOX="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_FF:-?}")"
+                            else
+                                STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
                         fi
                     else
                         print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "Firefox Developer Edition")"
@@ -495,7 +499,11 @@ iu_keepassxc() {
                             STATUS_KEEPASSXC="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "KeePassXC")"
-                            STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_KEEPASSXC="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_KPX:-?}")"
+                            else
+                                STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
                         fi
                     else
                         print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "KeePassXC")"
@@ -2014,7 +2022,11 @@ iu_visual_studio_code() {
                                 STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                             else
                                 print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
-                                STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                                if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                    STATUS_VSCODE="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_VSCODE:-?}")"
+                                else
+                                    STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                                fi
                             fi
                         else
                             print_warn "$(internet_msg "$L_INTERNET_APP_NOT_IN_ARCHIVE" "Visual Studio Code")"
@@ -2082,7 +2094,11 @@ iu_codeedit() {
                             STATUS_CODEEDIT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "CodeEdit")"
-                            STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_CODEEDIT="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_CE:-?}")"
+                            else
+                                STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
                         fi
                     else
                         print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "CodeEdit")"
@@ -2124,8 +2140,8 @@ iu_docker_desktop() {
             return 0
         fi
 
-        local R URL CK CS ART HOST
-        IFS='|' read -r R URL CK CS ART HOST <<EOF_DOCKER_ROW
+        local R URL CK CS ART HOST POLICY
+        IFS='|' read -r R URL CK CS ART HOST POLICY <<EOF_DOCKER_ROW
 $feed_row
 EOF_DOCKER_ROW
         if [ -z "$R" ]; then
@@ -2206,6 +2222,11 @@ EOF_DOCKER_ROW
                     print_ok "${STATUS_DOCKER#✅ }"
                     return 0
                 fi
+            elif [ "$vrc" -eq 4 ]; then
+                STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${R:-?}")"
+                INTERNET_LAST_VERIFIED=0
+                print_warn "$STATUS_DOCKER"
+                return 0
             elif [ "$vrc" -eq 3 ]; then
                 STATUS_DOCKER="$L_INTERNET_STATUS_INSTALL_ERROR"
                 INTERNET_LAST_VERIFIED=0
@@ -2416,7 +2437,11 @@ sys.exit(0 if exp_hex and exp_hex == act else 1)
                             STATUS_LEDGER="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$SRC_APP")"
-                            STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_LEDGER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_LEDGER:-?}")"
+                            else
+                                STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
                         fi
                     else
                         print_warn "$L_INTERNET_APP_NOT_ON_VOLUME"
@@ -2497,7 +2522,11 @@ except Exception:
                             STATUS_TREZOR="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
                             print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Trezor Suite.app")"
-                            STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_TREZOR="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_TS:-?}")"
+                            else
+                                STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
                         fi
                     else
                         print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "Trezor Suite")"
@@ -2566,8 +2595,9 @@ iu_ipmiview() {
 }
 
 iu_dji_assistant() {
-    print_header "🚁 DJI Assistant 2"
     DJI_PATH="$(internet_app_path "DJI Assistant 2")"
+    [ -d "$DJI_PATH" ] || return 0
+    print_header "🚁 DJI Assistant 2"
     if [ -d "$DJI_PATH" ]; then
         VER=$(app_version "$DJI_PATH")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"

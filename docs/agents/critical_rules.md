@@ -99,7 +99,7 @@ Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 
 | Method | Apps |
 |--------|------|
-| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor (direct-first), Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Remote Desktop Manager |
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager; direct-first choices in `config/vendor_direct_first.txt` |
 | Mozilla product-details/download + DMG | Firefox Developer Edition |
 | GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
 | Google Keystone | Google Chrome, Google Drive, Gemini |
@@ -109,7 +109,7 @@ Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 | Vendor feed + verified DMG (idle only); `docker desktop update` fallback | Docker Desktop v4.37+ |
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
 | Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
-| Built-in auto-updater (silent launch / Sparkle appcast, triggered-unverified) | Proton Drive |
+| Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
 | Manual only | IPMIView, DJI Assistant 2 |
 
@@ -258,6 +258,10 @@ not success.
   released or expired (it contradicted `mau_clean_stale_deferrals` and produced a false message).
 
 ## 16. Only Installed Applications & CLI Toolchains (v1.5.0)
+
+v1.5.3 updates existing native CLIs before Node/npm. Supported native OpenCode migration keeps the npm fallback until native version and PATH verification succeed. Duplicate cleanup scans only known npm prefixes, checks supported native ownership and equal/newer version, and rechecks active processes before removal. Unknown versions, unresolved ownership or active CLI processes retain the fallback.
+
+For GUI updates, known current/stale feeds do not launch apps. Proton minimum OS and staged-rollout policy are evaluated before direct installation; partial rollouts stay with the native updater. A stale official feed remains an explicit warning and is re-evaluated each run. `copy_verified_app` itself never quits applications and defers running or ambiguous state before staging and before swapping.
 
 - The update pipeline updates **only** what is already installed on the Mac.
 - Missing native CLI tools (`claude`, `codex`, `opencode`, `agent`, `agy`) and node toolchains are skipped without error.
