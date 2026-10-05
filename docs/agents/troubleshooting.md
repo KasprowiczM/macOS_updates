@@ -2,6 +2,7 @@
 
 | Problem | Fix |
 |---------|-----|
+| Proton Drive appears as a pending downgrade / an updater launch that never happened | v1.5.4 displays stale manufacturer data separately as a warning, with installed/vendor versions and no install target. Unknown outcomes and actual unverified updaters remain visible. |
 | ChatGPT spends time opening and closing before installation | v1.5.3 tries its verified vendor artifact first when an update is known. Unknown feeds still use the native updater fallback; running apps are preserved. |
 | Proton Drive manufacturer feed is older than the installed app | Inspect `bash scripts/check_vendor_feeds.sh`. A stale official feed remains a warning; no downgrade or repeated launch is attempted. |
 | Native and npm CLI copies both exist | Native updates run first. Cleanup requires a supported native executable, an equal or newer version, safe PATH resolution and no active process. Uncertain copies are retained. |

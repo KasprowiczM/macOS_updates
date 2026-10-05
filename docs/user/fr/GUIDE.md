@@ -1,6 +1,6 @@
 # Guide utilisateur (Français)
 
-**Version :** 1.5.3 · **Apple Silicon, macOS 13+**
+**Version :** 1.5.4 · **Apple Silicon, macOS 13+**
 
 ## Fonctionnement
 

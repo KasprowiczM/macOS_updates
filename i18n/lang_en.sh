@@ -535,7 +535,7 @@ L_INSTALLER_GIT_INSTALLING="git not found — installing Xcode Command Line Tool
 
 L_ALL_SUMMARY_WARN="UPDATE COMPLETED WITH WARNINGS"
 L_ALL_SUMMARY_ERROR="UPDATE COMPLETED WITH ERRORS"
-L_ALL_RESULT_DEGRADED="completed with warnings (unverified)"
+L_ALL_RESULT_DEGRADED="completed with warnings"
 L_ALL_WARN_NOT_BLOCKING="Some updates could not be verified. This did not block the macOS system update."
 L_ALL_SYSTEM_DEFERRED="⏭️ skipped because a blocking update step failed"
 L_INTERNET_HARD_FAILURE="At least one internet application failed to download or install."
@@ -781,7 +781,9 @@ L_INTERNET_MS_RETRY_FAILED_FMT="Microsoft AutoUpdate retry failed (reason: %s)"
 L_INTERNET_MS_MANUAL_ACTION_FMT="Manual action required: run '%s' or open Microsoft AutoUpdate manually"
 L_ALL_SUMMARY_UPDATED_TITLE="Updated"
 L_ALL_SUMMARY_PENDING_TITLE="Still pending / failed"
-L_ALL_SUMMARY_UNCONFIRMED_TITLE="Updater launched, but update not confirmed"
+L_ALL_SUMMARY_UNCONFIRMED_TITLE="Unconfirmed operations"
+L_ALL_SUMMARY_WARNING_TITLE="Manufacturer warnings"
+L_ALL_SUMMARY_FEED_WARNING_FMT="Vendor feed %s is older than installed %s."
 L_ALL_SUMMARY_INVENTORY_CHANGES="Inventory version fields changed: %s"
 
 # ── Internet (v1.5.0) ──────────────────────────────────────────

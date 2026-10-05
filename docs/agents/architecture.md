@@ -1,5 +1,7 @@
 # Architecture
 
+v1.5.4 keeps run-summary format **4** with additive item support: `status="warning"` represents manufacturer evidence issues, and optional `installed_version` / `vendor_version` fields preserve both observations. A stale feed has `old_version=null` and `new_version=null`; it is not an installation target. Consumers that enumerate statuses must recognize `warning`; consumers counting updates continue to filter `status="updated"`. Known per-app warnings suppress duplicate generic Internet warnings, while hard failures and unknown/malformed status input retain the generic diagnostic.
+
 v1.5.3 verifies vendor versions before GUI work and uses direct-first vendor artifacts for ChatGPT. Known current/stale feeds avoid launches; unknown feeds retain the native fallback. The final settle loop runs only for toolkit-launched applications. App-copy transactions check running state before staging and immediately before replacement; unknown state defers without closing user apps.
 
 The CLI step updates existing native installations before Node/npm and uses `lib/python/cli_duplicates.py` to discover redundant npm packages conservatively. Package removal requires native version validation, supported location, PATH ownership and process checks; failed migration retains the fallback.

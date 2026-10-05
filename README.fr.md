@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.3** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.4** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.4 :** Les anciens flux du fabricant sont présentés séparément comme avertissements, sans cible de rétrogradation ni affirmation de lancement d’un programme de mise à jour. Les opérations réellement non confirmées restent visibles. Le dernier passage utilisateur a duré 108 secondes sans mise à jour d’application observée ; ce n’est pas un benchmark d’installation.
 
 **v1.5.3 :** ChatGPT utilise les téléchargements vérifiés du fabricant avant de lancer son interface ; les flux connus comme actuels ou anciens ne déclenchent aucun cycle de lancement et attente. Le JSON des versions Proton est pris en charge, mais un ancien flux reste un avertissement explicite. Les mises à jour CLI natives précèdent Node/npm ; les copies npm redondantes sont supprimées après vérification d’une installation native prise en charge. Les applications ouvertes sont protégées lors du remplacement ; sans autorisation, les mises à jour système sont différées avec un avertissement.
 
