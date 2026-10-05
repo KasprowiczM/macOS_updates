@@ -6,6 +6,20 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.5.4] — 2026-10-05
+
+### Fixed
+
+- A stale manufacturer feed is a `warning` item, with separate `installed_version` and `vendor_version` evidence and no `new_version` install target. It no longer appears as a pending downgrade.
+- A per-app manufacturer warning no longer adds a duplicate generic unconfirmed-updater item. Actual unverified operations, unknown/malformed statuses and hard step failures remain visible; degraded exit semantics are unchanged.
+- Summary warning and unconfirmed-operation labels are localized in seven languages. Generic completion warnings no longer automatically claim that an updater was unverified or even launched.
+- Proton Mail's informational message describes its native updater without incorrectly identifying it as Sparkle.
+
+### Verified live evidence
+
+- The user's completed v1.5.3 run took **108 seconds**, with no observed package/app updates, 25 verified internet applications and zero unverified app updaters. App Store, Homebrew, native CLI and system checks completed cleanly; macOS 27.0.1 had no offered update. Proton Drive's older manufacturer feed was the sole warning.
+- This was a current-software verification run, not a benchmark of installing new updates. [Dated follow-up review](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-05_v154.md) records release validation and remaining live acceptance limits.
+
 ## [1.5.3] — 2026-10-05
 
 ### Fixed

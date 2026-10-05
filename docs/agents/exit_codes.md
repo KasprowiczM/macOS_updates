@@ -31,6 +31,8 @@ must not look like a failure to cron, CI, or `dev_sync`. Use `MAC_UPDATE_DEGRADE
 
 ## App Store exit 2 (Accessibility)
 
+v1.5.4 changes report presentation only: a stale vendor feed remains degraded (`10` at the leaf, `0` plus `degraded=true` at the master). Manufacturer warnings are separate from pending installations and unconfirmed operations. A warning does not imply that an updater was launched.
+
 `update_appstore.sh` exits **2** when Terminal lacks Accessibility for AppleScript TRACK 2.
 
 Options:

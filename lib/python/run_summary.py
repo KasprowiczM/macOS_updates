@@ -39,49 +39,63 @@ SUMMARY_I18N = {
     "en": {
         "updated_title": "Updated",
         "pending_title": "Still pending / failed",
-        "unconfirmed_title": "Updater launched, but update not confirmed",
+        "unconfirmed_title": "Unconfirmed operations",
+        "warning_title": "Manufacturer warnings",
+        "feed_warning": "Vendor feed %s is older than installed %s.",
         "inventory_changes": "Inventory version fields changed: %s",
         "none": "(none)",
     },
     "pl": {
         "updated_title": "Zaktualizowano",
         "pending_title": "Nadal oczekuje / niepowodzenie",
-        "unconfirmed_title": "Uruchomiono updater, ale nie potwierdzono aktualizacji",
+        "unconfirmed_title": "Niepotwierdzone operacje",
+        "warning_title": "Ostrzeżenia producenta",
+        "feed_warning": "Feed producenta %s jest starszy niż zainstalowana wersja %s.",
         "inventory_changes": "Zmieniono pól wersji w inventory: %s",
         "none": "(brak)",
     },
     "de": {
         "updated_title": "Aktualisiert",
         "pending_title": "Noch ausstehend / fehlgeschlagen",
-        "unconfirmed_title": "Updater gestartet, aber Aktualisierung nicht bestätigt",
+        "unconfirmed_title": "Unbestätigte Vorgänge",
+        "warning_title": "Herstellerwarnungen",
+        "feed_warning": "Herstellerfeed %s ist älter als die installierte Version %s.",
         "inventory_changes": "Inventar-Versionsfelder geändert: %s",
         "none": "(keine)",
     },
     "es": {
         "updated_title": "Actualizado",
         "pending_title": "Aún pendiente / fallido",
-        "unconfirmed_title": "Actualizador iniciado, pero actualización no confirmada",
+        "unconfirmed_title": "Operaciones sin confirmar",
+        "warning_title": "Advertencias del fabricante",
+        "feed_warning": "El feed del fabricante %s es anterior a la versión instalada %s.",
         "inventory_changes": "Campos de versión de inventario cambiados: %s",
         "none": "(ninguno)",
     },
     "fr": {
         "updated_title": "Mis à jour",
         "pending_title": "Toujours en attente / échoué",
-        "unconfirmed_title": "Programme de mise à jour lancé, mais mise à jour non confirmée",
+        "unconfirmed_title": "Opérations non confirmées",
+        "warning_title": "Avertissements du fabricant",
+        "feed_warning": "Le flux du fabricant %s est antérieur à la version installée %s.",
         "inventory_changes": "Champs de version de l'inventaire modifiés : %s",
         "none": "(aucun)",
     },
     "it": {
         "updated_title": "Aggiornato",
         "pending_title": "Ancora in sospeso / non riuscito",
-        "unconfirmed_title": "Programma di aggiornamento avviato, ma aggiornamento non confermato",
+        "unconfirmed_title": "Operazioni non confermate",
+        "warning_title": "Avvisi del produttore",
+        "feed_warning": "Il feed del produttore %s è precedente alla versione installata %s.",
         "inventory_changes": "Campi versione inventario modificati: %s",
         "none": "(nessuno)",
     },
     "pt": {
         "updated_title": "Atualizado",
         "pending_title": "Ainda pendente / falhou",
-        "unconfirmed_title": "Atualizador iniciado, mas atualização não confirmada",
+        "unconfirmed_title": "Operações não confirmadas",
+        "warning_title": "Avisos do fabricante",
+        "feed_warning": "O feed do fabricante %s é anterior à versão instalada %s.",
         "inventory_changes": "Campos de versão do inventário alterados: %s",
         "none": "(nenhum)",
     },
@@ -760,6 +774,8 @@ def collect_run_items(
 
     # Internet status codes (v1.5.0)
     internet_unconfirmed_apps = 0
+    internet_explained_warnings = 0
+    internet_unexplained_status = False
     inet_codes_file = sdir / "internet_status_codes.txt"
     if inet_codes_file.is_file():
         for line in inet_codes_file.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -768,8 +784,14 @@ def collect_run_items(
                 continue
             parts = line.split("|", 2)
             if len(parts) < 3:
+                internet_unexplained_status = True
                 continue
             app_name, code, text = parts[0].strip(), parts[1].strip(), parts[2].strip()
+            if code not in ("unverified", "error_soft", "error_hard", "feed_stale",
+                            "behind", "needs_restart", "update_available", "rollout_hold",
+                            "updated", "current_verified", "current_vendor", "current_cask_only",
+                            "managed_brew", "managed_appstore", "manual", "skipped"):
+                internet_unexplained_status = True
             app_keys = get_all_alias_keys(app_name)
             if app_keys & seen_internet_keys:
                 continue
@@ -790,7 +812,25 @@ def collect_run_items(
                 })
                 continue
 
-            if code in ("behind", "needs_restart", "feed_stale", "update_available", "rollout_hold"):
+            if code == "feed_stale":
+                seen_internet_keys.update(app_keys)
+                internet_explained_warnings += 1
+                m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*<\s*.*?([0-9][0-9a-zA-Z._-]*)', text)
+                vendor_version, installed_version = (m.group(1), m.group(2)) if m else (None, None)
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": None,
+                    "new_version": None,
+                    "installed_version": installed_version,
+                    "vendor_version": vendor_version,
+                    "status": "warning",
+                    "details": re.sub(r"^[^\w(]+", "", text).strip() or "vendor feed stale",
+                })
+                continue
+
+            if code in ("behind", "needs_restart", "update_available", "rollout_hold"):
                 seen_internet_keys.update(app_keys)
                 old_ver = None
                 new_ver = None
@@ -810,13 +850,6 @@ def collect_run_items(
                         details = f"vendor {new_ver} > installed {old_ver}"
                     else:
                         details = "behind vendor version"
-                elif code == "feed_stale":
-                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*<\s*.*?([0-9][0-9a-zA-Z._-]*)', text)
-                    if m:
-                        old_ver, new_ver = m.group(2), m.group(1)
-                        details = f"vendor feed stale (feed {new_ver} < installed {old_ver})"
-                    else:
-                        details = "vendor feed stale"
                 elif code == "update_available":
                     m = re.search(r'([0-9][0-9a-zA-Z._-]*)', text)
                     if m:
@@ -871,7 +904,9 @@ def collect_run_items(
         for step_key, step_val in step_results.items():
             status_code = classify_step_status(step_val)
             if status_code in ("warn", "error", "unconfirmed"):
-                if step_key == "internet" and internet_unconfirmed_apps:
+                if (step_key == "internet" and status_code == "warn" and
+                        not internet_unexplained_status and
+                        (internet_unconfirmed_apps or internet_explained_warnings)):
                     # Already itemised per app above.
                     continue
                 details = str(step_val)
@@ -899,6 +934,8 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     title_updated = os.environ.get("L_ALL_SUMMARY_UPDATED_TITLE", i18n["updated_title"])
     title_pending = os.environ.get("L_ALL_SUMMARY_PENDING_TITLE", i18n["pending_title"])
     title_unconfirmed = os.environ.get("L_ALL_SUMMARY_UNCONFIRMED_TITLE", i18n["unconfirmed_title"])
+    title_warning = os.environ.get("L_ALL_SUMMARY_WARNING_TITLE", i18n["warning_title"])
+    feed_warning_fmt = os.environ.get("L_ALL_SUMMARY_FEED_WARNING_FMT", i18n["feed_warning"])
     inv_fmt = os.environ.get("L_ALL_SUMMARY_INVENTORY_CHANGES", i18n["inventory_changes"])
     none_str = i18n["none"]
 
@@ -906,6 +943,7 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     updated_items = [it for it in items if it.get("status") == "updated"]
     pending_items = [it for it in items if it.get("status") == "pending"]
     unconfirmed_items = [it for it in items if it.get("status") == "unconfirmed"]
+    warning_items = [it for it in items if it.get("status") == "warning"]
     counts = summary.get("counts", {})
     inventory_count = counts.get("inventory_version_fields_changed", 0)
 
@@ -937,6 +975,17 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
             lines.append(f"   • {it['name']}{det_str}")
     else:
         lines.append(f"   • {none_str}")
+
+    if warning_items:
+        lines.append("")
+        lines.append(f"⚠️  {title_warning}:")
+        for it in warning_items:
+            vendor, installed = it.get("vendor_version"), it.get("installed_version")
+            if vendor and installed:
+                details = feed_warning_fmt % (vendor, installed)
+            else:
+                details = it.get("details") or ""
+            lines.append(f"   • {it['name']} — {details}")
 
     lines.append("")
     lines.append(f"⚠️  {title_unconfirmed}:")

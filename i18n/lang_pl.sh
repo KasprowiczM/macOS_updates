@@ -696,7 +696,7 @@ L_SETUP_SUMMARY_TITLE="PODSUMOWANIE KONFIGURACJI"
 
 L_ALL_SUMMARY_WARN="AKTUALIZACJA ZAKOŃCZONA Z OSTRZEŻENIAMI"
 L_ALL_SUMMARY_ERROR="AKTUALIZACJA ZAKOŃCZONA Z BŁĘDAMI"
-L_ALL_RESULT_DEGRADED="zakończono z ostrzeżeniami (niezweryfikowane)"
+L_ALL_RESULT_DEGRADED="zakończono z ostrzeżeniami"
 L_ALL_WARN_NOT_BLOCKING="Części aktualizacji nie udało się zweryfikować. Nie zablokowało to aktualizacji systemu macOS."
 L_ALL_SYSTEM_DEFERRED="⏭️ pominięto, ponieważ blokujący krok aktualizacji zakończył się błędem"
 L_INTERNET_HARD_FAILURE="Co najmniej jednej aplikacji internetowej nie udało się pobrać ani zainstalować."
@@ -779,7 +779,9 @@ L_INTERNET_MS_RETRY_FAILED_FMT="Ponowna próba Microsoft AutoUpdate nie powiodł
 L_INTERNET_MS_MANUAL_ACTION_FMT="Wymagana akcja manualna: uruchom '%s' lub otwórz ręcznie Microsoft AutoUpdate"
 L_ALL_SUMMARY_UPDATED_TITLE="Zaktualizowano"
 L_ALL_SUMMARY_PENDING_TITLE="Nadal oczekuje / niepowodzenie"
-L_ALL_SUMMARY_UNCONFIRMED_TITLE="Uruchomiono updater, ale nie potwierdzono aktualizacji"
+L_ALL_SUMMARY_UNCONFIRMED_TITLE="Niepotwierdzone operacje"
+L_ALL_SUMMARY_WARNING_TITLE="Ostrzeżenia producenta"
+L_ALL_SUMMARY_FEED_WARNING_FMT="Feed producenta %s jest starszy niż zainstalowana wersja %s."
 L_ALL_SUMMARY_INVENTORY_CHANGES="Zmieniono pól wersji w inventory: %s"
 
 # ── Internet (v1.5.0) ──────────────────────────────────────────

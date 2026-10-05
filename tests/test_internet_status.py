@@ -267,7 +267,8 @@ internet_summary_end
 
             warp_items = [it for it in items if "Warp" in it["name"]]
             self.assertEqual(len(warp_items), 1)
-            self.assertEqual(warp_items[0]["status"], "pending")
+            self.assertEqual(warp_items[0]["status"], "warning")
+            self.assertIsNone(warp_items[0]["new_version"])
 
             antigravity_items = [it for it in items if it["name"] == "Antigravity"]
             self.assertEqual(len(antigravity_items), 1)
