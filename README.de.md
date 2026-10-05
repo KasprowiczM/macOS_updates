@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.3** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.5.4** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.4:** Veraltete Herstellerfeeds erscheinen als separate Warnungen ohne ausstehendes Downgrade oder behaupteten Updater-Start. Tatsächlich unbestätigte Vorgänge bleiben sichtbar. Der letzte Nutzerlauf dauerte 108 Sekunden ohne beobachtete App-Updates; dies ist kein Installationsbenchmark.
 
 **v1.5.3:** ChatGPT verwendet geprüfte Herstellerdownloads vor dem GUI-Start; aktuelle oder veraltete Herstellerfeeds lösen keinen Start mit Wartezeit aus. Proton-Versionsdaten im JSON-Format werden unterstützt, ein älterer Feed bleibt jedoch eine ausdrückliche Warnung. Native CLI-Updates laufen vor Node/npm; doppelte npm-Kopien werden erst nach Prüfung einer unterstützten nativen Installation entfernt. Laufende Anwendungen bleiben beim Austausch geschützt; Systemupdates ohne Autorisierung werden mit einer Warnung verschoben.
 

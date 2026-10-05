@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.5.3**).
+**Version:** see `VERSION` in repo root (currently **1.5.4**).
 
 ## One-line install (new Mac, Apple Silicon)
 

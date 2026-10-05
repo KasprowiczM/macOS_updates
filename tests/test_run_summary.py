@@ -156,6 +156,72 @@ class FormatVersion4AndMigrationTests(unittest.TestCase):
 
 
 class RunItemsAndTerminalSummaryTests(unittest.TestCase):
+    def test_stale_feed_is_warning_without_an_update_target_or_fake_launch(self) -> None:
+        from run_summary import collect_run_items, format_terminal_summary
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "internet_status_codes.txt").write_text(
+                "Proton Drive|feed_stale|⚠️ Nieaktualny feed (feed 3.0.3 < zainstalowana 3.1.0)\n")
+            items = collect_run_items(p, step_results={"internet": {"code": "warn", "text": "Warning"}})
+            self.assertEqual(len(items), 1)
+            item = items[0]
+            self.assertEqual(item["status"], "warning")
+            self.assertEqual(item["installed_version"], "3.1.0")
+            self.assertEqual(item["vendor_version"], "3.0.3")
+            self.assertIsNone(item["old_version"])
+            self.assertIsNone(item["new_version"])
+            rendered = format_terminal_summary({"items": items}, "pl")
+            self.assertIn("Ostrzeżenia producenta", rendered)
+            self.assertIn("3.0.3", rendered)
+            self.assertNotIn("Step: Internet", rendered)
+            self.assertNotIn("Uruchomiono updater", rendered)
+
+    def test_stale_feed_preserves_actual_unconfirmed_apps_and_hard_steps(self) -> None:
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "internet_status_codes.txt").write_text(
+                "Drive|feed_stale|feed 3.0.3 < installed 3.1.0\n"
+                "Other|unverified|Updater launched without proof\n")
+            for step_code in ("warn", "error", "unconfirmed"):
+                items = collect_run_items(p, step_results={"internet": {"code": step_code}})
+                self.assertTrue(any(it["name"] == "Drive" and it["status"] == "warning" for it in items))
+                self.assertTrue(any(it["name"] == "Other" and it["status"] == "unconfirmed" for it in items))
+                self.assertEqual(any(it["name"] == "Step: Internet apps" for it in items), step_code != "warn")
+
+    def test_stale_feed_does_not_hide_unexplained_or_malformed_status(self) -> None:
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            for extra in ("Other|unknown|Unclassified result\n", "malformed row\n"):
+                (p / "internet_status_codes.txt").write_text(
+                    "Drive|feed_stale|feed 3.0.3 < installed 3.1.0\n" + extra)
+                items = collect_run_items(p, step_results={"internet": {"code": "warn"}})
+                self.assertTrue(any(it["name"] == "Step: Internet apps" for it in items))
+
+    def test_warning_without_parseable_versions_preserves_diagnostic(self) -> None:
+        from run_summary import collect_run_items
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            (p / "internet_status_codes.txt").write_text("Drive|feed_stale|Vendor comparison unavailable\n")
+            items = collect_run_items(p)
+            self.assertEqual(items[0]["status"], "warning")
+            self.assertIsNone(items[0]["new_version"])
+            self.assertIsNone(items[0]["installed_version"])
+            self.assertIn("comparison unavailable", items[0]["details"])
+
+    def test_manufacturer_warning_rendered_in_all_seven_languages(self) -> None:
+        from run_summary import format_terminal_summary, SUMMARY_I18N
+        from unittest.mock import patch
+        item = {"name": "Drive", "status": "warning", "installed_version": "3.1.0",
+                "vendor_version": "3.0.3", "new_version": None}
+        with patch.dict("os.environ", {}, clear=True):
+            for lang, strings in SUMMARY_I18N.items():
+                rendered = format_terminal_summary({"items": [item]}, lang)
+                self.assertIn(strings["warning_title"], rendered)
+                self.assertIn(strings["feed_warning"] % ("3.0.3", "3.1.0"), rendered)
+                self.assertIn(strings["unconfirmed_title"], rendered)
+
     def test_collect_run_items_from_snapshots(self) -> None:
         from run_summary import collect_run_items, format_terminal_summary
         with tempfile.TemporaryDirectory() as tmp:
@@ -214,13 +280,13 @@ class RunItemsAndTerminalSummaryTests(unittest.TestCase):
             self.assertIn("Still pending / failed:", term_en)
             self.assertIn("Microsoft Word", term_en)
             self.assertIn("Update Assistant terminated.", term_en)
-            self.assertIn("Updater launched, but update not confirmed:", term_en)
+            self.assertIn("Unconfirmed operations:", term_en)
             self.assertIn("Inventory version fields changed: 9", term_en)
 
             term_pl = format_terminal_summary(summary, lang="pl")
             self.assertIn("Zaktualizowano:", term_pl)
             self.assertIn("Nadal oczekuje / niepowodzenie:", term_pl)
-            self.assertIn("Uruchomiono updater, ale nie potwierdzono aktualizacji:", term_pl)
+            self.assertIn("Niepotwierdzone operacje:", term_pl)
             self.assertIn("Zmieniono pól wersji w inventory: 9", term_pl)
 
     def test_collect_run_items_system_installed_and_deduplicated(self) -> None:

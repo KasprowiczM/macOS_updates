@@ -674,7 +674,7 @@ L_SETUP_SUMMARY_TITLE="RÉSUMÉ DE CONFIGURATION"
 
 L_ALL_SUMMARY_WARN="MISE À JOUR TERMINÉE AVEC DES AVERTISSEMENTS"
 L_ALL_SUMMARY_ERROR="MISE À JOUR TERMINÉE AVEC DES ERREURS"
-L_ALL_RESULT_DEGRADED="terminé avec des avertissements (non vérifié)"
+L_ALL_RESULT_DEGRADED="terminé avec des avertissements"
 L_ALL_WARN_NOT_BLOCKING="Certaines mises à jour n'ont pas pu être vérifiées. Cela n'a pas bloqué la mise à jour du système macOS."
 L_ALL_SYSTEM_DEFERRED="⏭️ ignoré car une étape bloquante de mise à jour a échoué"
 L_INTERNET_HARD_FAILURE="Au moins une application Internet n'a pas pu être téléchargée ou installée."
@@ -757,7 +757,9 @@ L_INTERNET_MS_RETRY_FAILED_FMT="La nouvelle tentative de Microsoft AutoUpdate a 
 L_INTERNET_MS_MANUAL_ACTION_FMT="Action manuelle requise : exécutez '%s' ou ouvrez manuellement Microsoft AutoUpdate"
 L_ALL_SUMMARY_UPDATED_TITLE="Mis à jour"
 L_ALL_SUMMARY_PENDING_TITLE="Toujours en attente / échec"
-L_ALL_SUMMARY_UNCONFIRMED_TITLE="Programme de mise à jour lancé, mais mise à jour non confirmée"
+L_ALL_SUMMARY_UNCONFIRMED_TITLE="Opérations non confirmées"
+L_ALL_SUMMARY_WARNING_TITLE="Avertissements du fabricant"
+L_ALL_SUMMARY_FEED_WARNING_FMT="Le flux du fabricant %s est antérieur à la version installée %s."
 L_ALL_SUMMARY_INVENTORY_CHANGES="Champs de version modifiés dans l'inventaire : %s"
 
 # ── Internet (v1.5.0) ──────────────────────────────────────────
