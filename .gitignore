@@ -29,6 +29,7 @@ __pycache__/
 
 # ── Local-only / generated — not for public GitHub ───────────────
 /graphify-out/
+/.playwright-mcp/
 /scratch/
 /.claude/settings.local.json
 
@@ -44,10 +45,10 @@ __pycache__/
 /docs/reviews/FABLE5_Project_Review_Report.md
 /docs/reviews/IMPLEMENTATION_REPORT_20260609.md
 /docs/reviews/ultra_review_opus5_v*.md
+/docs/reviews/ULTRA_REVIEW_2026-09-06_v144.md
 docs/agents/handoffs/
 docs/agents/handoff.md
-docs/agents/codex_notes.md
-docs/agents/audit_2026-04-26.md
+docs/agents/archive/
 /scratch/
 git_history_archive.md
 

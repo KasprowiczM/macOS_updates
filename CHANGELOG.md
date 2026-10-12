@@ -6,6 +6,32 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.5.5] — 2026-10-12
+
+### Fixed
+
+- **Stale command hash after a Homebrew upgrade (F1, critical).** A `brew upgrade` of `python@3.14` (Homebrew 7.0.9) removed `/opt/homebrew/bin/python3` while `update_all.sh` was running; bash kept the hashed path from step 0 and step 5 plus the run-summary write failed with `No such file or directory`. `update_all.sh`, every `update_*.sh` orchestrator and `migration_setup.sh` now run `shopt -s checkhash` right after `set -o pipefail`, and `update_all.sh` additionally runs `hash -r` before steps 2–5.
+- **Reporting failures no longer defer macOS updates (F2).** Step 5 (inventory/postupdate) still records an error and exits non-zero, but no longer sets `BLOCKING_EXIT`: it mutates nothing, so skipping security updates over it repeated the 2026-07-26 regression ("the machine may be mid-transaction" was false).
+- **No false "files updated" claim (F3).** The closing "Files updated: APPLICATIONS.md, UPDATES.md" (and the inventory-only equivalent) is printed only when step 5 succeeded.
+- **Honest run-summary failures (F4).** `write_machine_summary` names its cause (`python3` missing from `PATH`, or its exit status). When the final write fails, the `run_summary_*.json` left at `run_status: "started"` is relabelled `"failed"` instead of masquerading as the result.
+- **Repeated graceful quit for toolkit-launched apps (F5).** `internet_app_quit_gracefully` re-sends the AppleScript `quit` every 10 s inside its wait window, so an instance relaunched by the vendor updater (the likely cause for Claude Desktop in the 2026-10-11 run) is also asked to quit. Never force-killed. New `MAC_UPDATE_QUIT_WAIT` (default 60, 0–300) and `MAC_UPDATE_QUIT_RESEND` (default 10, 1–60); `L_INTERNET_APP_STILL_RUNNING_FMT` now takes the wait as a parameter.
+- **Honest soft-warning wording (F6).** `update_internet_apps.sh` prints "At least one internet application was not verified or updated" only for a real unverified/behind/restart-pending/error-class cause. When the only soft causes are a stale manufacturer feed and/or a toolkit-launched app that did not quit, it prints the new `L_INTERNET_WARNINGS_ONLY` ("finished with warnings; no application update is pending") in all seven languages; exit code stays `10`. The master messages now read "<step> reported warnings (soft) — macOS step not blocked".
+
+### Tests
+
+- New `tests/test_run_log_regressions_20261011.py` (checkhash behaviour with a vanishing `python3`, non-blocking step 5, conditional "files updated" message, summary-failure handling, repeated-quit behaviour with a stubbed `osascript`, warning wording) and a static `checkhash` guard in `tests/test_safety_static.py`.
+
+### Live evidence (2026-10-11)
+
+- The same run verified App Store Track 2 (UniFi 10.38.1 → 11.0.0), a verified vendor install (OpenCode Desktop 1.18.35 → 1.19.0) and toolkit-launched native updaters (Claude Desktop 2.31226.1, Warp). The macOS system step was skipped by the bug above, so the system/reboot path remains unaccepted. See [the follow-up review](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md).
+
+### Documentation
+
+- **Documentation cleanup.** `README.md` was restructured (site link, at-a-glance table, a per-method table for the 43 apps / 11 update methods, corrected `MAC_UPDATE_INTERNET_SETTLE_SECONDS` default `15`, the new `MAC_UPDATE_QUIT_WAIT` / `MAC_UPDATE_QUIT_RESEND` variables, test count 561) and the six translations (`README.pl/es/fr/de/it/pt.md`) were rewritten to carry exactly the same facts; the stale `vendor_latest`, `--greedy-auto-updates` and v1.4.0 feature sections in five of them are gone.
+- **One agent contract.** `AGENTS.md` is the single source for agent rules; `CLAUDE.md`, `GEMINI.md` and `CODEX.md` import it and keep only harness-specific notes. The broken reference to the local-only handoff guide was removed.
+- **Development records organized.** `docs/reviews/` is now an index plus the records of the current release line; 43 superseded prompts, reports and reviews moved to `docs/reviews/archive/` (history kept with `git mv`), and implementation plans moved to `docs/archive/plans/`. Machine- and account-specific details (an e-mail address, a hostname, a login name in a LaunchAgent label) were redacted from archived records.
+- **New files and fixes.** Added `SECURITY.md` and a rewritten `CONTRIBUTING.md`; corrected `docs/agents` (duplicate section numbers in `critical_rules.md`, misplaced paragraph in `exit_codes.md`, missing scripts in `scripts.md`), the Claude slash-command notes, `dev_sync/INDEX.md` anchors, and removed a machine-specific package list from a slash command.
+
 ## [1.5.4] — 2026-10-05
 
 ### Fixed

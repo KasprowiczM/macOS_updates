@@ -12,19 +12,30 @@ This repository is owned by the `KasprowiczM` GitHub Free account. Private repos
 - Public-repository standard runners may be free, but the same anti-waste rules still apply.
 
 
-Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–27, 7 languages, v**1.5.4**, multi-cloud private overlay via `dev_sync/`.
+Automated macOS update system — Bash 3.2+ scripts + Python 3 backend, **Apple Silicon (arm64) only**, macOS 13–27, 7 languages, v**1.5.5**, multi-cloud private overlay via `dev_sync/`. Website: https://macosupdates.dev · License: MIT.
+
+This file is the single shared contract for every agent harness (`CLAUDE.md`, `GEMINI.md` and `CODEX.md` import it and add only harness-specific notes).
 
 ## Quick Commands
 
 ```bash
-bash install.sh                         # One-line new-user install
-bash build_inventory.sh                 # Build APPLICATIONS.md from this Mac
-bash update_all.sh                      # Full update (all 7 steps)
+bash install.sh                         # One-line new-user install (see docs/INSTALL.md)
+bash build_inventory.sh                 # Build APPLICATIONS.md from this Mac only
+bash update_all.sh                      # Full update (all 7 steps, 0-6)
+bash update_all.sh --dry-run -y         # Preview without mutations
 bash scripts/report_update_coverage.sh  # Coverage by update method category
-bash dev_sync/dev-sync-import.sh        # Restore private overlay (owners)
-bash run_tests.sh                       # Full test suite
+bash scripts/check_vendor_feeds.sh      # Vendor truth table (read-only)
+bash dev_sync/dev-sync-import.sh        # Restore private overlay (owners only)
+bash run_tests.sh                       # Full test suite (bash -n, py_compile, unittest, secret scan)
 bash -n update_all.sh                   # Syntax check
 ```
+
+## Run logs & diagnostics
+
+- Every `update_all.sh` invocation writes `logs/update_all_<YYYYMMDD_HHMMSS>.log` (gitignored); rotation keeps the last `MAC_UPDATE_MAX_LOGS` files (default 30).
+- On non-zero `OVERALL_EXIT`, the EXIT trap appends every `*.txt` snapshot from the session dir into the run log (capped at 200 lines per snapshot) before wiping the dir.
+- `update_appstore.sh` writes `$MAC_UPDATE_SESSION_DIR/appstore_diag.txt` on Track 1 (`sudo mas upgrade`) failure, on Track 2 (AppleScript) non-success branches and on a final non-empty `mas outdated`; `update_all.sh` picks it up in its failure-path logger.
+- Machine-readable result: `--json-summary`, or `logs/run_summary_*.json` (format 4). Never paste raw logs or machine inventory into tracked files; paraphrase evidence instead.
 
 ## Model Hierarchy
 
@@ -45,8 +56,8 @@ Load only when relevant to your task:
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
 - @docs/agents/acceptance_checklist.md — live acceptance paths for v1.5.x
 - @docs/agents/mcp_setup.md — MCP server absolute path requirement, PATH env fix
-- @docs/agents/handoff.md — how to create handoff files between sessions
 - @docs/agents/security.md — secret handling and deny rules
+- docs/user/INDEX.md — end-user guides (7 languages); docs/reviews/README.md — index of historical review and implementation records (not authoritative, not auto-loaded)
 
 ## Subagents
 
@@ -64,10 +75,11 @@ Load only when relevant to your task:
    session — App Store receipts belong to the user, not to root.
 3. **Bash 3.2 only** — no `declare -A`, `mapfile`, `readarray`.
 4. **No new standalone pipeline entrypoints** — update pipeline Python stays in heredocs or importable pure-function modules under `lib/python/` (which `run_tests.sh` compiles and tests); `dev_sync/` and `scripts/fix_mcp_configs.py` are the existing Python backend/tools.
-5. **No hardcoded paths** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`.
+5. **No hardcoded paths** — use `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"`. Temp files: `mktemp -d "${TMPDIR:-/tmp}/mac_update_*.XXXXXX"` (never bare `/tmp/`).
 6. **All `update_*.sh` orchestrators must `set -o pipefail`** — and must **not** `set -e`; the orchestrator has to run every step even on partial failure.
 7. **A config method name is only valid if a handler exists** — every method in `config/internet_app_methods.txt` needs an `internet_handler_*` / `iu_*` implementation. `tests/test_safety_static.py` enforces this.
 8. **Never call interactive `sudo` without a TTY** — see `docs/agents/critical_rules.md`.
+9. **Never install apps for the user** — handlers update only what is already installed; inventory is built per Mac (`--bootstrap-cli` is the one explicit, opt-in exception for CLIs).
 10. **Every mechanism that hides its own diagnostic input must declare a
    lifetime and a path back to re-evaluation.** A guard whose release
    condition is an observation the guard itself suppresses is a deadlock

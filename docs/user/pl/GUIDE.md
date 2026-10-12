@@ -1,6 +1,6 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.5.4 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.5.5 · **Apple Silicon, macOS 13+**
 
 ## Co robi ten zestaw
 
@@ -9,7 +9,7 @@ macOS Updates koordynuje aktualizacje na **Macach Apple Silicon z macOS 13+** w 
 1. Prescan i inwentarz tego Maca
 2. App Store (`sudo mas upgrade <app-id>` + osobny GUI Track 2 dla aplikacji iPad)
 3. Najpierw istniejące natywne CLI, potem Node/Bun i zapasowe instalacje npm
-4. Homebrew (formuły i caski `--greedy`)
+4. Homebrew (formuły i caski; `--greedy` tylko dla casków zarejestrowanych jako `brew_cask`)
 5. Zainstalowane aplikacje internetowe: bezpośrednie handlery, CLI lub wyzwalanie aktualizatora
 6. Atomowy postupdate inwentarza i historii
 7. macOS (`softwareupdate -i <label> -R`) na końcu; odraczany po blokującym błędzie lub bez autoryzacji

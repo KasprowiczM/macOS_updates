@@ -33,7 +33,33 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 - **GitHub tags:** strip the leading `v` with `sed 's/^v//'` (never `tr -d 'v'`, which deletes every `v`) before comparing with `app_version()`.
 - **iOS/iPadOS apps on Apple Silicon** (UniFi, WiFiman, …): no `Contents/Info` plist — `app_version()` falls back to `mdls -name kMDItemVersion`.
 
-## 5. Cask Adoption & Validation Requirement
+## 5. Internet app update methods
+
+| Method | Apps |
+|--------|------|
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager; direct-first choices in `config/vendor_direct_first.txt` |
+| Mozilla product-details/download + DMG | Firefox Developer Edition |
+| GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
+| Google Keystone | Google Chrome, Google Drive, Gemini |
+| Chromium Updater | Comet (Perplexity AI) |
+| msupdate CLI | Microsoft Word, Microsoft Excel, Microsoft PowerPoint, Microsoft Outlook, Microsoft OneNote |
+| Vendor self-updater + MAU fallback | Microsoft Teams (normally owns its cadence; MAU may recover a failed Teams updater via `TEAMS21`) |
+| Vendor feed + verified DMG (idle only); `docker desktop update` fallback | Docker Desktop v4.37+ |
+| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
+| Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
+| Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
+| App Store GUI Track 2 | UniFi, WiFiman, Picsart |
+| Manual only | IPMIView, DJI Assistant 2 |
+
+These methods are not equivalent proof levels:
+
+- **verified direct** — the script verifies a version/package path or a vendor CLI reports completion.
+- **triggered-unverified** — the app was launched to trigger its built-in updater; completion is not asserted.
+- **externally managed** — the App Store or vendor owns the update lifecycle outside a directly verifiable handler.
+- **manual** — the registry intentionally requires user action.
+- **unknown** — no supported registry method matches the installed app.
+
+## 5a. Cask Adoption & Validation Requirement
 - **Config `brew_cask` requires live adoption:** Setting `brew_cask` in `config/internet_app_methods.txt` requires executing `brew install --cask --adopt <slug>`.
 - **Validation Interlock:** `update_internet_apps.sh` validates `brew_cask` entries against `brew_cask_versions` (`lib/brew.sh`) mapped via `internet_cask_name_for_app`. Never call `brew list --cask --versions` directly — it regressed upstream on 2026-08-19 and silently returned nothing. Missing casks produce `L_INTERNET_STATUS_CASK_MISSING` soft warning.
 
@@ -95,33 +121,26 @@ once. On macOS 14+ `sudo_local` survives OS updates; on macOS 13 the script patc
 `/etc/pam.d/sudo`, which macOS upgrades overwrite, so it must be re-run after a major upgrade.
 Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 
-## 5. Internet app update methods
+## 6e. Long-lived orchestrators enable `shopt -s checkhash`
 
-| Method | Apps |
-|--------|------|
-| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager; direct-first choices in `config/vendor_direct_first.txt` |
-| Mozilla product-details/download + DMG | Firefox Developer Edition |
-| GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
-| Google Keystone | Google Chrome, Google Drive, Gemini |
-| Chromium Updater | Comet (Perplexity AI) |
-| msupdate CLI | Microsoft Word, Microsoft Excel, Microsoft PowerPoint, Microsoft Outlook, Microsoft OneNote |
-| Vendor self-updater + MAU fallback | Microsoft Teams (normally owns its cadence; MAU may recover a failed Teams updater via `TEAMS21`) |
-| Vendor feed + verified DMG (idle only); `docker desktop update` fallback | Docker Desktop v4.37+ |
-| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
-| Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
-| Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
-| App Store GUI Track 2 | UniFi, WiFiman, Picsart |
-| Manual only | IPMIView, DJI Assistant 2 |
+`update_all.sh` and every `update_*.sh` orchestrator (plus `migration_setup.sh`) run
+`shopt -s checkhash` immediately after `set -o pipefail`. bash caches the resolved path of
+every external command; if that file later disappears, bash does **not** re-search `PATH`
+unless `checkhash` is on, and fails with `No such file or directory`.
 
-These methods are not equivalent proof levels:
+Why it matters: on 2026-10-11 a `brew upgrade` of `python@3.14` (Homebrew 7.0.9) removed
+`/opt/homebrew/bin/python3` in step 3. The master process had hashed that path in step 0, so
+step 5 and the run-summary write died, even though `/usr/bin/python3` was still on `PATH`.
+Child scripts were unaffected because each is a fresh process.
 
-- **verified direct** — the script verifies a version/package path or a vendor CLI reports completion.
-- **triggered-unverified** — the app was launched to trigger its built-in updater; completion is not asserted.
-- **externally managed** — the App Store or vendor owns the update lifecycle outside a directly verifiable handler.
-- **manual** — the registry intentionally requires user action.
-- **unknown** — no supported registry method matches the installed app.
+- `update_all.sh` also runs `hash -r` before steps 2–5 (the previous child may have changed
+  what is installed).
+- Do not remove either; `tests/test_safety_static.py::test_orchestrators_enable_checkhash_after_pipefail`
+  and `tests/test_run_log_regressions_20261011.py` enforce it.
+- Any new long-lived top-level script that upgrades toolchains and later calls `python3`,
+  `node` or similar must do the same.
 
-## 6. Downloaded installers
+## 7. Downloaded installers
 - Use random temp paths under `$MAC_UPDATE_SESSION_DIR` or `mktemp`.
 - Run `hdiutil verify` before mounting downloaded DMGs.
 - Mount each DMG at a unique mountpoint inside `$MAC_UPDATE_SESSION_DIR`; never discover an installer by scanning shared `/Volumes` names.
@@ -130,14 +149,14 @@ These methods are not equivalent proof levels:
 - Do not report success after a failed copy/install; return a non-zero exit so `update_all.sh` records a failed step.
 - **Honest status:** a GUI app that is only launched reports `LAUNCHED_UNVERIFIED` (⏳), not success; a failed launch reports `LAUNCH_FAILED` (⚠️) and fails the step. Only a confirmed version change reports `UPDATED`/`CURRENT`.
 
-## 7. Private state and imports
+## 8. Private state and imports
 
 - Write `APPLICATIONS.md`, `UPDATES.md`, provider config and logs through a same-directory temporary file, flush/fsync where implemented, then `os.replace()`.
 - Private config is mode `0600`; log/config directories are private to the user.
 - Cloud imports stage only allowlisted, safe relative paths. Commit the staged set transactionally and roll back already replaced targets if any later file fails.
 - Rclone listing/copy failures are fatal; never turn an incomplete remote listing into a successful empty import.
 
-## 8. APPLICATIONS.md structure
+## 8a. APPLICATIONS.md structure
 - GRUPA 1: Apple system apps
 - GRUPA 2: App Store (mas IDs)
 - GRUPA 3: Internet apps
@@ -221,6 +240,8 @@ not success.
   - `10`: Soft / degraded result (e.g. offline check, unverified launch, missing remote feed). Surfaces as warnings in banners, logs, and `UPDATES.md`.
   - `1` / `127`: Hard failure (e.g. broken installation, corrupt download, failed bundle swap).
 - `update_all.sh` tracks `BLOCKING_EXIT` separately from `OVERALL_EXIT`. Only hard failures defer the final `softwareupdate -i <label> -R` step. Soft warnings never suppress macOS system updates.
+- **Step 5 (inventory/postupdate) is a reporting step.** A failure sets `RESULT_MD` to error, `STATUS_CODE_MD="error"` and `OVERALL_EXIT=1` (the run is not clean and exits non-zero) but **never** `BLOCKING_EXIT`: it mutates nothing, so deferring macOS security updates over it is the 2026-07-26-style regression (it recurred on 2026-10-11 when a vanished `python3` failed step 5 and the OS update was skipped with a false "machine may be mid-transaction" message). The closing "Files updated" line is printed only when `STATUS_CODE_MD=ok`.
+- Soft-result wording stays honest: master messages say "reported warnings (soft)"; `update_internet_apps.sh` prints the generic "not verified or updated" line only for a real unverified/behind/restart-pending/error-class cause, and `L_INTERNET_WARNINGS_ONLY` when the only soft causes are `feed_stale` and/or a toolkit-launched app that did not quit (exit stays `10`).
 
 ## 14. macOS 27 Golden Gate Constraints and Ecosystem Rules
 

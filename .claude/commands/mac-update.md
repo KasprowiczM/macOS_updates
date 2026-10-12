@@ -1,5 +1,5 @@
 ---
-description: Run full MacBook update — prescan, macOS, App Store, npm CLI, Homebrew, internet apps, postupdate
+description: Run full MacBook update — prescan, App Store, native CLI + npm, Homebrew, internet apps, postupdate, macOS last
 ---
 
 Run the full MacBook update sequence:
@@ -18,7 +18,7 @@ Steps (see VERSION):
 6. macOS system (`softwareupdate -i <label> -R`)
 
 Before running, remind the user:
-- ≥ 10 GB free disk space
+- ≥ 20 GB free disk space recommended (large macOS updates)
 - Stable Wi‑Fi
 - Battery ≥ 50% or plugged in
 - Time Machine backup recommended

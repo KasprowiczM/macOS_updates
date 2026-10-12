@@ -10,14 +10,14 @@ This directory (`dev_sync/`) contains the complete private-overlay sync system. 
 3. Then see [README.md](README.md) for full documentation
 
 ### For Developers
-1. Architecture: See [README.md](README.md#architecture)
+1. Architecture: See [README.md](README.md#what-gets-synced)
 2. Core code: [dev_sync_core.py](dev_sync_core.py)
-3. Operator guide: [../DEV_SCRIPTS_README.md](../DEV_SCRIPTS_README.md)
+3. Import safety: [overlay_import.py](overlay_import.py) — overlay import planner (directory manifests, Git-tracked and excluded paths skipped, symlink escapes refused)
 
 ### Reference Materials
-- Configuration details: [README.md](README.md#configuration-file)
-- Troubleshooting: [README.md](README.md#troubleshooting)
-- Command reference: [README.md](README.md#commands-reference)
+- Configuration details: [README.md](README.md#configuration)
+- Logs and recovery: [README.md](README.md#logs)
+- Command reference: [README.md](README.md#commands)
 
 ## Files in This Directory
 
@@ -31,18 +31,20 @@ This directory (`dev_sync/`) contains the complete private-overlay sync system. 
 
 ### Core Implementation
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| [dev_sync_core.py](dev_sync_core.py) | 680 | Main logic: providers, config, sync operations |
-| [dev_sync_export.py](dev_sync_export.py) | 40 | CLI for exporting files to cloud |
-| [dev_sync_import.py](dev_sync_import.py) | 40 | CLI for importing files from cloud |
-| [dev_sync_verify_full.py](dev_sync_verify_full.py) | 140 | CLI for full verification |
-| [dev_sync_verify_git.py](dev_sync_verify_git.py) | 40 | CLI for git state verification |
-| [dev_sync_prune_excluded.py](dev_sync_prune_excluded.py) | - | Plan/quarantine stale or generated provider files |
-| [dev_sync_purge_quarantine.py](dev_sync_purge_quarantine.py) | - | Permanently delete reviewed quarantine |
-| [dev_sync_proton_status.py](dev_sync_proton_status.py) | - | Check Proton File Provider upload/offload readiness |
-| [provider_setup.sh](provider_setup.sh) | 420 | Interactive setup wizard (bash 3.2+) |
-| [__init__.py](__init__.py) | 2 | Python package marker |
+| File | Purpose |
+|------|---------|
+| [dev_sync_core.py](dev_sync_core.py) | Main logic: providers, config, classification, transfer, manifest and verification |
+| [overlay_import.py](overlay_import.py) | Import planner: expands directory manifests, skips Git-tracked and excluded paths, refuses symlink escapes |
+| [dev_sync_export.py](dev_sync_export.py) | CLI for exporting files to cloud |
+| [dev_sync_import.py](dev_sync_import.py) | CLI for importing files from cloud |
+| [dev_sync_verify_full.py](dev_sync_verify_full.py) | CLI for full verification |
+| [dev_sync_verify_git.py](dev_sync_verify_git.py) | CLI for git state verification |
+| [dev_sync_prune_excluded.py](dev_sync_prune_excluded.py) | Plan/quarantine stale or generated provider files |
+| [dev_sync_purge_quarantine.py](dev_sync_purge_quarantine.py) | Permanently delete reviewed quarantine |
+| [dev_sync_proton_status.py](dev_sync_proton_status.py) | Check Proton File Provider upload/offload readiness |
+| [provider_setup.sh](provider_setup.sh) | Interactive setup wizard (Bash 3.2+) |
+| `dev-sync-*.sh` | Thin shell wrappers around the Python CLIs (root-level copies call these) |
+| [__init__.py](__init__.py) | Python package marker |
 
 ## Usage Commands
 
@@ -109,7 +111,7 @@ All operations create timestamped logs:
 
 Example:
 ```bash
-cat dev_sync_logs/export_20260331_124530.log
+cat dev_sync_logs/export_<timestamp>.log
 ```
 
 ## Architecture Overview
@@ -225,11 +227,11 @@ The system automatically migrates to the new schema.
 | rsync not found | Install: `brew install rsync` |
 | rclone not found | Install: `brew install rclone` |
 
-See [README.md](README.md#troubleshooting) for more details.
+See [README.md](README.md#logs) and [README.md](README.md#cleanup-and-quarantine) for more details.
 
 ## Adding Custom Providers
 
-See [README.md](README.md#development) — Development section for how to:
+The provider classes live in [dev_sync_core.py](dev_sync_core.py). To add a provider:
 1. Subclass `CloudProvider`
 2. Implement required methods
 3. Register in factory function
@@ -239,16 +241,13 @@ See [README.md](README.md#development) — Development section for how to:
 
 1. **Quick start**: [QUICK_START.md](QUICK_START.md)
 2. **Full guide**: [README.md](README.md)
-3. **Operator guide**: [../DEV_SCRIPTS_README.md](../DEV_SCRIPTS_README.md)
+3. **Command reference**: [README.md](README.md#commands)
 4. **Command help**: `bash dev_sync/dev-sync-export.sh --help`
 
-## File Statistics
+## Dependencies
 
-- Total lines of code: ~1,500
-- Python files: 5 (680 lines core logic)
-- Bash scripts: 1 (420 lines, bash 3.2+ compatible)
-- Documentation: 3 files (~25 KB)
-- No external dependencies (uses standard Python library + rsync/rclone)
+- No external Python dependencies (standard library only); transfers use `rsync` or `rclone` depending on the provider
+- Bash 3.2+ compatible shell scripts
 
 ## Release Notes
 
