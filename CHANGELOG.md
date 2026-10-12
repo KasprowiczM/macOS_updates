@@ -6,6 +6,10 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Website link.** The project site link in all seven READMEs, `CONTRIBUTING.md`, `AGENTS.md`, `docs/INSTALL.md` and `docs/user/INDEX.md` now points to the live domain `https://macos-updates.64bit.site`; `macosupdates.dev` was never registered.
+
 ## [1.5.5] — 2026-10-12
 
 ### Fixed
