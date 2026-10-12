@@ -9,7 +9,7 @@ macOS Updates orchestriert Updates auf **Apple-Silicon-Macs mit macOS 13+**:
 1. Vorab-Scan und Inventar
 2. App Store (`sudo mas upgrade <app-id>` + separater GUI Track 2)
 3. Bestehende native CLIs zuerst, danach Node/Bun und npm-Fallbacks
-4. Homebrew (`--greedy`)
+4. Homebrew (greedy nur für als `brew_cask` registrierte Casks)
 5. Installierte Internet-Apps: direkte Handler, CLIs oder Update-Auslöser
 6. Atomarer Post-Update-Verlauf
 7. macOS (`softwareupdate -i <label> -R`) zuletzt; bei blockierenden Fehlern oder fehlender Autorisierung verschoben

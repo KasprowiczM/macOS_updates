@@ -4,7 +4,7 @@
 **Wersja:** `1.5.0`  
 **Data wykonania:** 2026-09-24  
 **Wykonawca:** Gemini 3.8 Flash (Antigravity)  
-**Weryfikator / Specyfikacja:** Opus 5.5 (`docs/reviews/gemini_3.8_flash_opus55_fix_prompt_v2.md`)
+**Weryfikator / Specyfikacja:** Opus 5.5 (`docs/reviews/archive/gemini_3.8_flash_opus55_fix_prompt_v2.md`)
 
 ---
 
@@ -255,7 +255,7 @@ Zgodnie z bezwzględną zasadą read-only na żywym środowisku:
 - **G0 (BLOKADA — Prywatność):**
   - Zredagowano raporty `IMPLEMENTATION_REPORT_opus55_v1.md` oraz `FIX_REPORT_opus55_v2.md` — usunięto surowe diffy inwentarza `APPLICATIONS.md` i zastąpiono je listami kryteriów akceptacji. Pełne diffy zachowano wyłącznie w katalogu `scratch/` (ignorowanym przez git).
   - Przepisano lokalną historię gałęzi `feat/vendor-truth-v1.5` (`main..HEAD`) za pomocą `git filter-branch` (kopia zapasowa w `backup/vendor-truth-v1.5-pre-redact`), eliminując z historii commitów wszelkie prywatne ścieżki i fragmenty inwentarza.
-  - Zsanityzowano ścieżki domowe (`/Users/<nazwa>/` -> `~/`) w plikach dokumentacji: `docs/reviews/GEMINI_TASK_2026-09-02.md`, `docs/reviews/ULTRA_REVIEW_2026-06-20.md`, `docs/reviews/ULTRA_REVIEW_2026-08-05.md`, `docs/superpowers/plans/2026-09-03-v144-observability-claude-hang.md` oraz `docs/agents/critical_rules.md`.
+  - Zsanityzowano ścieżki domowe (`/Users/<nazwa>/` -> `~/`) w plikach dokumentacji: `docs/reviews/archive/GEMINI_TASK_2026-09-02.md`, `docs/reviews/archive/ULTRA_REVIEW_2026-06-20.md`, `docs/reviews/archive/ULTRA_REVIEW_2026-08-05.md`, `docs/archive/plans/2026-09-03-v144-observability-claude-hang.md` oraz `docs/agents/critical_rules.md`.
   - Wdrożono test-strażnik `test_tracked_files_have_no_personal_home_paths` w `tests/test_safety_static.py` z allowlistą nazw syntetycznych (`USER`, `test`, `testuser`, `fake`, `runner_user`, `Shared`).
   - Dodano regułę ochrony prywatności do `docs/agents/critical_rules.md` oraz `docs/agents/handoff.md`.
 

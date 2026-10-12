@@ -4,17 +4,21 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
+**Website:** [macosupdates.dev](https://macosupdates.dev) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
+
 > **v1.5.5** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
-**v1.5.5:** A Homebrew upgrade that removes `python3` mid-run no longer breaks the inventory/report step (the shell now re-searches `PATH`), and a failed reporting step no longer postpones macOS updates. Final messages are honest: no "files updated" claim after a failure, and stale-feed or quit-timeout warnings are no longer reported as unverified updates. Toolkit-launched apps are asked to quit repeatedly (never force-killed).
+| At a glance | |
+|-------------|--|
+| Platform | Apple Silicon (arm64) only · macOS 13 Ventura to macOS 27 · Bash 3.2 + Python 3 |
+| Pipeline | 7 steps (0–6), macOS system update always last |
+| Registry | 43 internet apps · 11 update methods (see [Update methods](#update-methods)) |
+| Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
+| Tests | 561 automated tests (`bash run_tests.sh`) |
 
-**v1.5.4:** Stale manufacturer feeds are shown as separate warnings, without a pending downgrade target or a claim that an updater launched. Actual unconfirmed operations remain visible. The latest user-run verification completed in 108 seconds with no observed app updates; this is not an installation benchmark.
+**New in v1.5.5:** A Homebrew upgrade that removes `python3` mid-run no longer breaks the inventory/report step (the shell now re-searches `PATH`), and a failed reporting step no longer postpones macOS updates. Final messages are honest: no "files updated" claim after a failure, and stale-feed or quit-timeout warnings are no longer reported as unverified updates. Apps launched by the toolkit are asked to quit repeatedly (never force-killed). Earlier 1.5.x releases (stale manufacturer feeds as warnings, ChatGPT/Proton vendor downloads, native-CLI-first ordering, bundle-swap protection) are described in [CHANGELOG.md](CHANGELOG.md).
 
-**v1.5.3:** ChatGPT uses verified vendor downloads before GUI launch; known current or stale vendor feeds do not trigger a launch-and-wait cycle. Proton release JSON is supported, but an older manufacturer feed remains an explicit warning. Native CLI updates run before Node/npm work; redundant npm copies are removed only after validating a supported native installation. Running applications are protected at the bundle swap, and system updates without authorization are deferred with a warning.
-
-**Vendor truth (v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. **Apps you have open are never closed — the toolkit only quits what it launched itself.** Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
-
-**Public repo:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · Going public: [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · Changes: [CHANGELOG.md](CHANGELOG.md)
+**Vendor truth (since v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. **Apps you have open are never closed — the toolkit only quits what it launched itself.** Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
 
 ---
 
@@ -27,6 +31,120 @@
 The installer clones the repo, prompts for **language** (English menu, 7 locales), installs dependencies, builds **your** `APPLICATIONS.md` from apps already on this Mac, and prints which apps the project can update. It never imports another user's inventory or installs apps for you.
 
 See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
+
+---
+
+## What this does
+
+`update_all.sh` runs seven steps:
+
+| Step | Action |
+|------|--------|
+| 0 | **Prescan** — discover installed apps → update `APPLICATIONS.md` |
+| 1 | **App Store** — Track 1: `sudo mas upgrade <app-id>`; Track 2: AppleScript GUI for iPad apps |
+| 2 | **Native CLI + npm** — existing native CLIs first, then Node, Bun and global npm CLIs |
+| 3 | **Homebrew** — formulae and casks (`brew_cask` + downgrade protection) + cleanup and health check |
+| 4 | **Internet apps** — verified direct handlers, `sparkle_appcast`, vendor CLIs and honest update triggers |
+| 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
+| 6 | **macOS (final)** — per-label `softwareupdate -i <label> -R` (restart-required labels in the final batch); deferred after a blocking hard failure in steps 1–4 or when authorization is unavailable |
+
+**Important:** Updates only touch software already installed on your Mac. Supported-but-missing apps are reported, not installed. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Step 5 is reporting-only: a failure there is an error but never defers the macOS step. Unknown installed apps are listed so you (or an AI agent) can add handlers.
+
+Coverage is deliberately explicit: **verified direct** means the updater confirmed the package/version path; **triggered-unverified** means an app was launched to let its vendor updater run but completion cannot be proven; **externally managed** means the vendor or App Store owns the update lifecycle; **manual** requires user action; **unknown** has no registered method.
+
+```bash
+bash scripts/report_update_coverage.sh   # coverage report
+bash build_inventory.sh                  # rebuild APPLICATIONS.md from this Mac
+```
+
+### Update methods
+
+The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) maps 43 apps to 11 methods:
+
+| Method | Apps | Coverage | How it updates |
+|--------|-----:|----------|----------------|
+| `brew_cask` | 11 | externally managed | Homebrew cask (greedy only for these tokens) with downgrade protection, e.g. Brave, Obsidian, Spotify, Inkscape |
+| `silent_launch` | 9 | triggered-unverified | The app's own updater; opportunistic check against a Sparkle / electron-updater feed, otherwise reported as "launched (unverified)". Never replaces the app itself |
+| `github_dmg` | 6 | verified direct | Vendor/GitHub release DMG with signature and Team ID verification, staged swap and rollback (Firefox Developer Edition, KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
+| `msupdate` | 5 | verified direct | Microsoft AutoUpdate (`msupdate`) for Word, Excel, PowerPoint, Outlook, OneNote |
+| `keystone` | 3 | verified direct | Google updater (Omaha), checked against its update history: Chrome, Gemini, Google Drive |
+| `appstore_gui` | 3 | externally managed | App Store Track 2 (AppleScript) for UniFi, WiFiman, Picsart |
+| `sparkle_appcast` | 1 | verified direct | Sparkle appcast (Proton Drive) |
+| `chromium_updater` | 1 | verified direct | Chromium-based updater proof (Comet) |
+| `docker_cli` | 1 | verified direct | Docker Desktop: verified DMG from its appcast when idle; fallback `docker desktop update` |
+| `mau_fallback_self_update` | 1 | triggered-unverified | Teams self-updater plus an observed, verified `TEAMS21` MAU fallback when Microsoft offers it |
+| `manual` | 2 | manual | IPMIView and DJI Assistant 2 — notification only |
+
+---
+
+## Command-line flags
+
+`lib/cli.sh` is the authoritative list; `bash update_all.sh --help` prints it.
+
+| Flag | Effect |
+|------|--------|
+| `-y`, `--yes` | Skip the confirmation prompt |
+| `-h`, `--help` | Show usage and exit `0` |
+| `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
+| `--verify-only` | Verify installed app versions against history without mutating |
+| `--json-summary` | Print a JSON result object on stdout after the run |
+| `--bootstrap-cli` | Explicitly install missing CLI tools (by default only installed CLIs are updated) |
+| `--non-interactive` | Non-interactive mode for launchd / cron (also implies `-y`) |
+| `--notify` | Post a macOS notification when the run finishes |
+| `--treat-appstore-ax-as-warning` | Treat App Store exit `2` (missing Accessibility) as a warning |
+| `--skip-prescan` | Skip step 0 (`APPLICATIONS.md` prescan) |
+| `--skip-appstore` | Skip step 1 (App Store) |
+| `--skip-npm` | Skip step 2 (native CLI + npm) |
+| `--skip-brew` | Skip step 3 (Homebrew) |
+| `--skip-internet` | Skip step 4 (internet apps) |
+| `--skip-postupdate` | Skip step 5 (`APPLICATIONS.md` / `UPDATES.md` history) |
+| `--skip-system` | Skip step 6 (macOS system update) |
+| `--skip-doctor` | Skip `brew doctor` inside `update_brew.sh` |
+
+An unknown `-…` option exits `2` after printing usage.
+
+## Environment variables
+
+Every flag has an equivalent variable (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_SKIP_SYSTEM=1`, …); these are the commonly used ones with no flag. The complete list with defaults is in [docs/agents/scripts.md](docs/agents/scripts.md#environment-variables).
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `MAC_UPDATE_NONINTERACTIVE` | `0` | Never prompt; skips App Store Track 2 GUI automation |
+| `MAC_UPDATE_NOTIFY` | `0` | Desktop notification on completion (also implied by non-interactive) |
+| `MAC_UPDATE_NO_SUDO` | *set automatically* | Exported by `update_all.sh` when there is no TTY; child scripts then skip root-only tracks instead of failing |
+| `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | Set to `1` to disable the background `sudo` timestamp refresher |
+| `MAC_UPDATE_STALE_DAYS` | `45` | Days after which an unverified app is reported as stale |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Run logs retained in `logs/` |
+| `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `15` | Pause that lets a launched vendor updater rewrite `Info.plist` (`0` disables, clamped to 120; skipped when no app was launched) |
+| `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; never force-killed (v1.5.5) |
+| `MAC_UPDATE_QUIT_RESEND` | `10` | Seconds (1–60) between repeated graceful `quit` requests inside the wait window (v1.5.5) |
+| `MAC_UPDATE_MAS_CHECK_TIMEOUT` | `120` | Timeout for `mas outdated` |
+| `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` | `1800` | Timeout for `sudo mas upgrade` |
+| `MAC_UPDATE_MAU_DEFERRAL_DAYS` | `7` | Microsoft AutoUpdate quarantine window (clamped to Microsoft's 1–28) |
+| `MAC_UPDATE_MAU_CLEAR_DEFERRALS` | `0` | Set to `1` to remove blocking MAU deferral keys via `defaults delete` |
+| `MAC_UPDATE_MAU_KEEP_DEFERRALS` | `0` | Set to `1` to make the toolkit never touch MAU deferral preferences |
+| `MAC_UPDATE_LANG` / `MAC_LANG` | from `.mac_update_prefs` | UI language (`en pl es it pt de fr`) |
+
+## sudo and Touch ID — the contract
+
+Rewritten in v1.3.1 / v1.4.0. `update_all.sh` has **exactly one** interactive `sudo` call
+site, and it is governed by three conditions:
+
+1. **At most once per run.** A single `sudo -v` before the log redirect, then a
+   background keep-alive refreshes the timestamp every 50 s so a long run never
+   prompts a second time. The keep-alive is started at most once and is killed by
+   the cleanup trap on every exit path, including `INT`/`TERM` — it can no longer
+   be orphaned.
+2. **Never without a controlling TTY.** If stdin is not a terminal — IDE task
+   runner, agent shell, launchd, cron — the toolkit does **not** call `sudo -v`.
+   A bare `sudo -v` there escalates to the GUI askpass/Touch ID dialog, which is
+   what made every command appear to demand elevation. Instead
+   `MAC_UPDATE_NO_SUDO=1` is exported, root-only steps are skipped, and the run
+   reports a soft warning.
+3. **Never during `--dry-run`.** A preview must not ask for credentials.
+
+`sudo` is also not requested at all when neither step 1 (App Store) nor step 6
+(macOS) is going to run, e.g. `bash update_all.sh --skip-appstore --skip-system`.
 
 ---
 
@@ -73,111 +191,19 @@ when you want App Store and macOS updates applied.
 
 ---
 
-## Command-line flags
-
-`lib/cli.sh` is the authoritative list; `bash update_all.sh --help` prints it.
-
-| Flag | Effect |
-|------|--------|
-| `-y`, `--yes` | Skip the confirmation prompt |
-| `-h`, `--help` | Show usage and exit `0` |
-| `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
-| `--verify-only` | Verify installed app versions against history without mutating |
-| `--json-summary` | Print a JSON result object on stdout after the run |
-| `--bootstrap-cli` | Explicitly install missing CLI tools (by default only installed CLIs are updated) |
-| `--non-interactive` | Non-interactive mode for launchd / cron (also implies `-y`) |
-| `--notify` | Post a macOS notification when the run finishes |
-| `--treat-appstore-ax-as-warning` | Treat App Store exit `2` (missing Accessibility) as a warning |
-| `--skip-prescan` | Skip step 0 (`APPLICATIONS.md` prescan) |
-| `--skip-appstore` | Skip step 1 (App Store) |
-| `--skip-npm` | Skip step 2 (native CLI + npm) |
-| `--skip-brew` | Skip step 3 (Homebrew) |
-| `--skip-internet` | Skip step 4 (internet apps) |
-| `--skip-postupdate` | Skip step 5 (`APPLICATIONS.md` / `UPDATES.md` history) |
-| `--skip-system` | Skip step 6 (macOS system update) |
-| `--skip-doctor` | Skip `brew doctor` inside `update_brew.sh` |
-
-An unknown `-…` option exits `2` after printing usage.
-
-## Environment variables
-
-Every flag has an equivalent variable; these are the ones with no flag.
-
-| Variable | Default | Meaning |
-|----------|---------|---------|
-| `MAC_UPDATE_NONINTERACTIVE` | `0` | Never prompt; skips App Store Track 2 GUI automation |
-| `MAC_UPDATE_NOTIFY` | `0` | Desktop notification on completion (also implied by non-interactive) |
-| `MAC_UPDATE_NO_SUDO` | *set automatically* | Exported by `update_all.sh` when there is no TTY; child scripts then skip root-only tracks instead of failing |
-| `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | Set to `1` to disable the background `sudo` timestamp refresher |
-| `MAC_UPDATE_STALE_DAYS` | `45` | Days after which an unverified app is reported as stale |
-| `MAC_UPDATE_MAX_LOGS` | `30` | Run logs retained in `logs/` |
-| `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `10` | Pause that lets a launched vendor updater rewrite `Info.plist` (`0` disables, clamped to 120) |
-| `MAC_UPDATE_MAS_CHECK_TIMEOUT` | `120` | Timeout for `mas outdated` |
-| `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` | `1800` | Timeout for `sudo mas upgrade` |
-| `MAC_UPDATE_MAU_DEFERRAL_DAYS` | `7` | Microsoft AutoUpdate quarantine window (clamped to Microsoft's 1–28) |
-| `MAC_UPDATE_MAU_CLEAR_DEFERRALS` | `0` | Set to `1` to remove blocking MAU deferral keys via `defaults delete` |
-| `MAC_UPDATE_MAU_KEEP_DEFERRALS` | `0` | Set to `1` to make the toolkit never touch MAU deferral preferences |
-| `MAC_UPDATE_LANG` / `MAC_LANG` | from `.mac_update_prefs` | UI language (`en pl es it pt de fr`) |
-
-## sudo and Touch ID — the contract
-
-Rewritten in v1.3.1 / v1.4.0. `update_all.sh` has **exactly one** interactive `sudo` call
-site, and it is governed by three conditions:
-
-1. **At most once per run.** A single `sudo -v` before the log redirect, then a
-   background keep-alive refreshes the timestamp every 50 s so a long run never
-   prompts a second time. The keep-alive is started at most once and is killed by
-   the cleanup trap on every exit path, including `INT`/`TERM` — it can no longer
-   be orphaned.
-2. **Never without a controlling TTY.** If stdin is not a terminal — IDE task
-   runner, agent shell, launchd, cron — the toolkit does **not** call `sudo -v`.
-   A bare `sudo -v` there escalates to the GUI askpass/Touch ID dialog, which is
-   what made every command appear to demand elevation. Instead
-   `MAC_UPDATE_NO_SUDO=1` is exported, root-only steps are skipped, and the run
-   reports a soft warning.
-3. **Never during `--dry-run`.** A preview must not ask for credentials.
-
-`sudo` is also not requested at all when neither step 1 (App Store) nor step 6
-(macOS) is going to run, e.g. `bash update_all.sh --skip-appstore --skip-system`.
-
----
-
-## What this does
-
-`update_all.sh` runs seven steps:
-
-| Step | Action |
-|------|--------|
-| 0 | **Prescan** — discover installed apps → update `APPLICATIONS.md` |
-| 1 | **App Store** — Track 1: `sudo mas upgrade`; Track 2: AppleScript GUI for iPad apps |
-| 2 | **Native CLI + npm** — Node, Bun, global npm CLIs |
-| 3 | **Homebrew** — formulae and casks (`brew_cask` + downgrade protection) + cleanup and health check |
-| 4 | **Internet apps** — verified direct handlers, `sparkle_appcast`, vendor CLIs and honest update triggers |
-| 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
-| 6 | **macOS (final)** — per-label `softwareupdate -i <label> -R` (restart-required in final batch); skipped when any earlier step failed |
-
-**Important:** Updates only touch software already installed on your Mac. Supported-but-missing apps are reported, not installed. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Unknown installed apps are listed so you (or an AI agent) can add handlers.
-
-Coverage is deliberately explicit: **verified direct** means the updater confirmed the package/version path; **triggered-unverified** means an app was launched to let its vendor updater run but completion cannot be proven; **externally managed** means the vendor or App Store owns the update lifecycle; **manual** requires user action; **unknown** has no registered method. Today Inkscape is a Homebrew cask, UniFi/WiFiman/Picsart use App Store Track 2, Microsoft Office uses `msupdate`, and Teams uses its self-updater with an observed, verified `TEAMS21` MAU fallback when Microsoft offers it. Only IPMIView and DJI Assistant 2 remain manual.
-
-```bash
-bash scripts/report_update_coverage.sh   # coverage report
-bash build_inventory.sh                  # rebuild APPLICATIONS.md from this Mac
-```
-
----
-
 ## Requirements
 
 | Tool | Auto-installed? |
 |------|----------------|
 | Apple Silicon (arm64) Mac | — |
-| macOS 13 Ventura or later | — |
+| macOS 13 Ventura or later (tested through macOS 27) | — |
 | Xcode Command Line Tools | ✅ `setup.sh` / `install.sh` |
 | Homebrew | ✅ |
 | `mas` (App Store CLI) | ✅ |
 | Python 3 | ✅ via Homebrew if missing |
 | `rclone` (optional) | ✅ if chosen as cloud provider |
+
+Intel Macs and macOS 12 or older are not supported; the scripts exit before any change.
 
 ---
 
@@ -213,7 +239,7 @@ bash update_all.sh
 
 ```
 macOS_updates/
-├── VERSION                     # Package version (see VERSION)
+├── VERSION                     # Package version (single source of truth)
 ├── install.sh                  # One-line installer entrypoint
 ├── uninstall.sh                # Remove clone (keeps Homebrew/apps)
 ├── setup.sh                    # First-run setup (no cloud)
@@ -221,6 +247,7 @@ macOS_updates/
 ├── build_inventory.sh          # Build APPLICATIONS.md from this Mac
 ├── update_all.sh               # Master orchestrator
 ├── update_*.sh                 # Individual update steps
+├── run_tests.sh                # Syntax + Python + unittest + secret scan
 │
 ├── dev_sync/                   # Private overlay sync (cloud)
 │   ├── provider_setup.sh
@@ -233,25 +260,25 @@ macOS_updates/
 │   ├── internet_app_methods.txt
 │   └── internet_dispatch_order.txt
 │
-├── lib/                        # Shared Bash libraries
+├── lib/                        # Shared Bash libraries (+ lib/python/ pure helpers)
 ├── i18n/                       # 7-language UI strings
-├── scripts/                    # Utilities (coverage report, scaffold, …)
+├── scripts/                    # Utilities (coverage report, vendor feeds, scaffold, …)
 ├── templates/                  # APPLICATIONS.md.template (reference)
 ├── tests/                      # unittest + static safety checks
 ├── docs/
-│   ├── INSTALL.md · UNINSTALL.md
+│   ├── INSTALL.md · UNINSTALL.md · PUBLIC_RELEASE.md
 │   ├── user/                   # End-user guides (7 languages)
-│   └── agents/                 # Developer / AI agent reference
+│   ├── agents/                 # Developer / AI agent reference
+│   ├── reviews/                # Index + current development records (archive/ = history)
+│   └── archive/                # Superseded implementation plans
 │
-├── CLAUDE.md · AGENTS.md · GEMINI.md · CODEX.md
-└── run_tests.sh
+├── CHANGELOG.md · CONTRIBUTING.md · SECURITY.md · LICENSE
+└── AGENTS.md · CLAUDE.md · GEMINI.md · CODEX.md
 ```
 
-**Private files (gitignored, cloud or local only):** `APPLICATIONS.md`, `UPDATES.md`, `.dev_sync_config.json`, `.mac_update_prefs`, `.env`
+**Private files (gitignored, cloud or local only):** `APPLICATIONS.md`, `UPDATES.md`, `.dev_sync_config.json`, `.mac_update_prefs`, `.env`, `logs/`
 
----
-
-## Individual scripts
+### Individual scripts
 
 | Script | Purpose |
 |--------|---------|
@@ -263,6 +290,8 @@ macOS_updates/
 | `update_system.sh` … `update_brew.sh` | Single-layer updates |
 | `uninstall.sh` | Remove toolkit directory |
 | `run_tests.sh` | Syntax + Python + unittest + secret scan |
+
+Full script reference: [docs/agents/scripts.md](docs/agents/scripts.md).
 
 ---
 
@@ -300,7 +329,7 @@ Root `dev-sync-*.sh` wrappers call the same scripts in `dev_sync/`.
 
 ## Test
 
-The test suite covers bash syntax, Python compilation, static safety contracts, and unit tests (480 automated tests).
+The test suite covers bash syntax, Python compilation, static safety contracts, documentation guards and unit tests (561 automated tests).
 Pull requests run Ubuntu ShellCheck, portable Python tests, and the secret scan.
 The full `run_tests.sh` suite on a macOS runner runs only on `workflow_dispatch` or a `v*` tag — not on every push.
 
@@ -314,7 +343,7 @@ bash update_all.sh --dry-run -y
 ## Critical technical notes
 
 - **`softwareupdate` must use `-R`** — otherwise updates download but never apply.
-- **`mas upgrade` must use `sudo`** on macOS 14.8.2+/15.7.2+/26.x (entitlement change, see https://github.com/orgs/Homebrew/discussions/6550).
+- **`mas upgrade` must use `sudo` and explicit app IDs** on macOS 14.8.2+/15.7.2+/26.1+ (entitlement change, see https://github.com/orgs/Homebrew/discussions/6550).
 - **Bash 3.2+** throughout — no `declare -A`, `mapfile`, `readarray`.
 - Downloaded app bundles are verified, installed through a rollback-safe staged swap, and mounted at unique per-session DMG mountpoints.
 - Private inventory/history writes and cloud imports use atomic replacement; imports stage accepted private files before committing them.
@@ -325,11 +354,13 @@ bash update_all.sh --dry-run -y
 
 | Audience | Start here |
 |----------|------------|
-| Users | [docs/user/en/QUICK_START.md](docs/user/en/QUICK_START.md) |
+| Users | [docs/user/INDEX.md](docs/user/INDEX.md) (quick start, guide and operations runbook in 7 languages) · [English quick start](docs/user/en/QUICK_START.md) |
 | Install / uninstall | [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md) |
-| Developers / agents | [docs/agents/scripts.md](docs/agents/scripts.md) |
-| Dev sync | [dev_sync/README.md](dev_sync/README.md) |
-| AI context | `CLAUDE.md`, `AGENTS.md` |
+| Public GitHub vs private overlay | [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · [dev_sync/README.md](dev_sync/README.md) |
+| Developers / agents | [docs/agents/scripts.md](docs/agents/scripts.md) · [critical rules](docs/agents/critical_rules.md) · [exit codes](docs/agents/exit_codes.md) · [troubleshooting](docs/agents/troubleshooting.md) · [acceptance checklist](docs/agents/acceptance_checklist.md) |
+| AI agent context | [AGENTS.md](AGENTS.md) (shared contract) · [CLAUDE.md](CLAUDE.md) · [GEMINI.md](GEMINI.md) · [CODEX.md](CODEX.md) |
+| Release history | [CHANGELOG.md](CHANGELOG.md) · [development records index](docs/reviews/README.md) |
+| Contributing / security | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) |
 
 ---
 
@@ -341,7 +372,13 @@ bash update_all.sh --dry-run -y
 | Wrong app list | `build_inventory.sh` — never copy another user's `APPLICATIONS.md` |
 | App not auto-updating | `scripts/report_update_coverage.sh` → add handler per GUIDE |
 | Missing `APPLICATIONS.md` | `build_inventory.sh` or `dev_sync/dev-sync-import.sh` (owner) |
-| `mas upgrade` fails | `sudo mas upgrade` |
+| `mas upgrade` fails | `sudo mas upgrade <app-id>` |
 | Cloud not configured | `bash dev_sync/provider_setup.sh` |
 
 Full list: [docs/agents/troubleshooting.md](docs/agents/troubleshooting.md)
+
+---
+
+## License
+
+[MIT](LICENSE) © macOS Updates contributors

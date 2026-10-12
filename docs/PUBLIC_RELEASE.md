@@ -16,7 +16,8 @@ This repository is designed for **public GitHub** plus an optional **private ove
 | `i18n/` | 7 language packs (English is source of truth) |
 | `templates/APPLICATIONS.md.template` | Reference structure (not a user catalog) |
 | `tests/`, `run_tests.sh`, `.github/workflows/` | CI (unit/static tests + shellcheck + gitleaks) |
-| `docs/` | User and developer documentation |
+| `docs/` | User and developer documentation; `docs/reviews/` holds the development-record index and archive |
+| `README*.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE` (MIT) | Public project documentation and policy |
 | `VERSION` | Package version |
 | `.env.example` | Template only (no secrets) |
 
@@ -70,9 +71,10 @@ bash dev_sync/dev-sync-verify-full.sh
 - [x] CI: Ubuntu ShellCheck + portable Python tests + gitleaks on PR; macOS full suite is manual or tag-only
 - [x] One-line install documented in `README.md` and `docs/INSTALL.md`
 - [x] New users build inventory locally (`build_inventory.sh`)
-- [ ] Rotate any secrets that ever lived in git before public push
-- [ ] Confirm GitHub repo visibility: **Public**
+- [x] GitHub repo visibility: **Public** (MIT license detected by GitHub)
+- [x] No absolute home paths, account names, e-mail addresses or hostnames in tracked documentation (checked with `git grep` before each release)
+- [ ] Owner action, once: rotate any secret that ever lived in git history before the repository went public (cannot be verified from the working tree)
 
 Local secret scan: `brew install gitleaks && bash scripts/scan_secrets.sh`
 
-See also: [agents/security.md](agents/security.md), [INSTALL.md](INSTALL.md), [UNINSTALL.md](UNINSTALL.md)
+See also: [../SECURITY.md](../SECURITY.md), [agents/security.md](agents/security.md), [INSTALL.md](INSTALL.md), [UNINSTALL.md](UNINSTALL.md)

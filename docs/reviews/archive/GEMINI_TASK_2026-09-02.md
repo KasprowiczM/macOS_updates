@@ -2,13 +2,13 @@
 
 **Projekt:** `~/Dev_Env/macOS_updates`
 **Baza:** v1.4.3 (2026-09-02), 213 testów zielonych
-**Źródło zadań:** `docs/reviews/ULTRA_REVIEW_2026-09-02.md`, sekcja „Rekomendacje" (R1–R7)
+**Źródło zadań:** `docs/reviews/archive/ULTRA_REVIEW_2026-09-02.md`, sekcja „Rekomendacje" (R1–R7)
 
 Skopiuj wszystko poniżej linii jako prompt.
 
 ---
 
-Pracujesz w repozytorium `~/Dev_Env/macOS_updates` na macOS 26.6.2, Apple Silicon. Zanim cokolwiek zmienisz, przeczytaj w tej kolejności: `AGENTS.md`, `docs/reviews/ULTRA_REVIEW_2026-09-02.md`, `docs/agents/critical_rules.md`, `docs/agents/exit_codes.md`, `docs/agents/architecture.md`.
+Pracujesz w repozytorium `~/Dev_Env/macOS_updates` na macOS 26.6.2, Apple Silicon. Zanim cokolwiek zmienisz, przeczytaj w tej kolejności: `AGENTS.md`, `docs/reviews/archive/ULTRA_REVIEW_2026-09-02.md`, `docs/agents/critical_rules.md`, `docs/agents/exit_codes.md`, `docs/agents/architecture.md`.
 
 ## Zasada nadrzędna tego zadania
 
@@ -66,7 +66,7 @@ Przejrzyj pod tym kątem:
 - ścieżkę `vendor_latest` w `lib/internet_app_updates.sh`,
 - filtry pomijania w `update_npm_cli.sh`.
 
-Dla każdego odpowiedz na trzy pytania i **udokumentuj odpowiedzi w `docs/reviews/GUARD_AUDIT_2026-09.md`**:
+Dla każdego odpowiedz na trzy pytania i **udokumentuj odpowiedzi w `docs/reviews/archive/GUARD_AUDIT_2026-09.md`**:
 1. Czy ten strażnik ukrywa dane, na podstawie których podejmuje decyzję?
 2. Jeśli tak — co musiałoby się zdarzyć, żeby go zwolnić, i czy to zdarzenie jest w ogóle obserwowalne, gdy strażnik jest aktywny?
 3. Jeśli nie jest obserwowalne — dodaj okno życia i drogę do ponownej oceny, wzorowane na `mau_quarantine_expired_ids`.

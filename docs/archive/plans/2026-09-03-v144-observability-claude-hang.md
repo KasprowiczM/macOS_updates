@@ -8,9 +8,9 @@
 
 **Tech Stack:** Bash 3.2, Python 3 stdlib (`lib/python/`), GNU `timeout` from Homebrew coreutils, `unittest`.
 
-**Spec:** `docs/reviews/GEMINI_TASK_2026-09-02.md` (Z1–Z5) plus live incident `logs/update_all_20260903_101005.log` (Z0, not in the Gemini prompt).
+**Spec:** `docs/reviews/archive/GEMINI_TASK_2026-09-02.md` (Z1–Z5) plus live incident `logs/update_all_20260903_101005.log` (Z0, not in the Gemini prompt).
 
-Callers of this document: none at runtime. The next implementing agent and the user read it. Closest existing file `docs/reviews/GEMINI_TASK_2026-09-02.md` is the task prompt, not a checkbox implementation plan.
+Callers of this document: none at runtime. The next implementing agent and the user read it. Closest existing file `docs/reviews/archive/GEMINI_TASK_2026-09-02.md` is the task prompt, not a checkbox implementation plan.
 
 ## Global Constraints
 
@@ -74,7 +74,7 @@ Fixing timeout kill + switching installed Claude to `claude update` is what lets
 
 ### Trusted sources (audit, no drive-by method changes)
 
-Doctrine already in `docs/reviews/Opus5_Max_Ultra_Review_v6.md`: the fastest trusted channel wins; Homebrew cask `claude-code` is ~7 days behind and must not replace the native installer.
+Doctrine already in `docs/reviews/archive/Opus5_Max_Ultra_Review_v6.md`: the fastest trusted channel wins; Homebrew cask `claude-code` is ~7 days behind and must not replace the native installer.
 
 | App / CLI | Configured method | Actual fetch | Verdict |
 |---|---|---|---|
@@ -109,7 +109,7 @@ Do not migrate anything to Homebrew to "clean up" Claude Code. That would be a f
 | `update_appstore.sh` / `update_brew.sh` / `lib/internet_app_updates.sh` | Write pending-after-run counts; App Store three-way diag. |
 | `lib/internet_app_updates.sh` `iu_firefox_developer_edition` | Show bundle + channel. |
 | `.mac_update_prefs` (gitignored) | Delete dead `FIREFOX_DEV_CHANNEL_VERSION`. |
-| `docs/reviews/GUARD_AUDIT_2026-09.md` | Z2 answers. |
+| `docs/reviews/archive/GUARD_AUDIT_2026-09.md` | Z2 answers. |
 | `AGENTS.md` | Rule 10. |
 | `tests/test_run_log_regressions_20260903.py` | Behavioral regressions for every task. |
 | `VERSION` / `CHANGELOG.md` | 1.4.4. |
@@ -319,7 +319,7 @@ Record exit and version. If `claude update` itself is a TUI, the 60 s + kill-aft
 ### Task 3: Guard audit + AGENTS.md rule 10 (Z2)
 
 **Files:**
-- Create: `docs/reviews/GUARD_AUDIT_2026-09.md`
+- Create: `docs/reviews/archive/GUARD_AUDIT_2026-09.md`
 - Modify: `AGENTS.md` (rule 10 after rule 8; there is no rule 9 today)
 
 **Interfaces:** none (documentation). No behavior change if all three pass.

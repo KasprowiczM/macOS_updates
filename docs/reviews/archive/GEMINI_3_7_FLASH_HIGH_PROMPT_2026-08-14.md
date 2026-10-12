@@ -6,7 +6,7 @@ repository `~/Dev_Env/macOS_updates` as working directory.
 ---
 
 You are a senior macOS/Bash release engineer. Implement ALL fixes and improvements from
-`docs/reviews/ULTRA_REVIEW_2026-08-14.md` in the repository at `~/Dev_Env/macOS_updates`.
+`docs/reviews/archive/ULTRA_REVIEW_2026-08-14.md` in the repository at `~/Dev_Env/macOS_updates`.
 Work with 95%+ confidence before each change; read the referenced files first. Do not invent
 behavior — every claim in the review is verified against code and the run log
 `logs/update_all_20260814_112225.log`.

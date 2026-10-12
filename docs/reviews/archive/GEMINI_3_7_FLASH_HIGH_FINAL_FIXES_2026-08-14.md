@@ -4,7 +4,7 @@ Paste this into Gemini 3.7 Flash high effort with working directory `~/Dev_Env/m
 
 ---
 
-You are finishing the Gemini implementation from `docs/reviews/GEMINI_3_7_FLASH_HIGH_PROMPT_2026-08-14.md`.
+You are finishing the Gemini implementation from `docs/reviews/archive/GEMINI_3_7_FLASH_HIGH_PROMPT_2026-08-14.md`.
 Most requested features appear implemented: `VERSION=1.4.0`, `lib/version.sh` now owns
 `app_version()` and `internet_version_relation()`, `lib/python/inventory.py` and
 `run_summary.py` exist, `config/inventory_exclusions.txt` exists with `Ascendo`, `--verify-only`
@@ -104,8 +104,8 @@ Add a static test that `RUN_TIMESTAMP="$LOG_TS"` exists and is used by the JSON 
 
 `git status --porcelain` showed untracked old review files:
 
-- `docs/reviews/Opus5_Max_Implementation_Prompt_v6.md`
-- `docs/reviews/Opus5_Max_Ultra_Review_v6.md`
+- `docs/reviews/archive/Opus5_Max_Implementation_Prompt_v6.md`
+- `docs/reviews/archive/Opus5_Max_Ultra_Review_v6.md`
 
 Do not silently include them in the final change set unless they are intentionally part of the
 release. Either:

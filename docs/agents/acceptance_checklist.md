@@ -1,6 +1,13 @@
 # Production Acceptance Checklist — v1.5.x Live Execution Paths
 
-## Live current-software acceptance and v1.5.4 follow-up (2026-10-05)
+## Current status (v1.5.5, 2026-10-12)
+
+- Release gate: **561 tests pass** (`bash run_tests.sh`), shell/Python syntax and secret scan pass.
+- Newest live evidence: the 2026-10-11 run below ([v1.5.5 follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md)). Paths 1 and 5 (success branch) were observed; the system update/reboot paths 2 and 3 are still **unaccepted** because that run skipped the macOS step (fixed in v1.5.5).
+- The two dated sections after it (2026-10-05, v1.5.3/v1.5.4) are historical evidence and are kept unchanged.
+
+
+## Historical: live current-software acceptance and v1.5.4 follow-up (2026-10-05)
 
 The user completed a real v1.5.3 Update All run in **108 seconds**: App Store, native CLI, Homebrew, inventory and system checks completed; 25 internet applications verified, zero unverified app updaters, no observed package/app version changes. No GUI application launch was recorded. macOS 27.0.1 offered no update. Proton Drive's stale manufacturer feed was the only degraded result.
 
@@ -18,7 +25,7 @@ The user ran an interactive Update All (Polish locale) on the v1.5.4 branch stat
 - **Path 7, partial:** Warp quit cleanly. Claude Desktop did not exit within 60 s after updating itself (most likely relaunched by its updater — not directly observed); the single `quit` was never re-sent. v1.5.5 re-sends the graceful quit (never force-kills) and reports the leftover as a warning.
 - **macOS system step NOT exercised:** step 5 failed on the missing `python3`, was wrongly classified as blocking, and the final macOS step was skipped. The system update/reboot path (paths 2 and 3) therefore remains unaccepted. v1.5.5 makes step 5 non-blocking; a future run must exercise the system step.
 
-## v1.5.3 validation (2026-10-05)
+## Historical: v1.5.3 validation (2026-10-05)
 
 - Release gate: **527 tests pass**, shell/Python syntax and secret scan pass; whole-repository warning-level ShellCheck passes.
 - Read-only vendor feed query confirms ChatGPT's installed version equals the current offer and Proton Mail is current. Proton Drive's official feed remains older than its installed release; this is a manufacturer-data warning, not a verified update.
@@ -138,7 +145,7 @@ When running `update_all.sh`, inspect the execution log in `logs/update_all_<YYY
 
 ### 5. Direct Vendor DMG Install & Atomic Rollback via `copy_verified_app`
 
-- **Condition:** An internet app with a direct DMG download feed (e.g. KeePassXC, LibreOffice) is outdated and closed on the local Mac.
+- **Condition:** An internet app with a direct DMG download feed (e.g. KeePassXC, Visual Studio Code) is outdated and closed on the local Mac.
 - **Log lines to look for:**
   - Normal successful upgrade:
     ```text

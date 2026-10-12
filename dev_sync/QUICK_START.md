@@ -225,8 +225,8 @@ cat dev_sync/README.md
 # Config schema details
 cat dev_sync/README.md | grep -A 50 "Configuration File"
 
-# Operator guide
-cat DEV_SCRIPTS_README.md
+# Command reference
+cat dev_sync/INDEX.md
 ```
 
 ## Troubleshooting

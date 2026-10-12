@@ -455,12 +455,12 @@ echo "alias upd='cd ~/Dev_Env/macOS_updates && bash update_all.sh -y'" >> ~/.zsh
 - [ ] LaunchAgent — cotygodniowy run w tle:
 
 ```xml
-<!-- ~/Library/LaunchAgents/com.mk.macos-updates.plist -->
+<!-- ~/Library/LaunchAgents/com.<user>.macos-updates.plist -->
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>com.mk.macos-updates</string>
+  <key>Label</key><string>com.<user>.macos-updates</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
@@ -480,7 +480,7 @@ echo "alias upd='cd ~/Dev_Env/macOS_updates && bash update_all.sh -y'" >> ~/.zsh
 ```
 
 ```bash
-launchctl load -w ~/Library/LaunchAgents/com.mk.macos-updates.plist
+launchctl load -w ~/Library/LaunchAgents/com.<user>.macos-updates.plist
 ```
 
 ⚠️ `--skip-system` jest tu celowe: krok 6 potrzebuje interakcji (volume owner), więc w tle by tylko wisiał. macOS zostaw na ręczny run z Touch ID.

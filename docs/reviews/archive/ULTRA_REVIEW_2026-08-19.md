@@ -202,7 +202,7 @@ i nigdy nie kasował — stąd 36. Teraz `chmod 600` + zachowanie najnowszych
 |---|---|
 | **LaunchAgent** | Nie zainstalowany. Jeśli na starym Macu miałeś harmonogram: `bash scripts/install_launchagent.sh --day 1 --hour 9`. |
 | **Puste pakiety npm** | `@google` i `@qwen-code` — puste katalogi po migracji, usunięte. |
-| **Duplikaty chmur** | `ProtonDrive-mk@itcs.pl-folder (19-08-2026 14:05)` i `GoogleDrive-m.kasprowicz@gmail.com (19-08-2026 14:02)` — drugie montowania z dzisiejszej migracji. `dev_sync` wskazuje na właściwe (bez sufiksu). Warto sprawdzić w Finderze, czy nie dublują danych. |
+| **Duplikaty chmur** | `ProtonDrive-<account>-folder (19-08-2026 14:05)` i `GoogleDrive-<account> (19-08-2026 14:02)` — drugie montowania z dzisiejszej migracji. `dev_sync` wskazuje na właściwe (bez sufiksu). Warto sprawdzić w Finderze, czy nie dublują danych. |
 | **`FIREFOX_DEV_CHANNEL_VERSION=150.0b10`** w `.mac_update_prefs` | Martwy klucz — nic w kodzie go nie czyta, a zainstalowany Firefox to 155.0. Zostawiony, bo to Twój plik konfiguracyjny. |
 | **`Ascendo.app`** | Nadal w `/Applications`, celowo w `config/inventory_exclusions.txt`. Jedyna aplikacja bez pokrycia. |
 

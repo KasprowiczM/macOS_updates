@@ -23,7 +23,7 @@ Interpret the results:
 - `mas outdated` → lists App Store apps with available updates
 - `brew outdated` → lists Homebrew packages with newer versions available
 - `brew doctor` → "Your system is ready to brew." = healthy
-- Disk space: update_all.sh needs ≥ 10 GB free
+- Disk space: keep ≥ 20 GB free (recommended for large macOS updates; not enforced by the scripts)
 
 Requires Apple Silicon. Scripts location: `~/Dev_Env/macOS_updates/` (or `$MAC_UPDATE_DIR`).
 Inventory: `bash build_inventory.sh` · Coverage: `bash scripts/report_update_coverage.sh`

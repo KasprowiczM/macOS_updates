@@ -9,7 +9,7 @@ macOS Updates orquestra atualizações em **Macs Apple Silicon com macOS 13+**:
 1. Pré-análise e inventário
 2. App Store (`sudo mas upgrade <app-id>` + Track 2 GUI separado)
 3. Primeiro as CLI nativas existentes, depois Node/Bun e alternativas npm
-4. Homebrew (`--greedy`)
+4. Homebrew (greedy apenas para casks registados como `brew_cask`)
 5. Apps instaladas: handlers diretos, CLI ou acionadores integrados
 6. Pós-atualização atómica do inventário/histórico
 7. macOS (`softwareupdate -i <label> -R`) no fim; adiado após erro bloqueante ou sem autorização

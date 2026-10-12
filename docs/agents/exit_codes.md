@@ -23,16 +23,18 @@ mid-transaction. Three deliberate exceptions:
   an offline feed, or a GUI automation that returned an ambiguous result surfaces as a
   warning and still allows macOS security updates to install. Suppressing security
   updates because an app updater could not be verified was the 2026-07-26 regression;
-  see `docs/agents/critical_rules.md` §10.
+  see `docs/agents/critical_rules.md` §13.
 
 `update_all.sh` itself exits `0` when the run was clean **or** merely degraded — a run
 where self-updating apps report `LAUNCHED_UNVERIFIED` is the normal healthy outcome and
 must not look like a failure to cron, CI, or `dev_sync`. Use `MAC_UPDATE_DEGRADED` or the
 `degraded` field of `--json-summary` to detect warnings programmatically.
 
-## App Store exit 2 (Accessibility)
+## Stale vendor feeds (v1.5.4)
 
 v1.5.4 changes report presentation only: a stale vendor feed remains degraded (`10` at the leaf, `0` plus `degraded=true` at the master). Manufacturer warnings are separate from pending installations and unconfirmed operations. A warning does not imply that an updater was launched.
+
+## App Store exit 2 (Accessibility)
 
 `update_appstore.sh` exits **2** when Terminal lacks Accessibility for AppleScript TRACK 2.
 

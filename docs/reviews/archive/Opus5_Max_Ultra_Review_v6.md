@@ -668,4 +668,4 @@ Największą brakującą funkcją nie jest kolejny handler, tylko **pomiar**: dz
 - [Homebrew/brew — Note cases when pinned formulae get upgraded (PR #3043)](https://github.com/Homebrew/brew/pull/3043)
 - [Homebrew Discussions #6550 — zmiana entitlementów `mas` (cytowane w `critical_rules.md` §2)](https://github.com/orgs/Homebrew/discussions/6550)
 
-*Ten przegląd nie zmodyfikował żadnego pliku projektu. Utworzone zostały wyłącznie: ten dokument oraz `docs/reviews/Opus5_Max_Implementation_Prompt_v6.md`.*
+*Ten przegląd nie zmodyfikował żadnego pliku projektu. Utworzone zostały wyłącznie: ten dokument oraz `docs/reviews/archive/Opus5_Max_Implementation_Prompt_v6.md`.*

@@ -33,7 +33,33 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 - **GitHub tags:** strip the leading `v` with `sed 's/^v//'` (never `tr -d 'v'`, which deletes every `v`) before comparing with `app_version()`.
 - **iOS/iPadOS apps on Apple Silicon** (UniFi, WiFiman, …): no `Contents/Info` plist — `app_version()` falls back to `mdls -name kMDItemVersion`.
 
-## 5. Cask Adoption & Validation Requirement
+## 5. Internet app update methods
+
+| Method | Apps |
+|--------|------|
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager; direct-first choices in `config/vendor_direct_first.txt` |
+| Mozilla product-details/download + DMG | Firefox Developer Edition |
+| GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
+| Google Keystone | Google Chrome, Google Drive, Gemini |
+| Chromium Updater | Comet (Perplexity AI) |
+| msupdate CLI | Microsoft Word, Microsoft Excel, Microsoft PowerPoint, Microsoft Outlook, Microsoft OneNote |
+| Vendor self-updater + MAU fallback | Microsoft Teams (normally owns its cadence; MAU may recover a failed Teams updater via `TEAMS21`) |
+| Vendor feed + verified DMG (idle only); `docker desktop update` fallback | Docker Desktop v4.37+ |
+| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
+| Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
+| Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
+| App Store GUI Track 2 | UniFi, WiFiman, Picsart |
+| Manual only | IPMIView, DJI Assistant 2 |
+
+These methods are not equivalent proof levels:
+
+- **verified direct** — the script verifies a version/package path or a vendor CLI reports completion.
+- **triggered-unverified** — the app was launched to trigger its built-in updater; completion is not asserted.
+- **externally managed** — the App Store or vendor owns the update lifecycle outside a directly verifiable handler.
+- **manual** — the registry intentionally requires user action.
+- **unknown** — no supported registry method matches the installed app.
+
+## 5a. Cask Adoption & Validation Requirement
 - **Config `brew_cask` requires live adoption:** Setting `brew_cask` in `config/internet_app_methods.txt` requires executing `brew install --cask --adopt <slug>`.
 - **Validation Interlock:** `update_internet_apps.sh` validates `brew_cask` entries against `brew_cask_versions` (`lib/brew.sh`) mapped via `internet_cask_name_for_app`. Never call `brew list --cask --versions` directly — it regressed upstream on 2026-08-19 and silently returned nothing. Missing casks produce `L_INTERNET_STATUS_CASK_MISSING` soft warning.
 
@@ -114,33 +140,7 @@ Child scripts were unaffected because each is a fresh process.
 - Any new long-lived top-level script that upgrades toolchains and later calls `python3`,
   `node` or similar must do the same.
 
-## 5. Internet app update methods
-
-| Method | Apps |
-|--------|------|
-| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager; direct-first choices in `config/vendor_direct_first.txt` |
-| Mozilla product-details/download + DMG | Firefox Developer Edition |
-| GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
-| Google Keystone | Google Chrome, Google Drive, Gemini |
-| Chromium Updater | Comet (Perplexity AI) |
-| msupdate CLI | Microsoft Word, Microsoft Excel, Microsoft PowerPoint, Microsoft Outlook, Microsoft OneNote |
-| Vendor self-updater + MAU fallback | Microsoft Teams (normally owns its cadence; MAU may recover a failed Teams updater via `TEAMS21`) |
-| Vendor feed + verified DMG (idle only); `docker desktop update` fallback | Docker Desktop v4.37+ |
-| Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
-| Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
-| Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
-| App Store GUI Track 2 | UniFi, WiFiman, Picsart |
-| Manual only | IPMIView, DJI Assistant 2 |
-
-These methods are not equivalent proof levels:
-
-- **verified direct** — the script verifies a version/package path or a vendor CLI reports completion.
-- **triggered-unverified** — the app was launched to trigger its built-in updater; completion is not asserted.
-- **externally managed** — the App Store or vendor owns the update lifecycle outside a directly verifiable handler.
-- **manual** — the registry intentionally requires user action.
-- **unknown** — no supported registry method matches the installed app.
-
-## 6. Downloaded installers
+## 7. Downloaded installers
 - Use random temp paths under `$MAC_UPDATE_SESSION_DIR` or `mktemp`.
 - Run `hdiutil verify` before mounting downloaded DMGs.
 - Mount each DMG at a unique mountpoint inside `$MAC_UPDATE_SESSION_DIR`; never discover an installer by scanning shared `/Volumes` names.
@@ -149,14 +149,14 @@ These methods are not equivalent proof levels:
 - Do not report success after a failed copy/install; return a non-zero exit so `update_all.sh` records a failed step.
 - **Honest status:** a GUI app that is only launched reports `LAUNCHED_UNVERIFIED` (⏳), not success; a failed launch reports `LAUNCH_FAILED` (⚠️) and fails the step. Only a confirmed version change reports `UPDATED`/`CURRENT`.
 
-## 7. Private state and imports
+## 8. Private state and imports
 
 - Write `APPLICATIONS.md`, `UPDATES.md`, provider config and logs through a same-directory temporary file, flush/fsync where implemented, then `os.replace()`.
 - Private config is mode `0600`; log/config directories are private to the user.
 - Cloud imports stage only allowlisted, safe relative paths. Commit the staged set transactionally and roll back already replaced targets if any later file fails.
 - Rclone listing/copy failures are fatal; never turn an incomplete remote listing into a successful empty import.
 
-## 8. APPLICATIONS.md structure
+## 8a. APPLICATIONS.md structure
 - GRUPA 1: Apple system apps
 - GRUPA 2: App Store (mas IDs)
 - GRUPA 3: Internet apps
