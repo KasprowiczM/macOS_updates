@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-**Website:** [macosupdates.dev](https://macosupdates.dev) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Lizenz:** [MIT](LICENSE) · **Änderungen:** [CHANGELOG.md](CHANGELOG.md)
+**Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Lizenz:** [MIT](LICENSE) · **Änderungen:** [CHANGELOG.md](CHANGELOG.md)
 
 > **v1.5.5** — Produktionsreifer Ein-Befehl-Orchestrator für Updates auf **Apple-Silicon-Macs mit macOS 13–27**. Er koordiniert verifizierte Paketaktualisierungen und ehrliche Auslöser der app-eigenen Updater für **Software, die bereits auf diesem Mac installiert ist**. **Mehrsprachig** (7 Sprachen). Optionales privates Overlay über [`dev_sync/`](dev_sync/README.md).
 

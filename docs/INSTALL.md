@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.5.5**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macosupdates.dev>
+**Version:** see `VERSION` in repo root (currently **1.5.5**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
 
 ## One-line install (new Mac, Apple Silicon)
 

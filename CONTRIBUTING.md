@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to **macOS Updates** (v1.5.5, MIT license). Project site: <https://macosupdates.dev>. Security issues: see [SECURITY.md](SECURITY.md) (do not open a public issue).
+Thank you for contributing to **macOS Updates** (v1.5.5, MIT license). Project site: <https://macos-updates.64bit.site>. Security issues: see [SECURITY.md](SECURITY.md) (do not open a public issue).
 
 ## Requirements
 

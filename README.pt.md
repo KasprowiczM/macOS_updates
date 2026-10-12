@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-**Site:** [macosupdates.dev](https://macosupdates.dev) · **Repositório:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licença:** [MIT](LICENSE) · **Alterações:** [CHANGELOG.md](CHANGELOG.md)
+**Site:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repositório:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licença:** [MIT](LICENSE) · **Alterações:** [CHANGELOG.md](CHANGELOG.md)
 
 > **v1.5.5** — Orquestrador de atualizações com um só comando, pronto para produção, para **Macs com Apple Silicon e macOS 13–27**. Coordena atualizações de pacotes verificadas e acionamentos honestos dos atualizadores das aplicações para o **software já instalado neste Mac**. **Multilingue** (7 idiomas). Camada privada opcional através de [`dev_sync/`](dev_sync/README.md).
 
