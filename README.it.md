@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.4** — Orchestratore di aggiornamenti in un singolo comando pronto per la produzione per **Mac Apple Silicon con macOS 13–27**. Coordina gli aggiornamenti verificati dei pacchetti per i software già installati su questo Mac. **Multilingue** (7 lingue). Layer cloud privato opzionale tramite [`dev_sync/`](dev_sync/README.md).
+> **v1.5.5** — Orchestratore di aggiornamenti in un singolo comando pronto per la produzione per **Mac Apple Silicon con macOS 13–27**. Coordina gli aggiornamenti verificati dei pacchetti per i software già installati su questo Mac. **Multilingue** (7 lingue). Layer cloud privato opzionale tramite [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.5:** Un aggiornamento Homebrew che rimuove `python3` durante l’esecuzione non interrompe più il passaggio di inventario/report (la shell ricerca di nuovo in `PATH`), e un passaggio di report fallito non rinvia più gli aggiornamenti di macOS. I messaggi finali sono onesti: nessuna dichiarazione «file aggiornati» dopo un errore, e gli avvisi su feed obsoleti o app non chiuse non sono più presentati come aggiornamenti non verificati. Alle app avviate dallo strumento viene chiesto più volte di chiudersi (mai forzate).
 
 **v1.5.4:** I feed obsoleti del produttore sono avvisi separati, senza suggerire un downgrade in attesa né dichiarare l’avvio di un updater. Le operazioni realmente non confermate restano visibili. L’ultima esecuzione dell’utente è durata 108 secondi senza aggiornamenti di app osservati; non è un benchmark di installazione.
 

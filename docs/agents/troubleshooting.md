@@ -2,6 +2,8 @@
 
 | Problem | Fix |
 |---------|-----|
+| `update_all.sh: line N: /opt/homebrew/bin/python3: No such file or directory`, then `Could not write run_summary JSON`, then the macOS step skipped | A Homebrew upgrade (python@3.14 on Homebrew 7.0.9) removed the unversioned `python3` link mid-run while bash still held the hashed path. Fixed in v1.5.5 (`shopt -s checkhash`, `hash -r` between steps; step 5 no longer defers the macOS step). If `python3` is missing in a new shell, run `brew link python@3.14` (or install the current `python` formula); `/usr/bin/python3` is the fallback. Then rerun `bash update_all.sh` |
+| `<bundle id> was launched for update and did not exit within 60s` | The vendor updater typically relaunches the app it just updated. v1.5.5 re-sends the graceful AppleScript `quit` every `MAC_UPDATE_QUIT_RESEND` seconds within `MAC_UPDATE_QUIT_WAIT`; if the app still runs it is left running (never force-killed) and reported as a warning, not as an unverified update. Quit it manually if you want |
 | Proton Drive appears as a pending downgrade / an updater launch that never happened | v1.5.4 displays stale manufacturer data separately as a warning, with installed/vendor versions and no install target. Unknown outcomes and actual unverified updaters remain visible. |
 | ChatGPT spends time opening and closing before installation | v1.5.3 tries its verified vendor artifact first when an update is known. Unknown feeds still use the native updater fallback; running apps are preserved. |
 | Proton Drive manufacturer feed is older than the installed app | Inspect `bash scripts/check_vendor_feeds.sh`. A stale official feed remains a warning; no downgrade or repeated launch is attempted. |

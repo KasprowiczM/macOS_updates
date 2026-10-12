@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.4** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–27**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.5** — Orquestrador de atualizações num único comando pronto para produção em **Macs Apple Silicon com macOS 13–27**. Coordena atualizações verificadas para programas já instalados neste Mac. **Multilíngue** (7 idiomas). Camada privada opcional na nuvem via [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.5:** Uma atualização do Homebrew que remove `python3` durante a execução já não quebra o passo de inventário/relatório (o shell volta a pesquisar o `PATH`), e um passo de relatório falhado já não adia as atualizações do macOS. As mensagens finais são honestas: sem a afirmação «ficheiros atualizados» após uma falha, e os avisos de feeds antigos ou de apps que não fecharam deixam de ser apresentados como atualizações não verificadas. Às apps iniciadas pela ferramenta é pedido repetidamente que fechem (nunca forçadas).
 
 **v1.5.4:** Feeds antigos do fabricante aparecem como avisos separados, sem sugerir uma versão inferior pendente nem afirmar que um atualizador foi iniciado. Operações realmente não confirmadas continuam visíveis. A última execução do utilizador durou 108 segundos sem atualizações de aplicações observadas; não é um teste de velocidade de instalação.
 

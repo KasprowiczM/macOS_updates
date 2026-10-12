@@ -5,6 +5,10 @@
 # Autor: Antigravity AI
 # Data:  2026-03-02 (zaktualizowano)
 set -o pipefail
+# Homebrew can remove /opt/homebrew/bin/python3 (or any other symlink) while
+# this process is running. Without checkhash, bash keeps calling the stale
+# hashed path ("No such file or directory") instead of re-searching PATH.
+shopt -s checkhash
 
 # Jeśli MAC_UPDATE_SESSION_DIR jest ustawiony, zapisuje informacje
 # o systemie przed i po aktualizacji.

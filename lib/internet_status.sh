@@ -108,3 +108,27 @@ internet_summary_end() {
     _CURRENT_SECTION_HEADER=""
     _CURRENT_SECTION_PRINTED=0
 }
+
+# Decide which closing line the internet step prints for a soft (exit 10) run.
+#   internet_soft_summary_kind <soft_fail> <warn_only> <unverified_count>
+# soft_fail   1 when a real problem was seen (offline, download error, launch
+#             failure, an app behind or waiting for a restart, ...).
+# warn_only   1 when the only soft causes are manufacturer-feed warnings
+#             (feed_stale) and/or a toolkit-launched app that did not quit.
+# Prints: generic | warnings_only | none
+#   generic        "at least one app was not verified or updated"
+#   warnings_only  "finished with warnings; no application update is pending"
+internet_soft_summary_kind() {
+    local soft_fail="${1:-0}" warn_only="${2:-0}" unverified="${3:-0}"
+    if [ "$soft_fail" -ne 0 ]; then
+        printf 'generic\n'
+    elif [ "$warn_only" -ne 0 ]; then
+        if [ "$unverified" -ne 0 ]; then
+            printf 'generic\n'
+        else
+            printf 'warnings_only\n'
+        fi
+    else
+        printf 'none\n'
+    fi
+}

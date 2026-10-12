@@ -95,6 +95,25 @@ once. On macOS 14+ `sudo_local` survives OS updates; on macOS 13 the script patc
 `/etc/pam.d/sudo`, which macOS upgrades overwrite, so it must be re-run after a major upgrade.
 Never touch `/etc/sudoers`; never grant passwordless `sudo`.
 
+## 6e. Long-lived orchestrators enable `shopt -s checkhash`
+
+`update_all.sh` and every `update_*.sh` orchestrator (plus `migration_setup.sh`) run
+`shopt -s checkhash` immediately after `set -o pipefail`. bash caches the resolved path of
+every external command; if that file later disappears, bash does **not** re-search `PATH`
+unless `checkhash` is on, and fails with `No such file or directory`.
+
+Why it matters: on 2026-10-11 a `brew upgrade` of `python@3.14` (Homebrew 7.0.9) removed
+`/opt/homebrew/bin/python3` in step 3. The master process had hashed that path in step 0, so
+step 5 and the run-summary write died, even though `/usr/bin/python3` was still on `PATH`.
+Child scripts were unaffected because each is a fresh process.
+
+- `update_all.sh` also runs `hash -r` before steps 2–5 (the previous child may have changed
+  what is installed).
+- Do not remove either; `tests/test_safety_static.py::test_orchestrators_enable_checkhash_after_pipefail`
+  and `tests/test_run_log_regressions_20261011.py` enforce it.
+- Any new long-lived top-level script that upgrades toolchains and later calls `python3`,
+  `node` or similar must do the same.
+
 ## 5. Internet app update methods
 
 | Method | Apps |
@@ -221,6 +240,8 @@ not success.
   - `10`: Soft / degraded result (e.g. offline check, unverified launch, missing remote feed). Surfaces as warnings in banners, logs, and `UPDATES.md`.
   - `1` / `127`: Hard failure (e.g. broken installation, corrupt download, failed bundle swap).
 - `update_all.sh` tracks `BLOCKING_EXIT` separately from `OVERALL_EXIT`. Only hard failures defer the final `softwareupdate -i <label> -R` step. Soft warnings never suppress macOS system updates.
+- **Step 5 (inventory/postupdate) is a reporting step.** A failure sets `RESULT_MD` to error, `STATUS_CODE_MD="error"` and `OVERALL_EXIT=1` (the run is not clean and exits non-zero) but **never** `BLOCKING_EXIT`: it mutates nothing, so deferring macOS security updates over it is the 2026-07-26-style regression (it recurred on 2026-10-11 when a vanished `python3` failed step 5 and the OS update was skipped with a false "machine may be mid-transaction" message). The closing "Files updated" line is printed only when `STATUS_CODE_MD=ok`.
+- Soft-result wording stays honest: master messages say "reported warnings (soft)"; `update_internet_apps.sh` prints the generic "not verified or updated" line only for a real unverified/behind/restart-pending/error-class cause, and `L_INTERNET_WARNINGS_ONLY` when the only soft causes are `feed_stale` and/or a toolkit-launched app that did not quit (exit stays `10`).
 
 ## 14. macOS 27 Golden Gate Constraints and Ecosystem Rules
 

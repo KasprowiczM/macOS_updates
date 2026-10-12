@@ -57,22 +57,57 @@ internet_app_is_running() {
     [ "$(internet_app_running_state "$1")" = "true" ]
 }
 
+# Clamp an integer setting: _vd_clamp_int <value> <default> <min> <max>.
+_vd_clamp_int() {
+    local val="$1" def="$2" min="$3" max="$4"
+    case "$val" in
+        ''|*[!0-9]*) val="$def" ;;
+    esac
+    [ "$val" -lt "$min" ] && val="$min"
+    [ "$val" -gt "$max" ] && val="$max"
+    printf '%s\n' "$val"
+}
+
+# Seconds a toolkit-launched app gets to exit (MAC_UPDATE_QUIT_WAIT, 0-300).
+internet_quit_wait_seconds() {
+    _vd_clamp_int "${MAC_UPDATE_QUIT_WAIT:-60}" 60 0 300
+}
+
+# Ask a toolkit-launched app to quit, politely and repeatedly.
+#
+# Only ever called for apps the toolkit itself launched (toolkit_launched.txt).
+# A vendor updater often relaunches the app it just updated, so the first
+# `quit` can hit an instance that is already gone while a fresh one keeps
+# running; the graceful quit is therefore re-sent every
+# MAC_UPDATE_QUIT_RESEND seconds (default 10, 1-60) inside the wait window.
+# Never force-kills: if the app is still up when the window closes the
+# function returns 1 and the caller leaves it running.
 internet_app_quit_gracefully() {
     local bid="$1"
     _vd_valid_bundle_id "$bid" || return 1
     if ! internet_app_is_running "$bid"; then
         return 0
     fi
+    local wait_s resend_s elapsed=0 since_quit=0
+    wait_s="$(internet_quit_wait_seconds)"
+    resend_s="$(_vd_clamp_int "${MAC_UPDATE_QUIT_RESEND:-10}" 10 1 60)"
     run_with_timeout 20 osascript -e "tell application id \"$bid\" to quit" 2>/dev/null || true
-    local elapsed=0
-    while [ "$elapsed" -lt 60 ]; do
+    while [ "$elapsed" -lt "$wait_s" ]; do
         if ! internet_app_is_running "$bid"; then
             return 0
         fi
         sleep 2
         elapsed=$((elapsed + 2))
+        since_quit=$((since_quit + 2))
+        if [ "$since_quit" -ge "$resend_s" ]; then
+            since_quit=0
+            if internet_app_is_running "$bid"; then
+                run_with_timeout 20 osascript -e "tell application id \"$bid\" to quit" 2>/dev/null || true
+            fi
+        fi
     done
-    return 1
+    # Final observation: the app may have exited during the last interval.
+    ! internet_app_is_running "$bid"
 }
 
 vendor_direct_host_allowed() {

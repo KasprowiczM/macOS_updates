@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.4** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–27**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+> **v1.5.5** — Gotowy do użycia na produkcji jedno-komendowy orkiestrator aktualizacji dla **Maców z Apple Silicon i macOS 13–27**. Koordynuje zweryfikowane aktualizacje pakietów oraz uczciwe wywoływanie updaterów dla **oprogramowania już zainstalowanego na tym Macu**. **Wielojęzyczny** (7 języków). Opcjonalna prywatna nakładka przez [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.5:** Aktualizacja Homebrew usuwająca `python3` w trakcie przebiegu nie psuje już kroku inwentarza/raportu (powłoka ponownie przeszukuje `PATH`), a nieudany krok raportujący nie odkłada już aktualizacji macOS. Komunikaty końcowe są uczciwe: brak twierdzenia o zaktualizowanych plikach po błędzie, a ostrzeżenia o starym feedzie lub niezamkniętej aplikacji nie są już opisywane jako niezweryfikowane aktualizacje. Aplikacje uruchomione przez narzędzie dostają wielokrotną prośbę o zamknięcie (bez wymuszania).
 
 **v1.5.4:** Starszy feed producenta jest osobnym ostrzeżeniem, bez sugerowania oczekującego downgrade’u lub uruchomienia aktualizatora. Faktyczne niepotwierdzone operacje pozostają widoczne. Ostatni przebieg użytkownika trwał 108 sekund bez zaobserwowanych aktualizacji aplikacji; to nie jest pomiar szybkości instalacji.
 
