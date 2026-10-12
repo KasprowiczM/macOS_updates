@@ -19,7 +19,7 @@ Use `bash uninstall.sh --purge` to also delete `.mac_update_prefs` inside the re
 - Homebrew, `mas`, Python, or other tools installed by `setup.sh`
 - Any applications on your Mac
 - Private files in cloud storage (`APPLICATIONS.md`, `UPDATES.md`, `.env`)
-- Logs under `logs/` if you copied them elsewhere
+- Anything you copied out of the clone beforehand (for example logs from `logs/`, which are deleted together with the directory)
 
 ## Manual removal
 

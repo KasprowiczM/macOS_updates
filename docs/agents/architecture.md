@@ -1,12 +1,6 @@
 # Architecture
 
-v1.5.5 hardens the master process against toolchain changes made by its own children: every long-lived orchestrator enables `shopt -s checkhash` (and `update_all.sh` runs `hash -r` between steps) so a `python3` link removed by a Homebrew upgrade cannot leave a stale hashed path. Step 5 is reporting-only and never defers macOS updates; a failed summary write relabels the stale `run_status: "started"` file as `"failed"`. Toolkit-launched apps receive a repeated graceful `quit` (`MAC_UPDATE_QUIT_WAIT`, `MAC_UPDATE_QUIT_RESEND`; never force-killed), and soft internet warnings that carry no pending update use their own wording (`L_INTERNET_WARNINGS_ONLY`).
-
-v1.5.4 keeps run-summary format **4** with additive item support: `status="warning"` represents manufacturer evidence issues, and optional `installed_version` / `vendor_version` fields preserve both observations. A stale feed has `old_version=null` and `new_version=null`; it is not an installation target. Consumers that enumerate statuses must recognize `warning`; consumers counting updates continue to filter `status="updated"`. Known per-app warnings suppress duplicate generic Internet warnings, while hard failures and unknown/malformed status input retain the generic diagnostic.
-
-v1.5.3 verifies vendor versions before GUI work and uses direct-first vendor artifacts for ChatGPT. Known current/stale feeds avoid launches; unknown feeds retain the native fallback. The final settle loop runs only for toolkit-launched applications. App-copy transactions check running state before staging and immediately before replacement; unknown state defers without closing user apps.
-
-The CLI step updates existing native installations before Node/npm and uses `lib/python/cli_duplicates.py` to discover redundant npm packages conservatively. Package removal requires native version validation, supported location, PATH ownership and process checks; failed migration retains the fallback.
+This page describes the structural rules of the toolkit (shell, Python, session directory, i18n, cloud sync). Per-release behavior changes that shaped them are summarized under *Recent changes* at the end; `CHANGELOG.md` is the full history.
 
 ## Shell
 - **Bash 3.2+ only** — no `declare -A`, no `mapfile`, no `readarray`, no bash 4+ features
@@ -53,3 +47,13 @@ The CLI step updates existing native installations before Node/npm and uses `lib
 
 ## Data Files
 - `APPLICATIONS.md` / `UPDATES.md` are auto-maintained — manual edits will be overwritten
+
+## Recent changes (v1.5.3 to v1.5.5)
+
+v1.5.5 hardens the master process against toolchain changes made by its own children: every long-lived orchestrator enables `shopt -s checkhash` (and `update_all.sh` runs `hash -r` between steps) so a `python3` link removed by a Homebrew upgrade cannot leave a stale hashed path. Step 5 is reporting-only and never defers macOS updates; a failed summary write relabels the stale `run_status: "started"` file as `"failed"`. Toolkit-launched apps receive a repeated graceful `quit` (`MAC_UPDATE_QUIT_WAIT`, `MAC_UPDATE_QUIT_RESEND`; never force-killed), and soft internet warnings that carry no pending update use their own wording (`L_INTERNET_WARNINGS_ONLY`).
+
+v1.5.4 keeps run-summary format **4** with additive item support: `status="warning"` represents manufacturer evidence issues, and optional `installed_version` / `vendor_version` fields preserve both observations. A stale feed has `old_version=null` and `new_version=null`; it is not an installation target. Consumers that enumerate statuses must recognize `warning`; consumers counting updates continue to filter `status="updated"`. Known per-app warnings suppress duplicate generic Internet warnings, while hard failures and unknown/malformed status input retain the generic diagnostic.
+
+v1.5.3 verifies vendor versions before GUI work and uses direct-first vendor artifacts for ChatGPT. Known current/stale feeds avoid launches; unknown feeds retain the native fallback. The final settle loop runs only for toolkit-launched applications. App-copy transactions check running state before staging and immediately before replacement; unknown state defers without closing user apps.
+
+The CLI step updates existing native installations before Node/npm and uses `lib/python/cli_duplicates.py` to discover redundant npm packages conservatively. Package removal requires native version validation, supported location, PATH ownership and process checks; failed migration retains the fallback.

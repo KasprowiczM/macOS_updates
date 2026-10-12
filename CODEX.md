@@ -1,26 +1,15 @@
 # macOS Updates — Codex Agent Context
 
-Codex is a cloud-based coding agent for this repo — read shared rules before modifying any script.
-
 **Version:** 1.5.5 · **Platform:** Apple Silicon (arm64), macOS 13–27
 
-## Shared Rules & Architecture
+Codex works on this repo with the same rules as every other agent. The shared contract (quick commands, reference docs, non-negotiable rules) lives in `AGENTS.md`:
 
-@CLAUDE.md
+@AGENTS.md
 
-## Reference Docs
+## Codex-specific notes
 
-Load only when relevant:
-
-- @docs/agents/scripts.md — install.sh, build_inventory.sh, pipeline, dev_sync, new Mac setup
-- @docs/agents/architecture.md — Bash 3.2, session dir, Python heredocs, i18n
-- @docs/agents/critical_rules.md — softwareupdate -R, sudo mas, update methods
-- @docs/agents/troubleshooting.md — common failures
-- @docs/user/en/GUIDE.md — adding internet apps and update methods
-- @docs/INSTALL.md · @docs/UNINSTALL.md — user install/remove
-
-## Production notes
-
-- New users: `install.sh` → `build_inventory.sh` (no cloud import)
-- `APPLICATIONS.md` is per-machine; never ship another user's catalog
-- `scripts/report_update_coverage.sh` lists apps by update-method category
+- Docs worth loading for typical Codex tasks: `docs/agents/scripts.md` (install, pipeline, `dev_sync`, adding apps), `docs/agents/critical_rules.md` (`softwareupdate -R`, `sudo mas`, update methods), `docs/user/en/GUIDE.md` (adding internet apps).
+- New users: `install.sh`, then `build_inventory.sh` (no cloud import).
+- `APPLICATIONS.md` is per-machine; never ship or commit another user's catalog.
+- `scripts/report_update_coverage.sh` lists apps by update-method category.
+- Install and removal: `docs/INSTALL.md`, `docs/UNINSTALL.md`.

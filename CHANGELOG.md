@@ -25,6 +25,13 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 - The same run verified App Store Track 2 (UniFi 10.38.1 → 11.0.0), a verified vendor install (OpenCode Desktop 1.18.35 → 1.19.0) and toolkit-launched native updaters (Claude Desktop 2.31226.1, Warp). The macOS system step was skipped by the bug above, so the system/reboot path remains unaccepted. See [the follow-up review](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md).
 
+### Documentation
+
+- **Documentation cleanup.** `README.md` was restructured (site link, at-a-glance table, a per-method table for the 43 apps / 11 update methods, corrected `MAC_UPDATE_INTERNET_SETTLE_SECONDS` default `15`, the new `MAC_UPDATE_QUIT_WAIT` / `MAC_UPDATE_QUIT_RESEND` variables, test count 561) and the six translations (`README.pl/es/fr/de/it/pt.md`) were rewritten to carry exactly the same facts; the stale `vendor_latest`, `--greedy-auto-updates` and v1.4.0 feature sections in five of them are gone.
+- **One agent contract.** `AGENTS.md` is the single source for agent rules; `CLAUDE.md`, `GEMINI.md` and `CODEX.md` import it and keep only harness-specific notes. The broken reference to the local-only handoff guide was removed.
+- **Development records organized.** `docs/reviews/` is now an index plus the records of the current release line; 43 superseded prompts, reports and reviews moved to `docs/reviews/archive/` (history kept with `git mv`), and implementation plans moved to `docs/archive/plans/`. Machine- and account-specific details (an e-mail address, a hostname, a login name in a LaunchAgent label) were redacted from archived records.
+- **New files and fixes.** Added `SECURITY.md` and a rewritten `CONTRIBUTING.md`; corrected `docs/agents` (duplicate section numbers in `critical_rules.md`, misplaced paragraph in `exit_codes.md`, missing scripts in `scripts.md`), the Claude slash-command notes, `dev_sync/INDEX.md` anchors, and removed a machine-specific package list from a slash command.
+
 ## [1.5.4] — 2026-10-05
 
 ### Fixed
