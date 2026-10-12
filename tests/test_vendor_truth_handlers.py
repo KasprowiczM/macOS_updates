@@ -649,6 +649,7 @@ exit 0
         }}
 
         INTERNET_SOFT_FAIL=0
+        INTERNET_QUIT_TIMEOUT=0
 
         # Load silent_launch_app and quit_toolkit_launched_apps from update_internet_apps.sh
         eval "$(sed -n '/^silent_launch_app()/,/^}}/p' "{REPO_ROOT}/update_internet_apps.sh")"
@@ -669,7 +670,7 @@ exit 0
         # Settle cleanup
         quit_toolkit_launched_apps
 
-        echo "SOFT_FAIL=$INTERNET_SOFT_FAIL"
+        echo "SOFT_FAIL=$INTERNET_SOFT_FAIL QUIT_TIMEOUT=$INTERNET_QUIT_TIMEOUT"
         """
         proc = self._run_bash(script)
         self.assertEqual(proc.returncode, 0, f"Script failed with stderr:\n{proc.stderr}\nstdout:\n{proc.stdout}")
@@ -695,7 +696,8 @@ exit 0
 
         # App C failed to exit within 60s -> warning with L_INTERNET_APP_STILL_RUNNING_FMT
         self.assertIn("com.test.appC was launched for update and did not exit within 60s", proc.stdout)
-        self.assertIn("SOFT_FAIL=1", proc.stdout)
+        # A quit timeout is a warning-only cause (v1.5.5), not a "not verified" failure.
+        self.assertIn("SOFT_FAIL=0 QUIT_TIMEOUT=1", proc.stdout)
 
     def test_opencode_vendor_feed_equal_does_not_launch(self):
         open_log = os.path.join(self.tmpdir, "open.log")

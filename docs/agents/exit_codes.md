@@ -13,11 +13,12 @@
 | Leaf `update_*.sh` | `10` | Soft/degraded failure (query failed, network unreachable, cosmetic; non-blocking) |
 | Leaf `update_*.sh` | `1` | Hard failure (package/install operation broke mid-transaction; blocking) |
 
-Only a **hard** failure (exit `1` / `127`) in steps 1–5 sets `BLOCKING_EXIT` and defers the
+Only a **hard** failure (exit `1` / `127`) in steps 1–4 sets `BLOCKING_EXIT` and defers the
 final macOS step. This prevents `softwareupdate -R` from restarting a Mac that may be
-mid-transaction. Two deliberate exceptions:
+mid-transaction. Three deliberate exceptions:
 
 - **Step 0 (prescan) never blocks.** It is a read-only scan and mutates nothing.
+- **Step 5 (inventory/postupdate) never blocks (v1.5.5).** It is a reporting step; a failure still sets `OVERALL_EXIT=1` (non-zero exit, "completed with errors") but must not defer macOS security updates.
 - **Soft results (exit `10`) never block.** A vendor updater that could not be verified,
   an offline feed, or a GUI automation that returned an ambiguous result surfaces as a
   warning and still allows macOS security updates to install. Suppressing security

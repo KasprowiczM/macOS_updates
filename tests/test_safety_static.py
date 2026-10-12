@@ -262,6 +262,30 @@ class StaticShellSafetyTests(unittest.TestCase):
                 text = self.read_script(name)
                 self.assertIn("set -o pipefail", text)
 
+    def test_orchestrators_enable_checkhash_after_pipefail(self) -> None:
+        """Long-lived orchestrators must `shopt -s checkhash` right after pipefail.
+
+        Homebrew can delete /opt/homebrew/bin/python3 mid-run (2026-10-11
+        python@3.14 upgrade). Without checkhash bash keeps the stale hashed
+        path and later `python3` calls fail with "No such file or directory".
+        """
+        orchestrators = [
+            "update_all.sh",
+            "update_appstore.sh",
+            "update_brew.sh",
+            "update_internet_apps.sh",
+            "update_npm_cli.sh",
+            "update_system.sh",
+            "migration_setup.sh",
+        ]
+        for name in orchestrators:
+            with self.subTest(script=name):
+                text = self.read_script(name)
+                pipefail = text.index("set -o pipefail")
+                checkhash = re.search(r"^shopt -s checkhash$", text, re.MULTILINE)
+                self.assertIsNotNone(checkhash, f"{name} must enable `shopt -s checkhash`")
+                self.assertGreater(checkhash.start(), pipefail)
+
     def test_update_all_persists_run_log(self) -> None:
         """update_all.sh must tee output to a persistent log under logs/.
 

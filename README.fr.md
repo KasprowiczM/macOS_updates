@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.4** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.5** — Orchestrateur de mise à jour en une commande prêt pour la production pour **Macs Apple Silicon sous macOS 13–27**. Coordonne les mises à jour vérifiées pour les logiciels déjà installés sur ce Mac. **Multilingue** (7 langues). Couche cloud privée optionnelle via [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.5 :** Une mise à jour Homebrew qui supprime `python3` en cours d’exécution ne casse plus l’étape d’inventaire/rapport (le shell réexamine `PATH`), et une étape de rapport en échec ne reporte plus les mises à jour de macOS. Les messages finaux sont honnêtes : plus d’affirmation « fichiers mis à jour » après un échec, et les avertissements de flux obsolète ou d’app non fermée ne sont plus présentés comme des mises à jour non vérifiées. Les apps lancées par l’outil reçoivent plusieurs demandes de fermeture (jamais d’arrêt forcé).
 
 **v1.5.4 :** Les anciens flux du fabricant sont présentés séparément comme avertissements, sans cible de rétrogradation ni affirmation de lancement d’un programme de mise à jour. Les opérations réellement non confirmées restent visibles. Le dernier passage utilisateur a duré 108 secondes sans mise à jour d’application observée ; ce n’est pas un benchmark d’installation.
 

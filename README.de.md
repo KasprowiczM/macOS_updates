@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.4** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+> **v1.5.5** — Produktionsbereiter Ein-Befehl-Update-Orchestrierer für **Apple Silicon Macs unter macOS 13–27**. Koordiniert verifizierte Paket-Updates für bereits auf diesem Mac installierte Software. **Mehrsprachig** (7 Sprachen). Optionale private Cloud-Schicht über [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.5:** Ein Homebrew-Upgrade, das `python3` mitten im Lauf entfernt, bricht den Inventar-/Berichtsschritt nicht mehr (die Shell durchsucht `PATH` neu), und ein fehlgeschlagener Berichtsschritt verschiebt macOS-Updates nicht mehr. Die Abschlussmeldungen sind ehrlich: keine Meldung „Dateien aktualisiert“ nach einem Fehler, und Warnungen zu veralteten Feeds oder nicht beendeten Apps gelten nicht mehr als unverifizierte Updates. Vom Toolkit gestartete Apps werden wiederholt zum Beenden aufgefordert (nie erzwungen).
 
 **v1.5.4:** Veraltete Herstellerfeeds erscheinen als separate Warnungen ohne ausstehendes Downgrade oder behaupteten Updater-Start. Tatsächlich unbestätigte Vorgänge bleiben sichtbar. Der letzte Nutzerlauf dauerte 108 Sekunden ohne beobachtete App-Updates; dies ist kein Installationsbenchmark.
 

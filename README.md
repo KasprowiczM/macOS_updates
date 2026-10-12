@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml/badge.svg)](https://github.com/KasprowiczM/macOS_updates/actions/workflows/ci.yml)
 
-> **v1.5.4** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.5.5** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+
+**v1.5.5:** A Homebrew upgrade that removes `python3` mid-run no longer breaks the inventory/report step (the shell now re-searches `PATH`), and a failed reporting step no longer postpones macOS updates. Final messages are honest: no "files updated" claim after a failure, and stale-feed or quit-timeout warnings are no longer reported as unverified updates. Toolkit-launched apps are asked to quit repeatedly (never force-killed).
 
 **v1.5.4:** Stale manufacturer feeds are shown as separate warnings, without a pending downgrade target or a claim that an updater launched. Actual unconfirmed operations remain visible. The latest user-run verification completed in 108 seconds with no observed app updates; this is not an installation benchmark.
 

@@ -76,6 +76,8 @@
 | `MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT` | `300` | Timeout (seconds) for post-Track-2 iPad app installation verification (0–1800) |
 | `MAC_UPDATE_APP_DIRS` | `/Applications:$HOME/Applications` | Colon-separated list of application directories for scanning (used in tests and hermetic CI runs) |
 | `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |
+| `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; the AppleScript `quit` is re-sent while it keeps running, never force-killed (v1.5.5) |
+| `MAC_UPDATE_QUIT_RESEND` | `10` | Interval in seconds (1–60) between repeated graceful `quit` requests inside `MAC_UPDATE_QUIT_WAIT` (v1.5.5) |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
 ## update_all.sh Step Order

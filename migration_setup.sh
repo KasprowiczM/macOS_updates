@@ -5,6 +5,10 @@
 # Data: 2026-03-12 | Zaktualizowano: 2026-06-09
 # Kompatybilność: bash 3.2+ · Apple Silicon (arm64) only
 set -o pipefail
+# Homebrew can remove /opt/homebrew/bin/python3 (or any other symlink) while
+# this process is running. Without checkhash, bash keeps calling the stale
+# hashed path ("No such file or directory") instead of re-searching PATH.
+shopt -s checkhash
 #
 # URUCHOM JAKO PIERWSZY po skopiowaniu folderu na nowego MacBooka.
 #

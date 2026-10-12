@@ -5,6 +5,10 @@
 # ============================================================
 # Autor: mk | Data: 2026-03-18 (zaktualizowano)
 set -o pipefail
+# Homebrew can remove /opt/homebrew/bin/python3 (or any other symlink) while
+# this process is running. Without checkhash, bash keeps calling the stale
+# hashed path ("No such file or directory") instead of re-searching PATH.
+shopt -s checkhash
 
 # Kompatybilność: bash 3.2+ (macOS domyślny shell, Apple Silicon arm64)
 #
@@ -80,6 +84,10 @@ INTERNET_SOFT_EXIT=10
 INTERNET_EXIT=0
 INTERNET_HARD_FAIL=0
 INTERNET_SOFT_FAIL=0
+# Warning-only causes (do not mean an update is pending): a toolkit-launched
+# app that did not quit, and manufacturer feeds older than the installed app.
+INTERNET_QUIT_TIMEOUT=0
+INTERNET_FEED_STALE=0
 INTERNET_TEMP_ROOT="${MAC_UPDATE_SESSION_DIR:-}"
 INTERNET_TEMP_OWNED=0
 if [ -z "$INTERNET_TEMP_ROOT" ]; then
@@ -433,8 +441,8 @@ quit_toolkit_launched_apps() {
             _t_bid="$(echo "$_t_bid" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             [ -n "$_t_bid" ] || continue
             if ! internet_app_quit_gracefully "$_t_bid"; then
-                print_warn "$(printf "$L_INTERNET_APP_STILL_RUNNING_FMT" "$_t_bid")"
-                INTERNET_SOFT_FAIL="1"
+                print_warn "$(printf "$L_INTERNET_APP_STILL_RUNNING_FMT" "$_t_bid" "$(internet_quit_wait_seconds)")"
+                INTERNET_QUIT_TIMEOUT=1
             fi
         done < "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt"
     fi
@@ -864,8 +872,12 @@ while IFS='|' read -r _c_app _c_meth _c_var; do
             ;;
     esac
     case "$_code" in
-        behind|needs_restart|feed_stale)
+        behind|needs_restart)
             _soft_fail_from_codes=1
+            ;;
+        feed_stale)
+            # Known per-app manufacturer warning: soft, but nothing is pending.
+            INTERNET_FEED_STALE=1
             ;;
     esac
 done < "$SCRIPT_DIR/config/internet_app_methods.txt"
@@ -1023,13 +1035,26 @@ do
 done
 [ "$_soft_fail_from_codes" -ne 0 ] && INTERNET_SOFT_FAIL=1
 
+_warn_only=0
+if [ "$INTERNET_FEED_STALE" -ne 0 ] || [ "$INTERNET_QUIT_TIMEOUT" -ne 0 ]; then
+    _warn_only=1
+fi
+_soft_kind="$(internet_soft_summary_kind "$INTERNET_SOFT_FAIL" "$_warn_only" "$_cnt_unverified")"
+
 if [ "$INTERNET_HARD_FAIL" -ne 0 ]; then
     INTERNET_EXIT=1
     print_error "$L_INTERNET_HARD_FAILURE"
     [ "$INTERNET_SOFT_FAIL" -ne 0 ] && print_warn "$L_INTERNET_PARTIAL_FAILURE"
-elif [ "$INTERNET_SOFT_FAIL" -ne 0 ]; then
+elif [ "$_soft_kind" != "none" ]; then
+    # Exit 10 either way (soft/degraded, never blocks macOS). Only the wording
+    # differs: "not verified or updated" is reserved for a real unverified,
+    # behind or errored application.
     INTERNET_EXIT="$INTERNET_SOFT_EXIT"
-    print_warn "$L_INTERNET_PARTIAL_FAILURE"
+    if [ "$_soft_kind" = "warnings_only" ]; then
+        print_warn "$L_INTERNET_WARNINGS_ONLY"
+    else
+        print_warn "$L_INTERNET_PARTIAL_FAILURE"
+    fi
     print_info "$L_INTERNET_SOFT_NOTE"
 fi
 print_header "$L_INTERNET_SCRIPT_DONE"

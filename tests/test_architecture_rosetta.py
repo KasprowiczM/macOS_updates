@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """tests/test_architecture_rosetta.py — Tests for architecture awareness & Rosetta."""
+from __future__ import annotations
 
 import os
 import shutil
