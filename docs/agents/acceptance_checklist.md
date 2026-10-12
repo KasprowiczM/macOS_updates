@@ -1,6 +1,13 @@
 # Production Acceptance Checklist — v1.5.x Live Execution Paths
 
-## Live current-software acceptance and v1.5.4 follow-up (2026-10-05)
+## Current status (v1.5.5, 2026-10-12)
+
+- Release gate: **561 tests pass** (`bash run_tests.sh`), shell/Python syntax and secret scan pass.
+- Newest live evidence: the 2026-10-11 run below ([v1.5.5 follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md)). Paths 1 and 5 (success branch) were observed; the system update/reboot paths 2 and 3 are still **unaccepted** because that run skipped the macOS step (fixed in v1.5.5).
+- The two dated sections after it (2026-10-05, v1.5.3/v1.5.4) are historical evidence and are kept unchanged.
+
+
+## Historical: live current-software acceptance and v1.5.4 follow-up (2026-10-05)
 
 The user completed a real v1.5.3 Update All run in **108 seconds**: App Store, native CLI, Homebrew, inventory and system checks completed; 25 internet applications verified, zero unverified app updaters, no observed package/app version changes. No GUI application launch was recorded. macOS 27.0.1 offered no update. Proton Drive's stale manufacturer feed was the only degraded result.
 
@@ -8,7 +15,17 @@ v1.5.4 fixes the presentation of that manufacturer warning and Proton Mail's upd
 
 Current follow-up evidence: [v1.5.4 run-log review](../reviews/RUN_LOG_FOLLOWUP_2026-10-05_v154.md). Historical v1.5.3 review and acceptance dates below remain unchanged.
 
-## v1.5.3 validation (2026-10-05)
+## Live run observation (2026-10-11)
+
+The user ran an interactive Update All (Polish locale) on the v1.5.4 branch state. The run exposed the stale-command-hash defect fixed in v1.5.5 (see [the follow-up review](../reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md)); the observations below are valid regardless of that defect.
+
+- **Path 1 (App Store Track 2) accepted:** UniFi 10.38.1 → 11.0.0 updated through the App Store GUI and verified after Track 2.
+- **Path 5, success branch only:** OpenCode Desktop 1.18.35 → 1.19.0 installed from the verified vendor feed and verified. The Gatekeeper-rejection and post-swap rollback branches were not exercised.
+- **Toolkit-launched native updaters:** Claude Desktop reached 2.31226.1 and Warp 0.2026.10.07.08.29.00 through their own updaters after the toolkit launched them.
+- **Path 7, partial:** Warp quit cleanly. Claude Desktop did not exit within 60 s after updating itself (most likely relaunched by its updater — not directly observed); the single `quit` was never re-sent. v1.5.5 re-sends the graceful quit (never force-kills) and reports the leftover as a warning.
+- **macOS system step NOT exercised:** step 5 failed on the missing `python3`, was wrongly classified as blocking, and the final macOS step was skipped. The system update/reboot path (paths 2 and 3) therefore remains unaccepted. v1.5.5 makes step 5 non-blocking; a future run must exercise the system step.
+
+## Historical: v1.5.3 validation (2026-10-05)
 
 - Release gate: **527 tests pass**, shell/Python syntax and secret scan pass; whole-repository warning-level ShellCheck passes.
 - Read-only vendor feed query confirms ChatGPT's installed version equals the current offer and Proton Mail is current. Proton Drive's official feed remains older than its installed release; this is a manufacturer-data warning, not a verified update.
@@ -28,13 +45,13 @@ When running `update_all.sh`, inspect the execution log in `logs/update_all_<YYY
 
 | # | Execution Path | Trigger Condition | Log Signal (i18n Key / EN Message) | Expected Valid Outcome | Observed (Date & Log File) |
 |---|---|---|---|---|---|
-| **1** | **App Store Track 2 (iPad Apps GUI)** | iTunes Lookup API detects an available update for an installed iPad app (UniFi, WiFiman, Picsart, etc.). | `L_APPSTORE_IOS_PENDING_FMT`<br>`"iPad app update available: %s %s → %s"`<br>`L_TOR_2_HEADER`<br>`"⬇️ TRACK 2: App Store GUI Automation (iPad apps)"` | Interactive: App Store GUI opens, clicks update, verifies closure, `ios_apps_pending` clears.<br>Non-interactive: Emits soft warning (`L_APPSTORE_IOS_NEEDS_INTERACTIVE`), writes `appstore_ios_pending.txt`, soft exit 10. | `[ ]` |
+| **1** | **App Store Track 2 (iPad Apps GUI)** | iTunes Lookup API detects an available update for an installed iPad app (UniFi, WiFiman, Picsart, etc.). | `L_APPSTORE_IOS_PENDING_FMT`<br>`"iPad app update available: %s %s → %s"`<br>`L_TOR_2_HEADER`<br>`"⬇️ TRACK 2: App Store GUI Automation (iPad apps)"` | Interactive: App Store GUI opens, clicks update, verifies closure, `ios_apps_pending` clears.<br>Non-interactive: Emits soft warning (`L_APPSTORE_IOS_NEEDS_INTERACTIVE`), writes `appstore_ios_pending.txt`, soft exit 10. | `[x]` 2026-10-11 — UniFi 10.38.1 → 11.0.0 via GUI, verified after Track 2 |
 | **2** | **macOS System Update (No-Restart + Restart Batch)** | `softwareupdate -l` returns both non-restart updates (Safari, CLT, XProtect) and restart-required system builds. | No-restart: `"Installing: <label>..."`<br>Restart batch: `L_SYSTEM_INSTALLING_RESTART_BATCH_FMT`<br>`"Installing (restart required): %s..."`<br>`L_SYSTEM_RESTARTING`<br>`"Update complete. System will restart automatically..."` | Non-restart labels install individually; restart-required labels install in ONE batch with `-R --verbose`; records each to `system_installed_labels.txt`; system triggers restart cleanly. | `[ ]` |
 | **3** | **Major macOS Upgrade Guard (macOS 28+)** | `softwareupdate -l` offers a major OS release (different major version from current host). | `L_SYSTEM_MAJOR_AVAILABLE`<br>`"Major macOS upgrade available: %s (%s) — skipped (requires MAC_UPDATE_ALLOW_MAJOR_UPGRADE=1)"` | Major version upgrade is filtered out (`should_install=0`); only minor/security labels are installed; system does not perform unintended major OS upgrade. | `[ ]` |
 | **4** | **Homebrew Orphan Cask Handling** | User manually removed a `.app` bundle from `/Applications`, leaving a stale Homebrew cask record. | `L_BREW_ORPHAN_CASK_FMT`<br>`"Cask %s: the app was removed manually (%s missing) — skipping. Remove the Homebrew record: brew uninstall --cask --force %s"` | Cask is skipped from upgrade targets; recorded in `brew_orphan_casks.txt`; pipeline never redownloads or reinstalls deleted app. | `[ ]` |
-| **5** | **Direct Vendor DMG Install & Atomic Rollback** | An internet app with a direct DMG feed (`config/vendor_feeds.txt`) is outdated and closed. | `L_INTERNET_GATEKEEPER_REJECTED`<br>`"Gatekeeper rejected signature: %s"`<br>Post-swap failure:<br>`"Post-install signature check failed for %s"` | DMG is downloaded from verified allowlist, Gatekeeper signature confirmed, staged in `/Applications/.macupd_staging.*`, swapped atomically with backup in `.macupd_backup.*`. On any verification failure, automatic rollback restores backup. | `[ ]` |
+| **5** | **Direct Vendor DMG Install & Atomic Rollback** | An internet app with a direct DMG feed (`config/vendor_feeds.txt`) is outdated and closed. | `L_INTERNET_GATEKEEPER_REJECTED`<br>`"Gatekeeper rejected signature: %s"`<br>Post-swap failure:<br>`"Post-install signature check failed for %s"` | DMG is downloaded from verified allowlist, Gatekeeper signature confirmed, staged in `/Applications/.macupd_staging.*`, swapped atomically with backup in `.macupd_backup.*`. On any verification failure, automatic rollback restores backup. | `[ ]` partial 2026-10-11 — success branch only (OpenCode Desktop 1.18.35 → 1.19.0); rollback branch not exercised |
 | **6** | **Chrome Staged Rollout Status (K1)** | Google VersionHistory API has newer public version, but Google Omaha returns `noupdate` / no response. | `L_INTERNET_STATUS_ROLLOUT_HOLD_FMT`<br>`"ℹ️  Vendor rollout: %s installed, %s public — not offered to this Mac yet"` | Reported as informational hold `rollout_hold` (`⏸` / `ℹ️`) with `INTERNET_LAST_VERIFIED=1`; no misleading unverified updater warnings or pipeline failures. | `[ ]` |
-| **7** | **Preserve User Apps & Quit Toolkit-Launched** | An app was closed prior to run; toolkit launched it in background for update trigger. | Launch: Bundle ID recorded in `toolkit_launched.txt`.<br>Quit: `internet_app_quit_gracefully` quits app.<br>Failure to quit:<br>`L_INTERNET_APP_STILL_RUNNING_FMT`<br>`"%s was launched for update and did not exit within 60s"` | User-opened apps are untouched. Apps opened by toolkit are recorded in `toolkit_launched.txt` and closed cleanly at end of Step 4. If an open app is outdated, warns `NEEDS_RESTART` without closing it. | `[ ]` |
+| **7** | **Preserve User Apps & Quit Toolkit-Launched** | An app was closed prior to run; toolkit launched it in background for update trigger. | Launch: Bundle ID recorded in `toolkit_launched.txt`.<br>Quit: `internet_app_quit_gracefully` quits app.<br>Failure to quit:<br>`L_INTERNET_APP_STILL_RUNNING_FMT`<br>`"%s was launched for update and did not exit within 60s"` | User-opened apps are untouched. Apps opened by toolkit are recorded in `toolkit_launched.txt` and closed cleanly at end of Step 4. If an open app is outdated, warns `NEEDS_RESTART` without closing it. | `[ ]` partial 2026-10-11 — Warp quit cleanly; Claude Desktop did not quit within 60 s (likely relaunched by its updater; v1.5.5 re-sends the graceful quit) |
 | **8** | **Docker Desktop verified DMG (v1.5.2)** | Docker Desktop is closed and behind its appcast. | `L_INTERNET_VENDOR_DIRECT_FMT`<br>`"Installing Docker Desktop %s from the vendor (desktop.docker.com) …"` | DMG verified (Gatekeeper, bundle ID, Team ID), swapped with rollback; engine never started. A running Docker reports `NEEDS_RESTART`. | `[x]` 2026-09-28 — 4.92.0 → 4.93.0, `codesign --verify --deep --strict` + `spctl` pass |
 | **9** | **Chromium updater history proof (v1.5.2)** | Gemini / Google Drive / Comet current, updater checked within 6 h. | `L_INTERNET_STATUS_OMAHA_RECENT_FMT`<br>`"✅ Up to date (vendor updater check at %s)"` | `current_vendor`, updater not woken, no 45 s wait. | `[x]` 2026-09-28 — Gemini 14:10, Drive 14:10, Comet 14:40; Step 4 11 min → 2 min |
 
@@ -128,7 +145,7 @@ When running `update_all.sh`, inspect the execution log in `logs/update_all_<YYY
 
 ### 5. Direct Vendor DMG Install & Atomic Rollback via `copy_verified_app`
 
-- **Condition:** An internet app with a direct DMG download feed (e.g. KeePassXC, LibreOffice) is outdated and closed on the local Mac.
+- **Condition:** An internet app with a direct DMG download feed (e.g. KeePassXC, Visual Studio Code) is outdated and closed on the local Mac.
 - **Log lines to look for:**
   - Normal successful upgrade:
     ```text

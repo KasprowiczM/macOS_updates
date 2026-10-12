@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.5.4**).
+**Version:** see `VERSION` in repo root (currently **1.5.5**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macosupdates.dev>
 
 ## One-line install (new Mac, Apple Silicon)
 
@@ -63,4 +63,4 @@ bash update_all.sh
 bash run_tests.sh
 ```
 
-See also [UNINSTALL.md](UNINSTALL.md) and [user/en/QUICK_START.md](user/en/QUICK_START.md).
+See also [UNINSTALL.md](UNINSTALL.md), [user/en/QUICK_START.md](user/en/QUICK_START.md) and the [documentation index in the README](../README.md#documentation).

@@ -290,7 +290,7 @@ lib/internet_handlers.sh                      feed bez czytelnego manifestu
 lib/python/inventory.py                       norm_name() bez markerów
 i18n/lang_{pl,en,de,fr,es,it,pt}.sh           3 nowe klucze × 7 języków
 tests/test_run_log_regressions_20260826.py    19 testów regresyjnych
-docs/reviews/ULTRA_REVIEW_2026-08-26.md       ten dokument
+docs/reviews/archive/ULTRA_REVIEW_2026-08-26.md       ten dokument
 ```
 
 ---

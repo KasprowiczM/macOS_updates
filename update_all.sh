@@ -8,6 +8,10 @@
 # We deliberately do NOT use `set -e` — orchestrator runs every step
 # even on partial failure and reports per-step status at the end.
 set -o pipefail
+# Homebrew can remove /opt/homebrew/bin/python3 (or any other symlink) while
+# this process is running. Without checkhash, bash keeps calling the stale
+# hashed path ("No such file or directory") instead of re-searching PATH.
+shopt -s checkhash
 
 # Data:  2026-04-18 (zaktualizowano)
 # Opis:  Uruchamia wszystkie skrypty aktualizacji po kolei:
@@ -63,6 +67,10 @@ write_machine_summary() {
     save_step_status_codes || true
     end_now="$(date +%s)"
     export MAC_UPDATE_RUN_STATUS="$status"
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "  run_summary: python3 not found on PATH — cannot write the machine summary" >&2
+        return 127
+    fi
     python3 -c '
 import json, os, sys
 sys.path.insert(0, os.path.join(sys.argv[1], "lib", "python"))
@@ -158,10 +166,32 @@ elif os.environ.get("MAC_UPDATE_RUN_STATUS") == "completed":
     print(format_terminal_summary(summary, lang=lang))
 ' "$SCRIPT_DIR" "$SESSION_DIR" "$START_TIME" "$end_now"       "${OVERALL_EXIT:-0}" "${DEGRADED:-0}" "${BLOCKING_EXIT:-0}"       "${RESULT_SCAN:-}" "${RESULT_APPSTORE:-}" "${RESULT_NPMCLI:-}" "${RESULT_BREW:-}"       "${RESULT_INTERNET:-}" "${RESULT_MD:-}" "${RESULT_SYSTEM:-}"
     rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "  run_summary: python3 exited with status $rc while writing the $status summary" >&2
+    fi
     if [ "$rc" -eq 0 ] && { [ "$status" = "completed" ] || [ "$status" = "interrupted" ]; }; then
         MAC_UPDATE_SUMMARY_DONE=1
     fi
     return "$rc"
+}
+
+# The start-of-run write leaves logs/run_summary_*.json at run_status "started".
+# If the final write fails, that file must not masquerade as the run result:
+# relabel it "failed" (sed on a same-directory temp file, then rename).
+mark_stale_summary_failed() {
+    local f tmp
+    for f in "$SCRIPT_DIR/logs/run_summary_latest.json" \
+             "$SCRIPT_DIR/logs/run_summary_${RUN_TIMESTAMP:-${LOG_TS:-}}.json"; do
+        [ -f "$f" ] || continue
+        grep -q '"run_status": "started"' "$f" 2>/dev/null || continue
+        tmp="$(mktemp "$f.XXXXXX")" || continue
+        if sed 's/"run_status": "started"/"run_status": "failed"/' "$f" > "$tmp"; then
+            mv -f "$tmp" "$f" || rm -f "$tmp"
+        else
+            rm -f "$tmp"
+        fi
+    done
+    return 0
 }
 
 export UI_START_EPOCH=$(date +%s)
@@ -539,7 +569,8 @@ SYSTEM_DEFERRED=0
 #                      mid-replacement). A SOFT result NEVER blocks — this is
 #                      the 2026-07-26 regression: a misdetected Microsoft
 #                      AutoUpdate check suppressed macOS security updates.
-#   step 5 inventory   blocking      — results were not recorded.
+#   step 5 inventory   NOT blocking  — reporting only, mutates nothing; a failure
+#                      still sets OVERALL_EXIT=1 but never defers macOS updates.
 #   step 6 system      n/a           — nothing runs after it.
 #
 # Rationale: only a failure that can leave the machine mid-mutation, or that a
@@ -1282,7 +1313,7 @@ if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
             RESULT_APPSTORE="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
             STATUS_CODE_APPSTORE="warn"
             DEGRADED=1
-            print_warn "App Store reported unverified updates (soft) — macOS step not blocked"
+            print_warn "App Store reported warnings (soft) — macOS step not blocked"
         else
             RESULT_APPSTORE="$L_STATUS_ERROR"
             STATUS_CODE_APPSTORE="error"
@@ -1303,6 +1334,9 @@ fi
 # STEP 2: Native CLI & npm update
 # ============================================================
 ui_master_progress 2 6
+# The previous child may have changed what is installed (Homebrew can drop
+# python3/node links); forget cached command paths before the next step.
+hash -r 2>/dev/null || true
 if [ "${MAC_UPDATE_SKIP_NPM:-0}" = "1" ]; then
     print_info "Skipped step 2 (--skip-npm)"
     RESULT_NPMCLI="$L_ALL_RESULT_SKIPPED"
@@ -1323,7 +1357,7 @@ else
         RESULT_NPMCLI="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
         STATUS_CODE_NPMCLI="warn"
         DEGRADED=1
-        print_warn "Native CLI + npm reported unverified updates (soft) — macOS step not blocked"
+        print_warn "Native CLI + npm reported warnings (soft) — macOS step not blocked"
     else
         RESULT_NPMCLI="$L_STATUS_ERROR"
         STATUS_CODE_NPMCLI="error"
@@ -1337,6 +1371,9 @@ fi
 # STEP 3: Homebrew update
 # ============================================================
 ui_master_progress 3 6
+# The previous child may have changed what is installed (Homebrew can drop
+# python3/node links); forget cached command paths before the next step.
+hash -r 2>/dev/null || true
 if [ "${MAC_UPDATE_SKIP_BREW:-0}" = "1" ]; then
     print_info "Skipped step 3 (--skip-brew)"
     RESULT_BREW="$L_ALL_RESULT_SKIPPED"
@@ -1358,7 +1395,7 @@ elif [ -f "$SCRIPT_DIR/update_brew.sh" ]; then
             RESULT_BREW="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
             STATUS_CODE_BREW="warn"
             DEGRADED=1
-            print_warn "Homebrew reported unverified updates (soft) — macOS step not blocked"
+            print_warn "Homebrew reported warnings (soft) — macOS step not blocked"
         else
             RESULT_BREW="$L_STATUS_ERROR"
             STATUS_CODE_BREW="error"
@@ -1379,6 +1416,9 @@ fi
 # STEP 4: Internet-downloaded apps update
 # ============================================================
 ui_master_progress 4 6
+# The previous child may have changed what is installed (Homebrew can drop
+# python3/node links); forget cached command paths before the next step.
+hash -r 2>/dev/null || true
 if [ "${MAC_UPDATE_SKIP_INTERNET:-0}" = "1" ]; then
     print_info "Skipped step 4 (--skip-internet)"
     RESULT_INTERNET="$L_ALL_RESULT_SKIPPED"
@@ -1403,7 +1443,7 @@ elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
             RESULT_INTERNET="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
             STATUS_CODE_INTERNET="warn"
             DEGRADED=1
-            print_warn "Internet apps reported unverified updates (soft) — macOS step not blocked"
+            print_warn "Internet apps reported warnings (soft) — macOS step not blocked"
         else
             RESULT_INTERNET="$L_STATUS_ERROR"
             STATUS_CODE_INTERNET="error"
@@ -1424,6 +1464,9 @@ fi
 # STEP 5: Update APPLICATIONS.md and UPDATES.md
 # ============================================================
 ui_master_progress 5 6
+# The previous child may have changed what is installed (Homebrew can drop
+# python3/node links); forget cached command paths before the next step.
+hash -r 2>/dev/null || true
 if [ "${MAC_UPDATE_SKIP_POSTUPDATE:-0}" = "1" ]; then
     print_info "Skipped step 5 (--skip-postupdate)"
     RESULT_MD="$L_ALL_RESULT_SKIPPED"
@@ -1962,12 +2005,14 @@ if python3 "$SESSION_DIR/postupdate.py" \
     RESULT_MD="$L_STATUS_OK completed"
     STATUS_CODE_MD="ok"
 else
-    # Step 5 is how a run records what happened: if it fails, the results were
-    # never written, so it is blocking.
+    # Step 5 is a reporting step: it mutates nothing, so a failure leaves the
+    # machine in a consistent state. The run is not clean (error + non-zero
+    # exit), but it must NOT set BLOCKING_EXIT — deferring macOS security
+    # updates over a reporting failure repeats the 2026-07-26 regression
+    # (v1.5.5: a vanished python3 failed this step and skipped the OS update).
     RESULT_MD="$L_STATUS_ERROR"
     STATUS_CODE_MD="error"
     OVERALL_EXIT=1
-    BLOCKING_EXIT=1
 fi
 fi
 fi
@@ -2088,10 +2133,14 @@ else
 fi
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
     print_info "DRY-RUN: no applications, inventory, or history files were changed."
-elif [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
-    print_info "Inventory refreshed: APPLICATIONS.md (UPDATES.md history intentionally unchanged)."
-else
-    print_info "$L_ALL_FILES_UPDATED_MSG"
+elif [ "${STATUS_CODE_MD:-}" = "ok" ]; then
+    # Only claim written files when step 5 really succeeded (a skipped or
+    # failed inventory step must not be reported as having updated them).
+    if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
+        print_info "Inventory refreshed: APPLICATIONS.md (UPDATES.md history intentionally unchanged)."
+    else
+        print_info "$L_ALL_FILES_UPDATED_MSG"
+    fi
 fi
 if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" != "1" ]; then
     print_info "$L_ALL_RESTART_CHECK_MSG"
@@ -2113,7 +2162,8 @@ export MAC_UPDATE_LOG_FILE="$LOG_FILE"
 export RUN_TIMESTAMP="${RUN_TIMESTAMP:-$LOG_TS}"
 
 if ! write_machine_summary completed; then
-    print_error "Could not write run_summary JSON"
+    print_error "Could not write run_summary JSON (see the run_summary line above for the cause)"
+    mark_stale_summary_failed
     OVERALL_EXIT=1
 fi
 

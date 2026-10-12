@@ -1,7 +1,7 @@
 # Implementation Prompt — Gemini 3 Flash (High Effort)
 ## macOS Updates v1.3.1 → v1.4.0
 
-**Source review:** `docs/reviews/Opus5_Max_Ultra_Review_v6.md` (2026-08-12, HEAD `dd3c7d5`)
+**Source review:** `docs/reviews/archive/Opus5_Max_Ultra_Review_v6.md` (2026-08-12, HEAD `dd3c7d5`)
 **Scope of this prompt:** Blocks 1 and 2 only — tasks **A3, A4, A5, A6, A1a–A1h, B1–B4**.
 Blocks 3–5 (tasks C\*, D\*, P\*, L\*) are **out of scope**; they ship in v1.5.0.
 

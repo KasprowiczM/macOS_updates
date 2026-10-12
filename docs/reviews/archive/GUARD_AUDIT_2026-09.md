@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-03  
 **Scope:** v1.4.4 observability / Ultra Review R1  
-**Reference:** `docs/reviews/GEMINI_TASK_2026-09-02.md` (Z2), Office `DeferralDays` deadlock 2026-07-14 → 2026-09-01
+**Reference:** `docs/reviews/archive/GEMINI_TASK_2026-09-02.md` (Z2), Office `DeferralDays` deadlock 2026-07-14 → 2026-09-01
 
 Three guards reviewed for the defect class where a mechanism hides the evidence it needs to release itself. For each guard the three Gemini questions are answered from measured code.
 

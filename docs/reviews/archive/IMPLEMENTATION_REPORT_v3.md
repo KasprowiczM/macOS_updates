@@ -103,7 +103,7 @@ Duration:     2m 38s
 
 ### 3.6 `bash scripts/install_launchagent.sh --check`
 ```
-  ✅ LaunchAgent is installed and active (~/Library/LaunchAgents/com.mk.mac-update.plist).
+  ✅ LaunchAgent is installed and active (~/Library/LaunchAgents/com.<user>.mac-update.plist).
   📅 Schedule: Monday at 09:00
 ```
 

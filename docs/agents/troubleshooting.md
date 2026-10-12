@@ -2,6 +2,8 @@
 
 | Problem | Fix |
 |---------|-----|
+| `update_all.sh: line N: /opt/homebrew/bin/python3: No such file or directory`, then `Could not write run_summary JSON`, then the macOS step skipped | A Homebrew upgrade (python@3.14 on Homebrew 7.0.9) removed the unversioned `python3` link mid-run while bash still held the hashed path. Fixed in v1.5.5 (`shopt -s checkhash`, `hash -r` between steps; step 5 no longer defers the macOS step). If `python3` is missing in a new shell, run `brew link python@3.14` (or install the current `python` formula); `/usr/bin/python3` is the fallback. Then rerun `bash update_all.sh` |
+| `<bundle id> was launched for update and did not exit within 60s` | The vendor updater typically relaunches the app it just updated. v1.5.5 re-sends the graceful AppleScript `quit` every `MAC_UPDATE_QUIT_RESEND` seconds within `MAC_UPDATE_QUIT_WAIT`; if the app still runs it is left running (never force-killed) and reported as a warning, not as an unverified update. Quit it manually if you want |
 | Proton Drive appears as a pending downgrade / an updater launch that never happened | v1.5.4 displays stale manufacturer data separately as a warning, with installed/vendor versions and no install target. Unknown outcomes and actual unverified updaters remain visible. |
 | ChatGPT spends time opening and closing before installation | v1.5.3 tries its verified vendor artifact first when an update is known. Unknown feeds still use the native updater fallback; running apps are preserved. |
 | Proton Drive manufacturer feed is older than the installed app | Inspect `bash scripts/check_vendor_feeds.sh`. A stale official feed remains a warning; no downgrade or repeated launch is attempted. |
@@ -13,8 +15,8 @@
 | macOS update not applied after reboot | `softwareupdate -i <label> -R` — never `sudo reboot` |
 | brew: You have not agreed to the Xcode license | `sudo xcodebuild -license accept` or launch Xcode. `update_brew.sh` checks `xcodebuild -checkFirstLaunchStatus` and prompts before Homebrew runs. |
 | brew doctor: CLT does not support macOS 27 (Tier 2) | Homebrew 7 requires CLT 27.0.0+ on macOS 27 (`softwareupdate --install -a` or `xcode-select --install`). |
-| Intel app nie startuje po upgrade (Rosetta) | macOS 27 drops Rosetta on upgrade; Intel x86_64 apps won't run without reinstalling Rosetta (`softwareupdate --install-rosetta --agree-to-license`), and Rosetta is completely removed in macOS 28. Migrate to Apple Silicon native build. |
-| macOS step was skipped | An earlier step failed; inspect the summary/log, fix it, then rerun. macOS runs last to avoid rebooting a partial session. |
+| Intel (x86_64) app does not start after an upgrade (Rosetta) | macOS 27 drops Rosetta on upgrade; Intel x86_64 apps won't run without reinstalling Rosetta (`softwareupdate --install-rosetta --agree-to-license`), and Rosetta is completely removed in macOS 28. Migrate to Apple Silicon native build. |
+| macOS step was skipped | Either a blocking hard failure in steps 1–4 (inspect the summary/log, fix it, rerun; macOS runs last to avoid rebooting a half-updated session) or authorization was unavailable (see below). Since v1.5.5 a step 5 reporting failure never skips it. |
 | macOS update step exits after declining restart | Rerun and accept the framework-managed restart (`-R`) or use System Settings; never replace it with a plain reboot. |
 | Touch ID for sudo not working | `bash scripts/setup_touchid_sudo.sh` (per-machine setup; survives OS updates) |
 | Sudo prompt during long update_all run | `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (default: keep-alive refreshes sudo every 50s) |
@@ -36,7 +38,7 @@
 | Cursor / OpenCode install from the vendor without launching | Configured in `config/vendor_direct_first.txt`: Cursor and OpenCode (v1.5.2 — its Tauri updater installed nothing in the 90 s stage wait) skip the silent launch and stage-wait cycle when behind, downloading and installing directly from the verified vendor feed |
 | Vendor feed stale | The vendor's appcast or release feed is serving a version older than what is currently installed locally (`remote < local`). The toolkit leaves the installed version intact without regressing |
 | CLI not installed — skipping | The toolkit only updates CLI tools that are already installed on the Mac. Run with `--bootstrap-cli` (or `MAC_UPDATE_BOOTSTRAP_CLI=1`) to intentionally install missing CLIs |
-| `mas upgrade` fails | `sudo mas upgrade` (CVE-2025-43411) |
+| `mas upgrade` fails | `sudo mas upgrade <app-id>` (entitlement change on macOS 15.7.2+/14.8.2+/26.1+, see `critical_rules.md`) |
 | iPad apps "not allowed" error | System Settings → Privacy → Accessibility → add terminal |
 | Wrong language | Edit `.mac_update_prefs` → `MAC_LANG=en` |
 | APPLICATIONS.md missing | `bash build_inventory.sh` or `dev_sync/dev-sync-import.sh` (owner) |

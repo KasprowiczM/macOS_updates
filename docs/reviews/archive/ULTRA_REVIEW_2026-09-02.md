@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-02
 **Zakres:** log przebiegu `logs/update_all_20260901_110312.log` + 22 wcześniejsze przebiegi, cała ścieżka Microsoft AutoUpdate, TOR 1 App Store, raport maszynowy
-**Maszyna referencyjna:** mac-r12-home, macOS 26.6.2 (25G83), Apple Silicon — najnowszy stabilny macOS w dniu review
+**Maszyna referencyjna:** <reference-mac>, macOS 26.6.2 (25G83), Apple Silicon — najnowszy stabilny macOS w dniu review
 **Metoda:** pomiar systemu docelowego, nie stanu repozytorium
 
 ---
@@ -156,4 +156,4 @@ Przebieg pobrał `156.0b1` i zaraportował „zaktualizowany do wersji 156.0". B
 
 ---
 
-*Review wykonany na maszynie referencyjnej mac-r12-home, macOS 26.6.2 (25G83). Wszystkie liczby pochodzą z pomiaru systemu docelowego.*
+*Review wykonany na maszynie referencyjnej <reference-mac>, macOS 26.6.2 (25G83). Wszystkie liczby pochodzą z pomiaru systemu docelowego.*

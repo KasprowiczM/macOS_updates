@@ -32,6 +32,12 @@
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
 | `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
+| `scripts/report_chronic_warnings.sh` | Print trailing non-OK step streaks from historical run summaries (`lib/python/chronic_warnings.py`) |
+| `scripts/scan_secrets.sh` | Lightweight secret scan used by CI and pre-push (gitleaks when installed) |
+| `scripts/pre-commit.sh` | Fast staged-file checks (`bash -n`, `py_compile`); the full suite stays the integration gate |
+| `scripts/fix_mcp_configs.py` | Repair user MCP configs (absolute `npx` path and `PATH` env); `fix_mcp_all.sh` applies it globally |
+| `scripts/fix_inventory_dedup.py` | One-off inventory de-duplication helper |
+| `scripts/migrate_internet_i18n.py` | One-shot migrator that moved Polish literals in `update_internet_apps.sh` into `L_INTERNET_*` keys (historical) |
 | `lib/appstore_ios.sh` | iOS and iPad app detection and App Store lookup helpers (Bash 3.2+) |
 | `lib/cli.sh` | Shared CLI flag parsing and usage definitions for orchestrators |
 | `lib/github_release.sh` | GitHub release tag and download asset lookup helpers |
@@ -69,13 +75,15 @@
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `MAC_UPDATE_BOOTSTRAP_CLI` | `0` | Set to `1` (or pass `--bootstrap-cli`) to install missing native CLIs; by default only installed CLIs are updated |
-| `MAC_UPDATE_STAGE_WAIT` | `90` | Seconds to wait for staging/install before verifying an updated bundle (0–600, cykl uruchomienia updatera producenta) |
+| `MAC_UPDATE_STAGE_WAIT` | `90` | Seconds to wait for staging/install before verifying an updated bundle (0–600; covers the launched vendor updater's staging cycle) |
 | `MAC_UPDATE_VENDOR_DIRECT` | `1` | Set to `0` to disable direct vendor installations when apps are behind |
 | `MAC_UPDATE_OMAHA_WAIT` | `45` | Timeout (seconds) waiting for Omaha updater response |
 | `MAC_UPDATE_OMAHA_MAX_AGE_H` | `6` | Maximum age (hours) of a previous Chromium-updater check (from `updater_history.jsonl`, same build as installed) accepted as current proof — the updater is then not woken |
 | `MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT` | `300` | Timeout (seconds) for post-Track-2 iPad app installation verification (0–1800) |
 | `MAC_UPDATE_APP_DIRS` | `/Applications:$HOME/Applications` | Colon-separated list of application directories for scanning (used in tests and hermetic CI runs) |
 | `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |
+| `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; the AppleScript `quit` is re-sent while it keeps running, never force-killed (v1.5.5) |
+| `MAC_UPDATE_QUIT_RESEND` | `10` | Interval in seconds (1–60) between repeated graceful `quit` requests inside `MAC_UPDATE_QUIT_WAIT` (v1.5.5) |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
 ## update_all.sh Step Order
@@ -90,7 +98,7 @@ Step 5: postupdate.py       — capture fresh /Applications to installed_apps_af
 Step 6: update_system.sh    — macOS via softwareupdate -i <label> -R (per-label no-restart + batch restart); last because it may restart
 ```
 
-If any step before step 6 encounters a hard failure (`BLOCKING_EXIT`), step 6 (`softwareupdate`) is deferred to avoid rebooting into a broken state. Soft warnings (`exit 10`) surface warnings in reporting while allowing system updates to proceed.
+If any of steps 1–4 encounters a hard failure (`BLOCKING_EXIT`), step 6 (`softwareupdate`) is deferred to avoid rebooting into a broken state. Steps 0 and 5 are read-only/reporting and never block. Soft warnings (`exit 10`) surface in reporting while allowing system updates to proceed. See [exit_codes.md](exit_codes.md).
 
 ## migration_setup.sh — Phases 0a–16 (New Mac First-Run)
 
@@ -105,7 +113,7 @@ Phase  3: Fix paths in all .md files (username, project dir, Homebrew prefix)
 Phase  4: Update macOS version + arch strings in all AI context files
 Phase  5: Check/install Xcode Command Line Tools
 Phase  6: Check/install Homebrew at /opt/homebrew (Apple Silicon only — Intel not supported)
-Phase  7: Check/install mas ≥4.0 (CVE-2025-43411 requirement)
+Phase  7: Check/install mas ≥4.0 (required for macOS 26.x; see the entitlement-change note in critical_rules.md)
 Phase  8: Detect Python 3; install python@3.11 if missing
 Phase  9: Check curl, git availability
 Phase 10: Check optional tools: msupdate, Docker CLI ≥4.37, Google Keystone
