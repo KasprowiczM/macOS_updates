@@ -6,6 +6,10 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Documentation
+
+- **Lockstep versioning with Ascendo.** Documented that release versions of `macOS_updates` and `Ascendo` proceed in lockstep starting from v1.5.5; parity ports between both repositories share the same version number.
+
 ### Fixed
 
 - **Website link.** The project site link in all seven READMEs, `CONTRIBUTING.md`, `AGENTS.md`, `docs/INSTALL.md` and `docs/user/INDEX.md` now points to the live domain `https://macos-updates.64bit.site`; `macosupdates.dev` was never registered.

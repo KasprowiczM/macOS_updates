@@ -53,6 +53,10 @@ When behavior changes, update in the same pull request:
 - `docs/agents/*` (script reference, exit codes, critical rules), `docs/user/*` and `docs/INSTALL.md` where relevant
 - `CHANGELOG.md`, and `VERSION` when releasing
 
+## Release & Versioning Policy (Lockstep with Ascendo)
+
+Starting with version 1.5.5, release numbers of `macOS_updates` and the companion cross-platform project [Ascendo](https://github.com/KasprowiczM/ascendo) proceed in lockstep. Ports of changes or parity updates between the two repositories share the identical version number.
+
 Documentation hygiene:
 
 - Counts (tests, apps, update methods) must come from commands, not memory: `bash run_tests.sh`, `grep -vcE '^\s*(#|$)' config/internet_apps.txt`.
