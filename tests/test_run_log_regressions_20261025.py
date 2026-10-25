@@ -102,6 +102,7 @@ class AppcastCrossCheck(unittest.TestCase):
         self.assertIn("vendor_appcast_published_channel", vt[:stale])
         self.assertIn("L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT", vt[:stale])
 
+    @unittest.skipUnless(sys.platform == "darwin" and shutil.which("defaults"), "needs macOS defaults(1) to read Info.plist")
     def test_shell_helper_end_to_end_with_stub_curl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_p = Path(tmp)
