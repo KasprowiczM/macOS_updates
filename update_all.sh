@@ -1300,20 +1300,20 @@ if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
         RESULT_APPSTORE="[DRY-RUN] skipped"
         STATUS_CODE_APPSTORE="skipped"
     elif bash "$SCRIPT_DIR/update_appstore.sh"; then
-        RESULT_APPSTORE="$L_STATUS_OK completed"
+        RESULT_APPSTORE="$L_ALL_RESULT_OK"
         STATUS_CODE_APPSTORE="ok"
     else
         APPSTORE_EXIT=$?
         if [ "$APPSTORE_EXIT" -eq 2 ] && [ "${MAC_UPDATE_TREAT_APPSTORE_AX_AS_WARNING:-0}" = "1" ]; then
-            RESULT_APPSTORE="$L_STATUS_WARN Accessibility required"
+            RESULT_APPSTORE="⚠️  $L_ALL_RESULT_AX_REQUIRED"
             STATUS_CODE_APPSTORE="warn"
             DEGRADED=1
             print_warn "App Store exit 2 (Accessibility) treated as warning"
         elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
-            RESULT_APPSTORE="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            RESULT_APPSTORE="⚠️  ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
             STATUS_CODE_APPSTORE="warn"
             DEGRADED=1
-            print_warn "App Store reported warnings (soft) — macOS step not blocked"
+            print_warn "$(printf "$L_ALL_STEP_SOFT_WARNINGS_FMT" "App Store")"
         else
             RESULT_APPSTORE="$L_STATUS_ERROR"
             STATUS_CODE_APPSTORE="error"
@@ -1323,7 +1323,7 @@ if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
     fi
 else
     print_error "File not found: update_appstore.sh"
-    RESULT_APPSTORE="$L_STATUS_ERROR missing file"
+    RESULT_APPSTORE="$L_STATUS_ERROR: $L_ALL_RESULT_MISSING_FILE"
     STATUS_CODE_APPSTORE="error"
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
@@ -1347,17 +1347,17 @@ if mac_update_dry_run_msg "update_npm_cli.sh"; then
     RESULT_NPMCLI="[DRY-RUN] skipped"
     STATUS_CODE_NPMCLI="skipped"
 elif mac_update_run_child "update_npm_cli.sh" "update_npm_cli.sh"; then
-    RESULT_NPMCLI="$L_STATUS_OK completed"
+    RESULT_NPMCLI="$L_ALL_RESULT_OK"
     STATUS_CODE_NPMCLI="ok"
 else
     # mac_update_run_child ends with `bash <child>`, so the child's exit status
     # reaches us unchanged and 10 stays distinguishable from 1 / 127.
     NPMCLI_EXIT=$?
     if [ "$NPMCLI_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
-        RESULT_NPMCLI="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+        RESULT_NPMCLI="⚠️  ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
         STATUS_CODE_NPMCLI="warn"
         DEGRADED=1
-        print_warn "Native CLI + npm reported warnings (soft) — macOS step not blocked"
+        print_warn "$(printf "$L_ALL_STEP_SOFT_WARNINGS_FMT" "Native CLI + npm")"
     else
         RESULT_NPMCLI="$L_STATUS_ERROR"
         STATUS_CODE_NPMCLI="error"
@@ -1387,15 +1387,15 @@ if mac_update_dry_run_msg "update_brew.sh"; then
 elif [ -f "$SCRIPT_DIR/update_brew.sh" ]; then
     chmod +x "$SCRIPT_DIR/update_brew.sh"
     if bash "$SCRIPT_DIR/update_brew.sh"; then
-        RESULT_BREW="$L_STATUS_OK completed"
+        RESULT_BREW="$L_ALL_RESULT_OK"
         STATUS_CODE_BREW="ok"
     else
         BREW_EXIT=$?
         if [ "$BREW_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
-            RESULT_BREW="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            RESULT_BREW="⚠️  ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
             STATUS_CODE_BREW="warn"
             DEGRADED=1
-            print_warn "Homebrew reported warnings (soft) — macOS step not blocked"
+            print_warn "$(printf "$L_ALL_STEP_SOFT_WARNINGS_FMT" "Homebrew")"
         else
             RESULT_BREW="$L_STATUS_ERROR"
             STATUS_CODE_BREW="error"
@@ -1405,7 +1405,7 @@ elif [ -f "$SCRIPT_DIR/update_brew.sh" ]; then
     fi
 else
     print_error "File not found: update_brew.sh"
-    RESULT_BREW="$L_STATUS_ERROR missing file"
+    RESULT_BREW="$L_STATUS_ERROR: $L_ALL_RESULT_MISSING_FILE"
     STATUS_CODE_BREW="error"
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
@@ -1432,7 +1432,7 @@ if mac_update_dry_run_msg "update_internet_apps.sh"; then
 elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
     chmod +x "$SCRIPT_DIR/update_internet_apps.sh"
     if bash "$SCRIPT_DIR/update_internet_apps.sh"; then
-        RESULT_INTERNET="$L_STATUS_OK completed"
+        RESULT_INTERNET="$L_ALL_RESULT_OK"
         STATUS_CODE_INTERNET="ok"
     else
         INTERNET_EXIT=$?
@@ -1440,10 +1440,10 @@ elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
         # not answer, an app refused to launch. Nothing is mid-mutation, so it
         # must never postpone macOS security updates (2026-07-26 regression).
         if [ "$INTERNET_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
-            RESULT_INTERNET="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+            RESULT_INTERNET="⚠️  ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
             STATUS_CODE_INTERNET="warn"
             DEGRADED=1
-            print_warn "Internet apps reported warnings (soft) — macOS step not blocked"
+            print_warn "$(printf "$L_ALL_STEP_SOFT_WARNINGS_FMT" "$L_ALL_STEP_INTERNET_NAME")"
         else
             RESULT_INTERNET="$L_STATUS_ERROR"
             STATUS_CODE_INTERNET="error"
@@ -1453,7 +1453,7 @@ elif [ -f "$SCRIPT_DIR/update_internet_apps.sh" ]; then
     fi
 else
     print_error "File not found: update_internet_apps.sh"
-    RESULT_INTERNET="$L_STATUS_ERROR missing file"
+    RESULT_INTERNET="$L_STATUS_ERROR: $L_ALL_RESULT_MISSING_FILE"
     STATUS_CODE_INTERNET="error"
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
@@ -2002,7 +2002,7 @@ if python3 "$SESSION_DIR/postupdate.py" \
     "$RESULT_INTERNET" \
     "$RESULT_NPMCLI" \
     "$RESULT_BREW"; then
-    RESULT_MD="$L_STATUS_OK completed"
+    RESULT_MD="$L_ALL_RESULT_OK"
     STATUS_CODE_MD="ok"
 else
     # Step 5 is a reporting step: it mutates nothing, so a failure leaves the
@@ -2033,7 +2033,7 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
         STATUS_CODE_SYSTEM="skipped"
         print_warn "Skipping the final macOS update because a blocking step failed (the machine may be mid-transaction); fix it and rerun."
     elif mac_update_run_child "update_system.sh" "update_system.sh (final step)"; then
-        RESULT_SYSTEM="$L_STATUS_OK completed"
+        RESULT_SYSTEM="$L_ALL_RESULT_OK"
         STATUS_CODE_SYSTEM="ok"
     else
         SYS_EXIT=$?
@@ -2042,7 +2042,7 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
                 RESULT_SYSTEM="${L_ALL_RESULT_SKIPPED_BY_USER:-pominięte przez użytkownika}"
                 STATUS_CODE_SYSTEM="skipped_by_user"
             else
-                RESULT_SYSTEM="$L_STATUS_WARN ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
+                RESULT_SYSTEM="⚠️  ${L_ALL_RESULT_DEGRADED:-completed with warnings}"
                 STATUS_CODE_SYSTEM="warn"
                 DEGRADED=1
             fi
@@ -2055,7 +2055,7 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
 
     # Postupdate runs before the reboot-capable system step. If softwareupdate
     # returns normally, replace the pending marker in the newest history entry.
-    if [ -f "$SCRIPT_DIR/UPDATES.md" ] && [ "$RESULT_MD" = "$L_STATUS_OK completed" ]; then
+    if [ -f "$SCRIPT_DIR/UPDATES.md" ] && [ "${STATUS_CODE_MD:-}" = "ok" ]; then
         if ! python3 - "$SCRIPT_DIR/UPDATES.md" "$SYSTEM_HISTORY_PENDING" "$RESULT_SYSTEM" <<'PYEOF'
 import os
 import sys
@@ -2114,20 +2114,28 @@ elif [ "$DEGRADED" -ne 0 ]; then
 fi
 ui_print_box "$_summary_msg"
 echo ""
-echo -e "  0. Scan new apps:           $RESULT_SCAN"
-echo -e "  1. App Store:               $RESULT_APPSTORE"
-echo -e "  2. Native CLI + npm:        $RESULT_NPMCLI"
-echo -e "  3. Homebrew:                $RESULT_BREW"
-echo -e "  4. Internet apps:           $RESULT_INTERNET"
-echo -e "  5. $L_ALL_UPDATE_APPS_LABEL $RESULT_MD"
-echo -e "  6. macOS System:            $RESULT_SYSTEM"
+printf '  %-26s %s\n' "$L_ALL_LABEL_SCAN" "$RESULT_SCAN"
+printf '  %-26s %s\n' "$L_ALL_LABEL_APPSTORE" "$RESULT_APPSTORE"
+printf '  %-26s %s\n' "$L_ALL_LABEL_NPMCLI" "$RESULT_NPMCLI"
+printf '  %-26s %s\n' "$L_ALL_LABEL_BREW" "$RESULT_BREW"
+printf '  %-26s %s\n' "$L_ALL_LABEL_INTERNET" "$RESULT_INTERNET"
+printf '  5. %-23s %s\n' "$L_ALL_UPDATE_APPS_LABEL" "$RESULT_MD"
+printf '  %-26s %s\n' "$L_ALL_LABEL_SYSTEM" "$RESULT_SYSTEM"
 echo ""
-echo -e "  Duration: ${MINUTES} min ${DURATION_SECS} sek"
+echo -e "  $(printf "$L_ALL_DURATION_FMT" "$MINUTES" "$DURATION_SECS")"
 echo ""
 if [ "$OVERALL_EXIT" -ne 0 ]; then
     print_error "One or more update steps failed. Review the step summary above and session logs before rerunning."
 elif [ "$DEGRADED" -ne 0 ]; then
-    print_warn "${L_ALL_WARN_NOT_BLOCKING:-Some updates could not be verified. This did not block the macOS system update.}"
+    # Distinguish "only informational warnings (e.g. a stale manufacturer feed)" from
+    # "something could not be verified / is still pending".
+    save_step_status_codes || true
+    if [ -n "${SESSION_DIR:-}" ] && PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" \
+        python3 -c 'import sys; from run_summary import degraded_is_warnings_only as f; sys.exit(0 if f(sys.argv[1]) else 1)' "$SESSION_DIR" 2>/dev/null; then
+        print_warn "$L_ALL_WARNINGS_ONLY"
+    else
+        print_warn "${L_ALL_WARN_NOT_BLOCKING:-Some updates could not be verified. This did not block the macOS system update.}"
+    fi
 else
     print_ok "$L_UPDATE_ALL_SUCCESS"
 fi
@@ -2170,17 +2178,15 @@ fi
 
 bash "$SCRIPT_DIR/scripts/report_chronic_warnings.sh" || true
 
-_ui_summary=$(cat <<EOS
-0. Scan:      $RESULT_SCAN
-1. App Store: $RESULT_APPSTORE
-2. npm/CLI:   $RESULT_NPMCLI
-3. Homebrew:  $RESULT_BREW
-4. Internet:  $RESULT_INTERNET
-5. Inventory: $RESULT_MD
-6. System:    $RESULT_SYSTEM
-Duration:     ${MINUTES}m ${DURATION_SECS}s
-EOS
-)
+_ui_summary="$(printf '%s %s\n' \
+    "$L_ALL_LABEL_SCAN" "$RESULT_SCAN" \
+    "$L_ALL_LABEL_APPSTORE" "$RESULT_APPSTORE" \
+    "$L_ALL_LABEL_NPMCLI" "$RESULT_NPMCLI" \
+    "$L_ALL_LABEL_BREW" "$RESULT_BREW" \
+    "$L_ALL_LABEL_INTERNET" "$RESULT_INTERNET" \
+    "5. $L_ALL_UPDATE_APPS_LABEL" "$RESULT_MD" \
+    "$L_ALL_LABEL_SYSTEM" "$RESULT_SYSTEM"
+    printf '%s\n' "$(printf "$L_ALL_DURATION_FMT" "$MINUTES" "$DURATION_SECS")")"
 ui_summary_table "$_ui_summary"
 
 if [ "${MAC_UPDATE_NOTIFY:-0}" = "1" ]; then

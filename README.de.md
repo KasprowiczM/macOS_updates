@@ -14,7 +14,7 @@
 | Ablauf | 7 Schritte (0–6), das macOS-Systemupdate kommt immer zuletzt |
 | Registry | 43 Internet-Apps · 11 Update-Methoden (siehe [Update-Methoden](#update-methoden)) |
 | Sprachen | EN, PL, ES, FR, DE, IT, PT (CLI und Dokumentation) |
-| Tests | 561 automatisierte Tests (`bash run_tests.sh`) |
+| Tests | 590 automatisierte Tests (`bash run_tests.sh`) |
 
 **Neu in v1.5.5:** Ein Homebrew-Upgrade, das `python3` mitten im Lauf entfernt, bricht den Inventar-/Berichtsschritt nicht mehr (die Shell durchsucht `PATH` erneut), und ein fehlgeschlagener Berichtsschritt verschiebt macOS-Updates nicht mehr. Die Abschlussmeldungen sind ehrlich: keine Behauptung „Dateien aktualisiert“ nach einem Fehler, und Warnungen zu veralteten Feeds oder nicht beendeten Apps gelten nicht mehr als unverifizierte Updates. Vom Werkzeug gestartete Apps werden wiederholt höflich zum Beenden aufgefordert (nie erzwungen). Frühere 1.5.x-Versionen (veraltete Hersteller-Feeds als Warnung, Hersteller-Downloads für ChatGPT/Proton, native CLIs vor npm, Schutz beim Austausch von Paketen) beschreibt [CHANGELOG.md](CHANGELOG.md).
 
@@ -331,7 +331,7 @@ Die `dev-sync-*.sh`-Wrapper im Wurzelverzeichnis rufen dieselben Skripte in `dev
 
 ## Tests
 
-Die Testsuite deckt Bash-Syntax, Python-Kompilierung, statische Sicherheitsverträge, Dokumentationswächter und Unit-Tests ab (561 automatisierte Tests).
+Die Testsuite deckt Bash-Syntax, Python-Kompilierung, statische Sicherheitsverträge, Dokumentationswächter und Unit-Tests ab (590 automatisierte Tests).
 Pull Requests führen ShellCheck auf Ubuntu, portable Python-Tests und den Secret-Scan aus.
 Die vollständige `run_tests.sh`-Suite auf einem macOS-Runner läuft nur bei `workflow_dispatch` oder einem `v*`-Tag, nicht bei jedem Push.
 

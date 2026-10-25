@@ -7,6 +7,14 @@ LOGS="${MAC_UPDATE_LOGS_DIR:-$SCRIPT_DIR/logs}"
 WINDOW="${MAC_UPDATE_CHRONIC_WINDOW:-10}"
 THRESHOLD="${MAC_UPDATE_CHRONIC_THRESHOLD:-3}"
 
+# Localized labels (silent fallback to English when the loader is unavailable).
+if [ -f "$SCRIPT_DIR/i18n/loader.sh" ]; then
+    # shellcheck source=i18n/loader.sh
+    . "$SCRIPT_DIR/i18n/loader.sh" >/dev/null 2>&1 || true
+fi
+export CHRONIC_TITLE="${L_ALL_CHRONIC_TITLE:-Chronic warning streaks:}"
+export CHRONIC_ITEM_FMT="${L_ALL_CHRONIC_ITEM_FMT:-- %s: %s trailing non-OK runs (first in streak: %s)}"
+
 python3 - "$SCRIPT_DIR" "$LOGS" "$WINDOW" "$THRESHOLD" <<'PY' || true
 import os
 import sys
@@ -22,12 +30,13 @@ from chronic_warnings import find_chronic_streaks
 
 hits = find_chronic_streaks(logs_dir, window=window, threshold=threshold)
 if hits:
-    print("Chronic warning streaks:")
+    print(os.environ.get("CHRONIC_TITLE", "Chronic warning streaks:"))
+    fmt = os.environ.get("CHRONIC_ITEM_FMT", "- %s: %s trailing non-OK runs (first in streak: %s)")
     for hit in hits:
-        print(
-            f"- {hit['step']}: {hit['streak']} trailing non-OK runs "
-            f"(first in streak: {hit['first_timestamp']})"
-        )
+        try:
+            print(fmt % (hit["step"], hit["streak"], hit["first_timestamp"]))
+        except (TypeError, ValueError):
+            print(f"- {hit['step']}: {hit['streak']} (first in streak: {hit['first_timestamp']})")
 PY
 
 exit 0

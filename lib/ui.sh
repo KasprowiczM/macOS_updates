@@ -138,7 +138,7 @@ ui_summary_table() {
     if ui_is_tty; then
         echo ""
         echo -e "\033[1;34m╔══════════════════════════════════════════════════════════════╗\033[0m"
-        echo -e "\033[1;34m║\033[0m  Run summary"
+        echo -e "\033[1;34m║\033[0m  ${L_ALL_RUN_SUMMARY_TITLE:-Run summary}"
         echo -e "\033[1;34m╠══════════════════════════════════════════════════════════════╣\033[0m"
         echo "$rows" | while IFS= read -r line; do
             [ -n "$line" ] && printf "\033[1;34m║\033[0m  %-58s \033[1;34m║\033[0m\n" "$line"
@@ -146,6 +146,6 @@ ui_summary_table() {
         echo -e "\033[1;34m╚══════════════════════════════════════════════════════════════╝\033[0m"
         echo ""
     else
-        echo ""; echo "Run summary"; echo "$rows"; echo ""
+        echo ""; echo "${L_ALL_RUN_SUMMARY_TITLE:-Run summary}"; echo "$rows"; echo ""
     fi
 }

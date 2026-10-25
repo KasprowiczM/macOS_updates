@@ -403,7 +403,7 @@ class StaticShellSafetyTests(unittest.TestCase):
     def test_appstore_skips_sudo_when_native_queue_is_empty(self) -> None:
         text = self.read_script("update_appstore.sh")
         self.assertIn('if [ -z "$NATIVE_OUTDATED" ]; then', text)
-        self.assertIn("sudo mas upgrade skipped", text)
+        self.assertIn("L_APPSTORE_TOR1_SKIPPED", text)
         self.assertIn("mas outdated --accurate", text)
         self.assertIn("MAC_UPDATE_MAS_CHECK_TIMEOUT", text)
         self.assertIn("MAC_UPDATE_MAS_UPGRADE_TIMEOUT", text)
@@ -422,8 +422,8 @@ class StaticShellSafetyTests(unittest.TestCase):
         # exit 10, which is the normal outcome when Track 2 queued background
         # installs — that trained users to ignore the banner.
         self.assertIn('elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then', final_block)
-        self.assertIn("FINISHED WITH WARNINGS", final_block)
-        self.assertIn("FINISHED WITH ERRORS", final_block)
+        self.assertIn("L_APPSTORE_BANNER_WARNINGS", final_block)
+        self.assertIn("L_APPSTORE_BANNER_ERRORS", final_block)
         self.assertNotIn("FINISHED WITH ERRORS OR PENDING UPDATES", final_block)
 
     def test_update_all_runs_reboot_capable_system_step_last(self) -> None:
@@ -1225,7 +1225,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         text = self.read_script("update_appstore.sh")
         self.assertIn('run_with_timeout "$GUI_TIMEOUT" osascript', text)
         self.assertIn("SOFT_FAIL=1", text)
-        self.assertIn("Track 2 (App Store GUI) timed out or failed", text)
+        self.assertIn("L_APPSTORE_TOR2_GUI_FAILED", text)
 
     def test_no_run_with_timeout_uses_piped_heredoc(self) -> None:
         """Assert no run_with_timeout call anywhere in .sh files has a piped heredoc (<<)."""
@@ -1704,8 +1704,11 @@ class StaticShellSafetyTests(unittest.TestCase):
     def test_appstore_soft_and_hard_banners_are_distinct(self) -> None:
         """A soft (exit 10) App Store result must not be reported as an error."""
         text = self.read_script("update_appstore.sh")
-        self.assertIn("SCRIPT 2 FINISHED WITH WARNINGS", text)
-        self.assertIn("SCRIPT 2 FINISHED WITH ERRORS", text)
+        self.assertIn("L_APPSTORE_BANNER_WARNINGS", text)
+        self.assertIn("L_APPSTORE_BANNER_ERRORS", text)
+        for lang in ("en", "pl"):
+            lang_text = (REPO_ROOT / "i18n" / f"lang_{lang}.sh").read_text(encoding="utf-8")
+            self.assertRegex(lang_text, r'(?m)^L_APPSTORE_BANNER_WARNINGS=".*(WARNINGS|OSTRZE).*"')
         self.assertNotIn("SCRIPT 2 FINISHED WITH ERRORS OR PENDING UPDATES", text)
         self.assertIn('-eq "$MAC_UPDATE_SOFT_EXIT"', text)
 
@@ -2662,6 +2665,7 @@ class I18nCompletenessTests(unittest.TestCase):
             "L_INTERNET_STATUS_BEHIND_FMT",
             "L_INTERNET_STATUS_NEEDS_RESTART_FMT",
             "L_INTERNET_STATUS_VENDOR_CURRENT_FMT",
+            "L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT",
             "L_INTERNET_STATUS_VENDOR_NOUPDATE",
             "L_INTERNET_STATUS_OMAHA_RECENT_FMT",
             "L_INTERNET_STATUS_ROLLOUT_HOLD_FMT",

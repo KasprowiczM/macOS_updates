@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime
 import json
 import re
+import urllib.parse
 import xml.etree.ElementTree as ET
 
 SPARKLE_NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
@@ -167,6 +168,87 @@ def parse_sparkle_appcast(
             }
 
     return best_item
+
+
+def sparkle_appcast_items(xml_text: str) -> list[dict]:
+    """Every <item> of a Sparkle appcast with its channel, regardless of channel.
+
+    Returns [{'version','short','build','channel','url'}]; 'channel' is '' when the
+    item carries no <sparkle:channel>. Never raises; unparseable input -> [].
+    Unlike parse_sparkle_appcast this does NOT filter by channel, because it is only
+    used to prove that an installed build was published, never to pick an install
+    target."""
+    if not xml_text or not xml_text.strip():
+        return []
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return []
+
+    def _text(item, name):
+        el = item.find(f"{{{SPARKLE_NS}}}{name}")
+        if el is None:
+            el = item.find(name)
+        return el.text.strip() if (el is not None and el.text and el.text.strip()) else None
+
+    out = []
+    for item in root.iter("item"):
+        enclosure = item.find("enclosure")
+        short = _text(item, "shortVersionString")
+        build = _text(item, "version")
+        if enclosure is not None:
+            short = short or enclosure.attrib.get(f"{{{SPARKLE_NS}}}shortVersionString")
+            build = build or enclosure.attrib.get(f"{{{SPARKLE_NS}}}version")
+        short = short.strip() if short else None
+        build = build.strip() if build else None
+        if not (short or build):
+            continue
+        out.append({
+            "version": short or build,
+            "short": short,
+            "build": build,
+            "channel": _text(item, "channel") or "",
+            "url": enclosure.attrib.get("url") if enclosure is not None else None,
+        })
+    return out
+
+
+def appcast_url_allowed(url: str, allowed_host: str) -> bool:
+    """True only for an https URL whose host equals allowed_host exactly."""
+    if not url or not allowed_host or allowed_host == "-":
+        return False
+    try:
+        parts = urllib.parse.urlsplit(url.strip())
+    except ValueError:
+        return False
+    return parts.scheme == "https" and (parts.hostname or "").lower() == allowed_host.strip().lower()
+
+
+def appcast_publishes_installed(
+    xml_text: str,
+    installed_short: str,
+    installed_build: str | None = None,
+) -> str | None:
+    """Return the channel ('stable', 'gradual-rollout', or '' for the default channel)
+    in which the appcast publishes the installed version, else None.
+
+    Match on the short version (version_compare == 0) or on the exact build string.
+    This only PROVES that the installed build is a real vendor release; callers must
+    never use a non-stable item as an install target."""
+    inst = normalize_vendor_version(installed_short or "")
+    build = (installed_build or "").strip()
+    best = None
+    for it in sparkle_appcast_items(xml_text):
+        hit = False
+        if inst and it["short"] and version_compare(normalize_vendor_version(it["short"]), inst) == 0:
+            hit = True
+        elif build and it["build"] and it["build"] == build:
+            hit = True
+        if hit:
+            if it["channel"] in ("", "stable"):
+                return it["channel"]
+            best = best if best is not None else it["channel"]
+    return best
 
 
 def select_claude_releases(obj: dict) -> dict | None:

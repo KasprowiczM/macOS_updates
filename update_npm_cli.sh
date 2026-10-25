@@ -140,6 +140,8 @@ resolve_target_file() {
 declare_profile_backup() {
     local raw_target="$1"
     local real_target
+    # Edits applied to a staging copy (see ensure_toolchain_paths) never back up.
+    [ "${_MACUPD_PROFILE_STAGING:-0}" = "1" ] && return 0
     real_target="$(resolve_target_file "$raw_target")"
     [ -f "$real_target" ] || return 0
 
@@ -153,7 +155,7 @@ declare_profile_backup() {
         backup_path="${real_target}.macupd-backup-${ts}"
         if cp "$real_target" "$backup_path" 2>/dev/null; then
             chmod 600 "$backup_path" 2>/dev/null || true
-            print_info "Kopia zapasowa profilu: $backup_path"
+            print_info "$(printf "$L_NPM_PROFILE_BACKUP_FMT" "$backup_path")"
             eval "_MACUPD_BACKED_UP_${backup_key}=1"
             prune_profile_backups "$real_target"
         fi
@@ -206,6 +208,9 @@ remove_line_from_file() {
     target="$(resolve_target_file "$raw_target")"
     [ -f "$target" ] || return 0
 
+    # Nothing to remove: no content change, so no backup and no rewrite.
+    grep -Fqx -- "$line" "$target" 2>/dev/null || return 0
+
     declare_profile_backup "$raw_target"
 
     local tmpfile
@@ -222,6 +227,9 @@ remove_npmrc_prefix() {
     local target
     target="$(resolve_target_file "$NPMRC_PATH")"
     [ -f "$target" ] || return 0
+
+    # Only back up / rewrite when a prefix/globalconfig line actually exists.
+    grep -Eq '^(prefix|globalconfig) *=' "$target" 2>/dev/null || return 0
 
     declare_profile_backup "$NPMRC_PATH"
 
@@ -273,6 +281,34 @@ ensure_toolchain_paths() {
     hash -r 2>/dev/null || true
 
     profile="$(find_shell_profile)"
+    sync_profile_block "$profile"
+}
+
+# The managed block is normalised by removing every known variant and re-appending
+# the canonical lines. Doing that in place rewrote (and backed up) the profile on
+# every run even when nothing changed — 2026-10-25 log: a fresh ~/.zshrc backup per
+# run. Apply the edits to a staging copy and touch the real profile only when the
+# result differs.
+sync_profile_block() {
+    local raw_profile="$1" real_profile staging rc=0
+    real_profile="$(resolve_target_file "$raw_profile")"
+    staging="$(mktemp "${TMPDIR:-/tmp}/mac_update_profile_stage.XXXXXX")" || return 1
+    if [ -f "$real_profile" ]; then
+        cat "$real_profile" > "$staging" || { rm -f "$staging"; return 1; }
+    fi
+    _MACUPD_PROFILE_STAGING=1
+    apply_profile_block "$staging" || rc=$?
+    _MACUPD_PROFILE_STAGING=0
+    if [ "$rc" -eq 0 ] && ! cmp -s "$staging" "$real_profile" 2>/dev/null; then
+        declare_profile_backup "$raw_profile"
+        cat "$staging" > "$real_profile" || rc=1
+    fi
+    rm -f "$staging"
+    return "$rc"
+}
+
+apply_profile_block() {
+    local profile="$1"
     remove_line_from_file "$profile" "# Managed by macOS Updates — native CLI toolchain" || return 1
     remove_line_from_file "$profile" "export N_PREFIX=\"$N_PREFIX\"" || return 1
     remove_line_from_file "$profile" "export PATH=\"$NPM_GLOBAL_BIN:$N_PREFIX/bin:$BUN_BIN:\$PATH\"" || return 1

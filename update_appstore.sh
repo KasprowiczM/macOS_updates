@@ -94,7 +94,7 @@ fi
 # ============================================================
 # STEP 0: Check and install mas
 # ============================================================
-print_header "Checking mas tool..."
+print_header "$L_APPSTORE_CHECKING_MAS"
 
 if ! command -v brew &> /dev/null; then
     print_error "$L_HOMEBREW_NOT_FOUND"
@@ -221,7 +221,7 @@ else
     MAS_OUTDATED_EXIT=$?
 fi
 if [ "$MAS_OUTDATED_EXIT" -ne 0 ]; then
-    print_warn "mas outdated ($MAS_OUTDATED_MODE) failed; native App Store state is unknown."
+    if [ "$MAS_OUTDATED_MODE" = "accurate" ]; then print_warn "$L_APPSTORE_MAS_OUTDATED_ACCURATE_UNKNOWN"; else print_warn "$L_APPSTORE_MAS_OUTDATED_UNKNOWN"; fi
     [ -n "$NATIVE_OUTDATED" ] && printf '%s\n' "$NATIVE_OUTDATED"
     SOFT_FAIL=1
     exit "$(mac_update_severity_exit_code)"
@@ -249,7 +249,7 @@ fi
 APPSTORE_CONFIRMED=0
 appstore_confirm() {
     [ "${MAC_UPDATE_YES:-0}" = "1" ] && return 0
-    read -r -p "  $L_CONFIRM_UPDATE [T/n]: " CONFIRM
+    read -r -p "  ${1:-$L_CONFIRM_UPDATE} [T/n]: " CONFIRM
     CONFIRM="${CONFIRM:-T}"
     case "$CONFIRM" in
         [Nn]*) return 1 ;;
@@ -288,7 +288,7 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
 fi
 
 if [ -z "$NATIVE_OUTDATED" ]; then
-    print_ok "$L_APPSTORE_NO_UPDATES — sudo mas upgrade skipped"
+    print_ok "$L_APPSTORE_TOR1_SKIPPED"
 else
     if [ "${MAC_UPDATE_NO_SUDO:-0}" = "1" ] || { [ ! -t 0 ] && ! sudo -n true 2>/dev/null; }; then
         print_info "$L_APPSTORE_NO_SUDO_SKIPPED"
@@ -435,8 +435,10 @@ if [ "$_TRACK2_SKIP_GUI" -eq 0 ]; then
 fi
 
 if [ "$_TRACK2_SKIP_GUI" -eq 0 ] && [ "$APPSTORE_CONFIRMED" -eq 0 ]; then
-    print_warn "$L_AX_PERMISSION_CHECK"
-    if ! appstore_confirm; then
+    # Track 2 only (no native update pending): say what will happen and ask the
+    # Track-2-specific question. The Accessibility check itself runs right after.
+    print_info "$L_TRACK2_ONLY_INFO"
+    if ! appstore_confirm "$L_CONFIRM_TRACK2"; then
         print_info "$L_UPDATE_CANCELED"
         _TRACK2_SKIP_GUI=1
         APPSTORE_TOR2_BRANCH="declined"
@@ -482,6 +484,15 @@ echo ""
 print_step "$L_APPSTORE_OPEN"
 
 GUI_TIMEOUT="${MAC_UPDATE_APPSTORE_GUI_TIMEOUT:-180}"
+case "$GUI_TIMEOUT" in ''|*[!0-9]*) GUI_TIMEOUT=180 ;; esac
+# The AppleScript keeps its own deadline a little below the hard timeout so it can
+# return a result token instead of being killed mid-poll.
+AS_BUDGET=$((GUI_TIMEOUT - 20))
+[ "$AS_BUDGET" -lt 30 ] && AS_BUDGET=30
+# Digits-only item ids of the pending iPad apps, passed as osascript arguments for the
+# product-page fallback (never interpolated into the script text).
+TRACK2_IDS="$(ios_pending_ids "${_IOS_PENDING:-}" | tr '\n' ' ')"
+TRACK2_IDS="${TRACK2_IDS% }"
 AS_SCRIPT_DIR="${MAC_UPDATE_SESSION_DIR:-}"
 if [ -n "$AS_SCRIPT_DIR" ] && [ -d "$AS_SCRIPT_DIR" ]; then
     AS_SCRIPT_FILE="$AS_SCRIPT_DIR/appstore_track2.scpt"
@@ -490,87 +501,158 @@ else
 fi
 
 cat <<'APPLESCRIPT' > "$AS_SCRIPT_FILE"
+-- Track 2: drive the App Store Updates page (and, as a fallback, the product pages
+-- of the iPad apps the iTunes lookup reports as outdated).
+-- argv: item 1 = time budget in seconds, items 2.. = numeric App Store item ids.
+property deadline : missing value
+property bulkLabels : {"Update All", "Uaktualnij wszystko", "Alle aktualisieren", "Actualizar todo", "Aggiorna tutto", "Atualizar Tudo", "Tout mettre à jour"}
+property itemLabels : {"Update", "Uaktualnij", "Aktualizuj", "Aktualisieren", "Actualizar", "Aggiorna", "Atualizar", "Mettre à jour", "Actualiser"}
 
-tell application "App Store" to activate
-delay 2
-open location "macappstores://showUpdatesPage"
-delay 6
-
-tell application "System Events"
-    tell process "App Store"
-        set frontmost to true
-        delay 2
-
-        set candidates to {}
+-- Every text label an accessibility element may expose (name, description, title).
+on labelsOf(elem)
+    set out to {}
+    tell application "System Events"
         try
-            set candidates to candidates & (buttons of window 1)
+            set v to name of elem
+            if v is not missing value then set end of out to (v as text)
         end try
         try
-            repeat with grp in (groups of window 1)
+            set v to description of elem
+            if v is not missing value then set end of out to (v as text)
+        end try
+        try
+            set v to title of elem
+            if v is not missing value then set end of out to (v as text)
+        end try
+    end tell
+    return out
+end labelsOf
+
+-- bulk labels match by containment; per-app labels match exactly or as "Update <app>".
+on labelMatches(lbls, wanted, containsMode)
+    repeat with l in lbls
+        set t to l as text
+        repeat with w in wanted
+            set wt to w as text
+            if containsMode then
+                if t contains wt then return true
+            else
+                if t is wt or t starts with (wt & " ") then return true
+            end if
+        end repeat
+    end repeat
+    return false
+end labelMatches
+
+on timeLeft()
+    return deadline is not missing value and (current date) < deadline
+end timeLeft
+
+-- One pass over the front window. Returns "" when nothing was clicked.
+on scanOnce(allowBulk)
+    set bulkBtn to missing value
+    set haveBulk to false
+    set itemBtns to {}
+    tell application "System Events"
+        tell process "App Store"
+            try
+                set allElems to entire contents of window 1
+            on error
+                return ""
+            end try
+            repeat with elem in allElems
                 try
-                    set candidates to candidates & (buttons of grp)
+                    if class of elem is button then
+                        set lbls to my labelsOf(elem)
+                        if allowBulk and my labelMatches(lbls, bulkLabels, true) then
+                            if not haveBulk then
+                                set bulkBtn to contents of elem
+                                set haveBulk to true
+                            end if
+                        else if my labelMatches(lbls, itemLabels, false) then
+                            set end of itemBtns to (contents of elem)
+                        end if
+                    end if
                 end try
             end repeat
-        end try
-
-        repeat with btn in candidates
-            try
-                if name of btn contains "Update All" then
-                    click btn
+            if haveBulk then
+                try
+                    click bulkBtn
                     delay 2
                     return "UPDATE_ALL_CLICKED"
-                end if
-            end try
-        end repeat
-
-        set found to false
-        try
-            set allElems to entire contents of window 1
-            repeat with elem in allElems
+                end try
+            end if
+            set clicked to 0
+            repeat with b in itemBtns
                 try
-                    if class of elem is button then
-                        if name of elem contains "Update All" then
-                            click elem
-                            set found to true
-                            delay 2
-                            exit repeat
-                        end if
-                    end if
+                    click b
+                    set clicked to clicked + 1
+                    delay 1
                 end try
             end repeat
-        end try
-        if found then return "UPDATE_ALL_DEEP"
-
-        set updateCount to 0
-        try
-            set allElems to entire contents of window 1
-            repeat with elem in allElems
-                try
-                    if class of elem is button then
-                        set btnName to name of elem
-                        if btnName is "Update" or btnName is "Aktualizuj" or btnName is "Aktualisieren" or btnName is "Actualizar" or btnName is "Aggiorna" or btnName is "Atualizar" or btnName is "Actualiser" then
-                            click elem
-                            set updateCount to updateCount + 1
-                            delay 1
-                        end if
-                    end if
-                end try
-            end repeat
-        end try
-
-        if updateCount > 0 then
-            return "INDIVIDUAL_UPDATES:" & updateCount
-        end if
-
-        return "NO_UPDATES_FOUND"
+            if clicked > 0 then return "INDIVIDUAL_UPDATES:" & clicked
+        end tell
     end tell
-end tell
+    return ""
+end scanOnce
 
+-- Poll until something was clicked, the window budget (seconds) runs out, or the deadline passes.
+on pollClick(windowSecs, allowBulk)
+    set stopAt to (current date) + windowSecs
+    repeat
+        set res to my scanOnce(allowBulk)
+        if res is not "" then return res
+        if (current date) >= stopAt or not my timeLeft() then exit repeat
+        delay 3
+    end repeat
+    return ""
+end pollClick
+
+on run argv
+    set budget to 150
+    try
+        set budget to (item 1 of argv) as integer
+    end try
+    set deadline to (current date) + budget
+
+    tell application "App Store" to activate
+    delay 2
+    open location "macappstores://showUpdatesPage"
+    delay 3
+    tell application "System Events" to tell process "App Store" to set frontmost to true
+
+    set res to my pollClick(30, true)
+    if res is not "" then return res
+
+    -- Nothing yet: the page may not have refreshed. Ask once for a refresh, poll again.
+    try
+        tell application "System Events" to tell process "App Store" to keystroke "r" using command down
+    end try
+    delay 3
+    set res to my pollClick(20, true)
+    if res is not "" then return res
+
+    -- Targeted fallback: open each pending app's own product page and press its Update button.
+    set n to 0
+    repeat with i from 2 to (count of argv)
+        if not my timeLeft() then exit repeat
+        set pid to (item i of argv) as text
+        try
+            open location "macappstores://apps.apple.com/app/id" & pid
+            delay 3
+            set r to my pollClick(15, false)
+            if r is not "" then set n to n + 1
+        end try
+    end repeat
+    if n > 0 then return "PRODUCT_PAGE_UPDATES:" & n
+
+    return "NO_UPDATES_FOUND"
+end run
 APPLESCRIPT
 
-if ! AS_RESULT=$(run_with_timeout "$GUI_TIMEOUT" osascript "$AS_SCRIPT_FILE" 2>&1); then
-    print_warn "Track 2 (App Store GUI) timed out or failed; review window manually"
-    mac_update_severity_register "error" "Track 2 (App Store GUI) timed out or failed"
+# shellcheck disable=SC2086  # TRACK2_IDS holds validated numeric ids; splitting is intended
+if ! AS_RESULT=$(run_with_timeout "$GUI_TIMEOUT" osascript "$AS_SCRIPT_FILE" "$AS_BUDGET" $TRACK2_IDS 2>&1); then
+    print_warn "$L_APPSTORE_TOR2_GUI_FAILED"
     if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
         echo "STATUS_FAILED: Track 2 GUI automation failed" >> "$MAC_UPDATE_SESSION_DIR/update_appstore_results.txt"
     fi
@@ -582,6 +664,7 @@ rm -f "$AS_SCRIPT_FILE"
 echo ""
 APPSTORE_TOR2_BRANCH="unexpected"
 APPSTORE_TOR2_BACKGROUND=0
+NOT_OFFERED_COUNT=0
 if echo "$AS_RESULT" | grep -q "not allowed\|assistive\|Accessibility"; then
     APPSTORE_TOR2_BRANCH="ax_revoked"
     print_warn "$L_APPSTORE_AX_REVOKED"
@@ -605,7 +688,32 @@ elif echo "$AS_RESULT" | grep -q "^INDIVIDUAL_UPDATES:"; then
     print_info "$L_APPSTORE_INSTALLING_BG"
     osascript -e 'tell application "System Events" to set visible of process "App Store" to false' >/dev/null 2>&1 || true
 
+elif echo "$AS_RESULT" | grep -q "^PRODUCT_PAGE_UPDATES:"; then
+    APPSTORE_TOR2_BRANCH="product_page"
+    APPSTORE_TOR2_BACKGROUND=1
+    COUNT="${AS_RESULT#PRODUCT_PAGE_UPDATES:}"
+    print_ok "$L_APPSTORE_INDIVIDUAL_UPDATES ($COUNT)"
+    print_info "$L_APPSTORE_INSTALLING_BG"
+    osascript -e 'tell application "System Events" to set visible of process "App Store" to false' >/dev/null 2>&1 || true
+
+elif echo "$AS_RESULT" | grep -q "^NO_UPDATES_FOUND" && [ -n "${_IOS_PENDING:-}" ]; then
+    # The store lookup says an iPad app is outdated, yet neither the Updates page
+    # nor the product page offered an Update button. Never report that as
+    # "all up to date": it is typically a staged rollout the App Store has not
+    # offered to this Mac yet. Soft warning, the app stays on the pending list.
+    APPSTORE_TOR2_BRANCH="not_offered"
+    printf '%s\n' "$_IOS_PENDING" | while IFS='|' read -r p_name p_id p_inst p_store; do
+        [ -n "$p_name" ] && print_warn "$(printf "$L_APPSTORE_IOS_NOT_OFFERED_FMT" "$p_name" "$p_store")"
+    done
+    NOT_OFFERED_COUNT="$(printf '%s\n' "$_IOS_PENDING" | awk -F'|' 'NF >= 4 && $1 != "" { n++ } END { print n + 0 }')"
+    SOFT_FAIL=1
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        printf '%s\n' "$_IOS_PENDING" > "$MAC_UPDATE_SESSION_DIR/appstore_ios_pending.txt"
+    fi
+    osascript -e 'tell application "App Store" to quit' >/dev/null 2>&1 || true
+
 elif echo "$AS_RESULT" | grep -q "^NO_UPDATES_FOUND"; then
+    # Store lookup unavailable (no pending list) and the GUI shows nothing.
     APPSTORE_TOR2_BRANCH="no_updates"
     print_ok "$L_APPSTORE_NO_UPDATES"
     osascript -e 'tell application "App Store" to quit' >/dev/null 2>&1 || true
@@ -680,7 +788,7 @@ fi
 print_header "$L_FINAL_CHECK"
 if [ "$MAS_OUTDATED_MODE" = "accurate" ]; then
     if ! STILL_OUTDATED=$(run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated --accurate 2>&1); then
-        print_warn "mas outdated --accurate failed; native App Store state is unknown."
+        print_warn "$L_APPSTORE_MAS_OUTDATED_ACCURATE_UNKNOWN"
         [ -n "$STILL_OUTDATED" ] && printf '%s\n' "$STILL_OUTDATED"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
             printf 'FINAL native verification failed (mode=accurate):\n%s\n' "$STILL_OUTDATED" \
@@ -692,7 +800,7 @@ if [ "$MAS_OUTDATED_MODE" = "accurate" ]; then
     fi
 else
     if ! STILL_OUTDATED=$(run_with_timeout "$MAS_CHECK_TIMEOUT" mas outdated 2>&1); then
-        print_warn "mas outdated failed; native App Store state is unknown."
+        print_warn "$L_APPSTORE_MAS_OUTDATED_UNKNOWN"
         [ -n "$STILL_OUTDATED" ] && printf '%s\n' "$STILL_OUTDATED"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
             printf 'FINAL native verification failed (mode=default):\n%s\n' "$STILL_OUTDATED" \
@@ -732,12 +840,15 @@ if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
         printf '%s\n' "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_appstore"
     else
         PENDING_APPSTORE="$(mas_outdated_ids "$STILL_OUTDATED" | wc -l | tr -d ' ')"
-        printf '%s\n' "${PENDING_APPSTORE:-0}" > "$MAC_UPDATE_SESSION_DIR/pending_appstore"
+        # iPad apps the store reports as outdated but never offered (not_offered)
+        # are still pending for the run summary.
+        PENDING_APPSTORE=$(( ${PENDING_APPSTORE:-0} + ${NOT_OFFERED_COUNT:-0} ))
+        printf '%s\n' "$PENDING_APPSTORE" > "$MAC_UPDATE_SESSION_DIR/pending_appstore"
     fi
 fi
 
 if [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
-    print_warn "Track 2 is still installing in the background; its completion is not verified by mas ($MAS_OUTDATED_MODE checks native apps only)."
+    print_warn "$(printf "$L_APPSTORE_TOR2_BG_UNVERIFIED_FMT" "$MAS_OUTDATED_MODE")"
     SOFT_FAIL=1
     if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
         {
@@ -781,6 +892,8 @@ if [ "$APPSTORE_EXIT" -eq 0 ]; then
         print_info "$L_APPSTORE_TOR2_NOTHING"
     elif [ "$APPSTORE_TOR2_BRANCH" = "declined" ]; then
         print_info "$L_UPDATE_CANCELED"
+    elif [ "$APPSTORE_TOR2_BRANCH" = "not_offered" ]; then
+        print_warn "$L_APPSTORE_TOR2_NOT_OFFERED"
     else
         print_info "$L_SCRIPT_2_SUMMARY_TOR2"
         print_warn "$L_SCRIPT_2_CHECK_WINDOW"
@@ -791,18 +904,20 @@ elif [ "$APPSTORE_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
     # until it finishes. Reporting that as an error trained users to ignore the
     # banner, so the three states are kept distinct here exactly as update_all.sh
     # does: clean / warnings / errors.
-    print_header "⚠️  SCRIPT 2 FINISHED WITH WARNINGS"
+    print_header "$L_APPSTORE_BANNER_WARNINGS"
     if [ -n "$STILL_OUTDATED" ]; then
         formatted_still="$(printf '%s\n' "$STILL_OUTDATED" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }')"
         print_warn "$(printf "$L_APPSTORE_STILL_PENDING_MANUAL_FMT" "$formatted_still")"
+    elif [ "$APPSTORE_TOR2_BRANCH" = "not_offered" ]; then
+        print_warn "$L_APPSTORE_TOR2_NOT_OFFERED"
     elif [ "$APPSTORE_TOR2_BACKGROUND" -eq 1 ]; then
-        print_info "App Store is still installing in the background; mas cannot confirm those apps until it finishes. Re-run later to verify."
+        print_info "$L_APPSTORE_BG_STILL_INSTALLING"
     else
-        print_info "Some App Store state could not be verified; review the diagnostics above. Nothing was left mid-install."
+        print_info "$L_APPSTORE_STATE_UNVERIFIED"
     fi
 else
-    print_header "❌ SCRIPT 2 FINISHED WITH ERRORS"
-    print_info "An App Store operation failed; review the diagnostics above."
+    print_header "$L_APPSTORE_BANNER_ERRORS"
+    print_info "$L_APPSTORE_OP_FAILED"
 fi
 echo ""
 exit "$APPSTORE_EXIT"

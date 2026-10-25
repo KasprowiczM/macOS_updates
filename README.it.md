@@ -14,7 +14,7 @@
 | Flusso | 7 passaggi (0–6), l'aggiornamento di macOS è sempre l'ultimo |
 | Registro | 43 app da Internet · 11 metodi di aggiornamento (vedi [Metodi di aggiornamento](#metodi-di-aggiornamento)) |
 | Lingue | EN, PL, ES, FR, DE, IT, PT (CLI e documentazione) |
-| Test | 561 test automatici (`bash run_tests.sh`) |
+| Test | 590 test automatici (`bash run_tests.sh`) |
 
 **Novità della v1.5.5:** Un upgrade di Homebrew che rimuove `python3` durante l'esecuzione non interrompe più il passaggio di inventario/report (la shell cerca di nuovo in `PATH`), e un passaggio di report fallito non rinvia più gli aggiornamenti di macOS. I messaggi finali sono onesti: nessuna dichiarazione «file aggiornati» dopo un errore, e gli avvisi su feed obsoleti o app non chiuse non sono più presentati come aggiornamenti non verificati. Alle app avviate dallo strumento viene chiesto ripetutamente di chiudersi (mai forzato). Le versioni 1.5.x precedenti (feed obsoleti come avvisi, download del produttore per ChatGPT/Proton, CLI native prima di npm, protezione della sostituzione dei pacchetti) sono descritte in [CHANGELOG.md](CHANGELOG.md).
 
@@ -331,7 +331,7 @@ I wrapper `dev-sync-*.sh` nella radice richiamano gli stessi script di `dev_sync
 
 ## Test
 
-La suite copre la sintassi bash, la compilazione Python, i contratti statici di sicurezza, le protezioni della documentazione e i test unitari (561 test automatici).
+La suite copre la sintassi bash, la compilazione Python, i contratti statici di sicurezza, le protezioni della documentazione e i test unitari (590 test automatici).
 Le pull request eseguono ShellCheck su Ubuntu, test Python portabili e la scansione dei segreti.
 La suite completa `run_tests.sh` su un runner macOS viene eseguita solo con `workflow_dispatch` o un tag `v*`, non a ogni push.
 

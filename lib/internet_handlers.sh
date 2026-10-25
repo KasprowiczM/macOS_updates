@@ -465,6 +465,19 @@ EOF
         INTERNET_LAST_VERIFIED=1
         return 0
     elif [ "$rel" = "older" ]; then
+        # The primary feed lists only the stable release. Before calling it stale,
+        # check whether the app's own Sparkle appcast publishes the installed
+        # version in another channel (e.g. gradual-rollout). That proves "current";
+        # it is never used as an install target (partial rollouts stay with the
+        # native updater).
+        local _appcast_channel=""
+        if command -v vendor_appcast_published_channel >/dev/null 2>&1 \
+            && _appcast_channel="$(vendor_appcast_published_channel "$app" "$app_path" 2>/dev/null)" \
+            && [ -n "$_appcast_channel" ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT" "$I")"
+            INTERNET_LAST_VERIFIED=1
+            return 0
+        fi
         INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$I")"
         INTERNET_LAST_VERIFIED=0
         return 0

@@ -159,9 +159,12 @@ class PostupdateNonBlockingTests(unittest.TestCase):
     def test_soft_step_messages_say_warnings_not_unverified(self) -> None:
         text = read("update_all.sh")
         self.assertNotIn("reported unverified updates (soft)", text)
-        for label in ("App Store", "Native CLI + npm", "Homebrew", "Internet apps"):
-            with self.subTest(step=label):
-                self.assertIn(f"{label} reported warnings (soft) — macOS step not blocked", text)
+        # 2026-10-25: the wording moved into one localized format key.
+        self.assertEqual(text.count("L_ALL_STEP_SOFT_WARNINGS_FMT"), 4)
+        for lang in LANGS:
+            lang_text = read(f"i18n/lang_{lang}.sh")
+            self.assertRegex(lang_text, r'(?m)^L_ALL_STEP_SOFT_WARNINGS_FMT="[^"]*%s[^"]*"$')
+        self.assertIn("reported warnings (soft) — macOS step not blocked", read("i18n/lang_en.sh"))
 
 
 class RunSummaryFailureTests(unittest.TestCase):

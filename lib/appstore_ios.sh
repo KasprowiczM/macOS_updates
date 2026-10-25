@@ -122,3 +122,9 @@ for p in pending:
     print(f"{p['name']}|{p['itemId']}|{p['installed']}|{p['store']}")
 PYEOF_IAP
 }
+
+# Digits-only App Store item ids (field 2) from ios_apps_pending output, one per line.
+# Anything non-numeric is dropped, so the ids are safe to pass as osascript arguments.
+ios_pending_ids() {
+    printf '%s\n' "${1:-}" | awk -F'|' '$2 ~ /^[0-9]+$/ { print $2 }'
+}

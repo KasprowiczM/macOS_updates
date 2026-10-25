@@ -159,7 +159,7 @@ def classify_step_status(val: Any) -> str:
         return "skipped_by_user"
 
     warn_tokens = (
-        "warn", "ostrzeż", "ostrzez", "warnung", "avertissement", "advertencia", "avviso", "aviso",
+        "warn", "ostrzeż", "ostrzez", "warnung", "avertissement", "advertencia", "avviso", "avvis", "aviso",
         "unverified", "niezweryfikowan", "degraded", "unknown", "nieznan", "zastrzeż",
     )
     if any(tok in s for tok in warn_tokens):
@@ -1050,6 +1050,61 @@ def determine_exit_class(overall_exit: int, degraded: int) -> str:
     if degraded != 0:
         return "warnings"
     return "clean"
+
+
+_ACTIONABLE_INTERNET_CODES = frozenset({
+    "unverified", "error_soft", "error_hard", "behind", "needs_restart",
+    "update_available",
+})
+
+
+def degraded_is_warnings_only(session_dir: str | Path) -> bool:
+    """True when a degraded (soft-warning) run has NO unverified or pending work.
+
+    That is: the internet step is the only non-OK step, every per-app internet code is
+    informational (e.g. a stale manufacturer feed), and every pending_* counter is 0.
+    Anything unknown or unreadable returns False, so the caller keeps the generic
+    "could not be verified" wording rather than understating a real problem."""
+    sdir = Path(session_dir)
+    try:
+        steps_file = sdir / "step_status_codes.txt"
+        codes_file = sdir / "internet_status_codes.txt"
+        if not steps_file.is_file() or not codes_file.is_file():
+            return False
+        steps: dict[str, str] = {}
+        for line in steps_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            if "=" in line:
+                key, _, val = line.partition("=")
+                steps[key.strip()] = val.strip()
+        if steps.get("internet") != "warn":
+            return False
+        for key, val in steps.items():
+            if key != "internet" and val not in ("ok", "skipped"):
+                return False
+        saw_warning = False
+        for line in codes_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|", 2)
+            if len(parts) < 3:
+                return False
+            code = parts[1].strip()
+            if code in _ACTIONABLE_INTERNET_CODES:
+                return False
+            if code == "feed_stale":
+                saw_warning = True
+        if not saw_warning:
+            return False
+        for _, fname in PENDING_FILES:
+            pf = sdir / fname
+            if pf.is_file():
+                val = pf.read_text(encoding="utf-8", errors="replace").strip()
+                if val not in ("", "0"):
+                    return False
+        return True
+    except OSError:
+        return False
 
 
 def merge_pending(counts: dict[str, Any], session_dir: str) -> tuple[dict[str, Any], dict[str, str]]:

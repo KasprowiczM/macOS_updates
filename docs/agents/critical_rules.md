@@ -24,6 +24,8 @@ sudo env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS   # explicit IDs, never a
   - Requires Accessibility permission in System Settings
   - This is a separate track, not a fallback for Track 1; unexpected GUI states fail honestly
   - `mas outdated` cannot prove the state of iPad apps, so Track 2 keeps its own result
+  - The GUI script polls the Updates page (~30 s), reads labels from `name`/`description`/`title`, refreshes once (Cmd+R) and falls back to each pending app's product page (digits-only ids passed as `osascript` arguments). It never trusts a fixed delay.
+  - **A GUI result never overrides the store lookup.** `NO_UPDATES_FOUND` while `ios_apps_pending` lists apps is the `not_offered` branch: soft warning (exit 10), `appstore_ios_pending.txt`, counted as pending. Never print "all up to date" for it — that false negative shipped silently on 7 runs (2026-10-05 → 10-25).
 
 ## 4. Version detection
 ```bash
@@ -257,6 +259,7 @@ not success.
 
 - **Source of truth:** The vendor's own release feed (`config/vendor_feeds.txt`) or live Omaha updater query is the authoritative truth for version comparison. Homebrew cask version is only a second voice: it may confirm that an app is behind, but equality confirms "current" only when no vendor feed is configured (`current_cask_only`).
 - **Feed stale guard:** When `remote < local`, the condition is treated as `feed_stale`, preserving the local installed version rather than regressing or downgrading.
+- **Rollout-channel proof (2026-10-25):** before reporting `feed_stale`, `internet_handler_vendor_truth` checks the app's Sparkle appcast from `config/vendor_appcasts.txt` (https, host must equal the app's allowed host in `vendor_feeds.txt`; the URL is config, never read from the plist). If the installed short version or build is published there in any channel (e.g. Proton Drive's `gradual-rollout`), the app is `current_verified`. This proves "current" only — a rollout item is never an install target (§16).
 - **Check before action:** Do not launch applications, virtual machines, or vendor updaters if the vendor feed reports the app is already up to date.
 - **Never terminate user-running applications:** Only quit what the toolkit itself launched, and always perform soft graceful termination (`quit`), never forced `kill`.
   An app that is already open when `update_all.sh` reaches it is in use: it is never quit, relaunched or
