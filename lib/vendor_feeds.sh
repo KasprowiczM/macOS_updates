@@ -60,3 +60,52 @@ $py_res
 EOF_RESULT
     printf "%s|%s|%s|%s|%s|%s|%s\n" "$v" "$u" "$ck" "$cs" "${artifact:--}" "${host:--}" "$policy"
 }
+
+# Explicit appcast URL for an app (config/vendor_appcasts.txt); empty when none.
+vendor_appcast_url() {
+    local app="$1" cfg
+    cfg="$_VENDOR_FEEDS_DIR/../config/vendor_appcasts.txt"
+    [ -f "$cfg" ] || return 1
+    awk -F'|' -v a="$app" '
+        /^[[:space:]]*#/ { next }
+        { n = $1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", n);
+          if (n == a) { u = $2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", u); print u; exit } }
+    ' "$cfg" 2>/dev/null
+}
+
+# Cross-check used when the primary vendor feed is OLDER than the installed app.
+# Prints the channel in which the app's own Sparkle appcast publishes the installed
+# version ("stable", "gradual-rollout", ... or "default") and returns 0; returns 1
+# when it is not published there, the appcast is missing/unreachable, or its host is
+# not the app's allowed host. Proof of "current" only: never an install target.
+vendor_appcast_published_channel() {
+    local app="$1" app_path="$2" row url host
+    url="$(vendor_appcast_url "$app")" || return 1
+    [ -n "$url" ] || return 1
+    row="$(vendor_feed_row "$app")" || return 1
+    host="$(printf '%s' "$row" | awk -F'|' '{ h = $6; gsub(/^[[:space:]]+|[[:space:]]+$/, "", h); print h }')"
+
+    local short build
+    short="$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)"
+    build="$(defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null || true)"
+    [ -n "$short" ] || return 1
+
+    PYTHONPATH="$_VENDOR_FEEDS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import appcast_url_allowed
+sys.exit(0 if appcast_url_allowed(sys.argv[1], sys.argv[2]) else 1)
+' "$url" "$host" || return 1
+
+    local out
+    out="$(curl -fsSL --max-time 15 --retry 2 "$url" 2>/dev/null | head -c 5242880 | \
+        PYTHONPATH="$_VENDOR_FEEDS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import appcast_publishes_installed
+ch = appcast_publishes_installed(sys.stdin.read(), sys.argv[1], sys.argv[2] or None)
+if ch is None:
+    sys.exit(1)
+print(ch or "default")
+' "$short" "$build")" || return 1
+    [ -n "$out" ] || return 1
+    printf '%s\n' "$out"
+}

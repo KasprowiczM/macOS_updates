@@ -10,6 +10,37 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 - **Lockstep versioning with Ascendo.** Documented that release versions of `macOS_updates` and `Ascendo` proceed in lockstep starting from v1.5.5; parity ports between both repositories share the same version number.
 
+### Fixed (2026-10-25 run-log follow-up)
+
+The version stays 1.5.5 until the Ascendo parity port (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-25.md).
+
+- **App Store Track 2 false negative (high).** The iTunes lookup reported `UniFi 11.0.1 → 11.0.2`, the AppleScript returned `NO_UPDATES_FOUND`, and the run claimed "no pending iPad app updates" with exit 0. The same happened on 7 runs since 2026-10-05.
+  - The AppleScript now polls the Updates page for up to ~30 s instead of a fixed 6 s delay.
+  - It reads button labels from `name`, `description` and `title` and matches localized bulk and per-app labels.
+  - If nothing is found it refreshes once (Cmd+R) and polls again.
+  - As a fallback it opens each pending app's product page (`PRODUCT_PAGE_UPDATES:<n>`). The ids come from the new `ios_pending_ids`, are digits only and are passed as `osascript` arguments.
+  - If the store still offers nothing while the lookup reports a pending app, the new `not_offered` branch prints a soft warning (`L_APPSTORE_IOS_NOT_OFFERED_FMT`, exit 10, non-blocking), writes `appstore_ios_pending.txt` and counts the app in `pending_after_run_appstore`.
+  - A Track-2-only run asks `L_CONFIRM_TRACK2` instead of "run both updates?".
+  - An undefined `mac_update_severity_register` call on the GUI-timeout path was removed.
+- **Proton Drive permanent "stale feed" warning (high).** Proton Drive 3.1.0 is published in the `gradual-rollout` channel of the app's own Sparkle appcast, while `version.json` lists only stable 3.0.3. The internet step was degraded for 10 consecutive runs.
+  - When the primary feed is older than the installed app, `internet_handler_vendor_truth` now checks the appcast listed in the new `config/vendor_appcasts.txt` (https only, on the app's allowed host).
+  - If the installed version or build is published there in any channel, the app is reported current (`L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT`).
+  - This only proves "current"; a rollout item is never an install target.
+  - `scripts/check_vendor_feeds.sh` shows the relation `rollout_ok`.
+- **Honest final banner.** When the only degraded cause is a stale manufacturer feed and nothing is unverified or pending, `update_all.sh` prints `L_ALL_WARNINGS_ONLY` instead of "some updates could not be verified" (`degraded_is_warnings_only` in `lib/python/run_summary.py`).
+- **Localized strings.** The following were hardcoded English: step results, the soft-warning lines, the final summary labels, "Run summary", chronic-warning streaks, the App Store banners and the Track 1 "skipped" line. Some were also tautological ("Warning completed with warnings") or mixed-language ("OK completed"). They now use i18n keys in all seven languages. Legacy texts in old run summaries still classify, and comparisons use `STATUS_CODE_*` instead of display text.
+- **No profile backup without a change.** The `~/.zshrc` / `~/.npmrc` backup and its message appear only when the content actually changes. `.npmrc` is rewritten only if it contains a `prefix`/`globalconfig` line. The managed profile block is now normalised on a staging copy (`sync_profile_block`), and the real profile is replaced only if the result differs. Rotation is unchanged.
+
+### Tests (2026-10-25)
+
+- New `tests/test_run_log_regressions_20261025.py` covers:
+  - channel-aware appcast parsing and the host allowlist;
+  - the shell cross-check with a stubbed `curl`;
+  - the warnings-only banner and step-text classification;
+  - the `not_offered` branch and the AppleScript (`osacompile`);
+  - id validation and i18n parity;
+  - backup-on-change and profile-sync idempotency.
+
 ### Fixed
 
 - **Website link.** The project site link in all seven READMEs, `CONTRIBUTING.md`, `AGENTS.md`, `docs/INSTALL.md` and `docs/user/INDEX.md` now points to the live domain `https://macos-updates.64bit.site`; `macosupdates.dev` was never registered.

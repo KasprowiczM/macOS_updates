@@ -1,0 +1,11 @@
+# ============================================================
+# config/vendor_appcasts.txt — vendor Sparkle appcasts used ONLY to prove that an
+# installed version is a published vendor release (never as an install source).
+# Format: App Name|appcast_url
+# The URL must be https and its host must equal the allowed_host of the same app in
+# config/vendor_feeds.txt. Used when the primary vendor feed is older than the
+# installed app (feed_stale): if the installed version is published in ANY channel
+# of this appcast (e.g. gradual-rollout) the app is reported as current.
+# Mirrors the app's own Info.plist SUFeedURL (verified 2026-10-25).
+# ============================================================
+Proton Drive|https://proton.me/download/drive/macos/appcast.xml

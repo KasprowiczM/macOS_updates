@@ -62,6 +62,7 @@
 | `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha text log + `updater_history.jsonl`, VersionHistory) |
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
 | `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
+| `config/vendor_appcasts.txt` | Sparkle appcasts used only to prove an installed rollout-channel build is a published vendor release (never an install source) |
 | `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds (Cursor, OpenCode) |
 | `config/cask_oracles.txt` | Read-only Homebrew Cask version oracle mappings for verifying unverified apps |
 | `tests/_env.py` | Helper for test subprocess environments that strips PYTHONPATH so child shell processes do not inherit it |

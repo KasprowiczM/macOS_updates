@@ -23,6 +23,7 @@ Everything in this directory is a **development record**, not product documentat
 | 2026-10-05 | [`ULTRA_REVIEW_2026-10-05_v153.md`](ULTRA_REVIEW_2026-10-05_v153.md) | not stated | review | v1.5.3 | Update-reliability review and release plan (vendor-truth ChatGPT/Proton, native-CLI-first ordering, bundle-swap protection). |
 | 2026-10-05 | [`RUN_LOG_FOLLOWUP_2026-10-05_v154.md`](RUN_LOG_FOLLOWUP_2026-10-05_v154.md) | not stated | run-log | v1.5.4 | Follow-up on the first live v1.5.3 run: stale manufacturer feeds become warnings, summary wording. |
 | 2026-10-11 | [`RUN_LOG_FOLLOWUP_2026-10-11_v155.md`](RUN_LOG_FOLLOWUP_2026-10-11_v155.md) | not stated | run-log | v1.5.5 | Follow-up on the 2026-10-11 live run: stale `python3` command hash, non-blocking step 5, honest summaries (F1-F6). |
+| 2026-10-25 | [`RUN_LOG_FOLLOWUP_2026-10-25.md`](RUN_LOG_FOLLOWUP_2026-10-25.md) | Claude Opus 5.5 (verifier) + Sonnet subagent (implementation) | run-log | unreleased (1.5.5) | App Store Track 2 false negative (`not_offered`, polling, product-page fallback), Proton Drive gradual-rollout appcast cross-check, warnings-only banner, localization, profile backups only on change (R1-R5). |
 
 ## Archive (chronological)
 

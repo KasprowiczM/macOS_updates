@@ -103,7 +103,14 @@ EOF
         if [ "$inst_ver" != "-" ] && [ "$vend_ver" != "-" ]; then
             cmp_res="$(version_cmp "$inst_ver" "$vend_ver" 2>/dev/null || echo "unknown")"
             case "$cmp_res" in
-                newer) relation="feed_stale" ;;
+                newer)
+                    relation="feed_stale"
+                    # Installed version published in another channel of the app's
+                    # own appcast (e.g. gradual-rollout): current, not stale.
+                    if vendor_appcast_published_channel "$app_name" "$app_path" >/dev/null 2>&1; then
+                        relation="rollout_ok"
+                    fi
+                    ;;
                 equal) relation="equal" ;;
                 older)
                     if [ "${v_policy:-eligible}" = "rollout_hold" ]; then
