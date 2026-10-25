@@ -14,7 +14,7 @@
 | Pipeline | 7 étapes (0–6), la mise à jour de macOS vient toujours en dernier |
 | Registre | 43 applications Internet · 11 méthodes de mise à jour (voir [Méthodes de mise à jour](#méthodes-de-mise-à-jour)) |
 | Langues | EN, PL, ES, FR, DE, IT, PT (CLI et documentation) |
-| Tests | 590 tests automatisés (`bash run_tests.sh`) |
+| Tests | 591 tests automatisés (`bash run_tests.sh`) |
 
 **Nouveautés de la v1.5.5 :** Une mise à jour Homebrew qui supprime `python3` en cours d'exécution ne casse plus l'étape d'inventaire/rapport (le shell recherche à nouveau dans `PATH`), et une étape de rapport en échec ne repousse plus les mises à jour de macOS. Les messages finaux sont honnêtes : plus d'affirmation « fichiers mis à jour » après un échec, et les avertissements de flux périmé ou d'application non fermée ne sont plus présentés comme des mises à jour non vérifiées. Les applications lancées par l'outil reçoivent des demandes de fermeture répétées (jamais de forçage). Les versions 1.5.x précédentes (flux périmés en avertissement, téléchargements éditeur pour ChatGPT/Proton, CLI natives avant npm, protection du remplacement de paquets) sont décrites dans [CHANGELOG.md](CHANGELOG.md).
 
@@ -332,7 +332,7 @@ Les enveloppes `dev-sync-*.sh` de la racine appellent les mêmes scripts de `dev
 
 ## Tests
 
-La suite couvre la syntaxe bash, la compilation Python, les contrats statiques de sécurité, les garde-fous de documentation et les tests unitaires (590 tests automatisés).
+La suite couvre la syntaxe bash, la compilation Python, les contrats statiques de sécurité, les garde-fous de documentation et les tests unitaires (591 tests automatisés).
 Les pull requests exécutent ShellCheck sur Ubuntu, des tests Python portables et l'analyse de secrets.
 La suite complète `run_tests.sh` sur un runner macOS ne s'exécute que via `workflow_dispatch` ou une étiquette `v*`, pas à chaque push.
 

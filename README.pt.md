@@ -14,7 +14,7 @@
 | Fluxo | 7 passos (0–6); a atualização do macOS vem sempre em último |
 | Registo | 43 aplicações da Internet · 11 métodos de atualização (ver [Métodos de atualização](#métodos-de-atualização)) |
 | Idiomas | EN, PL, ES, FR, DE, IT, PT (CLI e documentação) |
-| Testes | 590 testes automáticos (`bash run_tests.sh`) |
+| Testes | 591 testes automáticos (`bash run_tests.sh`) |
 
 **Novidades da v1.5.5:** Uma atualização do Homebrew que remove o `python3` durante a execução já não quebra o passo de inventário/relatório (o shell volta a procurar no `PATH`), e um passo de relatório com falha já não adia as atualizações do macOS. As mensagens finais são honestas: sem a afirmação «ficheiros atualizados» após uma falha, e os avisos de feeds desatualizados ou de aplicações que não fecharam já não são apresentados como atualizações não verificadas. As aplicações iniciadas pela ferramenta recebem pedidos repetidos para fechar (nunca forçados). As versões 1.5.x anteriores (feeds desatualizados como avisos, transferências do fabricante para ChatGPT/Proton, CLIs nativas antes do npm, proteção na substituição de pacotes) estão descritas em [CHANGELOG.md](CHANGELOG.md).
 
@@ -331,7 +331,7 @@ Os wrappers `dev-sync-*.sh` na raiz chamam os mesmos scripts de `dev_sync/`.
 
 ## Testes
 
-A bateria cobre a sintaxe do bash, a compilação do Python, os contratos estáticos de segurança, as guardas de documentação e os testes unitários (590 testes automáticos).
+A bateria cobre a sintaxe do bash, a compilação do Python, os contratos estáticos de segurança, as guardas de documentação e os testes unitários (591 testes automáticos).
 Os pull requests executam o ShellCheck no Ubuntu, testes Python portáteis e a análise de segredos.
 A suite completa `run_tests.sh` num runner macOS só corre com `workflow_dispatch` ou uma etiqueta `v*`, não a cada push.
 

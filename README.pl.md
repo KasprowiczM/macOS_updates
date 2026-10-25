@@ -14,7 +14,7 @@
 | Potok | 7 kroków (0–6), aktualizacja systemu macOS zawsze na końcu |
 | Rejestr | 43 aplikacje internetowe · 11 metod aktualizacji (zob. [Metody aktualizacji](#metody-aktualizacji)) |
 | Języki | EN, PL, ES, FR, DE, IT, PT (CLI i dokumentacja) |
-| Testy | 590 testów automatycznych (`bash run_tests.sh`) |
+| Testy | 591 testów automatycznych (`bash run_tests.sh`) |
 
 **Nowość w v1.5.5:** Aktualizacja Homebrew usuwająca `python3` w trakcie przebiegu nie psuje już kroku inwentarza/raportu (powłoka ponownie przeszukuje `PATH`), a nieudany krok raportujący nie odkłada już aktualizacji macOS. Komunikaty końcowe są uczciwe: brak twierdzenia o zaktualizowanych plikach po błędzie, a ostrzeżenia o starym feedzie lub niezamkniętej aplikacji nie są już opisywane jako niezweryfikowane aktualizacje. Aplikacje uruchomione przez narzędzie dostają wielokrotną prośbę o zamknięcie (bez wymuszania). Wcześniejsze wydania 1.5.x (stary feed producenta jako ostrzeżenie, pobieranie ChatGPT/Proton od producenta, natywne CLI przed npm, ochrona podmiany pakietów) opisuje [CHANGELOG.md](CHANGELOG.md).
 
@@ -333,7 +333,7 @@ Skrypty `dev-sync-*.sh` w głównym katalogu wywołują te same skrypty z `dev_s
 
 ## Testowanie
 
-Zestaw testów obejmuje składnię basha, kompilację Pythona, statyczne kontrakty bezpieczeństwa, strażników dokumentacji oraz testy jednostkowe (590 testów automatycznych).
+Zestaw testów obejmuje składnię basha, kompilację Pythona, statyczne kontrakty bezpieczeństwa, strażników dokumentacji oraz testy jednostkowe (591 testów automatycznych).
 Pull requesty uruchamiają na Ubuntu ShellCheck, przenośne testy Pythona i skan sekretów.
 Pełna suite `run_tests.sh` na runnerze macOS działa tylko przy `workflow_dispatch` albo tagu `v*` — nie przy każdym pushu.
 

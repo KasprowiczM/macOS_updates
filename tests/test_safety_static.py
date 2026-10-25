@@ -286,6 +286,29 @@ class StaticShellSafetyTests(unittest.TestCase):
                 self.assertIsNotNone(checkhash, f"{name} must enable `shopt -s checkhash`")
                 self.assertGreater(checkhash.start(), pipefail)
 
+    def test_locale_overrides_go_through_env(self) -> None:
+        """Locale overrides for a child command must use `env LANG=C ...`.
+
+        A `LANG=C LC_ALL=C cmd` prefix makes bash itself call setlocale() in the
+        forked subshell. With Homebrew bash 5.3 + gettext on macOS 27 that path
+        (libintl_setlocale -> CFLocaleCopyPreferredLanguages -> os_log) segfaults
+        intermittently: `softwareupdate -l failed (exit 139)`, roughly one in three
+        runs of SystemStepBehavioralTests (2026-10-25). `env` sets the variables
+        for the child only, so the shell never re-initialises its own locale.
+        """
+        prefix = re.compile(r"(?:^|[\s(;|&`])(?:LANG|LANGUAGE|LC_[A-Z]+)=\S*\s+[A-Za-z_./]")
+        offenders = []
+        for sh_file in REPO_ROOT.rglob("*.sh"):
+            rel = sh_file.relative_to(REPO_ROOT)
+            if rel.parts[0] in ("tests", ".git", "node_modules"):
+                continue
+            for no, line in enumerate(sh_file.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                code = line.split("#", 1)[0] if not line.lstrip().startswith("#") else ""
+                for m in prefix.finditer(code):
+                    if not re.search(r"\benv(?:\s+\w+=\S*)*\s*$", code[: m.start() + 1]):
+                        offenders.append(f"{rel}:{no}: {line.strip()}")
+        self.assertEqual(offenders, [], "use `env LANG=C LC_ALL=C cmd` instead of a bare prefix assignment")
+
     def test_update_all_persists_run_log(self) -> None:
         """update_all.sh must tee output to a persistent log under logs/.
 
