@@ -69,7 +69,9 @@ echo ""
 print_header "$L_SYSTEM_UPDATES_CHECK"
 
 UPDATES_EXIT=0
-UPDATES=$(LANG=C LC_ALL=C softwareupdate -l 2>&1) || UPDATES_EXIT=$?
+# `env`, not a `LANG=C cmd` prefix: the prefix makes this shell call setlocale(),
+# which segfaults intermittently in Homebrew bash 5.3 + gettext on macOS 27 (exit 139).
+UPDATES=$(env LANG=C LC_ALL=C softwareupdate -l 2>&1) || UPDATES_EXIT=$?
 echo "$UPDATES"
 
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
@@ -295,7 +297,7 @@ else
     print_ok "$L_SYSTEM_NO_RESTART_NEEDED"
     # Remeasure pending updates after install without restart
     if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-        POST_UPDATES=$(LANG=C LC_ALL=C softwareupdate -l 2>&1) || true
+        POST_UPDATES=$(env LANG=C LC_ALL=C softwareupdate -l 2>&1) || true
         echo "$POST_UPDATES" > "$MAC_UPDATE_SESSION_DIR/system_available.txt" 2>/dev/null || true
         if echo "$POST_UPDATES" | grep -q "No new software available"; then
             echo "0" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true

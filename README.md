@@ -14,7 +14,7 @@
 | Pipeline | 7 steps (0–6), macOS system update always last |
 | Registry | 43 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 590 automated tests (`bash run_tests.sh`) |
+| Tests | 591 automated tests (`bash run_tests.sh`) |
 
 **New in v1.5.5:** A Homebrew upgrade that removes `python3` mid-run no longer breaks the inventory/report step (the shell now re-searches `PATH`), and a failed reporting step no longer postpones macOS updates. Final messages are honest: no "files updated" claim after a failure, and stale-feed or quit-timeout warnings are no longer reported as unverified updates. Apps launched by the toolkit are asked to quit repeatedly (never force-killed). Earlier 1.5.x releases (stale manufacturer feeds as warnings, ChatGPT/Proton vendor downloads, native-CLI-first ordering, bundle-swap protection) are described in [CHANGELOG.md](CHANGELOG.md).
 
@@ -329,7 +329,7 @@ Root `dev-sync-*.sh` wrappers call the same scripts in `dev_sync/`.
 
 ## Test
 
-The test suite covers bash syntax, Python compilation, static safety contracts, documentation guards and unit tests (590 automated tests).
+The test suite covers bash syntax, Python compilation, static safety contracts, documentation guards and unit tests (591 automated tests).
 Pull requests run Ubuntu ShellCheck, portable Python tests, and the secret scan.
 The full `run_tests.sh` suite on a macOS runner runs only on `workflow_dispatch` or a `v*` tag — not on every push.
 

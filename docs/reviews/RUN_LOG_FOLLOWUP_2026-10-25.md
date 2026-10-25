@@ -72,7 +72,7 @@ The user ran Update All interactively (Polish locale, macOS 27.0.1, Homebrew 7.0
 - Four assertions in older regression tests now check i18n keys instead of hardcoded strings.
 - Full `bash run_tests.sh` passes, and warning-level ShellCheck on the changed shell files is clean.
 - A read-only `scripts/check_vendor_feeds.sh` shows Proton Drive as `rollout_ok`.
-- The pre-existing intermittent failure of `test_system_step.SystemStepBehavioralTests.test_batch_restart_labels_two_invocations_restart_last` (`softwareupdate -l` mock exiting 139) also occurs on the unchanged baseline (1 in 10 runs) and is not caused by these changes.
+- The intermittent `test_system_step` failure (`softwareupdate -l failed (exit 139)`) was pre-existing and is now fixed (follow-up commit). The crash report showed the calling Homebrew bash segfaulting in `setlocale()` when the `LANG=C LC_ALL=C cmd` prefix forced it to re-initialise its locale. `update_system.sh` now uses `env LANG=C LC_ALL=C`, and a static guard prevents bare locale prefixes. Before the fix 10/30 class runs failed; after it, 0/30.
 
 ## Remaining acceptance work
 
