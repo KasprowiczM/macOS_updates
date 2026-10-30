@@ -463,6 +463,7 @@ EOF
     if [ "$rel" = "equal" ]; then
         INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$I")"
         INTERNET_LAST_VERIFIED=1
+        print_ok "$INTERNET_LAST_STATUS"
         return 0
     elif [ "$rel" = "older" ]; then
         # The primary feed lists only the stable release. Before calling it stale,
@@ -476,19 +477,23 @@ EOF
             && [ -n "$_appcast_channel" ]; then
             INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT" "$I")"
             INTERNET_LAST_VERIFIED=1
+            print_ok "$INTERNET_LAST_STATUS"
             return 0
         fi
         INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$I")"
         INTERNET_LAST_VERIFIED=0
+        print_warn "$INTERNET_LAST_STATUS"
         return 0
     elif [ "$rel" = "unknown" ]; then
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
         INTERNET_LAST_VERIFIED=0
+        print_warn "$INTERNET_LAST_STATUS"
         return 0
     elif [ "$rel" = "newer" ]; then
         if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
             INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$I" "$R")"
             INTERNET_LAST_VERIFIED=1
+            print_info "$INTERNET_LAST_STATUS"
             return 0
         fi
 

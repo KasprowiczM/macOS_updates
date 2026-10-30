@@ -106,14 +106,35 @@ else
 fi
 
 say "3/4  python3 -m unittest discover tests"
-if python3 -c 'import sys, unittest
+# Host guard (pattern from macOS_cleanup 240f0b8/6b61e8f): a test that forgets to
+# mock a host-mutating tool must hit a failing stub, never the real one. Tests
+# still prepend their own mock dirs, which win over the guard. stdin is closed
+# so no test can block on, or answer, a real prompt.
+GUARD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mac_update_testguard.XXXXXX")" || exit 1
+GUARD_LOG="$GUARD_DIR/blocked.log"
+: > "$GUARD_LOG"
+for tool in softwareupdate mas brew msupdate installer sudo launchctl docker killall; do
+    cat > "$GUARD_DIR/$tool" <<GUARD_EOF
+#!/bin/sh
+echo "$tool \$*" >> "$GUARD_LOG"
+echo "run_tests.sh guard: real '$tool' blocked during tests" >&2
+exit 97
+GUARD_EOF
+    chmod +x "$GUARD_DIR/$tool"
+done
+if PATH="$GUARD_DIR:$PATH" python3 -c 'import sys, unittest
 sys.path[:0] = ["dev_sync", "lib/python"]
 prog = unittest.main(module=None, argv=["unittest", "discover", "-s", "tests"], exit=False)
-sys.exit(0 if prog.result.wasSuccessful() else 1)' 2>&1; then
+sys.exit(0 if prog.result.wasSuccessful() else 1)' </dev/null 2>&1; then
     ok "test suite passed"
 else
     err "test suite failed"
 fi
+if [ -s "$GUARD_LOG" ]; then
+    err "tests reached unmocked host tools (blocked by guard):"
+    sort "$GUARD_LOG" | uniq -c | sed 's/^/      /'
+fi
+rm -rf "$GUARD_DIR"
 
 say "4/4  scripts/scan_secrets.sh"
 if bash scripts/scan_secrets.sh 2>&1; then

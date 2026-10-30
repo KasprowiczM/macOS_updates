@@ -2,6 +2,7 @@
 """tests/test_vendor_feeds.py — tests for vendor feeds parsing, version comparison and config."""
 
 import json
+from pathlib import Path
 import os
 import shutil
 import subprocess
@@ -174,6 +175,36 @@ class TestVendorFeeds(unittest.TestCase):
         self.assertTrue(res["url"].endswith(".zip"))
         self.assertEqual(res["checksum_kind"], "sha512b64")
         self.assertTrue(len(res["checksum"]) > 20)
+
+    def test_electron_yml_multi_arch_prefers_arm64_and_resolves_relative_url(self):
+        # OpenCode Desktop moved from Tauri latest.json (404 since 2026-10) to an
+        # electron-builder latest-mac.yml with relative, multi-arch file entries.
+        text = (
+            "version: 1.19.5\nfiles:\n"
+            "  - url: opencode-desktop-mac-x64.zip\n    sha512: eDY0\n    size: 1\n"
+            "  - url: opencode-desktop-mac-arm64.dmg\n    sha512: ZG1n\n    size: 1\n"
+            "  - url: opencode-desktop-mac-arm64.zip\n    sha512: YXJt\n    size: 1\n"
+            "releaseDate: '2026-10-28T05:59:42.651Z'\n"
+        )
+        base = "https://github.com/anomalyco/opencode/releases/latest/download/latest-mac.yml"
+        res = evaluate_feed("yml", text, "-", base_url=base)
+        self.assertEqual(res["version"], "1.19.5")
+        self.assertEqual(
+            res["url"],
+            "https://github.com/anomalyco/opencode/releases/latest/download/opencode-desktop-mac-arm64.zip",
+        )
+        self.assertEqual(res["checksum"], "YXJt")
+        # Absolute URLs are never rewritten against the feed URL.
+        abs_res = evaluate_feed("yml", self._read_fixture("antigravity.yml"), "-", base_url=base)
+        self.assertTrue(abs_res["url"].startswith("https://"))
+        self.assertNotIn("anomalyco", abs_res["url"])
+
+    def test_opencode_feed_config_uses_electron_yml(self):
+        cfg = (Path(__file__).resolve().parents[1] / "config" / "vendor_feeds.txt").read_text()
+        row = next(l for l in cfg.splitlines() if l.startswith("OpenCode|"))
+        self.assertEqual(row.split("|")[1], "yml")
+        self.assertTrue(row.split("|")[2].endswith("/latest-mac.yml"))
+        self.assertEqual(row.split("|")[4], "zip")
 
     def test_parse_devolutions_productinfo(self):
         text = self._read_fixture("productinfo.htm")

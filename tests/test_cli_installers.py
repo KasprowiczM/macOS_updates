@@ -8,6 +8,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:
+    from tests._env import isolate_host_tools
+except ImportError:  # unittest discover -s tests puts tests/ itself on sys.path
+    from _env import isolate_host_tools
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LIB = REPO_ROOT / "lib" / "native_installers.sh"
 
@@ -16,6 +21,7 @@ def _run(snippet: str, env: dict[str, str] | None = None, timeout: int = 20) -> 
     merged = os.environ.copy()
     if env:
         merged.update(env)
+    isolate_host_tools(merged)
     return subprocess.run(
         ["bash", "-c", f'source "{LIB}"; {snippet}'],
         capture_output=True,
@@ -163,6 +169,7 @@ def _run_npm_cli(snippet: str, env: dict[str, str] | None = None, timeout: int =
     merged = os.environ.copy()
     if env:
         merged.update(env)
+    isolate_host_tools(merged)
     cmd = (
         f'eval "$(sed -e \'/mac_update_require_supported_platform/d\' -e \'/^print_header "🧰 Native CLI & npm"/,$d\' "{REPO_ROOT}/update_npm_cli.sh")"; '
         f'{snippet}'
@@ -642,6 +649,7 @@ class PruneVendorCliVersionsTests(unittest.TestCase):
                 MAC_UPDATE_BOOTSTRAP_CLI="0",
                 MAC_UPDATE_DRY_RUN="0",
             )
+            isolate_host_tools(env)
             res = subprocess.run(
                 ["bash", str(REPO_ROOT / "update_npm_cli.sh")],
                 capture_output=True,

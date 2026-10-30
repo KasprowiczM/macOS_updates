@@ -186,6 +186,53 @@ EOF
         self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
         self.assertEqual((self.session_dir / "pending_system").read_text().strip(), "3")
 
+    def test_declined_restart_installs_no_restart_labels_and_is_skipped_by_user(self) -> None:
+        """2026-10-29: declining the restart prompt printed "installing with automatic
+        restart" right after "will not be installed" and failed the whole run (exit 1).
+        A decline is the user's choice: no-restart labels still install, restart labels
+        never run without -R, exit 10 + system_skipped_by_user."""
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}",
+                   MAC_UPDATE_SESSION_DIR=str(self.session_dir), MAC_UPDATE_YES="0",
+                   MAC_LANG="en")
+        res = subprocess.run(["bash", str(REPO_ROOT / "update_system.sh")],
+                             input="T\nn\n", env=env, capture_output=True, text=True)
+        out = res.stdout + res.stderr
+        self.assertEqual(res.returncode, 10, out)
+        self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
+        installs = [l for l in log_file.read_text().splitlines() if l.startswith("softwareupdate -i")]
+        self.assertEqual(len(installs), 1, installs)
+        self.assertIn("Safari27.0TahoeAuto-27.0", installs[0])
+        self.assertIn("-R", installs[0])
+        self.assertNotIn("26.7-25G229", installs[0])
+        self.assertNotIn("Installing with automatic restart", out)
+        self.assertNotIn("will not be installed without", out)
+
+    def test_declined_restart_with_only_restart_labels_installs_nothing(self) -> None:
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}",
+                   MAC_UPDATE_SESSION_DIR=str(self.session_dir), MAC_UPDATE_YES="0")
+        listing_only_restart = SAMPLE_LISTING.split("* Label: Safari")[0] + "* Label: macOS Tahoe 26.7-25G229\n\tTitle: macOS Tahoe 26.7, Version: 26.7, Size: 1KiB, Recommended: YES, Action: restart, \n"
+        self.create_mock_script(
+            "softwareupdate",
+            f"""
+            echo "softwareupdate $@" >> "{log_file}"
+            if [ "$1" = "-l" ]; then
+                cat << 'EOF'
+{listing_only_restart}
+EOF
+            fi
+            exit 0
+            """,
+        )
+        res = subprocess.run(["bash", str(REPO_ROOT / "update_system.sh")],
+                             input="T\nn\n", env=env, capture_output=True, text=True)
+        self.assertEqual(res.returncode, 10, res.stdout + res.stderr)
+        self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
+        self.assertNotIn("softwareupdate -i", log_file.read_text())
+
     def test_no_terminal_and_cold_sudo_defers_without_installing(self) -> None:
         log_file = self.work_dir / "calls.log"
         self.setup_mocks(log_file)

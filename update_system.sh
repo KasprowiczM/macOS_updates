@@ -154,6 +154,7 @@ fi
 NORESTART_LABELS=()
 RESTART_LABELS=()
 ANY_RESTART=false
+SYSTEM_RESTART_DECLINED=0
 while IFS=$'\t' read -r kind label title version req_restart; do
     should_install=0
     case "$kind" in
@@ -226,10 +227,19 @@ if [ "$ANY_RESTART" = true ]; then
         read -r -p "  $L_SYSTEM_CONFIRM_RESTART " AUTO_RESTART
         AUTO_RESTART="${AUTO_RESTART:-T}"
         if [[ "$AUTO_RESTART" =~ ^[Nn] ]]; then
-            print_error "Restart-required macOS updates will not be installed without softwareupdate -R."
-            print_info "$L_SYSTEM_RESTART_MECHANISM"
-            print_warn "$L_SYSTEM_REMEMBER_RESTART"
-            exit 1
+            # A deliberate decline is the user's choice, not a failure: never
+            # install restart-required labels without -R, but still install the
+            # no-restart labels and report the step as skipped by the user.
+            print_warn "$(printf "${L_SYSTEM_RESTART_DECLINED_FMT:-Restart-required updates skipped at your request: %s. Install them later in System Settings or rerun.}" "${RESTART_LABELS[*]}")"
+            if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+                touch "$MAC_UPDATE_SESSION_DIR/system_skipped_by_user" 2>/dev/null || true
+                echo "${#RESTART_LABELS[@]}" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
+            fi
+            SYSTEM_RESTART_DECLINED=1
+            RESTART_LABELS=()
+            ANY_RESTART=false
+            NEEDS_RESTART=false
+            [ "${#NORESTART_LABELS[@]}" -eq 0 ] && exit 10
         fi
     fi
 fi
@@ -342,3 +352,7 @@ fi
 
 echo ""
 print_header "$L_SYSTEM_SCRIPT_DONE"
+
+# A declined restart leaves restart-required labels pending: soft, skipped by user.
+[ "${SYSTEM_RESTART_DECLINED:-0}" = "1" ] && exit 10
+exit 0

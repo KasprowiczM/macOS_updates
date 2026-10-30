@@ -273,6 +273,31 @@ class TestVendorTruthHandlers(unittest.TestCase):
         self.assertIn("VERIFIED=1", proc.stdout)
         self.assertFalse(os.path.exists(open_log), "silent_launch_app was called when versions are equal")
 
+    def test_vendor_truth_terminal_branches_print_their_status(self):
+        # 2026-10-30 run: Proton Drive's section was empty because the equal /
+        # stale / unknown branches only set INTERNET_LAST_STATUS.
+        for feed_ver, marker in (("2.0.0", "OK:"), ("1.0.0", "WARN:"), ("garbage", "WARN:")):
+            script = f"""
+            . "{REPO_ROOT}/i18n/lang_en.sh"
+            . "{REPO_ROOT}/lib/version.sh"
+            . "{REPO_ROOT}/lib/internet_i18n.sh"
+            . "{REPO_ROOT}/lib/vendor_feeds.sh"
+            . "{REPO_ROOT}/lib/vendor_direct.sh"
+            . "{REPO_ROOT}/lib/internet_handlers.sh"
+            print_ok() {{ echo "OK:$*"; }}
+            print_info() {{ :; }}
+            print_warn() {{ echo "WARN:$*"; }}
+            print_step() {{ :; }}
+            vendor_appcast_published_channel() {{ return 1; }}
+            silent_launch_app() {{ return 0; }}
+            app_version() {{ echo "2.0.0"; }}
+            vendor_feed_lookup() {{ echo "{feed_ver}|https://example.com/a.zip|-|-|zip|example.com"; }}
+            internet_handler_vendor_truth "X" "{self.tmpdir}/X.app" "X"
+            """
+            proc = self._run_bash(script)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn(marker, proc.stdout, f"{feed_ver}: {proc.stdout}")
+
     def test_vendor_truth_running_app_is_never_touched(self):
         open_log = os.path.join(self.tmpdir, "open.log")
         quit_log = os.path.join(self.tmpdir, "quit.log")

@@ -6,6 +6,20 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Fixed (2026-10-30 run-log follow-up, macOS 27.2)
+
+Version stays 1.5.5 (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-30.md).
+
+- **Managed Node.js moved to an alpha (high).** `detect_latest_node_version` took the head of `nodejs.org/dist/index.json`, which became `v27.0.0-alpha.0.0.0` on 2026-10-29, and `n latest` installed it; npm 12.2.1 then warned on every call. The new `lib/python/node_releases.py` selects the newest stable `vX.Y.Z` (the shell fallback is restricted the same way) and `n` installs that exact version, so the next run returns to stable (v26.13.0 today).
+- **Declined restart failed the whole run (high).** Answering "n" to the automatic-restart prompt printed "will not be installed" followed by "installing with automatic restart", exited `1` and showed step 6 as an error. It now installs the no-restart labels, skips the restart-required ones (never without `-R`), writes `system_skipped_by_user` and exits `10` with a localized message (`L_SYSTEM_RESTART_DECLINED_FMT`, 7 languages).
+- **OpenCode Desktop permanently unverified (medium).** OpenCode Desktop is now an Electron app; the Tauri `latest.json` feed returns 404, so every run fell back to a blind launch. The feed is `latest-mac.yml`. `parse_electron_yml` prefers the arm64 zip in multi-arch feeds, and `evaluate_feed` resolves relative URLs against the feed URL.
+- **Empty app sections (low).** `internet_handler_vendor_truth` printed nothing in its current, stale-feed, unknown and dry-run branches (Proton Drive showed only its header). Each branch now prints its status.
+
+### Tests
+
+- **Host-tool guard (pattern from macOS_cleanup).** `run_tests.sh` runs the unittest step with stdin closed and a guard directory of failing `softwareupdate`/`mas`/`brew`/`msupdate`/`installer`/`sudo`/`launchctl`/`docker`/`killall` stubs behind each test's own mocks. Any call that reaches a guard stub fails the gate. It found three tests querying the real Homebrew/mas; they now use `tests/_env.py:isolate_host_tools`.
+- **Docs:** the Xcode gate is `xcodebuild -license check`; `-checkFirstLaunchStatus` (which the docs named) returns 69 on a licensed Xcode 27.2.
+
 ### Documentation
 
 - **Lockstep versioning with Ascendo.** Documented that release versions of `macOS_updates` and `Ascendo` proceed in lockstep starting from v1.5.5; parity ports between both repositories share the same version number.

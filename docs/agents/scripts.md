@@ -57,6 +57,7 @@
 | `lib/python/appstore_lookup.py` | Pure-function helpers for App Store iPad app metadata lookup via iTunes API |
 | `lib/python/brew_casks.py` | Pure helpers for Homebrew casks: app targets parsing, orphan cask detection, and sudo privilege detection |
 | `lib/python/chronic_warnings.py` | Streak detection for trailing non-OK step runs across historical run summary logs |
+| `lib/python/node_releases.py` | Newest stable Node.js release from `nodejs.org/dist/index.json`; alpha/rc/nightly builds are never install targets |
 | `lib/python/cli_retention.py` | Vendor CLI version retention and pruning helpers |
 | `lib/python/system_updates.py` | Pure-function helpers for softwareupdate catalog parsing, label extraction, and reboot classification |
 | `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha text log + `updater_history.jsonl`, VersionHistory) |

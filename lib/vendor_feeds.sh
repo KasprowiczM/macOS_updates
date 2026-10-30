@@ -37,9 +37,10 @@ from vendor_feeds import evaluate_feed
 kind = sys.argv[1]
 arg = sys.argv[2]
 os_ver = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else None
+base_url = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] else None
 body = sys.stdin.read()
 
-res = evaluate_feed(kind, body, arg, os_version=os_ver)
+res = evaluate_feed(kind, body, arg, os_version=os_ver, base_url=base_url)
 if not res or not res.get("version"):
     sys.exit(1)
 
@@ -49,7 +50,7 @@ ck = res.get("checksum_kind") or "-"
 cs = res.get("checksum") or "-"
 policy = "rollout_hold" if res.get("rollout_hold") else "eligible"
 print(f"{v}|{u}|{ck}|{cs}|{policy}")
-' "$kind" "$arg" "$(sw_vers -productVersion 2>/dev/null)"
+' "$kind" "$arg" "$(sw_vers -productVersion 2>/dev/null)" "$url"
     )
     local rc=$?
     [ $rc -eq 0 ] && [ -n "$py_res" ] || return 1
