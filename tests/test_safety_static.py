@@ -1275,11 +1275,13 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('[ "$KPX_UNAME" = "arm64" ] && KPX_ARCH="arm64"', kpx_block)
 
     def test_detect_latest_node_version_contains_python_and_awk_fallback(self) -> None:
-        """detect_latest_node_version must contain both python3 and awk fallback parser."""
+        """detect_latest_node_version must contain a python3 parser and a shell fallback,
+        both restricted to stable vX.Y.Z releases (2026-10-29 alpha regression)."""
         text = self.read_script("update_npm_cli.sh")
         fn_block = text.split("detect_latest_node_version() {")[1].split("install_node_tarball")[0]
         self.assertIn("python3", fn_block)
-        self.assertIn("awk", fn_block)
+        self.assertIn("latest_stable_node", fn_block)
+        self.assertIn('"version":"v[0-9]+\\.[0-9]+\\.[0-9]+"', fn_block)
         self.assertIn('SOFT_FAIL=1', fn_block)
 
     def test_bun_shasum_pattern_is_resilient(self) -> None:
@@ -3059,6 +3061,11 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
             env = os.environ.copy()
             env["MAC_LANG"] = "en"
             env["MAC_UPDATE_APP_DIRS"] = str(tmp_apps)
+            try:
+                from tests._env import isolate_host_tools
+            except ImportError:
+                from _env import isolate_host_tools
+            isolate_host_tools(env)
             res = subprocess.run(
                 ["bash", str(REPO_ROOT / "scripts" / "report_update_coverage.sh"), "--json"],
                 capture_output=True,

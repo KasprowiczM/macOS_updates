@@ -5,7 +5,7 @@
 sudo softwareupdate -i "$label" -R --verbose   # CORRECT — writes boot metadata
 # Without -R: update downloads but NEVER applies after reboot
 ```
-`-R` only restarts or shuts down when required, so it is safe to keep on every install path. If the user declines a restart-required update, do not install it without `-R`; exit non-zero with manual instructions.
+`-R` only restarts or shuts down when required, so it is safe to keep on every install path. If the user declines a restart-required update, never install it without `-R`: no-restart labels still install, the step writes `system_skipped_by_user` and exits `10` (reported as "skipped by user", not an error). Before 2026-10-30 a decline exited `1`, printed "installing with automatic restart" right after "will not be installed", and failed the whole run.
 
 Never run bare `softwareupdate -ia`: it attempts to install all updates indiscriminately, including major macOS upgrades across releases (e.g. macOS 28.0 from macOS 27.0). Updates must be classified by major version:
 - Point/security updates (`same_major` and `other` components) are installed per label.
@@ -225,6 +225,15 @@ write a global `~/.npmrc` exception from this toolkit. A CLI whose
 `--version` is `?` or whose binary is the vendor stub is a failed update,
 not success.
 
+## 10a. Managed Node.js is always a stable release
+
+`detect_latest_node_version` picks the newest `vX.Y.Z` entry of `nodejs.org/dist/index.json`
+(`lib/python/node_releases.py:latest_stable_node`) and `n` installs that exact version.
+Never take the index head or run `n latest`: on 2026-10-29 the head was
+`v27.0.0-alpha.0.0.0`, the toolkit moved the managed Node from 26.12.1 to it, and npm 12
+warned on every call that it does not support that Node. A managed Node that is a
+pre-release differs from the stable target, so the next run returns it to stable.
+
 ## 11. Centralized Version Normalization (`lib/version.sh`)
 
 - `app_version()` and `internet_version_relation()` must be sourced from `lib/version.sh` across all components (`update_brew.sh`, `update_internet_apps.sh`, `lib/internet_app_updates.sh`).
@@ -247,7 +256,7 @@ not success.
 
 ## 14. macOS 27 Golden Gate Constraints and Ecosystem Rules
 
-- **Xcode License Gate after App Store Update:** macOS 27 invalidates or requires re-acceptance of the Xcode license agreement upon upgrading Xcode via `mas`. `update_brew.sh` and any toolchain consumers must gate on `xcodebuild -checkFirstLaunchStatus` and prompt the user to accept (`sudo xcodebuild -license accept`) before running Homebrew commands to avoid catastrophic failure across the entire Homebrew step.
+- **Xcode License Gate after App Store Update:** macOS 27 invalidates or requires re-acceptance of the Xcode license agreement upon upgrading Xcode via `mas`. `update_brew.sh` and any toolchain consumers must gate on `xcodebuild -license check` (`brew_xcode_license_ok` in `lib/brew.sh`; never `-checkFirstLaunchStatus`, which returns 69 on a licensed Xcode 27.2 whenever first-launch components are pending) and prompt the user to accept (`sudo xcodebuild -license accept`) before running Homebrew commands to avoid catastrophic failure across the entire Homebrew step.
 - **Rosetta Translation Lifecycle & EOL 28:** macOS 27 drops preinstalled Rosetta; Apple Silicon systems do not retain it across upgrades. Any Intel-only x86_64 apps (e.g. DJI Assistant 2) must be flagged with `[x86_64: Rosetta missing — will not run]` (or warning in inventory) and warned that Rosetta is completely removed in macOS 28. Do not attempt silent background reinstallation of Rosetta.
 - **Command Line Tools on macOS 27:** Homebrew 7.0+ sets `minimum_version "27.0.0"` for CLT on macOS 27. Older CLT versions (e.g., 26.x CLT from macOS 26) trigger `CLT does not support macOS 27` Tier 2 warnings under `brew doctor`.
 - **Installer Packages (`.pkg`) Default to arm64:** On macOS 27, package installers without an explicit `hostArchitecture` tag default to `arm64`. Any custom `.pkg` scripts must specify hostArchitecture or be verified arm64-native.

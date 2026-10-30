@@ -420,8 +420,12 @@ def parse_electron_yml(text: str) -> dict | None:
         url = p_m.group(1) if p_m else None
         sha512 = s_m.group(1) if s_m else None
     else:
-        # Pick first ending with .zip, else first
-        chosen = next((f for f in files if f["url"].lower().endswith(".zip")), files[0])
+        # Prefer the Apple Silicon zip: a multi-arch feed (e.g. OpenCode's
+        # latest-mac.yml) lists arm64 and x64 archives side by side.
+        zips = [f for f in files if f["url"].lower().endswith(".zip")]
+        arm = [f for f in zips if re.search(r"arm64|aarch64", f["url"], re.I)]
+        not_intel = [f for f in zips if not re.search(r"x64|x86_64|intel", f["url"], re.I)]
+        chosen = (arm or not_intel or zips or files)[0]
         url = chosen["url"]
         sha512 = chosen.get("sha512")
 
@@ -460,11 +464,14 @@ JSON_SELECTORS = {
 }
 
 
-def evaluate_feed(kind: str, body: str, arg: str, os_version: str | None = None) -> dict | None:
+def evaluate_feed(
+    kind: str, body: str, arg: str, os_version: str | None = None, base_url: str | None = None
+) -> dict | None:
     """kind: 'sparkle' (arg = comma channels or '-'), 'json' (arg = selector name), 'yml' (arg '-'),
     'kv' (arg = productinfo prefix). Never raises: any exception -> None.
     Post-process: result['version'] = normalize_vendor_version(result['version']);
-    result['url'] spaces -> '%20'."""
+    result['url'] spaces -> '%20'; a relative url (electron-builder yml) is resolved
+    against base_url, the configured feed URL."""
     try:
         if not body:
             return None
@@ -496,7 +503,10 @@ def evaluate_feed(kind: str, body: str, arg: str, os_version: str | None = None)
 
         res["version"] = norm_ver
         if res.get("url"):
-            res["url"] = res["url"].replace(" ", "%20")
+            url = res["url"]
+            if base_url and not urllib.parse.urlparse(url).scheme:
+                url = urllib.parse.urljoin(base_url, url)
+            res["url"] = url.replace(" ", "%20")
 
         return res
     except Exception:

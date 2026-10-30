@@ -2,7 +2,8 @@
 
 ## Current status (v1.5.5, 2026-10-12)
 
-- Release gate: **591 tests pass** (`bash run_tests.sh`), shell/Python syntax and secret scan pass (2026-10-25 follow-up, still v1.5.5).
+- Release gate: **600 tests pass** (`bash run_tests.sh`, now with the host-tool guard), shell/Python syntax and secret scan pass; the suite also passes under `/usr/bin/python3` 3.9 (2026-10-30 follow-up on macOS 27.2, still v1.5.5).
+- 2026-10-29 run ([follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-30.md)): macOS 27.2 was offered and the user declined the automatic restart. That exposed the declined-restart error now fixed (exit 10, "skipped by user"). Paths 2 and 3 remain unaccepted.
 - 2026-10-25 run ([follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-25.md)): Path 5 success branch again observed (KeePassXC 2.7.12 → 2.8.0). Path 1 exposed a Track 2 false negative (UniFi update pending, GUI found no button, reported as "nothing pending"); the fixed polling/product-page/`not_offered` flow still needs one live interactive run. Paths 2 and 3 remain unaccepted (no macOS update was offered).
 - Newest live evidence: the 2026-10-11 run below ([v1.5.5 follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md)). Paths 1 and 5 (success branch) were observed; the system update/reboot paths 2 and 3 are still **unaccepted** because that run skipped the macOS step (fixed in v1.5.5).
 - The two dated sections after it (2026-10-05, v1.5.3/v1.5.4) are historical evidence and are kept unchanged.

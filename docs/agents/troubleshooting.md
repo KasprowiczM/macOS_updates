@@ -9,11 +9,15 @@
 | Proton Drive manufacturer feed is older than the installed app | Inspect `bash scripts/check_vendor_feeds.sh`. A stale official feed remains a warning; no downgrade or repeated launch is attempted. |
 | Native and npm CLI copies both exist | Native updates run first. Cleanup requires a supported native executable, an equal or newer version, safe PATH resolution and no active process. Uncertain copies are retained. |
 | System update reports authorization unavailable | Run interactively or apply updates in System Settings. No terminal/authorization means soft deferral, and `sudo -n` prevents hidden prompts. |
+| OpenCode Desktop: "vendor feed unavailable", then "launched (unverified)" | Fixed 2026-10-30. OpenCode Desktop moved from Tauri to Electron; `latest.json` returns 404. The feed is now `latest-mac.yml` (electron-builder; relative arm64 zip + sha512), installed direct-first |
+| `npm v12.x does not support Node.js v27.0.0-alpha…` | Fixed 2026-10-30: the toolkit had installed the Node alpha at the head of `index.json`. The next `bash update_npm_cli.sh` (or Update All) returns the managed Node to the newest stable release (`critical_rules.md` §10a) |
+| You declined the automatic restart and step 6 showed "Error" | Fixed 2026-10-30: a decline is now "skipped by user" (exit 10). No-restart updates still install; install the restart-required ones later in System Settings or rerun |
+| An app's section in the internet step is empty | Fixed 2026-10-30: `internet_handler_vendor_truth` now prints its current / stale / unknown result (Proton Drive showed only its header) |
 | New Mac — where to start? | `bash install.sh` or `setup.sh` + `build_inventory.sh` |
 | Wrong app catalog / another user's apps | `bash build_inventory.sh` — never copy someone else's `APPLICATIONS.md` |
 | App not auto-updating | `bash scripts/report_update_coverage.sh` — add handler per GUIDE |
 | macOS update not applied after reboot | `softwareupdate -i <label> -R` — never `sudo reboot` |
-| brew: You have not agreed to the Xcode license | `sudo xcodebuild -license accept` or launch Xcode. `update_brew.sh` checks `xcodebuild -checkFirstLaunchStatus` and prompts before Homebrew runs. |
+| brew: You have not agreed to the Xcode license | `sudo xcodebuild -license accept` or launch Xcode. `update_brew.sh` checks `xcodebuild -license check` and prompts before Homebrew runs. |
 | brew doctor: CLT does not support macOS 27 (Tier 2) | Homebrew 7 requires CLT 27.0.0+ on macOS 27 (`softwareupdate --install -a` or `xcode-select --install`). |
 | Intel (x86_64) app does not start after an upgrade (Rosetta) | macOS 27 drops Rosetta on upgrade; Intel x86_64 apps won't run without reinstalling Rosetta (`softwareupdate --install-rosetta --agree-to-license`), and Rosetta is completely removed in macOS 28. Migrate to Apple Silicon native build. |
 | macOS step was skipped | Either a blocking hard failure in steps 1–4 (inspect the summary/log, fix it, rerun; macOS runs last to avoid rebooting a half-updated session) or authorization was unavailable (see below). Since v1.5.5 a step 5 reporting failure never skips it. |

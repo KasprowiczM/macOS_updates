@@ -498,9 +498,12 @@ detect_latest_node_version() {
     local json_body ver
     json_body="$(curl -fsSL --max-time 60 --retry 3 --retry-delay 2 https://nodejs.org/dist/index.json 2>/dev/null)"
     if [ -n "$json_body" ]; then
-        ver="$(echo "$json_body" | python3 -c 'import json,sys; arr=json.load(sys.stdin); print(arr[0]["version"])' 2>/dev/null)"
+        # Newest *stable* release: the index can lead with an alpha/rc build.
+        ver="$(echo "$json_body" | PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import json,sys
+from node_releases import latest_stable_node
+print(latest_stable_node(json.load(sys.stdin)) or "")' 2>/dev/null)"
         if [ -z "$ver" ]; then
-            ver="$(echo "$json_body" | awk -F'"' '/"version":/ {print $4; exit}')"
+            ver="$(echo "$json_body" | tr '{' '\n' | grep -oE '"version":"v[0-9]+\.[0-9]+\.[0-9]+"' | head -1 | cut -d'"' -f4)"
         fi
         if [ -n "$ver" ]; then
             echo "$ver"
@@ -657,7 +660,9 @@ ensure_latest_node() {
 
     if [ ! -x "$N_PREFIX/bin/node" ] && [ ! -x "$HOME/n/bin/node" ] || [ "$(normalize_semver "$current_node")" != "$(normalize_semver "$latest_node")" ]; then
         print_info "$(printf "$L_NPM_NODE_UPDATING_VIA_N" "${latest_node:-latest}")"
-        if N_PREFIX="$N_PREFIX" "$n_bin" latest; then
+        # Install the exact stable version detected above; `n latest` follows the
+        # index head and installed v27.0.0-alpha on 2026-10-29.
+        if N_PREFIX="$N_PREFIX" "$n_bin" "${latest_node#v}"; then
             export PATH="$LOCAL_BIN:$NPM_GLOBAL_BIN:$N_PREFIX/bin:$HOME/n/bin:$BUN_BIN:$PATH"
             hash -r 2>/dev/null || true
             local active_node=""
