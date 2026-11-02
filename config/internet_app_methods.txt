@@ -18,6 +18,9 @@ Antigravity IDE|silent_launch|STATUS_ANTIGRAVITY_IDE
 LM Studio|brew_cask|STATUS_LMSTUDIO
 OpenCode|silent_launch|STATUS_OPENCODE
 Cursor|silent_launch|STATUS_CURSOR
+Open Design|silent_launch|STATUS_OPENDESIGN
+HyperFrames|silent_launch|STATUS_HYPERFRAMES
+Superset|silent_launch|STATUS_SUPERSET
 Obsidian|brew_cask|STATUS_OBSIDIAN
 ProtonVPN|brew_cask|STATUS_PROTONVPN
 KeePassXC|github_dmg|STATUS_KEEPASSXC

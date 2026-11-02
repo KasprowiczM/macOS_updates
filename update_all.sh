@@ -689,6 +689,7 @@ from inventory import (
     load_appstore_gui_apps,
     row_exists,
     app_exists,
+    append_rows_to_new_section,
     installed_app_version,
     app_architecture,
     scan_installed_app_paths,
@@ -1071,16 +1072,17 @@ if os.path.exists(new_apps_file):
         existing_new_section = "### 🆕 Nowo wykryte aplikacje (do skategoryzowania)"
         if existing_new_section in content:
             # Znajdź koniec istniejącej tabeli w tej sekcji i wstaw tam
-            pattern_nowe = r'(### 🆕 Nowo wykryte aplikacje.*?)((?:\| [^\n]+\|\n)+)(\n+>|\n+###|\n+$)'
-            m_nowe = re.search(pattern_nowe, content, re.DOTALL)
-            if m_nowe:
-                insert_pos = m_nowe.start(3)
-                # Dodaj tylko te wpisy, których jeszcze nie ma
-                unhandled_dedup = [a for a in unhandled
-                                   if not re.search(re.escape(a), content, re.IGNORECASE)]
+            # Dodaj tylko te wpisy, których jeszcze nie ma jako wiersz tabeli.
+            # Nie szukaj w całym tekście: legenda wymienia każdą aplikację z
+            # config/internet_apps.txt, więc nowe aplikacje tam były, a wiersz
+            # nie powstawał mimo komunikatu "Dołączono" (2026-11-02).
+            unhandled_dedup = [a for a in unhandled if not row_exists(content, a)]
+            appended = append_rows_to_new_section(
+                content, ''.join(_format_unhandled_row(a) for a in unhandled_dedup)
+            ) if unhandled_dedup else content
+            if appended is not None:
                 if unhandled_dedup:
-                    new_rows_dedup = ''.join(_format_unhandled_row(a) for a in unhandled_dedup)
-                    content = content[:insert_pos] + new_rows_dedup + content[insert_pos:]
+                    content = appended
                     changes_made = True
                     print(f"  ✅ {os.environ.get('L_PRESCAN_APPENDED_NEW_APPS', 'Appended %s new applications to section 🆕') % len(unhandled_dedup)}")
             else:

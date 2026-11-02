@@ -450,8 +450,27 @@ iu_protonvpn() {
 
     # ── 13. KEEPASSXC (GitHub API + DMG arm64) ────────────────────
 
+# keepassxc_digest_ok FILE URL ASSET — the publisher's sha256 (<URL>.DIGEST)
+# must match the download; a missing or unparseable digest refuses the install.
+keepassxc_digest_ok() {
+    local file="$1" url="$2" asset="$3" digest_text expected actual
+    digest_text="$(curl -fsSL --max-time 20 --retry 2 "${url}.DIGEST" 2>/dev/null)" || digest_text=""
+    expected="$(printf '%s\n' "$digest_text" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import digest_for
+print(digest_for(sys.stdin.read(), sys.argv[1]) or "")
+' "$asset" 2>/dev/null)"
+    actual="$(shasum -a 256 "$file" 2>/dev/null | awk '{print $1}')"
+    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+        print_warn "$(internet_msg "$L_INTERNET_DIGEST_MISMATCH_FMT" "$asset")"
+        return 1
+    fi
+    return 0
+}
+
 iu_keepassxc() {
     print_header "🔑 KeePassXC"
+    KPX_REBUILD=""
     if [ -d "/Applications/KeePassXC.app" ]; then
         VER=$(app_version "/Applications/KeePassXC.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
@@ -463,6 +482,9 @@ iu_keepassxc() {
         KPX_UNAME="$(uname -m 2>/dev/null || echo "arm64")"
         KPX_ARCH="x86_64"
         [ "$KPX_UNAME" = "arm64" ] && KPX_ARCH="arm64"
+        if [ "$KPX_RELATION" = "current" ]; then
+            KPX_REBUILD="$(github_rebuild_asset "keepassxreboot/keepassxc" "$LATEST_KPX_TAG" "KeePassXC" "$LATEST_KPX" "$KPX_ARCH" "/Applications/KeePassXC.app")"
+        fi
 
         if [ "$LATEST_KPX" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
@@ -475,26 +497,49 @@ iu_keepassxc() {
         elif [ "$KPX_RELATION" = "unknown" ]; then
             print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "KeePassXC version")"
             STATUS_KEEPASSXC="$L_INTERNET_STATUS_UNKNOWN_VERSION"
-        elif [ "$KPX_RELATION" = "current" ]; then
+        elif [ "$KPX_RELATION" = "current" ] && [ -z "$KPX_REBUILD" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "KeePassXC" "$VER (remote: $LATEST_KPX)")"
             STATUS_KEEPASSXC="$L_INTERNET_STATUS_CURRENT"
         else
-            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_KPX" "$VER")"
-            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$LATEST_KPX ($KPX_ARCH)")"
-            # TODO(H5): Publisher digest is unverified for KeePassXC download
-            KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/KeePassXC-${LATEST_KPX}-${KPX_ARCH}.dmg"
+            # Either a newer version, or a same-version rebuild published after
+            # this bundle was installed (2.8.0-1: Qt fix for the macOS 27.2
+            # unlock crash). The rebuild keeps the version, so only that case
+            # may install an equal version.
+            KPX_ASSET="KeePassXC-${LATEST_KPX}-${KPX_ARCH}.dmg"
+            KPX_TARGET_LABEL="$LATEST_KPX"
+            if [ "$KPX_RELATION" = "current" ] && [ -n "$KPX_REBUILD" ]; then
+                KPX_ASSET="$KPX_REBUILD"
+                KPX_TARGET_LABEL="${KPX_REBUILD#KeePassXC-}"
+                KPX_TARGET_LABEL="${KPX_TARGET_LABEL%-"$KPX_ARCH".dmg}"
+                print_warn "$(internet_msg "$L_INTERNET_KEEPASSXC_REBUILD_FMT" "$KPX_TARGET_LABEL" "$VER")"
+            else
+                print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_KPX" "$VER")"
+            fi
+            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$KPX_TARGET_LABEL ($KPX_ARCH)")"
+            KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/${KPX_ASSET}"
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
-            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL"; then
+            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" \
+                && keepassxc_digest_ok "$TEMP_DMG" "$KPX_URL" "$KPX_ASSET"; then
                 KPX_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$KPX_MOUNT" ]; then
                     if [ -d "$KPX_MOUNT/KeePassXC.app" ]; then
                         KPX_SOURCE_VER=$(app_version "$KPX_MOUNT/KeePassXC.app")
-                        if [ "$(internet_version_relation "$KPX_SOURCE_VER" "$VER")" != "newer" ]; then
+                        KPX_SOURCE_REL="$(internet_version_relation "$KPX_SOURCE_VER" "$VER")"
+                        KPX_ACCEPT=0
+                        [ "$KPX_SOURCE_REL" = "newer" ] && KPX_ACCEPT=1
+                        if [ -n "$KPX_REBUILD" ] && [ "$KPX_SOURCE_VER" = "$VER" ]; then
+                            KPX_ACCEPT=1
+                        fi
+                        if [ "$KPX_ACCEPT" -ne 1 ]; then
                             print_warn "Refusing non-newer KeePassXC payload: $KPX_SOURCE_VER (installed: $VER)"
                             STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
                         elif copy_verified_app "$KPX_MOUNT/KeePassXC.app" "KeePassXC.app"; then
                             print_ok "$(internet_msg "$L_INTERNET_APP_COPIED" "KeePassXC")"
                             NEW_VER=$(app_version "/Applications/KeePassXC.app")
+                            KPX_REVISION="${KPX_ASSET#KeePassXC-"$KPX_SOURCE_VER"-}"
+                            KPX_REVISION="${KPX_REVISION%-"$KPX_ARCH".dmg}"
+                            case "$KPX_REVISION" in ''|*[!0-9]*) KPX_REVISION=0 ;; esac
+                            package_revision_record "KeePassXC" "$KPX_SOURCE_VER" "$KPX_REVISION" || true
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "KeePassXC" "$NEW_VER")"
                             STATUS_KEEPASSXC="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
@@ -2317,6 +2362,22 @@ iu_warp() {
 
 iu_cursor() {
     internet_dispatch_silent_launch "⚡ Cursor" "Cursor" "STATUS_CURSOR" "Cursor" "Cursor → Cursor → Check for updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
+}
+
+# Open Design, HyperFrames, Superset: the vendor feed (config/vendor_feeds.txt,
+# verify only) decides; only a behind app is launched so its own updater can
+# install. Open Design's version is the active launcher payload and HyperFrames'
+# is its build label (lib/python/inventory.py vendor_installed_version).
+iu_opendesign() {
+    internet_dispatch_silent_launch "🎨 Open Design" "Open Design" "STATUS_OPENDESIGN" "Open Design" "Open Design → Check for Updates" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Open Design")"
+}
+
+iu_hyperframes() {
+    internet_dispatch_silent_launch "🎞️  HyperFrames" "HyperFrames" "STATUS_HYPERFRAMES" "HyperFrames" "HyperFrames → Check for Updates" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "HyperFrames")"
+}
+
+iu_superset() {
+    internet_dispatch_silent_launch "🧩 Superset" "Superset" "STATUS_SUPERSET" "Superset" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Superset")"
 }
 
 iu_appcleaner() {
