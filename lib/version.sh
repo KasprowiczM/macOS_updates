@@ -11,10 +11,26 @@ mac_update_version() {
 }
 
 # ── Canonical Application Version Reader ─────────────────────
-# Read order: CFBundleShortVersionString → CFBundleVersion → mdls Spotlight metadata
+# Read order: vendor override (Open Design, HyperFrames) → CFBundleShortVersionString → CFBundleVersion → mdls Spotlight metadata
 # Cross-reference: lib/python/inventory.py installed_app_version()
 app_version() {
     local app_path="$1" v=""
+    # Bundles whose own version is not what their native updater ships
+    # (Open Design launcher payload, HyperFrames build label). One
+    # implementation: lib/python/inventory.py vendor_installed_version().
+    case "$app_path" in
+        */"Open Design.app"|*/HyperFrames.app)
+            v=$(PYTHONPATH="$_VERSION_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from inventory import vendor_installed_version
+print(vendor_installed_version(sys.argv[1]) or "")
+' "$app_path" 2>/dev/null)
+            if [ -n "$v" ]; then
+                echo "$v"
+                return 0
+            fi
+            ;;
+    esac
     v=$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
         || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null)
     if [ -z "$v" ]; then

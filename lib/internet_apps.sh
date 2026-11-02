@@ -192,6 +192,14 @@ internet_app_path() {
 
 internet_app_snapshot_version() {
     local app_path="$1" ver
+    # Same reader as the handlers (lib/version.sh), so snapshots see the version
+    # a native updater ships (Open Design payload, HyperFrames build label).
+    if command -v app_version >/dev/null 2>&1; then
+        ver="$(app_version "$app_path")"
+        case "$ver" in ''|"${L_INTERNET_VERSION_UNKNOWN:-unknown}") ver="?" ;; esac
+        echo "$ver"
+        return 0
+    fi
     ver=$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
         || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null \
         || true)

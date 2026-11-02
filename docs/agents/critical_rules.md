@@ -31,6 +31,8 @@ sudo env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS   # explicit IDs, never a
 ```bash
 defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 ```
+- **Open Design / HyperFrames:** the bundle version is not what their updater ships. `app_version` (and the snapshots) read `lib/python/inventory.py:vendor_installed_version`: Open Design's active launcher payload from `~/Library/Application Support/Open Design/launcher/.../runtime.json` (only when `install.json` names this bundle), HyperFrames' `HFBuildLabel` (`b666`). Keep a single implementation.
+- **Same-version rebuilds (KeePassXC `2.8.0-1`):** the version cannot show them. `github_rebuild_asset` compares the release's highest `-N` package revision with the one recorded at install (`~/.local/state/mac-update/package_revisions.tsv`); ditto keeps the DMG's timestamps, so the bundle's creation time is only a first-run fallback. Downloads must match the publisher `.DIGEST`.
 - **Firefox Dev Edition:** `application.ini` → `grep "^Version=" | cut -d= -f2` gives the **base** version (no beta suffix). Compare with `sort -V` against Mozilla product-details and never downgrade (local may legitimately be ahead of the published beta).
 - **GitHub tags:** strip the leading `v` with `sed 's/^v//'` (never `tr -d 'v'`, which deletes every `v`) before comparing with `app_version()`.
 - **iOS/iPadOS apps on Apple Silicon** (UniFi, WiFiman, …): no `Contents/Info` plist — `app_version()` falls back to `mdls -name kMDItemVersion`.
@@ -39,7 +41,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 
 | Method | Apps |
 |--------|------|
-| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager; direct-first choices in `config/vendor_direct_first.txt` |
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager, Open Design, HyperFrames, Superset; direct-first choices in `config/vendor_direct_first.txt`. Open Design, HyperFrames and Superset are verify-only: only their native updater installs |
 | Mozilla product-details/download + DMG | Firefox Developer Edition |
 | GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
 | Google Keystone | Google Chrome, Google Drive, Gemini |

@@ -62,7 +62,7 @@ def norm_name(s: str) -> str:
     app again. Drop architecture markers, symbol, modifier and format characters
     (emoji and variation selectors) along with separators.
     """
-    cleaned = re.sub(r"\[(x86_64(?:-only)?|arm64|universal|unknown)\]", "", s, flags=re.IGNORECASE)
+    cleaned = _ARCH_MARKER_RE.sub("", s)
     stripped = "".join(
         ch for ch in cleaned if unicodedata.category(ch) not in ("So", "Sk", "Cf")
     )
@@ -126,6 +126,21 @@ def row_exists(table_content: str, name: str, aliases: dict[str, list[str]] | No
     return False
 
 
+_ARCH_MARKER_RE = re.compile(r"\[(x86_64(?:-only)?|arm64|universal|unknown)\]", re.IGNORECASE)
+
+
+def strip_inventory_markers(name: str) -> str:
+    """Return the application name without markers the toolkit writes into APPLICATIONS.md.
+
+    New applications are recorded as e.g. "HyperFrames [arm64] 🆕". The removed-app
+    check used that raw cell as a bundle name, so "HyperFrames [arm64].app" never
+    existed and the next run deleted the row (2026-11-02: HyperFrames, Superset).
+    """
+    cleaned = _ARCH_MARKER_RE.sub("", name)
+    cleaned = "".join(ch for ch in cleaned if unicodedata.category(ch) not in ("So", "Sk", "Cf"))
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 def app_exists(
     name: str,
     aliases: dict[str, list[str]] | None = None,
@@ -133,6 +148,7 @@ def app_exists(
 ) -> bool:
     """Check if an application bundle exists on the filesystem in /Applications."""
     alias_map = aliases if aliases is not None else APP_ALIASES
+    name = strip_inventory_markers(name)
     candidates = set(alias_map.get(name, [name]))
     for key, val_list in alias_map.items():
         if name == key or name in val_list:
@@ -150,16 +166,127 @@ def app_exists(
     return False
 
 
+NEW_APPS_HEADING = "### 🆕 Nowo wykryte aplikacje"
+
+
+def append_rows_to_new_section(content: str, rows: str) -> str | None:
+    """Insert table rows after the last row of the 🆕 section's own table.
+
+    The section ends at the next "##"/"###" heading. The previous regex needed a
+    blank line before the "> **Uwaga:**" note; without one it ran on into the 4a
+    Formulae table of GROUP 4, where sync_formulae deleted the rows as uninstalled
+    formulae (2026-11-02: HyperFrames and Superset never appeared). None when the
+    section or its table is missing.
+    """
+    start = content.find(NEW_APPS_HEADING)
+    if start < 0:
+        return None
+    body_start = content.find("\n", start)
+    if body_start < 0:
+        return None
+    nxt = re.search(r"^#{2,3} ", content[body_start + 1:], re.MULTILINE)
+    end = body_start + 1 + nxt.start() if nxt else len(content)
+    last_row_end = None
+    for m in re.finditer(r"^\|[^\n]*\|[ \t]*(?:\n|$)", content[body_start + 1:end], re.MULTILINE):
+        last_row_end = body_start + 1 + m.end()
+    if last_row_end is None:
+        return None
+    insert = rows if content[last_row_end - 1:last_row_end] == "\n" else "\n" + rows
+    return content[:last_row_end] + insert + content[last_row_end:]
+
+
+OPEN_DESIGN_BUNDLE_ID = "io.open-design.desktop"
+HYPERFRAMES_BUNDLE_ID = "dev.hyperframes.desktop"
+
+
+def _read_plist(path: str) -> dict:
+    import plistlib
+
+    try:
+        with open(path, "rb") as handle:
+            data = plistlib.load(handle)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def open_design_payload_version(app_path: str | Path, home: str | None = None) -> str | None:
+    """Version of the payload the Open Design launcher actually runs.
+
+    The bundle in /Applications is a launcher whose own version never changes
+    (0.21.1); its native updater activates payloads under Application Support and
+    records the active one in runtime.json. install.json must name this bundle,
+    otherwise the payload belongs to another installation.
+    """
+    import json
+
+    base = os.path.join(
+        home or os.path.expanduser("~"),
+        "Library", "Application Support", "Open Design", "launcher", "channels",
+    )
+    try:
+        channels = sorted(os.listdir(base))
+    except OSError:
+        return None
+    target = os.path.realpath(str(app_path))
+    for channel in channels:
+        ns_root = os.path.join(base, channel, "namespaces")
+        try:
+            namespaces = sorted(os.listdir(ns_root))
+        except OSError:
+            continue
+        for namespace in namespaces:
+            ns_dir = os.path.join(ns_root, namespace)
+            try:
+                with open(os.path.join(ns_dir, "install.json"), encoding="utf-8") as handle:
+                    install = json.load(handle)
+                with open(os.path.join(ns_dir, "runtime.json"), encoding="utf-8") as handle:
+                    runtime = json.load(handle)
+            except (OSError, ValueError):
+                continue
+            launch = install.get("launchPath") if isinstance(install, dict) else None
+            if not launch or os.path.realpath(launch) != target:
+                continue
+            active = runtime.get("active") if isinstance(runtime, dict) else None
+            version = active.get("version") if isinstance(active, dict) else None
+            if isinstance(version, str) and version.strip():
+                return version.strip()
+    return None
+
+
+def vendor_installed_version(app_path: str | Path, home: str | None = None) -> str | None:
+    """Installed version where CFBundleShortVersionString is not the updater's identity.
+
+    - Open Design: the active launcher payload (see open_design_payload_version).
+    - HyperFrames: HFBuildLabel ("b637"); the bundle stays 0.1.0 while its native
+      updater ships numbered builds that latest.json names the same way.
+    None for every other application.
+    """
+    info = _read_plist(os.path.join(str(app_path), "Contents", "Info.plist"))
+    bundle_id = info.get("CFBundleIdentifier")
+    if bundle_id == OPEN_DESIGN_BUNDLE_ID:
+        return open_design_payload_version(app_path, home=home)
+    if bundle_id == HYPERFRAMES_BUNDLE_ID:
+        label = info.get("HFBuildLabel")
+        if isinstance(label, str) and re.fullmatch(r"b\d+", label.strip()):
+            return label.strip()
+    return None
+
+
 def installed_app_version(app_path: str | Path) -> str:
     """Read installed application version with canonical fallback hierarchy.
 
     Order:
+      0. vendor_installed_version (Open Design payload, HyperFrames build label)
       1. defaults read CFBundleShortVersionString
       2. defaults read CFBundleVersion
       3. mdls -name kMDItemVersion -raw
     Cross-reference: lib/version.sh app_version()
     """
     path_str = str(app_path)
+    override = vendor_installed_version(path_str)
+    if override:
+        return override
     info_path = os.path.join(path_str, "Contents", "Info")
 
     for key in ("CFBundleShortVersionString", "CFBundleVersion"):

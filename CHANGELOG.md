@@ -6,6 +6,15 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Fixed (2026-11-02 run-log follow-up, macOS 27.2)
+
+Version stays 1.5.5 (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-02.md).
+
+- **KeePassXC rebuild never installed (high).** 2.8.0 (Qt 6.11.1) crashes on macOS 27.2 when a database is unlocked; upstream's fix is the same-version package `2.8.0-1` (Qt 6.11.2). `dmg_package_revision` + `github_rebuild_asset` detect a newer package revision of the installed version (recorded in `~/.local/state/mac-update/package_revisions.tsv`, override `MAC_UPDATE_PACKAGE_REVISION_FILE`), and every KeePassXC download is checked against the publisher `.DIGEST`.
+- **New apps deleted on the next run (high).** `app_exists` now ignores the `[arm64]` / 🆕 markers prescan writes.
+- **New apps never written (high).** The 🆕-section insert ran into the GROUP 4 formulae table, where they were removed as uninstalled formulae; it is now bounded to its section (`append_rows_to_new_section`) and dedups on table rows.
+- **Open Design, HyperFrames, Superset managed by their native updaters (medium).** Verify-only vendor feeds decide; only a behind app is launched. Open Design reports its active launcher payload and HyperFrames its build label (`vendor_installed_version`), also in snapshots (`internet_app_snapshot_version` now delegates to `app_version`).
+
 ### Fixed (2026-10-30 run-log follow-up, macOS 27.2)
 
 Version stays 1.5.5 (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-30.md).

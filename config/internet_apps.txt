@@ -13,6 +13,9 @@ Antigravity IDE
 LM Studio
 OpenCode
 Cursor
+Open Design
+HyperFrames
+Superset
 Obsidian
 ProtonVPN
 KeePassXC

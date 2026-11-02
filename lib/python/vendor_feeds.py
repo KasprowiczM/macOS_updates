@@ -454,7 +454,84 @@ def parse_devolutions_productinfo(text: str, prefix: str) -> dict | None:
     }
 
 
+def select_open_design_metadata(obj: dict) -> dict | None:
+    """releases.open-design.ai/<channel>/latest/metadata.json (verify only).
+
+    The launcher's native updater installs a checksum-verified payload; the
+    toolkit only reads which version the channel publishes. A dry-run or a
+    channel whose macOS build is disabled is not a release.
+    """
+    if not isinstance(obj, dict) or obj.get("dryRun"):
+        return None
+    mac = (obj.get("platforms") or {}).get("mac")
+    if isinstance(mac, dict) and mac.get("enabled") is False:
+        return None
+    ver = obj.get("releaseVersion") or obj.get("stableVersion")
+    if not isinstance(ver, str) or not ver.strip():
+        return None
+    return {"version": ver.strip(), "url": None, "checksum_kind": None, "checksum": None}
+
+
+def select_hyperframes_latest(obj: dict) -> dict | None:
+    """static.heygen.ai/hyperframes-oss/desktop/latest.json (verify only).
+
+    The desktop app's updater names builds "b<N>"; the installed bundle carries
+    the same label in HFBuildLabel (lib/python/inventory.py).
+    """
+    if not isinstance(obj, dict):
+        return None
+    build = obj.get("build")
+    if not isinstance(build, str) or not re.fullmatch(r"b\d+", build.strip()):
+        return None
+    return {"version": build.strip(), "url": None, "checksum_kind": None, "checksum": None}
+
+
+def dmg_package_revision(release: dict, product: str, version: str, arch: str) -> dict | None:
+    """Newest package revision of one release's macOS DMG.
+
+    Vendors rebuild a release without changing its version: KeePassXC shipped
+    KeePassXC-2.8.0-1-arm64.dmg (Qt 6.11.2) two days after 2.8.0, whose Qt 6.11.1
+    crashed on macOS 27.2 when unlocking a database. The bundle still says 2.8.0,
+    so the version alone can never show the rebuild. Returns
+    {"name", "revision", "updated_epoch"} for the highest "<product>-<version>[-N]-<arch>.dmg"
+    asset, or None.
+    """
+    if not isinstance(release, dict):
+        return None
+    pattern = re.compile(
+        rf"^{re.escape(product)}-{re.escape(version)}(?:-(\d+))?-{re.escape(arch)}\.dmg$"
+    )
+    best = None
+    for asset in release.get("assets") or []:
+        if not isinstance(asset, dict):
+            continue
+        m = pattern.match(str(asset.get("name") or ""))
+        if not m:
+            continue
+        revision = int(m.group(1) or 0)
+        stamp = asset.get("updated_at") or asset.get("created_at") or ""
+        try:
+            epoch = int(datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ")
+                        .replace(tzinfo=datetime.timezone.utc).timestamp())
+        except (TypeError, ValueError):
+            epoch = 0
+        if best is None or revision > best["revision"]:
+            best = {"name": asset["name"], "revision": revision, "updated_epoch": epoch}
+    return best
+
+
+def digest_for(digest_text: str, filename: str) -> str | None:
+    """sha256 for filename from a "<hex>  <name>" digest file (KeePassXC .DIGEST)."""
+    for line in (digest_text or "").splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 2 and parts[-1].lstrip("*") == filename and re.fullmatch(r"[0-9a-fA-F]{64}", parts[0]):
+            return parts[0].lower()
+    return None
+
+
 JSON_SELECTORS = {
+    "open_design_metadata": select_open_design_metadata,
+    "hyperframes_latest": select_hyperframes_latest,
     "claude_releases": select_claude_releases,
     "cursor_update": select_cursor_update,
     "warp_channels": select_warp_channels,

@@ -518,6 +518,9 @@ STATUS_TREZOR="$L_INTERNET_STATUS_SKIPPED"
 STATUS_IPMIVIEW="$L_INTERNET_STATUS_SKIPPED"
 STATUS_RDMANAGER="$L_INTERNET_STATUS_SKIPPED"
 STATUS_OPENCODE="$L_INTERNET_STATUS_SKIPPED"
+STATUS_OPENDESIGN="$L_INTERNET_STATUS_SKIPPED"
+STATUS_HYPERFRAMES="$L_INTERNET_STATUS_SKIPPED"
+STATUS_SUPERSET="$L_INTERNET_STATUS_SKIPPED"
 STATUS_INKSCAPE="$L_INTERNET_STATUS_MANAGED_BREW"
 STATUS_DJI="$L_INTERNET_STATUS_SKIPPED"
 STATUS_UNIFI="$L_INTERNET_STATUS_MANAGED_APPSTORE"
@@ -933,6 +936,8 @@ internet_summary_row "Antigravity:"              "$STATUS_ANTIGRAVITY"   "Antigr
 internet_summary_row "Antigravity IDE:"          "$STATUS_ANTIGRAVITY_IDE" "Antigravity IDE"
 internet_summary_row "LM Studio:"                "$STATUS_LMSTUDIO"      "LM Studio"
 internet_summary_row "OpenCode Desktop:"         "$STATUS_OPENCODE"      "OpenCode"
+internet_summary_row "Open Design:"              "$STATUS_OPENDESIGN"    "Open Design"
+internet_summary_row "HyperFrames:"              "$STATUS_HYPERFRAMES"   "HyperFrames"
 
 internet_summary_section "$L_INTERNET_SECTION_VPN"
 internet_summary_row "ProtonVPN:"                "$STATUS_PROTONVPN"     "ProtonVPN"
@@ -957,6 +962,7 @@ internet_summary_row "CodeEdit:"                 "$STATUS_CODEEDIT"      "CodeEd
 internet_summary_row "Docker Desktop:"           "$STATUS_DOCKER"        "Docker Desktop"
 internet_summary_row "Warp:"                     "$STATUS_WARP"          "Warp"
 internet_summary_row "Cursor:"                   "$STATUS_CURSOR"        "Cursor"
+internet_summary_row "Superset:"                 "$STATUS_SUPERSET"      "Superset"
 
 internet_summary_section "$L_INTERNET_SECTION_PRODUCTIVITY"
 internet_summary_row "AppCleaner:"               "$STATUS_APPCLEANER"    "AppCleaner"
@@ -991,6 +997,7 @@ for status in \
     "$STATUS_CHROME" "$STATUS_FIREFOX" "$STATUS_BRAVE" \
     "$STATUS_CHATGPT" "$STATUS_CLAUDE_APP" "$STATUS_GEMINI" "$STATUS_COMET" "$STATUS_PERPLEXITY" \
     "$STATUS_ANTIGRAVITY" "$STATUS_ANTIGRAVITY_IDE" "$STATUS_LMSTUDIO" "$STATUS_OPENCODE" \
+    "$STATUS_OPENDESIGN" "$STATUS_HYPERFRAMES" "$STATUS_SUPERSET" \
     "$STATUS_PROTONVPN" "$STATUS_KEEPASSXC" "$STATUS_PROTONMAIL" "$STATUS_ZOOM" \
     "$STATUS_GOOGLEDRIVE" "$STATUS_MEGASYNC" "$STATUS_PROTONDRIVE" "$STATUS_MICROSOFT" "$STATUS_TEAMS" \
     "$STATUS_VSCODE" "$STATUS_CODEEDIT" "$STATUS_DOCKER" "$STATUS_WARP" "$STATUS_CURSOR" \

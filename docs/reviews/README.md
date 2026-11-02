@@ -25,6 +25,7 @@ Everything in this directory is a **development record**, not product documentat
 | 2026-10-11 | [`RUN_LOG_FOLLOWUP_2026-10-11_v155.md`](RUN_LOG_FOLLOWUP_2026-10-11_v155.md) | not stated | run-log | v1.5.5 | Follow-up on the 2026-10-11 live run: stale `python3` command hash, non-blocking step 5, honest summaries (F1-F6). |
 | 2026-10-25 | [`RUN_LOG_FOLLOWUP_2026-10-25.md`](RUN_LOG_FOLLOWUP_2026-10-25.md) | Claude Opus 5.5 (verifier) + Sonnet subagent (implementation) | run-log | unreleased (1.5.5) | App Store Track 2 false negative (`not_offered`, polling, product-page fallback), Proton Drive gradual-rollout appcast cross-check, warnings-only banner, localization, profile backups only on change (R1-R5). |
 | 2026-10-30 | [`RUN_LOG_FOLLOWUP_2026-10-30.md`](RUN_LOG_FOLLOWUP_2026-10-30.md) | Claude Opus 5.5 (orchestrator) + Sonnet/Haiku subagents (research) | run-log | unreleased (1.5.5) | macOS 27.2: Node alpha selection, declined-restart honesty, OpenCode Electron feed, empty vendor-truth sections, host-tool test guard ported from macOS_cleanup (R1-R5). |
+| 2026-11-02 | [`RUN_LOG_FOLLOWUP_2026-11-02.md`](RUN_LOG_FOLLOWUP_2026-11-02.md) | Claude Opus 5.5 | run-log | unreleased (1.5.5) | KeePassXC same-version rebuild 2.8.0-1 (macOS 27.2 unlock crash) + `.DIGEST`, inventory marker/insert churn, Open Design / HyperFrames / Superset via native updaters (R1-R5). |
 
 ## Archive (chronological)
 

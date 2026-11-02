@@ -12,7 +12,7 @@
 |-------------|--|
 | Platform | Apple Silicon (arm64) only · macOS 13 Ventura to macOS 27 · Bash 3.2 + Python 3 |
 | Pipeline | 7 steps (0–6), macOS system update always last |
-| Registry | 43 internet apps · 11 update methods (see [Update methods](#update-methods)) |
+| Registry | 46 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
 | Tests | 591 automated tests (`bash run_tests.sh`) |
 
