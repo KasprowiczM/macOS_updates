@@ -210,9 +210,16 @@ if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
     # Mandatory even when update_all.sh confirmed the run (a restart is
     # consequential); an unanswered prompt lands in the declined branch.
     if ! mac_update_prompt_yn "$L_CONTINUE_PROMPT [T/n]: " n y; then
-        print_info "$L_UPDATE_CANCELED"
+        if [ "${MAC_UPDATE_PROMPT_TIMED_OUT:-0}" = "1" ]; then
+            # Nobody answered: nothing is installed (safe), but do not call
+            # that the user's choice.
+            print_warn "$(printf "$L_SYSTEM_PROMPT_TIMEOUT_FMT" "$(mac_update_prompt_timeout)")"
+        else
+            print_info "$L_UPDATE_CANCELED"
+        fi
         if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
             touch "$MAC_UPDATE_SESSION_DIR/system_skipped_by_user" 2>/dev/null || true
+            [ "${MAC_UPDATE_PROMPT_TIMED_OUT:-0}" = "1" ] && { touch "$MAC_UPDATE_SESSION_DIR/system_prompt_timeout" 2>/dev/null || true; }
         fi
         exit 10
     fi
@@ -227,9 +234,14 @@ if [ "$ANY_RESTART" = true ]; then
             # A deliberate decline is the user's choice, not a failure: never
             # install restart-required labels without -R, but still install the
             # no-restart labels and report the step as skipped by the user.
-            print_warn "$(printf "${L_SYSTEM_RESTART_DECLINED_FMT:-Restart-required updates skipped at your request: %s. Install them later in System Settings or rerun.}" "${RESTART_LABELS[*]}")"
+            if [ "${MAC_UPDATE_PROMPT_TIMED_OUT:-0}" = "1" ]; then
+                print_warn "$(printf "$L_SYSTEM_PROMPT_TIMEOUT_RESTART_FMT" "$(mac_update_prompt_timeout)" "${RESTART_LABELS[*]}")"
+            else
+                print_warn "$(printf "${L_SYSTEM_RESTART_DECLINED_FMT:-Restart-required updates skipped at your request: %s. Install them later in System Settings or rerun.}" "${RESTART_LABELS[*]}")"
+            fi
             if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
                 touch "$MAC_UPDATE_SESSION_DIR/system_skipped_by_user" 2>/dev/null || true
+                [ "${MAC_UPDATE_PROMPT_TIMED_OUT:-0}" = "1" ] && { touch "$MAC_UPDATE_SESSION_DIR/system_prompt_timeout" 2>/dev/null || true; }
                 echo "${#RESTART_LABELS[@]}" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
             fi
             SYSTEM_RESTART_DECLINED=1

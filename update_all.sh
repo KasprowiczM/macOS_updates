@@ -259,8 +259,11 @@ step_header() {
 log_strip_ansi_tee() {
     perl -e '
         $| = 1;
-        open(my $log, ">>", $ARGV[0]) or exit 1;
-        select((select($log), $| = 1)[0]);
+        # An unwritable log must not stop the stream: without a log the filter
+        # keeps passing output to the terminal (exiting would SIGPIPE the run).
+        my $log;
+        open($log, ">>", $ARGV[0]) or $log = undef;
+        select((select($log), $| = 1)[0]) if $log;
         my $carry = "";
         while (sysread(STDIN, my $buf, 65536)) {
             print STDOUT $buf;
@@ -268,9 +271,9 @@ log_strip_ansi_tee() {
             $carry = "";
             $carry = $1 if $text =~ s/(\e(?:\[[0-9;?]*[ -\/]*)?)\z//;
             $text =~ s/\e\[[0-9;?]*[ -\/]*[@-~]//g;
-            print $log $text;
+            print $log $text if $log;
         }
-        print $log $carry if length $carry;
+        print $log $carry if $log && length $carry;
     ' "$1"
 }
 
@@ -489,22 +492,26 @@ if [ "$_needs_sudo" -eq 1 ]; then
 
     # Keep the timestamp warm for the whole run. Started at most once; the PID
     # is killed in cleanup_session_dir() on every exit path including INT/TERM.
-    # It also stops by itself after MAC_UPDATE_SUDO_KEEPALIVE_MAX seconds
-    # (default 3600, clamped 300-14400): a run that sat 51 minutes on an
-    # unanswered question must not keep refreshing root credentials forever.
-    _ka_max="${MAC_UPDATE_SUDO_KEEPALIVE_MAX:-3600}"
+    # It also stops by itself as soon as this shell is gone, and after
+    # MAC_UPDATE_SUDO_KEEPALIVE_MAX seconds (default 14400 = 4 h, clamped
+    # 300-14400): a run that sat 51 minutes on an unanswered question must not
+    # keep refreshing root credentials forever, yet update_system.sh uses
+    # `sudo -n` per label at the end of a long run and needs a warm timestamp.
+    _ka_max="${MAC_UPDATE_SUDO_KEEPALIVE_MAX:-14400}"
     case "$_ka_max" in
-        ''|*[!0-9]*) _ka_max=3600 ;;
+        ''|*[!0-9]*) _ka_max=14400 ;;
     esac
     [ "$_ka_max" -lt 300 ] && _ka_max=300
     [ "$_ka_max" -gt 14400 ] && _ka_max=14400
     if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] && sudo -n true 2>/dev/null; then
         (
             _macupd_sleep_pid=""
+            _macupd_parent=$$
             _macupd_deadline=$(( $(date +%s) + _ka_max ))
             trap '[ -n "$_macupd_sleep_pid" ] && kill "$_macupd_sleep_pid" 2>/dev/null; exit 0' INT TERM
             while true; do
                 [ "$(date +%s)" -lt "$_macupd_deadline" ] || exit 0
+                kill -0 "$_macupd_parent" 2>/dev/null || exit 0
                 sudo -n true 2>/dev/null || exit 0
                 sleep 50 &
                 _macupd_sleep_pid=$!
@@ -2274,7 +2281,11 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
         SYS_EXIT=$?
         if [ "$SYS_EXIT" -eq "${MAC_UPDATE_SOFT_EXIT:-10}" ]; then
             if [ -f "$SESSION_DIR/system_skipped_by_user" ]; then
-                RESULT_SYSTEM="${L_ALL_RESULT_SKIPPED_BY_USER:-pominięte przez użytkownika}"
+                if [ -f "$SESSION_DIR/system_prompt_timeout" ]; then
+                    RESULT_SYSTEM="${L_ALL_RESULT_SKIPPED_NO_ANSWER:-skipped: no answer}"
+                else
+                    RESULT_SYSTEM="${L_ALL_RESULT_SKIPPED_BY_USER:-pominięte przez użytkownika}"
+                fi
                 STATUS_CODE_SYSTEM="skipped_by_user"
             else
                 RESULT_SYSTEM="⚠️  ${L_ALL_RESULT_DEGRADED:-completed with warnings}"

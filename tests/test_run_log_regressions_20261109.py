@@ -221,7 +221,7 @@ class SudoKeepAliveCapTests(unittest.TestCase):
 
     def clamp(self, value: str | None) -> str:
         text = read("update_all.sh")
-        start = text.index('_ka_max="${MAC_UPDATE_SUDO_KEEPALIVE_MAX:-3600}"')
+        start = text.index('_ka_max="${MAC_UPDATE_SUDO_KEEPALIVE_MAX:-14400}"')
         end = text.index('[ "$_ka_max" -gt 14400 ] && _ka_max=14400') + len('[ "$_ka_max" -gt 14400 ] && _ka_max=14400')
         env = shell_env(MAC_UPDATE_SUDO_KEEPALIVE_MAX=value)
         proc = subprocess.run(["bash", "-c", text[start:end] + '\necho "$_ka_max"'], capture_output=True,
@@ -229,9 +229,9 @@ class SudoKeepAliveCapTests(unittest.TestCase):
         return proc.stdout.strip()
 
     def test_default_and_clamping(self) -> None:
-        self.assertEqual(self.clamp(None), "3600")
-        self.assertEqual(self.clamp(""), "3600")
-        self.assertEqual(self.clamp("abc"), "3600")
+        self.assertEqual(self.clamp(None), "14400")
+        self.assertEqual(self.clamp(""), "14400")
+        self.assertEqual(self.clamp("abc"), "14400")
         self.assertEqual(self.clamp("10"), "300")
         self.assertEqual(self.clamp("900"), "900")
         self.assertEqual(self.clamp("999999"), "14400")
@@ -240,6 +240,9 @@ class SudoKeepAliveCapTests(unittest.TestCase):
         block = self.block()
         self.assertIn("_macupd_deadline=$(( $(date +%s) + _ka_max ))", block)
         self.assertIn('[ "$(date +%s)" -lt "$_macupd_deadline" ] || exit 0', block)
+        # The refresher also stops as soon as the parent shell is gone.
+        self.assertIn("_macupd_parent=$$", block)
+        self.assertIn('kill -0 "$_macupd_parent" 2>/dev/null || exit 0', block)
         # Rules of critical_rules 6c are untouched.
         self.assertEqual(block.count("SUDO_KEEPALIVE_PID=$!"), 1)
         self.assertEqual(block.count('SUDO_KEEPALIVE_PID=""'), 1)
@@ -294,6 +297,17 @@ class LogFilterTests(unittest.TestCase):
             proc.wait(timeout=10)
             self.assertEqual(echoed, b"".join(chunks), "the terminal stream is byte-identical")
             self.assertEqual(log.read_text(encoding="utf-8"), "Plain bold\nblue\nask? ")
+
+    @unittest.skipUnless(shutil.which("perl"), "perl not available")
+    def test_unwritable_log_still_passes_output_through(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "no_such_dir" / "run.log"  # cannot be opened
+            proc = subprocess.run(
+                ["bash", "-c", self.function() + f'\nlog_strip_ansi_tee "{bad}"'],
+                input=b"line one\n\x1b[1mline two\x1b[0m\nask? ", capture_output=True, timeout=20)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual(proc.stdout, b"line one\n\x1b[1mline two\x1b[0m\nask? ")
+            self.assertFalse(bad.exists())
 
     def test_perl_fallback_keeps_a_log(self) -> None:
         text = read("update_all.sh")

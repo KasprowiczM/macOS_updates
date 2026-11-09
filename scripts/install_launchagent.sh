@@ -70,8 +70,8 @@ if [ "$MODE" = "uninstall" ]; then
     CURRENT_UID="$(id -u)"
     launchctl bootout "gui/${CURRENT_UID}/${PLIST_LABEL}" 2>/dev/null \
         || launchctl bootout "gui/${CURRENT_UID}" "$PLIST_PATH" 2>/dev/null \
-        || launchctl unload -w "$PLIST_PATH" 2>/dev/null \
         || true
+    # No `unload -w` fallback: it leaves a persistent disabled override behind.
     rm -f "$PLIST_PATH"
     echo "✅ LaunchAgent uninstalled: $PLIST_LABEL"
     exit 0

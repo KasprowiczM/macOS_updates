@@ -108,6 +108,16 @@ class PromptHelperTests(unittest.TestCase):
         self.assertEqual(rc("\n", "y", "n"), 1)
         self.assertEqual(rc("maybe\n", "y", "y"), 1)  # unrecognised is never yes
 
+    def test_localized_yes_letters(self) -> None:
+        def rc(stdin):
+            res = self._bash(f"mac_update_prompt_yn 'q? ' n n; echo rc=$?", stdin=stdin)
+            return int(re.search(r"rc=(\d+)", res.stdout).group(1))
+        for letter in "yYtTjJsSoO":
+            self.assertEqual(rc(letter + "\n"), 0, letter)
+        for letter in "nN":
+            self.assertEqual(rc(letter + "\n"), 1, letter)
+        self.assertEqual(rc("x\n"), 1)
+
     def test_timeout_uses_default_and_says_so(self) -> None:
         # stdin stays open and silent for longer than the (minimum) 10 s limit.
         env = shell_env(MAC_UPDATE_PROMPT_TIMEOUT="10")
@@ -143,7 +153,10 @@ class _BrewHarness(unittest.TestCase):
         tokens = list(casks)
         docs = []
         for tok, app in casks.items():
-            art = f'[{{"app":["{app}"]}}]' if app else '[{"font":["F.ttf"]}]'
+            if app and app.startswith("["):
+                art = app  # raw artifacts JSON
+            else:
+                art = f'[{{"app":["{app}"]}}]' if app else '[{"font":["F.ttf"]}]'
             docs.append(f'{{"token":"{tok}","version":"2.0","installed":"1.0","artifacts":{art}}}')
         (self.tmp / "info.txt").write_text(",".join(docs), encoding="utf-8")
         (self.tmp / "doctor.txt").write_text(doctor, encoding="utf-8")
@@ -206,8 +219,63 @@ class CaskRunningDeferralTests(_BrewHarness):
         self.assertIn("run-cask", out)
         self.assertEqual(res.returncode, 10, out)  # soft, never hard
         # The final verification does not report the deferred casks again.
-        self.assertEqual((self.session / "pending_brew_casks").read_text().strip(), "2")
+        self.assertEqual((self.session / "pending_brew_casks").read_text().strip(), "4")  # 2 still outdated + 2 deferred
         self.assertNotIn("Formulae still outdated", out)
+
+    def test_pkg_cask_with_quit_ids(self) -> None:
+        def pkg(bid):
+            return ('[{"pkg":["x.pkg"]},{"uninstall":[{"quit":["%s"],'
+                    '"pkgutil":"com.x"}]}]' % bid)
+        self.brew({"pkg-run": pkg("com.test.PkgRun"),
+                   "pkg-unk": pkg("com.test.PkgUnk"),
+                   "pkg-idle": pkg("com.test.PkgIdle"),
+                   "pkg-sig": '[{"pkg":["x.pkg"]},{"uninstall":[{"signal":[["TERM","com.test.PkgSig"]]}]}]',
+                   "pkg-none": '[{"pkg":["x.pkg"]},{"uninstall":[{"pkgutil":"com.x"}]}]'})
+        res = self.run_brew(MAC_UPDATE_YES="1",
+                            FAKE_RUNNING_IDS="com.test.PkgRun com.test.PkgSig",
+                            FAKE_UNKNOWN_IDS="com.test.PkgUnk")
+        out = res.stdout + res.stderr
+        up = self.upgraded()
+        self.assertIn("pkg-idle", up, out)
+        self.assertIn("pkg-none", up, out)
+        for tok in ("pkg-run", "pkg-unk", "pkg-sig"):
+            self.assertNotIn(tok, up, out)
+        deferred = (self.session / "brew_deferred_running.txt").read_text().split()
+        self.assertEqual(sorted(deferred), ["pkg-run|com.test.PkgRun",
+                                            "pkg-sig|com.test.PkgSig",
+                                            "pkg-unk|com.test.PkgUnk"])
+        self.assertEqual(res.returncode, 10, out)
+
+    def test_unreadable_cask_json_defers_no_target_cask(self) -> None:
+        self.brew({"font-cask": None})
+        # `brew info` yields nothing at all for this cask.
+        _script(self.bin / "brew", f'''
+echo "$@" >> "{self.log}"
+case "$1" in
+  update) exit 0 ;;
+  list) [ "$2" = "--cask" ] && echo font-cask; exit 0 ;;
+  outdated) [ "$2" = "--cask" ] && echo "font-cask (1.0) < 2.0"; exit 0 ;;
+  info) exit 1 ;;
+  doctor) exit 0 ;;
+esac
+exit 0
+''')
+        res = self.run_brew(MAC_UPDATE_YES="1")
+        self.assertNotIn("font-cask", self.upgraded(), res.stdout + res.stderr)
+        deferred = (self.session / "brew_deferred_running.txt").read_text().split()
+        self.assertEqual(deferred, ["font-cask|UNREADABLE"])
+
+    def test_deferred_casks_reach_run_summary(self) -> None:
+        from run_summary import collect_run_items
+        (self.session / "pending_brew_casks").write_text("3\n")
+        (self.session / "brew_deferred_running.txt").write_text(
+            "run-cask|Run.app\npkg-run|com.test.PkgRun\n")
+        items = collect_run_items(self.session)
+        by_id = {i["id"]: i for i in items if i["category"] == "brew_cask"}
+        self.assertEqual(by_id["run-cask"]["status"], "pending")
+        self.assertIn("Run.app", by_id["run-cask"]["details"])
+        self.assertEqual(by_id["pkg-run"]["status"], "pending")
+        self.assertEqual(by_id["brew_casks"]["details"], "1 updates pending")
 
     def test_only_running_cask_is_deferred_softly(self) -> None:
         (self.apps / "Run.app").mkdir()

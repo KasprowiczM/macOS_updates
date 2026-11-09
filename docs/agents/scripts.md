@@ -95,9 +95,11 @@
 | `MAC_UPDATE_MIN_FREE_GB` | `15` | Pre-flight / `--doctor`: warn (degraded run) when free space on the system volume is below this many GB |
 | `MAC_UPDATE_MIN_BATTERY` | `30` | Pre-flight: on battery below this percent the macOS system step is skipped softly (other steps run) |
 | `MAC_UPDATE_NO_CAFFEINATE` | `0` | Set to `1` to not run `caffeinate -i -w $$` for the duration of a real run |
-| `MAC_UPDATE_SUDO_KEEPALIVE_MAX` | `3600` | Seconds after which the sudo keep-alive stops refreshing (clamped 300-14400) |
+| `MAC_UPDATE_SUDO_KEEPALIVE_MAX` | `14400` | Seconds after which the sudo keep-alive stops refreshing (clamped 300-14400); it also stops as soon as the parent shell is gone |
 | `MAC_UPDATE_PARENT_CONFIRMED` | unset | Exported as `1` by `update_all.sh` once its master confirmation succeeded; children skip their own redundant confirmation |
 | `MAC_UPDATE_DOCTOR_PROBE_AX` | `0` | `--doctor` only: set to `1` to probe Accessibility with `osascript` (can show a macOS permission prompt) |
+| `MAC_UPDATE_PREFLIGHT_NET_RETRIES` | `3` | Extra network probe passes before a real run aborts for "no network" (clamp 1-10); `--doctor` does one pass |
+| `MAC_UPDATE_PREFLIGHT_NET_RETRY_WAIT` | `10` | Seconds between those passes (clamp 0-60; tests use 0) |
 | `MAC_UPDATE_PREFLIGHT_HOSTS` | `api.github.com formulae.brew.sh itunes.apple.com` | HTTPS hosts probed by pre-flight / `--doctor` (test override) |
 | `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Seconds (clamp 10-900, 0 = wait forever) a mid-run yes/no prompt waits (`mac_update_prompt_yn`, `lib/ui.sh`); a timeout is a safe "no" |
 | `MAC_UPDATE_HOMEBREW_PREFIX` | `/opt/homebrew` | Test-only override of the prefix `mac_update_ensure_homebrew_path` adds to `PATH` |
