@@ -57,10 +57,24 @@ A review of the scheduled (launchd) path and the interactive path, prompted by r
 - **Prompt helper.** Unrecognised input is asked again (two re-asks, then the timeout default; input ending right after a stray answer is never a yes). Terminal type-ahead is flushed with `termios.tcflush` before the first read; nothing is drained when stdin is not a terminal. The flush is covered by a pty test.
 - Not verified live: a real rate-limited run, a Firefox update with the app open, a Polish run of the changed texts.
 
-## Not verified live
+## Live evidence and what is still unverified
 
-- No real scheduled launchd run was observed; the plist `PATH`, the load check and the bootout flow are covered by tests with stubbed `launchctl`.
-- The system-scope Google updater wake was not observed on a real Google Drive install.
-- No live full `update_all.sh` run on the merged branch.
-- The interactive prompt timeout and the real `caffeinate` process were not exercised live.
-- Acceptance paths 2 (system update with restart batch) and 3 (major upgrade guard) remain open.
+One live full run was made on the follow-up branch on 2026-11-09 (macOS 27.2, interactive, exit 0, degraded), before the last round of fixes.
+
+Observed in that run:
+
+- Pre-flight (disk, battery, network) and `caffeinate`; `--doctor` exits 0 / 10 without writing a log.
+- One master confirmation; the Homebrew step did not ask again.
+- Vendor-feed fetch diagnostics for every feed; apps that had produced spurious feed warnings reported current from the vendor feed.
+- Google Drive verified from the updater history after the system-scope wake (wake exit code 0).
+- `brew doctor` advisories shown in the final block and stored in the run summary.
+- An open browser was not replaced; its update was reported as pending.
+- ANSI-free run log and per-step durations.
+
+Still not verified live:
+
+- No real scheduled launchd run; the plist `PATH`, the load check and the bootout flow are covered by tests with stubbed `launchctl`.
+- The fixes made after the live run: GitHub rate-limit reporting and cached proof, the pre-download running check, prompt re-ask and type-ahead flush, the localized strings, and the two newly registered apps.
+- A prompt timeout and an open-cask deferral in a real run.
+- Acceptance paths 2 (system update with restart batch) and 3 (major upgrade guard): the macOS update offered in the live run was declined by the user.
+- Non-English translations of the new strings were not reviewed by native speakers.
