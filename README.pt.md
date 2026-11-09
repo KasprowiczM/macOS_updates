@@ -73,7 +73,7 @@ O registo ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/inte
 | `chromium_updater` | 1 | verified direct | Prova do atualizador baseado em Chromium (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: DMG verificado a partir do seu appcast quando inativo; alternativa `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Atualização própria do Teams mais um fallback MAU `TEAMS21` observado e verificado quando a Microsoft o oferece |
-| `manual` | 2 | manual | IPMIView e DJI Assistant 2: apenas notificação |
+| `manual` | 1 | manual | IPMIView: apenas notificação |
 
 ---
 

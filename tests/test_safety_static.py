@@ -1370,9 +1370,8 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('"classification_counts":', text)
 
     def test_target_aliases_contains_all_multi_name_apps(self) -> None:
-        """TARGET_ALIASES must define aliases for DJI Assistant 2, OpenCode, zoom.us, Visual Studio Code, and Brave Browser."""
+        """TARGET_ALIASES must define aliases for OpenCode, zoom.us, Visual Studio Code, and Brave Browser."""
         text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
-        self.assertIn('"DJI Assistant 2":', text)
         self.assertIn('"OpenCode":', text)
         self.assertIn('"zoom.us":', text)
         self.assertIn('"Visual Studio Code":', text)
@@ -2707,6 +2706,9 @@ class I18nCompletenessTests(unittest.TestCase):
             # Feed state (P1-1/P1-2): current per cached check / feed regressed.
             "L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT",
             "L_INTERNET_STATUS_FEED_REGRESSED_FMT",
+            # GitHub rate limit: parameterised, so classified error_soft by code in
+            # internet_status_code and counted soft via _soft_fail_from_codes.
+            "L_INTERNET_STATUS_GITHUB_RATELIMIT_FMT",
         }
 
         for key in all_status_keys:

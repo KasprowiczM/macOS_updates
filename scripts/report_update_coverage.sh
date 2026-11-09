@@ -292,10 +292,6 @@ TARGET_ALIASES = {
         "names": ["Ledger Live", "Ledger Wallet"],
         "bundle_ids": ["com.ledger.live"],
     },
-    "DJI Assistant 2": {
-        "names": ["DJI Assistant 2", "DJI Assistant 2(Consumer Drones Series)"],
-        "bundle_ids": ["DJI.Assistant"],
-    },
     "OpenCode": {
         "names": ["OpenCode", "opencode", "Opencode", "opencode Desktop"],
         "bundle_ids": ["ai.opencode.desktop"],
