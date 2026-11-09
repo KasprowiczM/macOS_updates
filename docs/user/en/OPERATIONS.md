@@ -31,6 +31,8 @@ Step 6 runs last because it may restart the Mac. Blocking hard failures defer it
 
 Preview without mutations: `bash update_all.sh --dry-run -y`
 
+Check readiness without running anything: `bash update_all.sh --doctor` (read-only; exit 0 ok, 10 warnings, 1 problem). Mid-run questions time out after `MAC_UPDATE_PROMPT_TIMEOUT` seconds (default 120) with "no", and a Homebrew cask whose app is open is deferred, not upgraded.
+
 ## Failure triage
 
 | Step failed | Check these files |
@@ -92,4 +94,4 @@ brew outdated
 softwareupdate -l
 ```
 
-For **triggered-unverified** apps, verify the About/version screen: launching the vendor updater does not prove completion. Manual coverage remains limited to IPMIView and DJI Assistant 2.
+For **triggered-unverified** apps, verify the About/version screen: launching the vendor updater does not prove completion. Manual coverage remains limited to IPMIView.

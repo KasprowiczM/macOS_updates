@@ -73,7 +73,7 @@ Rejestr ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/intern
 | `chromium_updater` | 1 | verified direct | Dowód z updatera opartego na Chromium (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: zweryfikowany DMG z appcastu, gdy aplikacja nie pracuje; zapasowo `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Własny updater Teams plus obserwowany, weryfikowany fallback MAU `TEAMS21`, gdy Microsoft go oferuje |
-| `manual` | 2 | manual | IPMIView i DJI Assistant 2 — tylko powiadomienie |
+| `manual` | 1 | manual | IPMIView — tylko powiadomienie |
 
 ---
 
@@ -85,6 +85,7 @@ Autorytatywną listę definiuje `lib/cli.sh`; `bash update_all.sh --help` ją wy
 |-------|-----------|
 | `-y`, `--yes` | Pomija pytanie o potwierdzenie |
 | `-h`, `--help` | Wyświetla pomoc i wychodzi z kodem `0` |
+| `--doctor` | Raport gotowości tylko do odczytu (platforma, narzędzia, `PATH` launchd, LaunchAgent, sudo, dysk, zasilanie, sieć, ostatni przebieg); bez pytania o sudo, bez logu przebiegu; wyjście `0` ok / `10` ostrzeżenia / `1` problem |
 | `--dry-run` | Podgląd każdego kroku, bez wprowadzania zmian, bez pytań o poświadczenia |
 | `--verify-only` | Weryfikuje wersje zainstalowanych aplikacji względem historii bez modyfikacji |
 | `--json-summary` | Wypisuje obiekt JSON z podsumowaniem na stdout po zakończeniu |
@@ -103,6 +104,12 @@ Autorytatywną listę definiuje `lib/cli.sh`; `bash update_all.sh --help` ją wy
 
 Nieznana opcja `-…` kończy działanie kodem `2` po wypisaniu pomocy.
 
+**Kontrola wstępna (tylko przy rzeczywistym uruchomieniu):** przed krokiem 0 przebieg sprawdza wolne miejsce na dysku, baterię i sieć. Mało miejsca obniża status przebiegu, niski poziom baterii pomija tylko krok macOS (miękko), a brak dostępnego hosta kończy przebieg kodem `1` przed jakimkolwiek krokiem. Mac jest utrzymywany w stanie czuwania za pomocą `caffeinate` na czas przebiegu (`MAC_UPDATE_NO_CAFFEINATE=1` wyłącza tę funkcję). Uruchom `bash update_all.sh --doctor`, aby zobaczyć te same sprawdzenia bez uruchamiania czegokolwiek.
+
+**Pytania:** każde pytanie w trakcie przebiegu wygasa po `MAC_UPDATE_PROMPT_TIMEOUT` sekundach z bezpieczną odpowiedzią „nie”; nierozpoznane dane wejściowe także oznaczają „nie”. Po potwierdzeniu w głównym skrypcie kroki Homebrew i App Store nie pytają ponownie; krok macOS nadal pyta.
+
+**Otwarte aplikacje:** cask Homebrew, którego aplikacja jest otwarta, nigdy nie jest aktualizowany; zostaje odroczony z komunikatem „zamknij aplikację”, a krok kończy się miękkim ostrzeżeniem (kod `10`).
+
 ## Zmienne środowiskowe
 
 Każda flaga ma odpowiednik w postaci zmiennej (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_SKIP_SYSTEM=1`, …); poniżej najczęściej używane zmienne bez osobnej flagi. Pełna lista z wartościami domyślnymi: [docs/agents/scripts.md](docs/agents/scripts.md#environment-variables).
@@ -114,7 +121,10 @@ Każda flaga ma odpowiednik w postaci zmiennej (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPD
 | `MAC_UPDATE_NO_SUDO` | *ustawiane automatycznie* | Eksportowane przez `update_all.sh` przy braku TTY; skrypty podrzędne pomijają kroki roota zamiast kończyć się błędem |
 | `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | Ustawienie na `1` wyłącza odświeżanie znacznika czasu `sudo` w tle |
 | `MAC_UPDATE_STALE_DAYS` | `45` | Liczba dni, po których niezweryfikowana aplikacja jest oznaczana jako przestarzała |
-| `MAC_UPDATE_MAX_LOGS` | `30` | Liczba zachowywanych logów w `logs/` |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Liczba zachowywanych logów w `logs/` (podsumowania przebiegów też są rotowane) |
+| `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Sekundy (10–900, `0` = czekaj bez końca), przez które pytanie tak/nie w trakcie przebiegu czeka; przekroczenie czasu oznacza „nie” |
+| `MAC_UPDATE_MIN_FREE_GB` | `15` | Kontrola wstępna: wolne miejsce poniżej tej wartości obniża status przebiegu |
+| `MAC_UPDATE_MIN_BATTERY` | `30` | Kontrola wstępna: na baterii poniżej tego procenta pomijany jest tylko krok macOS |
 | `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `15` | Pauza pozwalająca uruchomionemu updaterowi przepisać `Info.plist` (`0` wyłącza, limit 120; pomijana, gdy nie uruchomiono żadnej aplikacji) |
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Sekundy (0–300), jakie aplikacja uruchomiona przez narzędzie ma na zamknięcie po łagodnym `quit`; nigdy nie jest zabijana siłą (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Sekundy (1–60) między kolejnymi łagodnymi prośbami `quit` w oknie oczekiwania (v1.5.5) |

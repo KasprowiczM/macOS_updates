@@ -9,6 +9,7 @@ Options:
   -y, --yes                      Skip confirmation prompt
   -h, --help                     Show this help
       --dry-run                  Preview steps without mutating the system
+      --doctor                   Read-only readiness report (no sudo, no run log); exit 0 ok, 10 warnings, 1 problem
       --verify-only              Verify installed app versions against history without mutating
       --json-summary             Emit JSON summary on exit (stdout, after run)
       --bootstrap-cli            Install missing native CLIs and managed Node/Bun toolchain
@@ -35,6 +36,10 @@ Environment (also set by flags):
   MAC_UPDATE_NONINTERACTIVE=1
   MAC_UPDATE_NOTIFY=1
   MAC_UPDATE_STALE_DAYS=45
+  MAC_UPDATE_MIN_FREE_GB=15          Pre-flight: warn below this many free GB
+  MAC_UPDATE_MIN_BATTERY=30          Pre-flight: skip the macOS step on battery below this percent
+  MAC_UPDATE_NO_CAFFEINATE=1         Do not keep the Mac awake during the run
+  MAC_UPDATE_SUDO_KEEPALIVE_MAX=14400 Stop refreshing sudo after this many seconds (300-14400)
 EOF
 }
 
@@ -44,6 +49,7 @@ mac_update_parse_cli() {
             -y|--yes) export MAC_UPDATE_YES=1 ;;
             -h|--help) mac_update_cli_usage; exit 0 ;;
             --dry-run) export MAC_UPDATE_DRY_RUN=1 ;;
+            --doctor) export MAC_UPDATE_DOCTOR=1 ;;
             --verify-only) export MAC_UPDATE_VERIFY_ONLY=1 ;;
             --json-summary) export MAC_UPDATE_JSON_SUMMARY=1 ;;
             --bootstrap-cli) export MAC_UPDATE_BOOTSTRAP_CLI=1 ;;

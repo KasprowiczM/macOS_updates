@@ -73,7 +73,7 @@ Die Registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 | `chromium_updater` | 1 | verified direct | Nachweis des Chromium-basierten Updaters (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: verifiziertes DMG aus dem Appcast im Leerlauf; Rückfall `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Teams-Selbstupdate plus beobachteter, verifizierter MAU-Fallback `TEAMS21`, wenn Microsoft ihn anbietet |
-| `manual` | 2 | manual | IPMIView und DJI Assistant 2: nur Hinweis |
+| `manual` | 1 | manual | IPMIView: nur Hinweis |
 
 ---
 
@@ -85,6 +85,7 @@ Die Registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 |--------|---------|
 | `-y`, `--yes` | Bestätigungsabfrage überspringen |
 | `-h`, `--help` | Hilfe anzeigen und mit `0` beenden |
+| `--doctor` | Schreibgeschützter Bereitschaftsbericht (Plattform, Werkzeuge, launchd-`PATH`, LaunchAgent, sudo, Speicher, Strom, Netzwerk, letzter Lauf); keine sudo-Abfrage, kein Laufprotokoll; Exit `0` ok / `10` Warnungen / `1` Problem |
 | `--dry-run` | Jeden Schritt nur anzeigen, nichts ändern, nie nach Zugangsdaten fragen |
 | `--verify-only` | Installierte App-Versionen gegen die Historie prüfen, ohne zu ändern |
 | `--json-summary` | Nach dem Lauf ein JSON-Ergebnisobjekt auf stdout ausgeben |
@@ -103,6 +104,12 @@ Die Registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 
 Eine unbekannte Option `-…` beendet sich nach der Hilfeausgabe mit Code `2`.
 
+**Vorprüfung (nur bei echten Läufen):** Vor Schritt 0 prüft der Lauf freien Speicher, Akku und Netzwerk. Wenig Speicher stuft den Lauf herab, ein niedriger Akkustand überspringt nur den macOS-Schritt (weich), und ohne erreichbaren Host endet der Lauf mit Code `1` vor jedem Schritt. Der Mac wird während des Laufs mit `caffeinate` wach gehalten (`MAC_UPDATE_NO_CAFFEINATE=1` deaktiviert das). Mit `bash update_all.sh --doctor` siehst du dieselben Prüfungen, ohne etwas auszuführen.
+
+**Abfragen:** Jede Rückfrage während des Laufs läuft nach `MAC_UPDATE_PROMPT_TIMEOUT` Sekunden mit der sicheren Antwort „nein” ab; nicht erkannte Eingaben gelten ebenfalls als „nein”. Nach der Bestätigung im Hauptskript fragen die Homebrew- und App-Store-Schritte nicht erneut; der macOS-Schritt fragt weiterhin.
+
+**Geöffnete Apps:** Ein Homebrew-Cask, dessen App geöffnet ist, wird nie aktualisiert; er wird mit der Meldung „Beende die App” zurückgestellt, und der Schritt endet mit einer weichen Warnung (Code `10`).
+
 ## Umgebungsvariablen
 
 Jede Option hat eine gleichwertige Variable (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_SKIP_SYSTEM=1`, …); hier die häufig genutzten ohne eigene Option. Die vollständige Liste mit Standardwerten steht in [docs/agents/scripts.md](docs/agents/scripts.md#environment-variables).
@@ -114,7 +121,10 @@ Jede Option hat eine gleichwertige Variable (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE
 | `MAC_UPDATE_NO_SUDO` | *automatisch gesetzt* | Von `update_all.sh` ohne TTY exportiert; Kindskripte überspringen dann Root-Spuren, statt zu scheitern |
 | `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | `1` deaktiviert die Hintergrundauffrischung des `sudo`-Zeitstempels |
 | `MAC_UPDATE_STALE_DAYS` | `45` | Tage, nach denen eine unverifizierte App als veraltet gemeldet wird |
-| `MAC_UPDATE_MAX_LOGS` | `30` | In `logs/` aufbewahrte Laufprotokolle |
+| `MAC_UPDATE_MAX_LOGS` | `30` | In `logs/` aufbewahrte Laufprotokolle (Laufzusammenfassungen werden ebenfalls rotiert) |
+| `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Sekunden (10–900, `0` = unbegrenzt warten), die eine Ja/Nein-Abfrage während des Laufs wartet; Zeitüberschreitung bedeutet „nein” |
+| `MAC_UPDATE_MIN_FREE_GB` | `15` | Vorprüfung: freier Speicher unter diesem Wert stuft den Lauf herab |
+| `MAC_UPDATE_MIN_BATTERY` | `30` | Vorprüfung: im Akkubetrieb unter diesem Prozentwert wird nur der macOS-Schritt übersprungen |
 | `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `15` | Pause, damit ein gestarteter Hersteller-Updater `Info.plist` neu schreiben kann (`0` deaktiviert, auf 120 begrenzt; entfällt, wenn keine App gestartet wurde) |
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Sekunden (0–300), die eine vom Werkzeug gestartete App nach dem sanften `quit` zum Beenden hat; nie erzwungen (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Sekunden (1–60) zwischen wiederholten sanften `quit`-Anforderungen im Wartefenster (v1.5.5) |

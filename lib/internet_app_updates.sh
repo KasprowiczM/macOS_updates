@@ -82,10 +82,24 @@ google_keystone_check() {
             GOOGLE_KEYSTONE_EXIT=$?
             [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
         fi
-        if [ "$triggered" -eq 0 ] && [ -x "$sys_updater" ]; then
-            output=$(run_with_timeout "$updater_timeout" "$sys_updater" --wake-all 2>&1)
-            GOOGLE_KEYSTONE_EXIT=$?
-            [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+        # Google Drive (com.google.drivefs) is registered ONLY with the system-scope
+        # GoogleUpdater. Waking the user scope never re-checks it, and a binary run
+        # without --system acts in user scope even when it is the system install.
+        # On 2026-11-08 the last scheduled system check was 14 h old (the Mac slept),
+        # the user-scope wake produced nothing for Drive, and it was reported
+        # "updater triggered (no response)". Wake the system scope as well; it is the
+        # same --wake-all --system the vendor's own LaunchDaemon runs.
+        if [ -x "$sys_updater" ]; then
+            local sys_out sys_rc
+            sys_out=$(run_with_timeout "$updater_timeout" "$sys_updater" --wake-all --system 2>&1)
+            sys_rc=$?
+            command -v internet_diag_log >/dev/null 2>&1 && \
+                internet_diag_log "GoogleUpdater system-scope wake (--wake-all --system): exit=$sys_rc"
+            if [ "$triggered" -eq 0 ]; then
+                output="$sys_out"
+                GOOGLE_KEYSTONE_EXIT=$sys_rc
+                [ "$sys_rc" -eq 0 ] && triggered=1
+            fi
         fi
         if [ ! -x "$user_updater" ] && [ ! -x "$sys_updater" ]; then
             if [ -n "$agent" ] && [ -f "$agent" ]; then
@@ -161,7 +175,7 @@ iu_google_chrome() {
 
         local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
         local vh_json=""
-        vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+        vh_json="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 "$vh_url" 2>/dev/null || true)"
         local pub_ver=""
         if [ -n "$vh_json" ]; then
             pub_ver="$(printf '%s\n' "$vh_json" | PYTHONPATH="$_LIB_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
@@ -206,7 +220,7 @@ iu_firefox_developer_edition() {
         fi
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        LATEST_FF=$(curl -fsSL --max-time 20 --retry 2 \
+        LATEST_FF=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 2 \
             "https://product-details.mozilla.org/1.0/firefox_versions.json" \
             | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('FIREFOX_DEVEDITION','?'))" \
             2>/dev/null || echo "?")
@@ -234,12 +248,14 @@ iu_firefox_developer_edition() {
             FF_VER_DISPLAY="$VER (kanał $LATEST_FF)"
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
+        elif internet_defer_running_app "/Applications/Firefox Developer Edition.app" STATUS_FIREFOX "$VER" "$LATEST_FF"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_FF" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_APPLE_SILICON" "Firefox Developer Edition" "$LATEST_FF")"
             FF_URL="https://download.mozilla.org/?product=firefox-devedition-latest&os=osx&lang=pl"
             TEMP_DMG="$(make_temp_dmg Firefox_DevEd)"
-            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL"; then
                 FF_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$FF_MOUNT" ]; then
                     if [ -d "$FF_MOUNT/Firefox Developer Edition.app" ]; then
@@ -253,10 +269,10 @@ iu_firefox_developer_edition() {
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
                             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_FIREFOX="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_FF:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
                                 STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -454,7 +470,7 @@ iu_protonvpn() {
 # must match the download; a missing or unparseable digest refuses the install.
 keepassxc_digest_ok() {
     local file="$1" url="$2" asset="$3" digest_text expected actual
-    digest_text="$(curl -fsSL --max-time 20 --retry 2 "${url}.DIGEST" 2>/dev/null)" || digest_text=""
+    digest_text="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 2 "${url}.DIGEST" 2>/dev/null)" || digest_text=""
     expected="$(printf '%s\n' "$digest_text" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
 from vendor_feeds import digest_for
@@ -477,6 +493,7 @@ iu_keepassxc() {
 
         LATEST_KPX_TAG=$(github_latest_tag "keepassxreboot/keepassxc")
         LATEST_KPX=$(echo "$LATEST_KPX_TAG" | sed 's/^v//')
+        [ "$LATEST_KPX" = "?" ] || github_lookup_record "KeePassXC" "$LATEST_KPX"
         KPX_RELATION="$(internet_version_relation "$LATEST_KPX" "$VER")"
         # Arch detection for DMG URL with safe fallback
         KPX_UNAME="$(uname -m 2>/dev/null || echo "arm64")"
@@ -486,7 +503,9 @@ iu_keepassxc() {
             KPX_REBUILD="$(github_rebuild_asset "keepassxreboot/keepassxc" "$LATEST_KPX_TAG" "KeePassXC" "$LATEST_KPX" "$KPX_ARCH" "/Applications/KeePassXC.app")"
         fi
 
-        if [ "$LATEST_KPX" = "?" ]; then
+        if [ "$LATEST_KPX" = "?" ] && github_lookup_handled "KeePassXC" "$VER"; then
+            STATUS_KEEPASSXC="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_KPX" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             if silent_launch_app "KeePassXC"; then
                 print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "KeePassXC → Check for updates")"
@@ -500,6 +519,8 @@ iu_keepassxc() {
         elif [ "$KPX_RELATION" = "current" ] && [ -z "$KPX_REBUILD" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "KeePassXC" "$VER (remote: $LATEST_KPX)")"
             STATUS_KEEPASSXC="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/KeePassXC.app" STATUS_KEEPASSXC "$VER" "${LATEST_KPX}${KPX_REBUILD:+ (rebuild)}"; then
+            :
         else
             # Either a newer version, or a same-version rebuild published after
             # this bundle was installed (2.8.0-1: Qt fix for the macOS 27.2
@@ -518,7 +539,7 @@ iu_keepassxc() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$KPX_TARGET_LABEL ($KPX_ARCH)")"
             KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/${KPX_ASSET}"
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
-            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" \
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" \
                 && keepassxc_digest_ok "$TEMP_DMG" "$KPX_URL" "$KPX_ASSET"; then
                 KPX_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$KPX_MOUNT" ]; then
@@ -543,10 +564,10 @@ iu_keepassxc() {
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "KeePassXC" "$NEW_VER")"
                             STATUS_KEEPASSXC="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "KeePassXC")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_KEEPASSXC="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_KPX:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "KeePassXC")"
                                 STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -2013,7 +2034,7 @@ iu_visual_studio_code() {
         VER=$(app_version "/Applications/Visual Studio Code.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        VSCODE_JSON=$(curl -fsSL --max-time 30 --retry 3 --retry-delay 2 "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest" 2>/dev/null || true)
+        VSCODE_JSON=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 30 --retry 3 --retry-delay 2 "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest" 2>/dev/null || true)
         LATEST_VSCODE=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('productVersion', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
         VSCODE_URL=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('url', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
         VSCODE_SHA256=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('sha256hash', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
@@ -2036,6 +2057,8 @@ iu_visual_studio_code() {
             elif [ "$VSCODE_RELATION" = "current" ]; then
                 print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER (remote: $LATEST_VSCODE)")"
                 STATUS_VSCODE="$L_INTERNET_STATUS_CURRENT"
+            elif internet_defer_running_app "/Applications/Visual Studio Code.app" STATUS_VSCODE "$VER" "$LATEST_VSCODE"; then
+                :
             else
                 print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
                 print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "Visual Studio Code" "$LATEST_VSCODE")"
@@ -2044,7 +2067,7 @@ iu_visual_studio_code() {
                 rm -rf "$TEMP_DIR" 2>/dev/null || true
                 mkdir -p "$TEMP_DIR"
 
-                if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
+                if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
                     if [ -n "$VSCODE_SHA256" ]; then
                         if ! echo "$VSCODE_SHA256  $TEMP_ZIP" | shasum -a 256 -c >/dev/null 2>&1; then
                             print_warn "$(printf "$L_INTERNET_VSCODE_CHECKSUM_MISMATCH" "$TEMP_ZIP")"
@@ -2066,10 +2089,10 @@ iu_visual_studio_code() {
                                 print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Visual Studio Code" "$NEW_VER")"
                                 STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                             else
-                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
                                 if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                     STATUS_VSCODE="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_VSCODE:-?}")"
                                 else
+                                    print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
                                     STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
                                 fi
                             fi
@@ -2104,9 +2127,12 @@ iu_codeedit() {
 
         LATEST_CE_TAG=$(github_latest_tag "CodeEditApp/CodeEdit")
         LATEST_CE=$(echo "$LATEST_CE_TAG" | sed 's/^v//')
+        [ "$LATEST_CE" = "?" ] || github_lookup_record "CodeEdit" "$LATEST_CE"
         CE_RELATION="$(internet_version_relation "$LATEST_CE" "$VER")"
 
-        if [ "$LATEST_CE" = "?" ]; then
+        if [ "$LATEST_CE" = "?" ] && github_lookup_handled "CodeEdit" "$VER"; then
+            STATUS_CODEEDIT="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_CE" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             if silent_launch_app "CodeEdit"; then
                 STATUS_CODEEDIT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
@@ -2119,13 +2145,15 @@ iu_codeedit() {
         elif [ "$CE_RELATION" = "current" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "CodeEdit" "$VER (remote: $LATEST_CE)")"
             STATUS_CODEEDIT="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/CodeEdit.app" STATUS_CODEEDIT "$VER" "$LATEST_CE"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_CE" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "CodeEdit" "$LATEST_CE")"
             # TODO(H5): Publisher digest is unverified for CodeEdit download
             CE_URL="https://github.com/CodeEditApp/CodeEdit/releases/download/${LATEST_CE_TAG}/CodeEdit.dmg"
             TEMP_DMG="$(make_temp_dmg CodeEdit)"
-            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL"; then
                 CE_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$CE_MOUNT" ]; then
                     if [ -d "$CE_MOUNT/CodeEdit.app" ]; then
@@ -2138,10 +2166,10 @@ iu_codeedit() {
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "CodeEdit" "$NEW_VER")"
                             STATUS_CODEEDIT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "CodeEdit")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_CODEEDIT="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_CE:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "CodeEdit")"
                                 STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -2207,7 +2235,7 @@ EOF_DOCKER_ROW
         elif [ "$rel" = "older" ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$VER")"
             INTERNET_LAST_VERIFIED=0
-            print_warn "$STATUS_DOCKER"
+            print_warn "$(internet_status_body "$STATUS_DOCKER")"
             return 0
         elif [ "$rel" = "unknown" ]; then
             print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
@@ -2221,7 +2249,7 @@ EOF_DOCKER_ROW
         if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$VER" "$R")"
             INTERNET_LAST_VERIFIED=1
-            print_info "$STATUS_DOCKER"
+            print_info "$(internet_status_body "$STATUS_DOCKER")"
             return 0
         fi
 
@@ -2240,7 +2268,7 @@ EOF_DOCKER_ROW
         if [ "$docker_running" -eq 1 ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "$R")"
             INTERNET_LAST_VERIFIED=1
-            print_warn "$STATUS_DOCKER"
+            print_warn "$(internet_status_body "$STATUS_DOCKER")"
             return 0
         fi
 
@@ -2270,13 +2298,13 @@ EOF_DOCKER_ROW
             elif [ "$vrc" -eq 4 ]; then
                 STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${R:-?}")"
                 INTERNET_LAST_VERIFIED=0
-                print_warn "$STATUS_DOCKER"
+                print_warn "$(internet_status_body "$STATUS_DOCKER")"
                 return 0
             elif [ "$vrc" -eq 3 ]; then
                 STATUS_DOCKER="$L_INTERNET_STATUS_INSTALL_ERROR"
                 INTERNET_LAST_VERIFIED=0
                 INTERNET_HARD_FAIL=1
-                print_warn "$STATUS_DOCKER"
+                print_warn "$(internet_status_body "$STATUS_DOCKER")"
                 return 1
             fi
             internet_diag_log "Docker Desktop: vendor direct install rc=$vrc — falling back to docker desktop update"
@@ -2347,7 +2375,7 @@ EOF_DOCKER_ROW
 
         STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$new_ver" "$R")"
         INTERNET_LAST_VERIFIED=1
-        print_warn "$STATUS_DOCKER"
+        print_warn "$(internet_status_body "$STATUS_DOCKER")"
         return 0
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Docker Desktop")"
@@ -2378,6 +2406,18 @@ iu_hyperframes() {
 
 iu_superset() {
     internet_dispatch_silent_launch "🧩 Superset" "Superset" "STATUS_SUPERSET" "Superset" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Superset")"
+}
+
+# DeepSeek Harness (Electron + Squirrel, own electron-updater feed) and Grok Bot
+# (Cursor "sand" product, Squirrel.Mac JSON feed): verify-only vendor feeds
+# (config/vendor_feeds.txt); only a behind app is launched so its own updater
+# installs. A launch alone never counts as verified (critical_rules.md 6b).
+iu_deepseek_harness() {
+    internet_dispatch_silent_launch "🐋 DeepSeek Harness" "DeepSeek Harness" "STATUS_DEEPSEEK" "DeepSeek Harness" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "DeepSeek Harness")"
+}
+
+iu_grok_bot() {
+    internet_dispatch_silent_launch "🤖 Grok Bot" "Grok Bot" "STATUS_GROKBOT" "Grok Bot" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Grok Bot")"
 }
 
 iu_appcleaner() {
@@ -2412,7 +2452,7 @@ iu_ledger() {
         VER=$(app_version "$LEDGER_APP")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_APP" "$LEDGER_NAME" "$VER")"
 
-        LEDGER_YML=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
+        LEDGER_YML=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
         LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
         # electron-builder's latest-mac.yml lists the .zip first and repeats
         # that entry's digest as the top-level `sha512:`. Taking the first
@@ -2442,6 +2482,8 @@ for url, digest in entries:
         elif [ "$LEDGER_RELATION" = "current" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "$LEDGER_NAME" "$VER (remote: $LATEST_LEDGER)")"
             STATUS_LEDGER="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "$LEDGER_APP" STATUS_LEDGER "$VER" "$LATEST_LEDGER"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_LEDGER" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "$LEDGER_NAME" "$LATEST_LEDGER")"
@@ -2456,7 +2498,7 @@ for url, digest in entries:
             fi
             LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
-            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL"; then
                 if [ -n "$LEDGER_SHA512" ]; then
                     ACTUAL_SHA512=$(shasum -a 512 "$TEMP_DMG" | awk '{print $1}')
                     if ! python3 -c "
@@ -2497,10 +2539,10 @@ sys.exit(0 if exp_hex and exp_hex == act else 1)
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "$LEDGER_NAME" "$NEW_VER")"
                             STATUS_LEDGER="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$SRC_APP")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_LEDGER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_LEDGER:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$SRC_APP")"
                                 STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -2536,13 +2578,12 @@ iu_trezor_suite() {
         # Monorepo: trezor-suite publishes both suite (desktop) and connect (library)
         # releases. /releases/latest may return a connect release. Filter to desktop-only
         # tags matching v?NN.N.N (no slashes, no connect prefix).
-        LATEST_TS_TAG=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 \
-            -H "User-Agent: macos-updates-toolkit" \
-            ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} \
-            "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" 2>/dev/null \
-            | python3 -c 'import json,sys,re
+        LATEST_TS_TAG="?"
+        TS_BODY="$(mktemp "${TMPDIR:-/tmp}/ghapi.XXXXXX")" || TS_BODY=""
+        if [ -n "$TS_BODY" ] && github_api_fetch "trezor/trezor-suite" "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" "$TS_BODY"; then
+            LATEST_TS_TAG=$(python3 -c 'import json,sys,re
 try:
-    releases=json.load(sys.stdin)
+    releases=json.load(open(sys.argv[1]))
     for r in releases:
         tag=r.get("tag_name","")
         if not r.get("prerelease") and re.match(r"^v?\d{2}\.\d+\.\d+$", tag):
@@ -2550,11 +2591,16 @@ try:
     else:
         print("?")
 except Exception:
-    print("?")' 2>/dev/null)
+    print("?")' "$TS_BODY" 2>/dev/null)
+        fi
+        [ -n "$TS_BODY" ] && rm -f "$TS_BODY"
         LATEST_TS=$(echo "$LATEST_TS_TAG" | sed 's/^v//')
+        [ "$LATEST_TS" = "?" ] || github_lookup_record "Trezor Suite" "$LATEST_TS"
         TS_RELATION="$(internet_version_relation "$LATEST_TS" "$VER")"
 
-        if [ "$LATEST_TS" = "?" ]; then
+        if [ "$LATEST_TS" = "?" ] && github_lookup_handled "Trezor Suite" "$VER"; then
+            STATUS_TREZOR="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_TS" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             STATUS_TREZOR="$L_INTERNET_STATUS_OFFLINE"
         elif [ "$TS_RELATION" = "unknown" ]; then
@@ -2563,13 +2609,15 @@ except Exception:
         elif [ "$TS_RELATION" = "current" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Trezor Suite" "$VER (remote: $LATEST_TS)")"
             STATUS_TREZOR="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/Trezor Suite.app" STATUS_TREZOR "$VER" "$LATEST_TS"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_TS" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_ARM" "Trezor Suite" "$LATEST_TS")"
             # TODO(H5): Publisher digest is unverified for Trezor Suite download
             TS_URL="https://github.com/trezor/trezor-suite/releases/download/${LATEST_TS_TAG}/Trezor-Suite-${LATEST_TS}-mac-arm64.dmg"
             TEMP_DMG="$(make_temp_dmg TrezorSuite)"
-            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL"; then
                 TS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$TS_MOUNT" ]; then
                     if [ -d "$TS_MOUNT/Trezor Suite.app" ]; then
@@ -2582,10 +2630,10 @@ except Exception:
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Trezor Suite" "$NEW_VER")"
                             STATUS_TREZOR="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Trezor Suite.app")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_TREZOR="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_TS:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Trezor Suite.app")"
                                 STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -2650,40 +2698,5 @@ iu_ipmiview() {
         STATUS_IPMIVIEW="$L_INTERNET_STATUS_MANUAL_UPDATE"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "IPMIView")"
-    fi
-
-    # ── 35. DJI ASSISTANT (manual) ───────────────────────────────
-}
-
-iu_dji_assistant() {
-    DJI_PATH="$(internet_app_path "DJI Assistant 2")"
-    [ -d "$DJI_PATH" ] || return 0
-    print_header "🚁 DJI Assistant 2"
-    if [ -d "$DJI_PATH" ]; then
-        VER=$(app_version "$DJI_PATH")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        ARCH="$(mac_update_app_architecture "$DJI_PATH")"
-        if [ "$ARCH" = "x86_64-only" ]; then
-            if mac_update_rosetta_installed; then
-                STATUS_DJI="$L_INTERNET_ROSETTA_REQUIRED; $L_INTERNET_ROSETTA_EOL"
-            else
-                STATUS_DJI="$L_INTERNET_ROSETTA_REQUIRED $L_INTERNET_ROSETTA_NOT_INSTALLED; $L_INTERNET_ROSETTA_EOL"
-                if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-                    echo "DJI Assistant 2" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
-                fi
-            fi
-            print_warn "$STATUS_DJI"
-        else
-            # A vendor that ships no auto-updater is a permanent fact about that vendor, not
-            # a fault in this run. Reported as information for the same reason Antigravity's
-            # 404 feed was demoted on 2026-08-26: a warning the operator can never clear
-            # trains them to ignore warnings that matter. The manual-update line below still
-            # tells them exactly what to do.
-            print_info "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "DJI Assistant 2")"
-            print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://www.dji.com/downloads/djiapp/dji-assistant-2-consumer-drones-series")"
-            STATUS_DJI="$L_INTERNET_STATUS_MANUAL_UPDATE"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "DJI Assistant 2")"
     fi
 }

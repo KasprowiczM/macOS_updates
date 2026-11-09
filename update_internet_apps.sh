@@ -269,7 +269,7 @@ copy_verified_app() {
     # This common transaction never closes an application from the user's session.
     if ! replacement_app_is_idle "$dest"; then
         INTERNET_COPY_DEFERRED=1
-        print_warn "Application is running or its state is unknown; replacement deferred: $app_label"
+        print_warn "$(internet_msg "$L_INTERNET_COPY_DEFERRED_RUNNING_FMT" "$app_label")"
         return 2
     fi
 
@@ -310,7 +310,7 @@ copy_verified_app() {
     if ! replacement_app_is_idle "$dest"; then
         INTERNET_COPY_DEFERRED=1
         rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        print_warn "Application became active; replacement deferred: $app_label"
+        print_warn "$(internet_msg "$L_INTERNET_COPY_DEFERRED_ACTIVE_FMT" "$app_label")"
         return 2
     fi
 
@@ -521,8 +521,9 @@ STATUS_OPENCODE="$L_INTERNET_STATUS_SKIPPED"
 STATUS_OPENDESIGN="$L_INTERNET_STATUS_SKIPPED"
 STATUS_HYPERFRAMES="$L_INTERNET_STATUS_SKIPPED"
 STATUS_SUPERSET="$L_INTERNET_STATUS_SKIPPED"
+STATUS_DEEPSEEK="$L_INTERNET_STATUS_SKIPPED"
+STATUS_GROKBOT="$L_INTERNET_STATUS_SKIPPED"
 STATUS_INKSCAPE="$L_INTERNET_STATUS_MANAGED_BREW"
-STATUS_DJI="$L_INTERNET_STATUS_SKIPPED"
 STATUS_UNIFI="$L_INTERNET_STATUS_MANAGED_APPSTORE"
 STATUS_WIFIMAN="$L_INTERNET_STATUS_MANAGED_APPSTORE"
 STATUS_PICSART="$L_INTERNET_STATUS_MANAGED_APPSTORE"
@@ -532,63 +533,13 @@ STATUS_PICSART="$L_INTERNET_STATUS_MANAGED_APPSTORE"
 # ============================================================
 . "$SCRIPT_DIR/lib/internet_app_updates.sh"
 
-# Check for Intel-only (x86_64-only) applications and Rosetta availability
-if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-    rm -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
-fi
-
-HAS_X86_64=0
-while IFS='|' read -r _app_name _method _status_var _rest; do
-    case "$_app_name" in '#'*|'') continue ;; esac
-    _app_path="$(internet_app_path "$_app_name")"
-    if [ -d "$_app_path" ]; then
-        _arch="$(mac_update_app_architecture "$_app_path")"
-        if [ "$_arch" = "x86_64-only" ]; then
-            HAS_X86_64=1
-            break
-        fi
-    fi
-done < "$SCRIPT_DIR/config/internet_app_methods.txt"
-
-if [ "$HAS_X86_64" -eq 1 ]; then
-    if ! mac_update_rosetta_installed; then
-        if [ "${MAC_UPDATE_INSTALL_ROSETTA:-0}" = "1" ]; then
-            print_step "Installing Rosetta via softwareupdate..."
-            softwareupdate --install-rosetta --agree-to-license
-            if mac_update_rosetta_installed; then
-                print_ok "Rosetta installed successfully"
-            else
-                print_warn "Rosetta installation could not be verified"
-            fi
-        fi
-    fi
-fi
+# Intel-only (x86_64-only) apps and Rosetta: generic registry-driven helpers in lib/internet_apps.sh
+internet_rosetta_preflight "$SCRIPT_DIR/config/internet_app_methods.txt"
 
 internet_dispatch_run_all
 
-# Ensure all x86_64-only apps reflect Rosetta requirement in their final status
-while IFS='|' read -r _app_name _method _status_var _rest; do
-    case "$_app_name" in '#'*|'') continue ;; esac
-    _status_var="$(echo "$_status_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    _app_path="$(internet_app_path "$_app_name")"
-    if [ -d "$_app_path" ]; then
-        _arch="$(mac_update_app_architecture "$_app_path")"
-        if [ "$_arch" = "x86_64-only" ]; then
-            if mac_update_rosetta_installed; then
-                eval "$_status_var=\"\$L_INTERNET_ROSETTA_REQUIRED; \$L_INTERNET_ROSETTA_EOL\""
-            else
-                eval "$_status_var=\"\$L_INTERNET_ROSETTA_REQUIRED \$L_INTERNET_ROSETTA_NOT_INSTALLED; \$L_INTERNET_ROSETTA_EOL\""
-                if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-                    echo "$_app_name" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
-                fi
-            fi
-        fi
-    fi
-done < "$SCRIPT_DIR/config/internet_app_methods.txt"
-
-if [ -n "$MAC_UPDATE_SESSION_DIR" ] && [ -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" ]; then
-    sort -u "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" -o "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
-fi
+# Every x86_64-only app reflects the Rosetta requirement in its final status
+internet_rosetta_finalize "$SCRIPT_DIR/config/internet_app_methods.txt"
 
 # ── Snapshot PO aktualizacji ──────────────────────────────────
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
@@ -692,6 +643,7 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
                     break
                 fi
             done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+            _h_method="$(internet_effective_method "$_h_app" "$_h_method")"
             printf "%s\t%s\t%s\t%s\n" "$TS" "$_h_app" "$_h_ver" "$_h_method" >> "$HISTORY_FILE"
         done < "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
         internet_rotate_version_history
@@ -709,7 +661,7 @@ while IFS='|' read -r _s_app _s_meth _s_var; do
         eval "_s_cur=\"\${$_s_var}\""
         _s_code="$(internet_status_code "$_s_cur")"
         case "$_s_code" in
-            current_verified|current_vendor|updated|behind|needs_restart|feed_stale|update_available|rollout_hold)
+            current_verified|current_vendor|updated|behind|needs_restart|feed_stale|update_available|rollout_hold|current_cached|current_feed_regressed|feed_unreachable)
                 continue
                 ;;
         esac
@@ -870,12 +822,24 @@ while IFS='|' read -r _c_app _c_meth _c_var; do
         behind|needs_restart)
             _cnt_behind=$((_cnt_behind + 1))
             ;;
-        unverified)
+        unverified|feed_unreachable)
             _cnt_unverified=$((_cnt_unverified + 1))
             ;;
+        # current_cached / current_feed_regressed are informational "current"
+        # results without a live comparison this run: neither verified (rule 6b)
+        # nor a warning, so they join no counter.
     esac
     case "$_code" in
         behind|needs_restart)
+            _soft_fail_from_codes=1
+            ;;
+        feed_unreachable)
+            # The vendor feed failed and the app's updater ran without proof.
+            _soft_fail_from_codes=1
+            ;;
+        error_soft)
+            # Includes the GitHub rate-limit status (a parameterised message that
+            # the exact-match scan below cannot recognise).
             _soft_fail_from_codes=1
             ;;
         feed_stale)
@@ -938,6 +902,8 @@ internet_summary_row "LM Studio:"                "$STATUS_LMSTUDIO"      "LM Stu
 internet_summary_row "OpenCode Desktop:"         "$STATUS_OPENCODE"      "OpenCode"
 internet_summary_row "Open Design:"              "$STATUS_OPENDESIGN"    "Open Design"
 internet_summary_row "HyperFrames:"              "$STATUS_HYPERFRAMES"   "HyperFrames"
+internet_summary_row "DeepSeek Harness:"         "$STATUS_DEEPSEEK"      "DeepSeek Harness"
+internet_summary_row "Grok Bot:"                 "$STATUS_GROKBOT"       "Grok Bot"
 
 internet_summary_section "$L_INTERNET_SECTION_VPN"
 internet_summary_row "ProtonVPN:"                "$STATUS_PROTONVPN"     "ProtonVPN"
@@ -981,7 +947,6 @@ internet_summary_row "Trezor Suite:"             "$STATUS_TREZOR"        "Trezor
 internet_summary_section "$L_INTERNET_SECTION_NETWORK"
 internet_summary_row "Remote Desktop Manager:"   "$STATUS_RDMANAGER"     "Remote Desktop Manager"
 internet_summary_row "IPMIView:"                 "$STATUS_IPMIVIEW"      "IPMIView"
-internet_summary_row "DJI Assistant 2:"          "$STATUS_DJI"           "DJI Assistant 2"
 
 internet_summary_section "IoT / iPad on Apple Silicon"
 internet_summary_row "UniFi:"                    "$STATUS_UNIFI"         "UniFi"
@@ -997,14 +962,14 @@ for status in \
     "$STATUS_CHROME" "$STATUS_FIREFOX" "$STATUS_BRAVE" \
     "$STATUS_CHATGPT" "$STATUS_CLAUDE_APP" "$STATUS_GEMINI" "$STATUS_COMET" "$STATUS_PERPLEXITY" \
     "$STATUS_ANTIGRAVITY" "$STATUS_ANTIGRAVITY_IDE" "$STATUS_LMSTUDIO" "$STATUS_OPENCODE" \
-    "$STATUS_OPENDESIGN" "$STATUS_HYPERFRAMES" "$STATUS_SUPERSET" \
+    "$STATUS_OPENDESIGN" "$STATUS_HYPERFRAMES" "$STATUS_SUPERSET" "$STATUS_DEEPSEEK" "$STATUS_GROKBOT" \
     "$STATUS_PROTONVPN" "$STATUS_KEEPASSXC" "$STATUS_PROTONMAIL" "$STATUS_ZOOM" \
     "$STATUS_GOOGLEDRIVE" "$STATUS_MEGASYNC" "$STATUS_PROTONDRIVE" "$STATUS_MICROSOFT" "$STATUS_TEAMS" \
     "$STATUS_VSCODE" "$STATUS_CODEEDIT" "$STATUS_DOCKER" "$STATUS_WARP" "$STATUS_CURSOR" \
     "$STATUS_APPCLEANER" "$STATUS_OBSIDIAN" "$STATUS_SPOTIFY" "$STATUS_CAPCUT" \
     "$STATUS_LEDGER" "$STATUS_TREZOR" \
     "$STATUS_RDMANAGER" "$STATUS_IPMIVIEW" "$STATUS_INKSCAPE" \
-    "$STATUS_DJI" "$STATUS_UNIFI" "$STATUS_WIFIMAN" "$STATUS_PICSART"
+    "$STATUS_UNIFI" "$STATUS_WIFIMAN" "$STATUS_PICSART"
 do
     # Flag a failure only when the status equals an explicit error-status
     # constant — do not scan for the ⚠️ glyph, which would silently break if a
@@ -1035,6 +1000,8 @@ do
         "$L_INTERNET_STATUS_MAU_OPENED"|\
         "$L_INTERNET_STATUS_UNKNOWN_VERSION"|\
         "$L_INTERNET_STATUS_CASK_MISSING"|\
+        "$L_INTERNET_STATUS_FEED_UNREACHABLE"|\
+        "$L_INTERNET_STATUS_FEED_UNREADABLE"|\
         "$L_INTERNET_STATUS_LAUNCH_FAILED")
             INTERNET_SOFT_FAIL=1
             ;;

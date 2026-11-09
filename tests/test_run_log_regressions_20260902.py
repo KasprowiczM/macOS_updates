@@ -317,7 +317,7 @@ class VendorFactNotWarningTests(unittest.TestCase):
     """A permanent vendor fact must not be reported as a clearable warning."""
 
     def test_no_auto_updater_is_information(self) -> None:
-        """IPMIView and DJI Assistant 2 ship no updater; that never changes.
+        """IPMIView ships no updater; that never changes.
 
         Reported as a warning, they degraded the internet step on every run for
         months — the same shape as Antigravity's 404 feed, demoted on 2026-08-26.

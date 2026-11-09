@@ -496,7 +496,7 @@ write_cli_snapshot() {
 
 detect_latest_node_version() {
     local json_body ver
-    json_body="$(curl -fsSL --max-time 60 --retry 3 --retry-delay 2 https://nodejs.org/dist/index.json 2>/dev/null)"
+    json_body="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 60 --retry 3 --retry-delay 2 https://nodejs.org/dist/index.json 2>/dev/null)"
     if [ -n "$json_body" ]; then
         # Newest *stable* release: the index can lead with an alpha/rc build.
         ver="$(echo "$json_body" | PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c 'import json,sys
@@ -545,12 +545,12 @@ install_node_tarball() {
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/mac_update_node.XXXXXX")" || return 1
 
     print_info "$L_NPM_NODE_BOOTSTRAPPING"
-    if ! curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$tmpdir/$archive_name" "$archive_url"; then
+    if ! curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$tmpdir/$archive_name" "$archive_url"; then
         rm -rf "$tmpdir"
         return 1
     fi
 
-    if ! curl -fsSL --max-time 60 --retry 3 --retry-delay 2 -o "$tmpdir/SHASUMS256.txt" "$shasums_url"; then
+    if ! curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 60 --retry 3 --retry-delay 2 -o "$tmpdir/SHASUMS256.txt" "$shasums_url"; then
         rm -rf "$tmpdir"
         return 1
     fi
@@ -731,12 +731,12 @@ install_bun_tarball() {
     tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/mac_update_bun.XXXXXX")" || return 1
 
     print_info "$(printf "$L_NPM_BUN_INSTALLING" "${bun_version}")"
-    if ! curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$tmpdir/$archive_name" "$archive_url"; then
+    if ! curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$tmpdir/$archive_name" "$archive_url"; then
         rm -rf "$tmpdir"
         SOFT_FAIL=1
         return 1
     fi
-    if ! curl -fsSL --max-time 60 --retry 3 --retry-delay 2 -o "$tmpdir/SHASUMS256.txt" "$shasums_url"; then
+    if ! curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 60 --retry 3 --retry-delay 2 -o "$tmpdir/SHASUMS256.txt" "$shasums_url"; then
         rm -rf "$tmpdir"
         SOFT_FAIL=1
         return 1

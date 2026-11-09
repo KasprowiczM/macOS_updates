@@ -30,6 +30,21 @@ where self-updating apps report `LAUNCHED_UNVERIFIED` is the normal healthy outc
 must not look like a failure to cron, CI, or `dev_sync`. Use `MAC_UPDATE_DEGRADED` or the
 `degraded` field of `--json-summary` to detect warnings programmatically.
 
+## Doctor, pre-flight and prompt timeouts (2026-11-09)
+
+| Situation | Exit | Notes |
+|-----------|------|-------|
+| `update_all.sh --doctor`, all checks ok | `0` | Read-only: no sudo prompt, no run log, no summary |
+| `--doctor`, warnings only | `10` | Low disk, battery, missing optional tool, plist without `PATH`, ... |
+| `--doctor`, hard problem | `1` | For example unsupported platform or no network |
+| Pre-flight: low free disk (`MAC_UPDATE_MIN_FREE_GB`) | run continues, degraded | Reported as a warning |
+| Pre-flight: on battery below `MAC_UPDATE_MIN_BATTERY` | macOS step recorded as `skipped` (never started), run marked degraded, `update_all.sh` still exits `0` | Other steps run |
+| Pre-flight: no reachable host (`MAC_UPDATE_PREFLIGHT_HOSTS`) | `1` before any step | Dry runs and inventory-only runs skip pre-flight |
+| Prompt times out (`MAC_UPDATE_PROMPT_TIMEOUT`) | `10` where the step declines | Safe answer is "no"; the macOS step lands in its existing declined branch |
+| Cask deferred because its app is open | `10` | Homebrew step; session file `brew_deferred_running.txt` |
+| `feed_unreachable` | `10` | Internet step; `current_cached` and `current_feed_regressed` are informational |
+
+
 ## Stale vendor feeds (v1.5.4)
 
 v1.5.4 changes report presentation only: a stale vendor feed remains degraded (`10` at the leaf, `0` plus `degraded=true` at the master). Manufacturer warnings are separate from pending installations and unconfirmed operations. A warning does not imply that an updater was launched.

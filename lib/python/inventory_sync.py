@@ -781,6 +781,16 @@ def detect_cli_versions(
     return detected
 
 
+def _app_dirs(home: str) -> List[str]:
+    """Application directories: MAC_UPDATE_APP_DIRS (tests, hermetic runs) or the defaults."""
+    override = os.environ.get("MAC_UPDATE_APP_DIRS", "").strip()
+    if override:
+        dirs = [d for d in override.split(":") if d]
+        if dirs:
+            return dirs
+    return ["/Applications", os.path.join(home, "Applications")]
+
+
 def gather_facts(
     script_dir: str,
     home: str,
@@ -868,7 +878,7 @@ def gather_facts(
         res = run(["brew", "list", "--cask"], capture_output=True, text=True, timeout=60)
         if res.returncode == 0:
             all_casks = [l.strip() for l in res.stdout.splitlines() if l.strip()]
-            app_dirs = ["/Applications", os.path.join(home, "Applications")]
+            app_dirs = _app_dirs(home)
             # Check orphan casks
             info_res = run(["brew", "info", "--json=v2", "--cask"] + all_casks, capture_output=True, text=True, timeout=90)
             orphans: List[str] = []
@@ -890,7 +900,7 @@ def gather_facts(
 
     # 5. iPad apps from /Applications and ~/Applications
     ipad_apps: List[Tuple[str, str, str, str]] = []
-    app_dirs = ["/Applications", os.path.join(home, "Applications")]
+    app_dirs = _app_dirs(home)
     installed_names: Set[str] = set()
 
     for ad in app_dirs:

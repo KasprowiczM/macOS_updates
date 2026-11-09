@@ -75,6 +75,46 @@ class AgentsRuleTenTests(unittest.TestCase):
         self.assertIn("mau_quarantine_expired_ids", text)
 
 
+def _write_runs(tmp: str, runs: list) -> None:
+    for i, (steps, flags) in enumerate(runs):
+        (Path(tmp) / f"run_summary_20260801_{i:06d}.json").write_text(
+            json.dumps({"timestamp": f"2026-08-01T00:00:{i:02d}+00:00", "steps": steps, "flags": flags}),
+            encoding="utf-8",
+        )
+
+
+class ChronicStreakNeutralityTests(unittest.TestCase):
+    WARN = {"internet": {"code": "warn"}}
+
+    def _find(self, tmp: str, window: int = 10):
+        sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
+        from chronic_warnings import find_chronic_streaks
+
+        return find_chronic_streaks(tmp, window=window, threshold=3)
+
+    def test_skipped_is_neutral(self) -> None:
+        skipped = {"internet": {"code": "skipped"}}
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_runs(tmp, [({"internet": {"code": "ok"}}, {}), (self.WARN, {}), (skipped, {}),
+                              (self.WARN, {}), (skipped, {}), (self.WARN, {})])
+            hits = self._find(tmp)
+            self.assertEqual([(h["step"], h["streak"]) for h in hits], [("internet", 3)])
+
+    def test_dry_run_and_inventory_only_excluded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = [(self.WARN, {})] * 4
+            runs += [(self.WARN, {"dry_run": True})] * 3 + [(self.WARN, {"inventory_only": True})] * 3
+            _write_runs(tmp, runs)
+            self.assertEqual(self._find(tmp)[0]["streak"], 4)
+
+    def test_window_filled_with_eligible_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = [(self.WARN, {})] * 4 + [(self.WARN, {"dry_run": True})] * 8
+            _write_runs(tmp, runs)
+            # window 4 must still see the 4 real runs despite 8 newer dry-runs
+            self.assertEqual(self._find(tmp, window=4)[0]["streak"], 4)
+
+
 class ChronicWarningsTests(unittest.TestCase):
     def test_trailing_internet_streak(self) -> None:
         sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
