@@ -44,6 +44,7 @@ METHOD_LABELS = {
     "en": {
         "keystone": "Google Keystone",
         "github_dmg": "verified direct download",
+        "mozilla_dmg": "Mozilla product-details + verified DMG",
         "silent_launch": "built-in updater triggered (unverified)",
         "msupdate": "Microsoft AutoUpdate",
         "mau_fallback_self_update": "Teams self-updater + observed MAU fallback",
@@ -59,6 +60,7 @@ METHOD_LABELS = {
     "pl": {
         "keystone": "Google Keystone",
         "github_dmg": "zweryfikowane pobranie bezpośrednie",
+        "mozilla_dmg": "Mozilla product-details + zweryfikowany DMG",
         "silent_launch": "uruchomiony updater (bez weryfikacji)",
         "msupdate": "Microsoft AutoUpdate",
         "mau_fallback_self_update": "updater Teams + obserwowany fallback MAU",
@@ -74,6 +76,7 @@ METHOD_LABELS = {
     "de": {
         "keystone": "Google Keystone",
         "github_dmg": "verifizierter Direktdownload",
+        "mozilla_dmg": "Mozilla product-details + verifiziertes DMG",
         "silent_launch": "Updater gestartet (nicht verifiziert)",
         "msupdate": "Microsoft AutoUpdate",
         "mau_fallback_self_update": "Teams-Updater + beobachteter MAU-Fallback",
@@ -89,6 +92,7 @@ METHOD_LABELS = {
     "fr": {
         "keystone": "Google Keystone",
         "github_dmg": "téléchargement direct vérifié",
+        "mozilla_dmg": "Mozilla product-details + DMG vérifié",
         "silent_launch": "mise à jour déclenchée (non vérifiée)",
         "msupdate": "Microsoft AutoUpdate",
         "mau_fallback_self_update": "updater Teams + repli MAU observé",
@@ -104,6 +108,7 @@ METHOD_LABELS = {
     "es": {
         "keystone": "Google Keystone",
         "github_dmg": "descarga directa verificada",
+        "mozilla_dmg": "Mozilla product-details + DMG verificado",
         "silent_launch": "actualizador iniciado (sin verificar)",
         "msupdate": "Microsoft AutoUpdate",
         "mau_fallback_self_update": "actualizador de Teams + fallback MAU observado",
@@ -119,6 +124,7 @@ METHOD_LABELS = {
     "it": {
         "keystone": "Google Keystone",
         "github_dmg": "download diretto verificato",
+        "mozilla_dmg": "Mozilla product-details + DMG verificato",
         "silent_launch": "updater avviato (non verificato)",
         "msupdate": "Microsoft AutoUpdate",
         "mau_fallback_self_update": "updater Teams + fallback MAU osservato",
@@ -134,6 +140,7 @@ METHOD_LABELS = {
     "pt": {
         "keystone": "Google Keystone",
         "github_dmg": "download direto verificado",
+        "mozilla_dmg": "Mozilla product-details + DMG verificado",
         "silent_launch": "atualizador iniciado (não verificado)",
         "msupdate": "Microsoft AutoUpdate",
         "mau_fallback_self_update": "atualizador do Teams + fallback MAU observado",
@@ -152,6 +159,7 @@ METHOD_AI_HINT = {
     "en": {
         "keystone": "Add a keystone registry row and handler.",
         "github_dmg": "Add a signed, verified direct-download handler.",
+        "mozilla_dmg": "Use Mozilla product-details and a verified DMG.",
         "silent_launch": "Add a bundle-aware silent-launch handler.",
         "msupdate": "Add the Microsoft product ID to the shared handler.",
         "mau_fallback_self_update": "Use the Teams self-updater and observe a verified TEAMS21 MAU fallback when offered.",
@@ -166,6 +174,7 @@ METHOD_AI_HINT = {
     "pl": {
         "keystone": "Dodaj wpis keystone i handler.",
         "github_dmg": "Dodaj handler bezpośredniego pobrania z weryfikacją podpisu.",
+        "mozilla_dmg": "Użyj Mozilla product-details i zweryfikowanego DMG.",
         "silent_launch": "Dodaj handler cichego uruchomienia rozpoznający bundle.",
         "msupdate": "Dodaj identyfikator produktu do wspólnego handlera Microsoft.",
         "mau_fallback_self_update": "Użyj updatera Teams i obserwuj zweryfikowany fallback MAU TEAMS21, gdy zostanie zaoferowany.",
@@ -263,7 +272,7 @@ CLASS_TEXT = {
 # must (a) be used by at least one row of config/internet_app_methods.txt and
 # (b) be backed by a handler that performs a real remote check. Guarded by
 # tests/test_safety_static.py::test_direct_methods_are_used_and_verify.
-DIRECT_METHODS = {"keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast", "chromium_updater"}
+DIRECT_METHODS = {"keystone", "github_dmg", "mozilla_dmg", "msupdate", "docker_cli", "sparkle_appcast", "chromium_updater"}
 TRIGGER_METHODS = {"silent_launch", "mau_fallback_self_update"}
 EXTERNAL_METHODS = {"brew_cask", "appstore_gui", "app_store_ios"}
 

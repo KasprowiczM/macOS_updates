@@ -307,7 +307,7 @@ fi
 echo "STATUS_TEAMS=$STATUS_TEAMS"
 """
             res = subprocess.run(["bash", "-c", test_script], capture_output=True, text=True, check=True)
-            self.assertIn("STATUS_TEAMS=✅ aktualna (cask)", res.stdout)
+            self.assertIn("STATUS_TEAMS=✅ Aktualna (cask)", res.stdout)
             verified_content = (session_dir / "internet_verified_apps.txt").read_text(encoding="utf-8")
             self.assertIn("Microsoft Teams|24.100.0", verified_content)
 
