@@ -31,6 +31,8 @@ Schritt 6 läuft zuletzt, da er den Mac neu starten kann. Blockierende Fehler ve
 
 Vorschau ohne Änderungen: `bash update_all.sh --dry-run -y`
 
+Bereitschaftsprüfung ohne Ausführung: `bash update_all.sh --doctor` (nur lesend; Exit 0 ok, 10 Warnungen, 1 Problem). Rückfragen während des Laufs laufen nach `MAC_UPDATE_PROMPT_TIMEOUT` Sekunden (Standard 120) mit „nein” ab, und ein Homebrew-Cask, dessen App geöffnet ist, wird zurückgestellt statt aktualisiert.
+
 ## Fehleranalyse
 
 | Fehlgeschlagener Schritt | Diese Dateien prüfen |

@@ -31,6 +31,8 @@ Il passo 6 viene eseguito per ultimo perché può riavviare il Mac. Gli errori b
 
 Anteprima senza modifiche: `bash update_all.sh --dry-run -y`
 
+Verifica di prontezza senza eseguire nulla: `bash update_all.sh --doctor` (sola lettura; codice 0 ok, 10 avvisi, 1 problema). Le domande durante l'esecuzione scadono dopo `MAC_UPDATE_PROMPT_TIMEOUT` secondi (predefinito 120) con "no", e un cask Homebrew la cui app è aperta viene rinviato, non aggiornato.
+
 ## Analisi degli errori
 
 | Passo fallito | File da controllare |
