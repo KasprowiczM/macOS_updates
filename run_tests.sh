@@ -113,6 +113,9 @@ say "3/4  python3 -m unittest discover tests"
 GUARD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mac_update_testguard.XXXXXX")" || exit 1
 GUARD_LOG="$GUARD_DIR/blocked.log"
 : > "$GUARD_LOG"
+# Persistent vendor feed state (lib/python/feed_state.py) must never be read
+# from or written to the real ~/.local/state during tests.
+export MAC_UPDATE_FEED_STATE_FILE="$GUARD_DIR/feed_state.json"
 for tool in softwareupdate mas brew msupdate installer sudo launchctl docker killall; do
     cat > "$GUARD_DIR/$tool" <<GUARD_EOF
 #!/bin/sh

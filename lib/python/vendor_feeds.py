@@ -673,24 +673,28 @@ def omaha_recent_status(
 _WIN_EPOCH_OFFSET_S = 11644473600
 
 
-def omaha_history_status(
+def omaha_history_explain(
     history_text: str,
     appid: str,
     installed_versions: list[str],
     max_age_h: float = 6.0,
     now: float | None = None,
-) -> tuple[str, str, str] | None:
-    """Latest Omaha outcome for appid from a Chromium updater's updater_history.jsonl.
+) -> dict:
+    """Decide whether updater_history.jsonl proves appid current, and say why not.
 
     UPDATE START events carry the appId, UPDATE END events carry the outcome
     (last updateStates entry) and nextVersion; both share processToken+eventId.
     The process START event carries the timestamp (Windows-epoch microseconds).
-    Returns ("noupdate"|"updated", "HH:MM" local, version) only when the latest
-    event is within max_age_h AND its version equals one of installed_versions
-    (a NO_UPDATE for a different build proves nothing). Otherwise None.
+
+    Returns a dict with "proof" (("noupdate"|"updated", "HH:MM", version) or None)
+    and "reason": "ok", "no_history", "no_event_for_app", "too_old", "future_timestamp",
+    "outcome_not_proof" or "version_mismatch". When an event exists it also carries
+    "state", "version" and "age_h", so a refused proof can be logged precisely.
+    A NO_UPDATE recorded for a different build is never proof.
     """
+    out: dict = {"proof": None, "reason": "no_history"}
     if not history_text or not appid:
-        return None
+        return out
     if now is None:
         now = datetime.datetime.now().timestamp()
 
@@ -732,20 +736,47 @@ def omaha_history_status(
             best = (ts, str(final), str(ev.get("nextVersion", "")))
 
     if best is None:
-        return None
+        out["reason"] = "no_event_for_app"
+        return out
     ts, final, version = best
     unix_ts = ts / 1_000_000 - _WIN_EPOCH_OFFSET_S
     age_h = (now - unix_ts) / 3600.0
-    if age_h < 0 or age_h > max_age_h:
-        return None
+    out.update({"state": final, "version": version, "age_h": round(age_h, 2)})
+    if age_h < 0:
+        out["reason"] = "future_timestamp"
+        return out
+    if age_h > max_age_h:
+        out["reason"] = "too_old"
+        return out
     status = {"NO_UPDATE": "noupdate", "UPDATED": "updated"}.get(final)
     if status is None:
-        return None
+        out["reason"] = "outcome_not_proof"
+        return out
     vkey = version_key(version)
     if vkey is None or not any(version_key(v) == vkey for v in installed_versions if v):
-        return None
+        out["reason"] = "version_mismatch"
+        return out
     hhmm = datetime.datetime.fromtimestamp(unix_ts).strftime("%H:%M")
-    return (status, hhmm, version)
+    out["proof"] = (status, hhmm, version)
+    out["reason"] = "ok"
+    return out
+
+
+def omaha_history_status(
+    history_text: str,
+    appid: str,
+    installed_versions: list[str],
+    max_age_h: float = 6.0,
+    now: float | None = None,
+) -> tuple[str, str, str] | None:
+    """Latest Omaha outcome for appid from a Chromium updater's updater_history.jsonl.
+
+    Returns ("noupdate"|"updated", "HH:MM" local, version) only when the latest
+    event is within max_age_h AND its version equals one of installed_versions
+    (a NO_UPDATE for a different build proves nothing). Otherwise None.
+    See omaha_history_explain for the refusal reason.
+    """
+    return omaha_history_explain(history_text, appid, installed_versions, max_age_h, now)["proof"]
 
 
 def version_history_public(obj: dict | str) -> str | None:
