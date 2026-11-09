@@ -273,6 +273,11 @@ class KeePassXCRebuildTests(unittest.TestCase):
                 '#!/bin/sh\nout=""; prev=""\nfor a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\n'
                 f'cat "{root / "release.json"}" > "$out"\nprintf 200\n')
             curl.chmod(0o755)
+            # `stat -f %B` (bundle birth time) is BSD-only; GNU stat treats -f as
+            # filesystem status. Stub it so the logic runs the same on Linux CI.
+            stat = bindir / "stat"
+            stat.write_text('#!/bin/sh\ncase "$*" in "-f %B"*) date +%s ;; *) exec /usr/bin/env -u PATH stat "$@" ;; esac\n')
+            stat.chmod(0o755)
             app = root / "KeePassXC.app"
             app.mkdir()
             script = (

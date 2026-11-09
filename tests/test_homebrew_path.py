@@ -58,6 +58,12 @@ class HomebrewPathTests(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), MINIMAL_PATH)
 
     def test_update_brew_finds_stub_brew_under_launchd_path(self) -> None:
+        # The platform guard (arm64 + macOS 13+) runs before the PATH helper; stub the
+        # probes so the test exercises the helper on any host (Linux CI is x86_64).
+        for name, out in (("uname", "arm64"), ("sw_vers", "26.0")):
+            stub = self.bindir / name
+            stub.write_text(f"#!/bin/sh\necho {out}\n", encoding="utf-8")
+            stub.chmod(0o755)
         env = {
             "HOME": str(self.root),
             "USER": "tester",
