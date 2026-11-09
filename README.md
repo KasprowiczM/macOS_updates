@@ -85,6 +85,7 @@ The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 |------|--------|
 | `-y`, `--yes` | Skip the confirmation prompt |
 | `-h`, `--help` | Show usage and exit `0` |
+| `--doctor` | Read-only readiness report (platform, tools, launchd `PATH`, LaunchAgent, sudo, disk, power, network, last run); no sudo prompt, no run log; exit `0` ok / `10` warnings / `1` problem |
 | `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
 | `--verify-only` | Verify installed app versions against history without mutating |
 | `--json-summary` | Print a JSON result object on stdout after the run |
@@ -103,6 +104,12 @@ The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 
 An unknown `-…` option exits `2` after printing usage.
 
+**Pre-flight (real runs only):** before step 0 the run checks free disk space, battery and network. Low disk degrades the run, a low battery skips only the macOS step (softly), and no reachable host exits `1` before any step. The Mac is kept awake with `caffeinate` for the run (`MAC_UPDATE_NO_CAFFEINATE=1` opts out). Run `bash update_all.sh --doctor` to see the same checks without running anything.
+
+**Prompts:** every mid-run question times out after `MAC_UPDATE_PROMPT_TIMEOUT` seconds with the safe answer "no"; unrecognised input is also "no". After the master confirmation, the Homebrew and App Store steps do not ask again; the macOS step still asks.
+
+**Open apps:** a Homebrew cask whose app is open is never upgraded; it is deferred with a "quit the app" message and the step ends with a soft warning (exit `10`).
+
 ## Environment variables
 
 Every flag has an equivalent variable (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_SKIP_SYSTEM=1`, …); these are the commonly used ones with no flag. The complete list with defaults is in [docs/agents/scripts.md](docs/agents/scripts.md#environment-variables).
@@ -114,7 +121,10 @@ Every flag has an equivalent variable (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_SKIP_
 | `MAC_UPDATE_NO_SUDO` | *set automatically* | Exported by `update_all.sh` when there is no TTY; child scripts then skip root-only tracks instead of failing |
 | `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | Set to `1` to disable the background `sudo` timestamp refresher |
 | `MAC_UPDATE_STALE_DAYS` | `45` | Days after which an unverified app is reported as stale |
-| `MAC_UPDATE_MAX_LOGS` | `30` | Run logs retained in `logs/` |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Run logs retained in `logs/` (run summaries rotate too) |
+| `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Seconds (10–900, `0` = wait forever) a mid-run yes/no prompt waits; a timeout means "no" |
+| `MAC_UPDATE_MIN_FREE_GB` | `15` | Pre-flight: free space below this degrades the run |
+| `MAC_UPDATE_MIN_BATTERY` | `30` | Pre-flight: on battery below this percent only the macOS step is skipped |
 | `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `15` | Pause that lets a launched vendor updater rewrite `Info.plist` (`0` disables, clamped to 120; skipped when no app was launched) |
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; never force-killed (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Seconds (1–60) between repeated graceful `quit` requests inside the wait window (v1.5.5) |

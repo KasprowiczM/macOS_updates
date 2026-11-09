@@ -1,0 +1,36 @@
+# Review follow-up — 2026-11-09
+
+Author: Claude (orchestrator with implementation subagents). Version: unreleased (stays 1.5.5 under the lockstep policy). The authoritative summary is in [`CHANGELOG.md`](../../CHANGELOG.md).
+
+Evidence is paraphrased. Raw logs, inventory content and machine paths stay local and are never quoted here.
+
+## Scope
+
+A review of the scheduled (launchd) path and the interactive path, prompted by recent run logs: a scheduled run that found no Homebrew, a Homebrew prompt that waited about 51 minutes, a Google Drive check that never had fresh proof, a Proton Mail feed that moved backwards, an inflated chronic-warning streak and inventory counts that read zero.
+
+## Findings and fixes
+
+| ID | Severity | Finding and root cause | Fix |
+|----|----------|------------------------|-----|
+| P1 | high | Scheduled runs reported "Homebrew is not installed". launchd starts jobs with a minimal `PATH`; the plist set none. | `mac_update_ensure_homebrew_path` in `lib/platform.sh` (runs when sourced) and an explicit `EnvironmentVariables.PATH` in the generated plist. `install_launchagent.sh --check` warns about old plists. |
+| P2 | high | The LaunchAgent installer could print success although the service was not loaded; cleanup used `unload -w`, which persists a disabled state. | `launchctl print` verification; failure prints the launchctl error and exits non-zero; re-install cleanup uses `bootout`. |
+| P3 | high | A mid-run prompt had no lifetime (about 51 minutes waiting on 2026-11-04) and anything not starting with N counted as yes. | `mac_update_prompt_yn` with `MAC_UPDATE_PROMPT_TIMEOUT`; timeout and unrecognised input mean "no"; children skip their own question after `MAC_UPDATE_PARENT_CONFIRMED=1`, except the macOS step. |
+| P4 | high | `brew upgrade --cask` could replace an app that was open. | Cask with an open or unknown-state app is deferred (`brew_deferred_running.txt`), step ends soft. |
+| P5 | medium | Google Drive is registered only with the system-scope GoogleUpdater; the run's wake reached only the user scope, so the newest proof was always older than the 6 h window. | Also `--wake-all --system`; refused proofs are logged with a reason. Window and "different build is not proof" unchanged. |
+| P6 | medium | Feed failures left no trace and a failed fetch forced a blind updater launch. The Proton Mail feed dropped from 1.16.1 to 1.16.0 and was reported stale. | Fetch diagnostics, distinct fetch/parse failures, persistent feed state with cached proof (`current_cached`), high-water mark (`current_feed_regressed`) and `feed_unreachable`. |
+| P7 | medium | Chronic-warning streak counted `skipped` steps and dry runs (reported 10, real 4). | `skipped` is neutral; dry-run and inventory-only runs excluded. |
+| P8 | low | `build_inventory.sh` printed zero changes: the counts file was written after an early exit in inventory-only mode. | Counts written before the exit; own banner; added/removed entries reported. |
+| P9 | low | History labelled feed-driven apps with their config method, Firefox and IPMIView inaccurately; doubled status emoji. | `internet_effective_method`, `mozilla_dmg` label, IPMIView as App Store iPad app, text fixes. |
+| P10 | low | `brew doctor` warnings were mixed with a "good condition" line and could suggest running a sudo fix script. | Advisories (`advisories.txt`), security advisories flagged, fix script never run. |
+
+## Added
+
+`update_all.sh --doctor` (read-only readiness report, exit 0/10/1), cheap pre-flight (disk, battery, network) with `caffeinate`, sudo keep-alive limit, additive run-summary fields (`advisories`, per-step `duration_seconds`, inventory counts), log rotation for `run_summary_*.json`, and a follow-up hardening making every curl fetch https-only.
+
+## Not verified live
+
+- No real scheduled launchd run was observed; the plist `PATH`, the load check and the bootout flow are covered by tests with stubbed `launchctl`.
+- The system-scope Google updater wake was not observed on a real Google Drive install.
+- No live full `update_all.sh` run on the merged branch.
+- The interactive prompt timeout and the real `caffeinate` process were not exercised live.
+- Acceptance paths 2 (system update with restart batch) and 3 (major upgrade guard) remain open.
