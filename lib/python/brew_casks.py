@@ -124,3 +124,53 @@ def cask_requires_sudo(cask: dict) -> bool:
                             if k in item:
                                 return True
     return False
+
+
+_SECURITY_RE = re.compile(
+    r"certificate|\bTLS\b|\bSSL\b|compromised|forged|\btrusts?\b", re.IGNORECASE
+)
+_SKIP_NAME_PREFIXES = ("sudo ", "http://", "https://", "/", "brew ", "run ", "`")
+
+
+def doctor_advisories(text: str, max_len: int = 240, max_names: int = 6) -> list[str]:
+    """Parse (already filtered) `brew doctor` output into 'brew_doctor|severity|text' lines.
+
+    One advisory per 'Warning:' block. severity is 'security' when the block
+    mentions certificates / TLS / trust / compromised roots, else 'info'.
+    text = the warning's first line plus the affected names (indented lines that
+    are not commands, paths or URLs), single line, no '|', capped at max_len.
+    """
+    blocks: list[list[str]] = []
+    for line in text.splitlines():
+        if line.startswith("Warning:"):
+            blocks.append([line])
+        elif line.startswith("Error:"):
+            blocks.append([])  # errors are reported elsewhere; close the block
+        elif blocks and blocks[-1] is not None and blocks[-1]:
+            blocks[-1].append(line)
+    out: list[str] = []
+    for block in blocks:
+        if not block:
+            continue
+        head = block[0][len("Warning:"):].strip()
+        names: list[str] = []
+        for body in block[1:]:
+            if body[:1] not in (" ", "\t"):
+                continue
+            name = body.strip()
+            if not name or name.lower().startswith(_SKIP_NAME_PREFIXES):
+                continue
+            if name not in names:
+                names.append(name)
+        severity = "security" if _SECURITY_RE.search(" ".join(block)) else "info"
+        msg = head
+        if names:
+            shown = names[:max_names]
+            if len(names) > max_names:
+                shown.append("+%d more" % (len(names) - max_names))
+            msg = "%s (%s)" % (head, ", ".join(shown))
+        msg = " ".join(msg.replace("|", "/").split())
+        if len(msg) > max_len:
+            msg = msg[: max_len - 3].rstrip() + "..."
+        out.append("brew_doctor|%s|%s" % (severity, msg))
+    return out
