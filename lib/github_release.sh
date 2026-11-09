@@ -8,7 +8,7 @@ github_latest_tag() {
     if [ -n "${GITHUB_TOKEN:-}" ]; then
         auth_header="-H"
     fi
-    result=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 \
+    result=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 3 --retry-delay 2 \
         -H "User-Agent: macos-updates-toolkit" \
         ${auth_header:+"$auth_header"} ${auth_header:+"Authorization: Bearer $GITHUB_TOKEN"} \
         "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
@@ -22,7 +22,7 @@ except Exception:
     if [ -z "$result" ] || [ "$result" = "?" ]; then
         # Fallback: parse Location header redirect from github.com/owner/repo/releases/latest
         local loc
-        loc=$(curl -fssI --max-time 15 --retry 2 "https://github.com/${repo}/releases/latest" 2>/dev/null \
+        loc=$(curl -fssI --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "https://github.com/${repo}/releases/latest" 2>/dev/null \
             | grep -i '^location:' | tr -d '\r' | awk -F'/' '{print $NF}')
         result="${loc:-?}"
     fi
@@ -72,7 +72,7 @@ github_rebuild_asset() {
     case "$installed_epoch" in ''|*[!0-9]*) return 0 ;; esac
     local auth_header=""
     [ -n "${GITHUB_TOKEN:-}" ] && auth_header="-H"
-    curl -fsSL --max-time 20 --retry 2 --retry-delay 2 \
+    curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 2 --retry-delay 2 \
         -H "User-Agent: macos-updates-toolkit" \
         ${auth_header:+"$auth_header"} ${auth_header:+"Authorization: Bearer $GITHUB_TOKEN"} \
         "https://api.github.com/repos/${repo}/releases/tags/${tag}" 2>/dev/null \

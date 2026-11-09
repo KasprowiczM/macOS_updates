@@ -247,7 +247,7 @@ internet_handler_sparkle_check() {
     print_info "$(internet_msg "$L_INTERNET_SPARKLE_FEED_FOUND" "$feed_url")"
 
     local xml
-    xml="$(curl -fsSL --max-time 15 --retry 2 "$feed_url" 2>/dev/null || true)"
+    xml="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "$feed_url" 2>/dev/null || true)"
     if [ -z "$xml" ]; then
         print_warn "$L_INTERNET_STATUS_OFFLINE"
         internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
@@ -377,7 +377,7 @@ internet_handler_vendor_latest() {
         if [ -n "$base_url" ]; then
             base_url="${base_url%/}"
             local manifest_yml
-            manifest_yml="$(curl -fsSL --max-time 15 --retry 2 "${base_url}/latest-mac.yml" 2>/dev/null || curl -fsSL --max-time 15 --retry 2 "${base_url}/latest.yml" 2>/dev/null || true)"
+            manifest_yml="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "${base_url}/latest-mac.yml" 2>/dev/null || curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "${base_url}/latest.yml" 2>/dev/null || true)"
             if [ -n "$manifest_yml" ]; then
                 remote_ver="$(echo "$manifest_yml" | grep -E '^version:' | head -1 | cut -d':' -f2 | tr -d ' "')"
             else
@@ -394,7 +394,7 @@ internet_handler_vendor_latest() {
     # 3. Try custom feed_url override
     if [ -z "$remote_ver" ] && [ -n "$feed_url_override" ]; then
         local body
-        body="$(curl -fsSL --max-time 15 --retry 2 "$feed_url_override" 2>/dev/null || true)"
+        body="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "$feed_url_override" 2>/dev/null || true)"
         if [ -n "$body" ]; then
             remote_ver="$(echo "$body" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
             [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | sed -n 's/.*<sparkle:shortVersionString>\([^<]*\)<\/sparkle:shortVersionString>.*/\1/p' | head -1 || true)"
@@ -763,7 +763,7 @@ omaha_read_increment() {
 omaha_chrome_version_history_public() {
     local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
     local vh_json=""
-    vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+    vh_json="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 "$vh_url" 2>/dev/null || true)"
     [ -n "$vh_json" ] || return 0
     printf '%s\n' "$vh_json" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
