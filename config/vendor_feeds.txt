@@ -21,4 +21,10 @@ Docker Desktop|sparkle|https://desktop.docker.com/mac/main/arm64/appcast.xml|-|d
 Open Design|json|https://releases.open-design.ai/stable/latest/metadata.json|open_design_metadata|-|-
 HyperFrames|json|https://static.heygen.ai/hyperframes-oss/desktop/latest.json|hyperframes_latest|-|-
 Superset|yml|https://github.com/paradevai/paradev/releases/latest/download/latest-mac.yml|-|-|-
+# DeepSeek Harness: the app's own electron-updater feed (Resources/app-update.yml: generic provider, channel
+# "nightly" -> nightly-mac.yml; latest-mac.yml 404s). Pre-release versions ("0.2.2-rc.1") order correctly.
+DeepSeek Harness|yml|https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml|-|-|-
+# Grok Bot (Cursor "sand" product): the endpoint compiled into the app (api2.cursor.sh/updates, stable -> "sand");
+# 0.0.0 always returns the newest build as {"url","name"}.
+Grok Bot|json|https://api2.cursor.sh/updates/api/update/darwin-arm64/sand/0.0.0/stable|cursor_update|-|-
 Remote Desktop Manager|kv|https://devolutions.net/productinfo.htm|RDMMacbin|dmg|cdn.devolutions.net

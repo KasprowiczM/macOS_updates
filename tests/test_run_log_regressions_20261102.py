@@ -64,7 +64,7 @@ class InventoryMarkerTests(unittest.TestCase):
     def test_markers_are_not_part_of_the_bundle_name(self) -> None:
         self.assertEqual(strip_inventory_markers("HyperFrames [arm64]"), "HyperFrames")
         self.assertEqual(strip_inventory_markers("Superset [arm64] 🆕"), "Superset")
-        self.assertEqual(strip_inventory_markers("DJI Assistant 2 [x86_64-only]"), "DJI Assistant 2")
+        self.assertEqual(strip_inventory_markers("Fixture Intel App [x86_64-only]"), "Fixture Intel App")
 
     def test_marked_row_of_an_installed_app_is_not_removed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

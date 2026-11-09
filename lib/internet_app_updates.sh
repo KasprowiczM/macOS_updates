@@ -2394,6 +2394,18 @@ iu_superset() {
     internet_dispatch_silent_launch "🧩 Superset" "Superset" "STATUS_SUPERSET" "Superset" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Superset")"
 }
 
+# DeepSeek Harness (Electron + Squirrel, own electron-updater feed) and Grok Bot
+# (Cursor "sand" product, Squirrel.Mac JSON feed): verify-only vendor feeds
+# (config/vendor_feeds.txt); only a behind app is launched so its own updater
+# installs. A launch alone never counts as verified (critical_rules.md 6b).
+iu_deepseek_harness() {
+    internet_dispatch_silent_launch "🐋 DeepSeek Harness" "DeepSeek Harness" "STATUS_DEEPSEEK" "DeepSeek Harness" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "DeepSeek Harness")"
+}
+
+iu_grok_bot() {
+    internet_dispatch_silent_launch "🤖 Grok Bot" "Grok Bot" "STATUS_GROKBOT" "Grok Bot" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Grok Bot")"
+}
+
 iu_appcleaner() {
     internet_dispatch_silent_launch "🧹 AppCleaner" "AppCleaner" "STATUS_APPCLEANER" "AppCleaner" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "AppCleaner")"
 }
@@ -2664,40 +2676,5 @@ iu_ipmiview() {
         STATUS_IPMIVIEW="$L_INTERNET_STATUS_MANUAL_UPDATE"
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "IPMIView")"
-    fi
-
-    # ── 35. DJI ASSISTANT (manual) ───────────────────────────────
-}
-
-iu_dji_assistant() {
-    DJI_PATH="$(internet_app_path "DJI Assistant 2")"
-    [ -d "$DJI_PATH" ] || return 0
-    print_header "🚁 DJI Assistant 2"
-    if [ -d "$DJI_PATH" ]; then
-        VER=$(app_version "$DJI_PATH")
-        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
-        ARCH="$(mac_update_app_architecture "$DJI_PATH")"
-        if [ "$ARCH" = "x86_64-only" ]; then
-            if mac_update_rosetta_installed; then
-                STATUS_DJI="$L_INTERNET_ROSETTA_REQUIRED; $L_INTERNET_ROSETTA_EOL"
-            else
-                STATUS_DJI="$L_INTERNET_ROSETTA_REQUIRED $L_INTERNET_ROSETTA_NOT_INSTALLED; $L_INTERNET_ROSETTA_EOL"
-                if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-                    echo "DJI Assistant 2" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
-                fi
-            fi
-            print_warn "$(internet_status_body "$STATUS_DJI")"
-        else
-            # A vendor that ships no auto-updater is a permanent fact about that vendor, not
-            # a fault in this run. Reported as information for the same reason Antigravity's
-            # 404 feed was demoted on 2026-08-26: a warning the operator can never clear
-            # trains them to ignore warnings that matter. The manual-update line below still
-            # tells them exactly what to do.
-            print_info "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "DJI Assistant 2")"
-            print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://www.dji.com/downloads/djiapp/dji-assistant-2-consumer-drones-series")"
-            STATUS_DJI="$L_INTERNET_STATUS_MANUAL_UPDATE"
-        fi
-    else
-        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "DJI Assistant 2")"
     fi
 }

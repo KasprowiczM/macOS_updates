@@ -41,7 +41,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 
 | Method | Apps |
 |--------|------|
-| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager, Open Design, HyperFrames, Superset; direct-first choices in `config/vendor_direct_first.txt`. Open Design, HyperFrames and Superset are verify-only: only their native updater installs |
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager, Open Design, HyperFrames, Superset, DeepSeek Harness, Grok Bot; direct-first choices in `config/vendor_direct_first.txt`. Open Design, HyperFrames, Superset, DeepSeek Harness and Grok Bot are verify-only: only their native updater installs (DeepSeek: its own electron-updater `nightly-mac.yml`; Grok Bot: the Cursor "sand" Squirrel endpoint compiled into the app) |
 | Mozilla product-details/download + DMG | Firefox Developer Edition |
 | GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
 | Google Keystone | Google Chrome, Google Drive, Gemini |
@@ -53,7 +53,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 | Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
 | Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
-| Manual only | IPMIView, DJI Assistant 2 |
+| Manual only | IPMIView |
 
 These methods are not equivalent proof levels:
 
