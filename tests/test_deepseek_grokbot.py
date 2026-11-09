@@ -122,6 +122,19 @@ class DispatchTests(unittest.TestCase):
                     plistlib.dump({"CFBundleIdentifier": "test.fixture." + handler,
                                    "CFBundleShortVersionString": installed}, fh)
             (root / "feed").write_text(feed, encoding="utf-8")
+            # app_version() reads the bundle with macOS `defaults`; stub it (plistlib)
+            # so the handlers see the fixture version on Linux CI too.
+            stubs = root / "stubbin"
+            stubs.mkdir()
+            (stubs / "defaults").write_text(
+                "#!/usr/bin/env python3\nimport plistlib, sys\n"
+                "a = sys.argv[1:]\n"
+                "if len(a) != 3 or a[0] != 'read': sys.exit(1)\n"
+                "try:\n"
+                "    with open(a[1] + '.plist', 'rb') as fh: v = plistlib.load(fh)[a[2]]\n"
+                "except Exception: sys.exit(1)\n"
+                "print(v)\n", encoding="utf-8")
+            (stubs / "defaults").chmod(0o755)
             launched = root / "launched.log"
             script = f'''
 export SCRIPT_DIR="{REPO_ROOT}" MAC_LANG=en MAC_UPDATE_SESSION_DIR="{root}"
@@ -141,7 +154,7 @@ internet_app_is_running() {{ {"return 0" if running else "return 1"}; }}
 echo "STATUS=${{{status}}}"
 '''
             res = subprocess.run(["bash", "-c", script], cwd=REPO_ROOT, capture_output=True, text=True,
-                                 env=shell_env(HOME=str(root)), timeout=60)
+                                 env=shell_env(HOME=str(root), PATH=f"{stubs}:{os.environ['PATH']}"), timeout=60)
             self.assertEqual(res.returncode, 0, res.stderr)
             log = launched.read_text() if launched.exists() else ""
             return res.stdout, log
