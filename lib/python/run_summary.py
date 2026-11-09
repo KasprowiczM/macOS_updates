@@ -43,6 +43,9 @@ SUMMARY_I18N = {
         "warning_title": "Manufacturer warnings",
         "feed_warning": "Vendor feed %s is older than installed %s.",
         "inventory_changes": "Inventory version fields changed: %s",
+        "advisories_title": "Advisories",
+        "advisory_security": "SECURITY",
+        "inventory_apps": "Inventory entries added: %s, removed: %s",
         "none": "(none)",
     },
     "pl": {
@@ -52,6 +55,9 @@ SUMMARY_I18N = {
         "warning_title": "Ostrzeżenia producenta",
         "feed_warning": "Feed producenta %s jest starszy niż zainstalowana wersja %s.",
         "inventory_changes": "Zmieniono pól wersji w inventory: %s",
+        "advisories_title": "Zalecenia",
+        "advisory_security": "BEZPIECZEŃSTWO",
+        "inventory_apps": "Wpisy inwentarza dodane: %s, usunięte: %s",
         "none": "(brak)",
     },
     "de": {
@@ -61,6 +67,9 @@ SUMMARY_I18N = {
         "warning_title": "Herstellerwarnungen",
         "feed_warning": "Herstellerfeed %s ist älter als die installierte Version %s.",
         "inventory_changes": "Inventar-Versionsfelder geändert: %s",
+        "advisories_title": "Hinweise",
+        "advisory_security": "SICHERHEIT",
+        "inventory_apps": "Inventar-Einträge hinzugefügt: %s, entfernt: %s",
         "none": "(keine)",
     },
     "es": {
@@ -70,6 +79,9 @@ SUMMARY_I18N = {
         "warning_title": "Advertencias del fabricante",
         "feed_warning": "El feed del fabricante %s es anterior a la versión instalada %s.",
         "inventory_changes": "Campos de versión de inventario cambiados: %s",
+        "advisories_title": "Avisos",
+        "advisory_security": "SEGURIDAD",
+        "inventory_apps": "Entradas de inventario añadidas: %s, eliminadas: %s",
         "none": "(ninguno)",
     },
     "fr": {
@@ -79,6 +91,9 @@ SUMMARY_I18N = {
         "warning_title": "Avertissements du fabricant",
         "feed_warning": "Le flux du fabricant %s est antérieur à la version installée %s.",
         "inventory_changes": "Champs de version de l'inventaire modifiés : %s",
+        "advisories_title": "Avis",
+        "advisory_security": "SÉCURITÉ",
+        "inventory_apps": "Entrées d'inventaire ajoutées : %s, supprimées : %s",
         "none": "(aucun)",
     },
     "it": {
@@ -88,6 +103,9 @@ SUMMARY_I18N = {
         "warning_title": "Avvisi del produttore",
         "feed_warning": "Il feed del produttore %s è precedente alla versione installata %s.",
         "inventory_changes": "Campi versione inventario modificati: %s",
+        "advisories_title": "Avvisi",
+        "advisory_security": "SICUREZZA",
+        "inventory_apps": "Voci di inventario aggiunte: %s, rimosse: %s",
         "none": "(nessuno)",
     },
     "pt": {
@@ -97,6 +115,9 @@ SUMMARY_I18N = {
         "warning_title": "Avisos do fabricante",
         "feed_warning": "O feed do fabricante %s é anterior à versão instalada %s.",
         "inventory_changes": "Campos de versão do inventário alterados: %s",
+        "advisories_title": "Avisos",
+        "advisory_security": "SEGURANÇA",
+        "inventory_apps": "Entradas de inventário adicionadas: %s, removidas: %s",
         "none": "(nenhum)",
     },
 }
@@ -114,6 +135,71 @@ INVALID_VERSIONS = {
     "(brak)",
     "",
 }
+
+
+ADVISORY_SEVERITIES = ("security", "info")
+MAX_ADVISORIES = 50
+MAX_ADVISORY_TEXT = 500
+
+
+def read_advisories(session_dir: str | Path | None) -> list[dict[str, str]]:
+    """Advisories the child steps appended to $SESSION_DIR/advisories.txt.
+
+    One per line, ``source|severity|text`` (severity ``security`` or ``info``;
+    text may itself contain ``|``). Missing file, blank lines, comments and
+    malformed lines are tolerated; an unknown severity degrades to ``info``;
+    exact duplicates are dropped. Advisories never change exit codes.
+    """
+    if not session_dir:
+        return []
+    path = Path(session_dir) / "advisories.txt"
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    found: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("|", 2)
+        if len(parts) != 3:
+            continue
+        source, severity, text = (p.strip() for p in parts)
+        text = text[:MAX_ADVISORY_TEXT]
+        if not source or not text:
+            continue
+        if severity not in ADVISORY_SEVERITIES:
+            severity = "info"
+        key = (source, severity, text)
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append({"source": source, "severity": severity, "text": text})
+        if len(found) >= MAX_ADVISORIES:
+            break
+    return found
+
+
+def read_step_durations(session_dir: str | Path | None) -> dict[str, int]:
+    """Per-step wall-clock seconds from $SESSION_DIR/step_durations.txt (``key=seconds``)."""
+    if not session_dir:
+        return {}
+    try:
+        raw = (Path(session_dir) / "step_durations.txt").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    durations: dict[str, int] = {}
+    for line in raw.splitlines():
+        key, sep, val = line.strip().partition("=")
+        if not sep or not key:
+            continue
+        try:
+            durations[key.strip()] = max(0, int(val.strip()))
+        except ValueError:
+            continue
+    return durations
 
 
 def is_valid_version(v: Any) -> bool:
@@ -941,6 +1027,9 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     title_warning = os.environ.get("L_ALL_SUMMARY_WARNING_TITLE", i18n["warning_title"])
     feed_warning_fmt = os.environ.get("L_ALL_SUMMARY_FEED_WARNING_FMT", i18n["feed_warning"])
     inv_fmt = os.environ.get("L_ALL_SUMMARY_INVENTORY_CHANGES", i18n["inventory_changes"])
+    inv_apps_fmt = os.environ.get("L_ALL_SUMMARY_INVENTORY_APPS", i18n["inventory_apps"])
+    title_advisories = os.environ.get("L_ALL_SUMMARY_ADVISORIES_TITLE", i18n["advisories_title"])
+    tag_security = os.environ.get("L_ALL_SUMMARY_ADVISORY_SECURITY_TAG", i18n["advisory_security"])
     none_str = i18n["none"]
 
     items = summary.get("items", [])
@@ -950,6 +1039,30 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     warning_items = [it for it in items if it.get("status") == "warning"]
     counts = summary.get("counts", {})
     inventory_count = counts.get("inventory_version_fields_changed", 0)
+    flags = summary.get("flags") or {}
+    inventory_only = bool(flags.get("inventory_only")) if isinstance(flags, dict) else False
+
+    if inventory_only:
+        # Nothing was installed or updated; "Updated: (none)" would only mislead.
+        try:
+            inv_line = inv_fmt % inventory_count
+        except Exception:
+            inv_line = f"{inv_fmt}: {inventory_count}"
+        try:
+            apps_line = inv_apps_fmt % (
+                counts.get("inventory_entries_added", 0),
+                counts.get("inventory_entries_removed", 0),
+            )
+        except Exception:
+            apps_line = ""
+        out = [
+            "────────────────────────────────────────────────────────────",
+            f"📝 {inv_line}",
+        ]
+        if apps_line:
+            out.append(f"📝 {apps_line}")
+        out.append("────────────────────────────────────────────────────────────")
+        return "\n".join(out)
 
     lines: list[str] = [
         "────────────────────────────────────────────────────────────",
@@ -1001,6 +1114,20 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     else:
         lines.append(f"   • {none_str}")
 
+    advisories = [a for a in (summary.get("advisories") or []) if isinstance(a, dict)]
+    if advisories:
+        # Security advisories first, marked distinctly; order is otherwise stable.
+        ordered = sorted(advisories, key=lambda a: 0 if a.get("severity") == "security" else 1)
+        lines.append("")
+        lines.append(f"🛡️  {title_advisories}:")
+        for adv in ordered:
+            src = adv.get("source", "")
+            src_str = f" ({src})" if src else ""
+            if adv.get("severity") == "security":
+                lines.append(f"   🔒 [{tag_security}] {adv.get('text', '')}{src_str}")
+            else:
+                lines.append(f"   • {adv.get('text', '')}{src_str}")
+
     lines.append("")
     try:
         inv_line = inv_fmt % inventory_count
@@ -1037,6 +1164,8 @@ def migrate_run_summary(data: dict[str, Any]) -> dict[str, Any]:
                     "code": str(step_v["code"]),
                     "text": str(step_v.get("text", "")),
                 }
+                if isinstance(step_v.get("duration_seconds"), int):
+                    new_steps[step_k]["duration_seconds"] = step_v["duration_seconds"]
             else:
                 code = classify_step_status(step_v)
                 new_steps[step_k] = {
@@ -1155,8 +1284,15 @@ def build_run_summary(
     run_id: str | None = None,
     items: list[dict[str, Any]] | None = None,
     step_codes: dict[str, str] | None = None,
+    advisories: list[dict[str, str]] | None = None,
+    step_durations: dict[str, int] | None = None,
 ) -> dict[str, Any]:
-    """Compose the structured run summary dict."""
+    """Compose the structured run summary dict.
+
+    ``advisories`` (additive, format stays 4) lists notes the steps want shown
+    without changing the result; ``step_durations`` adds ``duration_seconds`` to
+    each step object that actually ran (skipped steps carry none).
+    """
     duration = max(0, end_time - start_time)
     minutes = duration // 60
     secs = duration % 60
@@ -1164,7 +1300,7 @@ def build_run_summary(
     start_iso = datetime.datetime.fromtimestamp(start_time, tz=datetime.timezone.utc).isoformat()
     end_iso = datetime.datetime.fromtimestamp(end_time, tz=datetime.timezone.utc).isoformat()
 
-    steps_v4: dict[str, dict[str, str]] = {}
+    steps_v4: dict[str, dict[str, Any]] = {}
     if step_results:
         for k, v in step_results.items():
             if isinstance(v, dict) and "code" in v:
@@ -1182,6 +1318,9 @@ def build_run_summary(
                     "code": code,
                     "text": str(v) if v is not None else "",
                 }
+    for k, secs in (step_durations or {}).items():
+        if k in steps_v4 and steps_v4[k].get("code") != "skipped" and isinstance(secs, int):
+            steps_v4[k]["duration_seconds"] = max(0, secs)
 
     summary: dict[str, Any] = {
         "format_version": FORMAT_VERSION,
@@ -1200,6 +1339,7 @@ def build_run_summary(
         "verification": verification or {},
         "flags": flags or {},
         "items": items if items is not None else [],
+        "advisories": list(advisories) if advisories else [],
     }
     if session_dir:
         summary["session_dir"] = session_dir

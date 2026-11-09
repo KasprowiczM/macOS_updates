@@ -639,7 +639,12 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertLess(inventory_guard, history_builder)
         build = self.read_script("build_inventory.sh")
         self.assertIn("MAC_UPDATE_INVENTORY_ONLY=1", build)
-        self.assertIn("UPDATES.md history intentionally unchanged", text)
+        # The closing line is localized (L_ALL_INVENTORY_DONE_FMT) and carries the real numbers.
+        self.assertIn("L_ALL_INVENTORY_DONE_FMT", text)
+        for lang in ("en", "pl", "es", "it", "pt", "de", "fr"):
+            lang_text = (REPO_ROOT / "i18n" / f"lang_{lang}.sh").read_text(encoding="utf-8")
+            self.assertRegex(lang_text, r'(?m)^L_ALL_INVENTORY_DONE_FMT="[^"]*%s[^"]*%s[^"]*%s[^"]*"$')
+        self.assertIn("UPDATES.md", (REPO_ROOT / "i18n" / "lang_en.sh").read_text(encoding="utf-8").split("L_ALL_INVENTORY_DONE_FMT=")[1].split("\n")[0])
 
     def test_prescan_recognizes_formatted_inventory_cells(self) -> None:
         inventory_py = (REPO_ROOT / "lib" / "python" / "inventory.py").read_text(encoding="utf-8")
