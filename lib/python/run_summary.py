@@ -790,13 +790,17 @@ def collect_run_items(
             if code not in ("unverified", "error_soft", "error_hard", "feed_stale",
                             "behind", "needs_restart", "update_available", "rollout_hold",
                             "updated", "current_verified", "current_vendor", "current_cask_only",
-                            "managed_brew", "managed_appstore", "manual", "skipped"):
+                            "managed_brew", "managed_appstore", "manual", "skipped",
+                            "feed_unreachable", "current_cached", "current_feed_regressed"):
                 internet_unexplained_status = True
             app_keys = get_all_alias_keys(app_name)
             if app_keys & seen_internet_keys:
                 continue
 
-            if code in ("unverified", "error_soft", "error_hard"):
+            # feed_unreachable: the vendor feed failed and the app's updater was
+            # launched without proof — unconfirmed, like "unverified". The two
+            # current_* codes from feed state are informational and add no item.
+            if code in ("unverified", "error_soft", "error_hard", "feed_unreachable"):
                 # Name the app, not just the step: "Step: Internet apps" told
                 # the user nothing about WHICH updater went unconfirmed.
                 seen_internet_keys.update(app_keys)
@@ -1054,7 +1058,7 @@ def determine_exit_class(overall_exit: int, degraded: int) -> str:
 
 _ACTIONABLE_INTERNET_CODES = frozenset({
     "unverified", "error_soft", "error_hard", "behind", "needs_restart",
-    "update_available",
+    "update_available", "feed_unreachable",
 })
 
 

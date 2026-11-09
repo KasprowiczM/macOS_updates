@@ -146,7 +146,17 @@ vendor_direct_verify_checksum() {
             python3 -c "import sys; sys.exit(0 if sys.argv[1].lower() == sys.argv[2].lower() else 1)" "$actual" "$val"
             ;;
         sha512b64)
-            python3 -c "import hashlib, base64, sys; f=open(sys.argv[1],'rb').read(); h=base64.b64encode(hashlib.sha512(f).digest()).decode('ascii'); sys.exit(0 if h == sys.argv[2] else 1)" "$file" "$val"
+            # Stream in 1 MiB chunks: artifacts are 150-250 MB and reading them
+            # whole into memory for one digest is needless (P2-6).
+            python3 -c '
+import base64, hashlib, hmac, sys
+h = hashlib.sha512()
+with open(sys.argv[1], "rb") as fh:
+    for chunk in iter(lambda: fh.read(1048576), b""):
+        h.update(chunk)
+got = base64.b64encode(h.digest()).decode("ascii")
+sys.exit(0 if hmac.compare_digest(got, sys.argv[2]) else 1)
+' "$file" "$val"
             ;;
         *)
             return 1

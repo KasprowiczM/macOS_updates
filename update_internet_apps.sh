@@ -692,6 +692,7 @@ if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
                     break
                 fi
             done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+            _h_method="$(internet_effective_method "$_h_app" "$_h_method")"
             printf "%s\t%s\t%s\t%s\n" "$TS" "$_h_app" "$_h_ver" "$_h_method" >> "$HISTORY_FILE"
         done < "$MAC_UPDATE_SESSION_DIR/internet_after.txt"
         internet_rotate_version_history
@@ -709,7 +710,7 @@ while IFS='|' read -r _s_app _s_meth _s_var; do
         eval "_s_cur=\"\${$_s_var}\""
         _s_code="$(internet_status_code "$_s_cur")"
         case "$_s_code" in
-            current_verified|current_vendor|updated|behind|needs_restart|feed_stale|update_available|rollout_hold)
+            current_verified|current_vendor|updated|behind|needs_restart|feed_stale|update_available|rollout_hold|current_cached|current_feed_regressed|feed_unreachable)
                 continue
                 ;;
         esac
@@ -870,12 +871,19 @@ while IFS='|' read -r _c_app _c_meth _c_var; do
         behind|needs_restart)
             _cnt_behind=$((_cnt_behind + 1))
             ;;
-        unverified)
+        unverified|feed_unreachable)
             _cnt_unverified=$((_cnt_unverified + 1))
             ;;
+        # current_cached / current_feed_regressed are informational "current"
+        # results without a live comparison this run: neither verified (rule 6b)
+        # nor a warning, so they join no counter.
     esac
     case "$_code" in
         behind|needs_restart)
+            _soft_fail_from_codes=1
+            ;;
+        feed_unreachable)
+            # The vendor feed failed and the app's updater ran without proof.
             _soft_fail_from_codes=1
             ;;
         feed_stale)
@@ -1035,6 +1043,8 @@ do
         "$L_INTERNET_STATUS_MAU_OPENED"|\
         "$L_INTERNET_STATUS_UNKNOWN_VERSION"|\
         "$L_INTERNET_STATUS_CASK_MISSING"|\
+        "$L_INTERNET_STATUS_FEED_UNREACHABLE"|\
+        "$L_INTERNET_STATUS_FEED_UNREADABLE"|\
         "$L_INTERNET_STATUS_LAUNCH_FAILED")
             INTERNET_SOFT_FAIL=1
             ;;

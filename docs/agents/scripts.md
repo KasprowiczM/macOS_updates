@@ -61,6 +61,7 @@
 | `lib/python/cli_retention.py` | Vendor CLI version retention and pruning helpers |
 | `lib/python/system_updates.py` | Pure-function helpers for softwareupdate catalog parsing, label extraction, and reboot classification |
 | `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha text log + `updater_history.jsonl`, VersionHistory) |
+| `lib/python/feed_state.py` | Persistent per-app vendor feed state (last good version, high-water mark): cached proof on a failed fetch, vendor-side feed regressions; atomic 0600 writes |
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
 | `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
 | `config/vendor_appcasts.txt` | Sparkle appcasts used only to prove an installed rollout-channel build is a published vendor release (never an install source) |
@@ -87,6 +88,8 @@
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; the AppleScript `quit` is re-sent while it keeps running, never force-killed (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Interval in seconds (1–60) between repeated graceful `quit` requests inside `MAC_UPDATE_QUIT_WAIT` (v1.5.5) |
 | `MAC_UPDATE_PACKAGE_REVISION_FILE` | `~/.local/state/mac-update/package_revisions.tsv` | Package revision installed per product+version (`KeePassXC\|2.8.0\|1`); detects same-version vendor rebuilds |
+| `MAC_UPDATE_FEED_STATE_FILE` | `~/.local/state/mac-update/feed_state.json` | Per-app vendor feed state (last successful version + time, high-water mark, last error); never an install source |
+| `MAC_UPDATE_FEED_CACHE_TTL_H` | `24` | Hours (0–168, 0 disables) a successful feed check that listed the installed version stays valid proof when the feed is unreachable — the app is then reported current from the cached check and not launched |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
 ## update_all.sh Step Order
