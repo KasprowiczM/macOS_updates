@@ -183,6 +183,62 @@ internet_handler_keystone() {
 
 # Standard silent-launch block with optional extra info line.
 #
+# ── GitHub-hosted apps: lookup failures and running-app deferral ─────────────
+# github_lookup_record <app> <version>: remember a successful GitHub lookup in the
+# persistent feed state (same file and TTL as the vendor feeds).
+github_lookup_record() {
+    command -v vendor_feed_state_record >/dev/null 2>&1 || return 0
+    vendor_feed_state_record "$1" ok "$2"
+    return 0
+}
+
+# github_lookup_handled <app> <installed>: call after a GitHub lookup returned "?".
+# Returns 0 and sets GITHUB_UNAVAILABLE_STATUS when the situation is fully handled:
+#  - a successful lookup younger than MAC_UPDATE_FEED_CACHE_TTL_H listed exactly the
+#    installed version -> current_cached (not counted as verified, no launch);
+#  - the API rate limit is exhausted -> a distinct soft status naming the reset time
+#    and GITHUB_TOKEN (never "no connection").
+# Returns 1 for every other cause; the caller keeps its offline handling.
+github_lookup_handled() {
+    local app="$1" installed="$2" proof age outcome cause rem reset hhmm
+    GITHUB_UNAVAILABLE_STATUS=""
+    if command -v vendor_feed_state_cached_proof >/dev/null 2>&1 \
+        && proof="$(vendor_feed_state_cached_proof "$app" "$installed")" && [ -n "$proof" ]; then
+        age="${proof#*|}"
+        GITHUB_UNAVAILABLE_STATUS="$(printf "$L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT" "$age" "$installed")"
+        INTERNET_LAST_VERIFIED=0
+        print_ok "$(internet_status_body "$GITHUB_UNAVAILABLE_STATUS")"
+        return 0
+    fi
+    outcome="$(github_last_outcome 2>/dev/null)"
+    cause="${outcome%%|*}"
+    if [ "$cause" = "ratelimit" ]; then
+        rem="${outcome#*|}"; rem="${rem#*|}"; rem="${rem%%|*}"
+        reset="${outcome##*|}"
+        hhmm="$(github_reset_time "$reset")"
+        print_warn "$(internet_msg "$L_INTERNET_GITHUB_RATELIMIT_FMT" "$app" "$hhmm")"
+        GITHUB_UNAVAILABLE_STATUS="$(printf "$L_INTERNET_STATUS_GITHUB_RATELIMIT_FMT" "$hhmm")"
+        return 0
+    fi
+    return 1
+}
+
+# internet_defer_running_app <dest .app path> <status_var> <installed> <latest>
+# Handlers that download first and install through copy_verified_app call this
+# BEFORE downloading: a running (or unknown-state) app is reported NEEDS_RESTART
+# without fetching the payload. copy_verified_app still re-checks right before the
+# swap (the app may be opened during the download). Returns 0 when deferred.
+internet_defer_running_app() {
+    local dest="$1" status_var="$2" installed="$3" latest="$4"
+    [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && return 1
+    command -v replacement_app_is_idle >/dev/null 2>&1 || return 1
+    replacement_app_is_idle "$dest" && return 1
+    print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$latest" "$installed")"
+    internet_diag_log "Download skipped for $dest: application is running or its state is unknown"
+    internet_handler_set_status "$status_var" "$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$installed" "${latest:-?}")"
+    return 0
+}
+
 # Opportunistic verification: an app whose only documented update path is its
 # own updater may still publish a machine-readable version feed (Sparkle
 # SUFeedURL, or electron-updater Contents/Resources/app-update.yml). When one

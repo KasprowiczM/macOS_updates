@@ -90,4 +90,4 @@ brew outdated
 softwareupdate -l
 ```
 
-Dla aplikacji **triggered-unverified** sprawdź ekran Informacje/wersję — samo uruchomienie aktualizatora nie potwierdza ukończenia. Ręczne pozostają tylko IPMIView i DJI Assistant 2.
+Dla aplikacji **triggered-unverified** sprawdź ekran Informacje/wersję — samo uruchomienie aktualizatora nie potwierdza ukończenia. Ręczny pozostaje tylko IPMIView.

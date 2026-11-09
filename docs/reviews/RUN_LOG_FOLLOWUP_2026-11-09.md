@@ -40,6 +40,23 @@ A review of the scheduled (launchd) path and the interactive path, prompted by r
 9. `install_launchagent.sh --uninstall` no longer falls back to `launchctl unload -w`.
 10. The run-log filter keeps passing output to the terminal when the log cannot be opened.
 
+## DeepSeek Harness, Grok Bot, DJI Assistant 2
+
+- **DeepSeek Harness** (`com.deepseek.dsh`, 0.2.2-rc.1): `app-update.yml` is a generic electron-updater provider on channel `nightly`. `nightly-mac.yml` returned HTTP 200 with version `0.2.2-rc.1` (folded `>-` url/checksum); `latest-mac.yml` and `nightly.yml` return an HTML page with 404. Registered verify-only; today's status is "Up to date (0.2.2-rc.1, vendor feed)". Limit: the feed URL is fixed to the nightly channel; an unknown pre-release label such as `nightly` ranks as a final release in `version_key`.
+- **Grok Bot** (`com.anysphere.sand`, 0.79.3): no `app-update.yml`, but the bundle's own code builds `https://api2.cursor.sh/updates` with product `sand` for the stable channel. `.../darwin-arm64/sand/0.0.0/stable` returned HTTP 200 `{"url":...,"name":"0.79.3"}` (the same call with the installed version returns 204). Registered verify-only with the existing `cursor_update` selector; today's status is "Up to date (0.79.3, vendor feed)". Assumes the app tracks the stable channel.
+- Neither app uses the `brew_cask` method (not adopted, rule 5a); the casks were not consulted as oracle because a real vendor feed exists.
+- **Inventory:** the prescan puts a newly installed app that is missing from `APPLICATIONS.md` into the "🆕 do skategoryzowania" table; nothing moves it to GROUP 3 afterwards (`config/internet_apps.txt` only feeds the legend and the update-method summary), so the owner moves the rows by hand once.
+- **DJI Assistant 2** removed from the product. Its handler was the only test of the Intel-only path; the generic helpers now carry it and the tests use a fake x86_64 bundle.
+- Not verified live: no real update run, no launch of either app.
+
+## First live run on the merged branch (four defects)
+
+- **GitHub rate limit shown as "no connection".** The API lookups recorded no HTTP status; the anonymous limit (60/h) was exhausted. `github_api_fetch` now logs curl exit, HTTP status and `x-ratelimit-*` per lookup and stores the outcome for the handler; rate limiting (403/429 with remaining 0) gets its own soft status with the reset time and the `GITHUB_TOKEN` hint, and `current_cached` applies when a successful lookup within `MAC_UPDATE_FEED_CACHE_TTL_H` listed exactly the installed version. Tests use a stub `curl`; the real API is never contacted.
+- **Download before the running check.** The six download-then-`copy_verified_app` handlers (Firefox Developer Edition, KeePassXC, Visual Studio Code, CodeEdit, Ledger, Trezor Suite) call `internet_defer_running_app` first; `copy_verified_app` keeps its second check before the swap, and a deferral prints no copy error.
+- **English text in a Polish run.** Deferral messages, the two `mas upgrade` lines and the run-summary item details now come from `L_*` keys in all seven languages (the Python module reads them from the environment, English default).
+- **Prompt helper.** Unrecognised input is asked again (two re-asks, then the timeout default; input ending right after a stray answer is never a yes). Terminal type-ahead is flushed with `termios.tcflush` before the first read; nothing is drained when stdin is not a terminal. The flush is covered by a pty test.
+- Not verified live: a real rate-limited run, a Firefox update with the app open, a Polish run of the changed texts.
+
 ## Not verified live
 
 - No real scheduled launchd run was observed; the plist `PATH`, the load check and the bootout flow are covered by tests with stubbed `launchctl`.

@@ -385,6 +385,21 @@ def select_proton_releases(obj: dict, os_version: str | None = None) -> dict | N
     }
 
 
+def _yml_scalar(block: str, key: str, anchor: str = "") -> str | None:
+    """Value of 'key:' inside block. Handles the plain form and YAML folded/literal block
+    scalars ('key: >-' / '|' with the value on the next line), which electron-builder
+    emits for long urls and checksums (DeepSeek Harness feed). anchor='(?m)^' pins a
+    top-level key."""
+    m = re.search(anchor + re.escape(key) + r":[ \t]*[\"']?([^\"'\s]*)", block)
+    if not m:
+        return None
+    value = m.group(1)
+    if re.fullmatch(r"[>|][+-]?", value):
+        nxt = re.compile(r"\s*[\"']?([^\"'\s]+)").match(block, m.end())
+        return nxt.group(1) if nxt else None
+    return value or None
+
+
 def parse_electron_yml(text: str) -> dict | None:
     """no PyYAML: top-level 'version: X'; under 'files:' pairs '- url: U' + 'sha512: S';
     pick first url ending '.zip' (else first); checksum_kind='sha512b64'"""
@@ -405,20 +420,17 @@ def parse_electron_yml(text: str) -> dict | None:
     for fb in file_blocks:
         if not fb.strip():
             continue
-        u_m = re.search(r"url:\s*[\"']?([^\"'\s\r\n]+)", fb)
-        s_m = re.search(r"sha512:\s*[\"']?([^\"'\s\r\n]+)", fb)
-        if u_m:
+        u_val = _yml_scalar(fb, "url")
+        if u_val:
             files.append({
-                "url": u_m.group(1),
-                "sha512": s_m.group(1) if s_m else None,
+                "url": u_val,
+                "sha512": _yml_scalar(fb, "sha512"),
             })
 
     if not files:
         # Fallback to single top-level url / path / sha512
-        p_m = re.search(r"(?m)^path:\s*[\"']?([^\"'\s\r\n]+)", text)
-        s_m = re.search(r"(?m)^sha512:\s*[\"']?([^\"'\s\r\n]+)", text)
-        url = p_m.group(1) if p_m else None
-        sha512 = s_m.group(1) if s_m else None
+        url = _yml_scalar(text, "path", "(?m)^")
+        sha512 = _yml_scalar(text, "sha512", "(?m)^")
     else:
         # Prefer the Apple Silicon zip: a multi-arch feed (e.g. OpenCode's
         # latest-mac.yml) lists arm64 and x64 archives side by side.

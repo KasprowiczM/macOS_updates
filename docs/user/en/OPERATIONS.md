@@ -94,4 +94,4 @@ brew outdated
 softwareupdate -l
 ```
 
-For **triggered-unverified** apps, verify the About/version screen: launching the vendor updater does not prove completion. Manual coverage remains limited to IPMIView and DJI Assistant 2.
+For **triggered-unverified** apps, verify the About/version screen: launching the vendor updater does not prove completion. Manual coverage remains limited to IPMIView.

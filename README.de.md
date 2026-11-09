@@ -73,7 +73,7 @@ Die Registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 | `chromium_updater` | 1 | verified direct | Nachweis des Chromium-basierten Updaters (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: verifiziertes DMG aus dem Appcast im Leerlauf; Rückfall `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Teams-Selbstupdate plus beobachteter, verifizierter MAU-Fallback `TEAMS21`, wenn Microsoft ihn anbietet |
-| `manual` | 2 | manual | IPMIView und DJI Assistant 2: nur Hinweis |
+| `manual` | 1 | manual | IPMIView: nur Hinweis |
 
 ---
 
