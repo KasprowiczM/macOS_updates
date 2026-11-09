@@ -317,3 +317,13 @@ print(cask_primary_app(sys.stdin.read()))
 ' 2>/dev/null
 }
 
+# brew_doctor_advisories — stdin: filtered `brew doctor` output;
+# stdout: one `brew_doctor|<security|info>|<text>` advisory per line (run-summary contract)
+brew_doctor_advisories() {
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from brew_casks import doctor_advisories
+for line in doctor_advisories(sys.stdin.read()):
+    print(line)
+' 2>/dev/null
+}

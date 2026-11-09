@@ -1166,9 +1166,10 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertGreater(dry_pos, -1)
         self.assertGreater(update_pos, -1)
         # dry-run early exit must appear before first brew update
-        early = text.find("[DRY-RUN] Would run: brew update")
+        early = text.find("$L_BREW_DRYRUN_WOULD_RUN_FULL")
         self.assertGreater(early, -1)
         self.assertLess(early, update_pos)
+        self.assertIn("[DRY-RUN] Would run: brew update", self.read_script("i18n/lang_en.sh"))
 
     def test_brew_asaf_filter_keeps_internal_blank_lines_in_warning_block(self) -> None:
         text = self.read_script("update_brew.sh")
