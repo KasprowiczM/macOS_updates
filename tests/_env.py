@@ -104,3 +104,78 @@ def install_app_state_stubs(bin_dir) -> None:
     )
     for n in ("defaults", "osascript"):
         (d / n).chmod(0o755)
+
+
+# ── Throw-away copy of the toolkit for end-to-end shell tests ───────────────
+# Never copy the checkout wholesale: an owner's checkout also holds private and
+# untracked content (APPLICATIONS.md, logs/, skills/, dangling symlinks, agent
+# directories) that must not leak into a test and can make copytree fail.
+_COPY_EXCLUDED_TOP = frozenset({
+    ".git", ".claude", ".agents", ".antigravitycli", "logs", "scratch", "tests", "docs", "skills",
+    "APPLICATIONS.md", "UPDATES.md", ".dev_sync_config.json", ".mac_update_prefs", ".mac-update.lock",
+})
+_COPY_FALLBACK_TOP_DIRS = ("lib", "config", "i18n", "scripts", "templates", "dev_sync")
+
+
+def _copy_allowed(rel: str) -> bool:
+    parts = rel.split("/")
+    top = parts[0]
+    if top in _COPY_EXCLUDED_TOP or top.startswith(".env") or "__pycache__" in parts:
+        return False
+    return not (len(parts) == 1 and top.startswith(".") and top != ".shellcheckrc")
+
+
+def _tracked_files(repo_root: str) -> "list[str] | None":
+    """Names from `git ls-files -z`, or None when git or the repository is unavailable."""
+    import subprocess
+
+    try:
+        proc = subprocess.run(["git", "-C", repo_root, "ls-files", "-z"], capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0 or not proc.stdout:
+        return None
+    return [p for p in proc.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
+
+
+def copy_toolkit(repo_root: Any, dest: Any) -> str:
+    """Copy only what the toolkit needs into ``dest`` and return it as a string.
+
+    Prefers the tracked files; without git it falls back to the top-level scripts
+    plus lib/, config/, i18n/, scripts/, templates/, dev_sync/ and VERSION.
+    Untracked or ignored content, private files and dangling symlinks are never
+    copied; a tracked symlink is recreated as one.
+    """
+    import shutil
+
+    root = os.fspath(repo_root)
+    out = os.fspath(dest)
+    names = _tracked_files(root)
+    if names is None:
+        names = []
+        for entry in sorted(os.listdir(root)):
+            full = os.path.join(root, entry)
+            if os.path.isfile(full) and (entry.endswith(".sh") or entry == "VERSION"):
+                names.append(entry)
+        for top in _COPY_FALLBACK_TOP_DIRS:
+            for base, dirs, files in os.walk(os.path.join(root, top)):
+                dirs[:] = [d for d in dirs if d != "__pycache__"]
+                names.extend(os.path.relpath(os.path.join(base, f), root) for f in files)
+    os.makedirs(out, exist_ok=True)
+    for rel in names:
+        if not _copy_allowed(rel):
+            continue
+        src = os.path.join(root, rel)
+        dst = os.path.join(out, rel)
+        try:
+            if os.path.islink(src):
+                if not os.path.exists(src):
+                    continue  # dangling
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                os.symlink(os.readlink(src), dst)
+            elif os.path.isfile(src):
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copy2(src, dst)
+        except OSError:
+            continue  # vanished while copying: not part of the toolkit
+    return out

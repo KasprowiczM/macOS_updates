@@ -870,6 +870,7 @@ L_DOCTOR_LAUNCHD_PATH_OK="Mit dem minimalen launchd-PATH werden weiterhin gefund
 L_DOCTOR_LAUNCHD_PATH_WARN="Mit dem minimalen launchd-PATH werden NICHT gefunden: %s — geplante Läufe würden diese Schritte überspringen"
 L_DOCTOR_LAUNCHAGENT_ACTIVE="Geplanter Lauf (LaunchAgent) ist aktiv"
 L_DOCTOR_LAUNCHAGENT_NOT_LOADED="LaunchAgent-plist vorhanden, aber nicht geladen — Abhilfe: bash scripts/install_launchagent.sh"
+L_DOCTOR_LAUNCHAGENT_PATH_WARN="Die LaunchAgent-plist hat keinen Homebrew-PATH — geplante Läufe finden brew/mas nicht; Abhilfe: bash scripts/install_launchagent.sh"
 L_DOCTOR_LAUNCHAGENT_NONE="Kein geplanter Lauf installiert (optional: bash scripts/install_launchagent.sh)"
 L_DOCTOR_SUDO_OK="sudo ist ohne Abfrage bereit (Anmeldedaten im Cache)"
 L_DOCTOR_SUDO_COLD="sudo hat keine zwischengespeicherten Anmeldedaten — ein interaktiver Lauf fragt einmal; unbeaufsichtigte Läufe überspringen Root-Schritte"
