@@ -140,9 +140,8 @@ if grep -q '^MAJOR' "$SYSTEM_PARSED_FILE"; then
             if [ "${MAC_UPDATE_YES:-0}" = "1" ]; then
                 MAJOR_ALLOWED=1
             elif [ -t 0 ]; then
-                read -r -p "  $(printf "$L_SYSTEM_MAJOR_CONFIRM" "$title")" CONFIRM_MAJOR
-                CONFIRM_MAJOR="${CONFIRM_MAJOR:-T}"
-                if [[ "$CONFIRM_MAJOR" =~ ^[TtYy]$ ]]; then
+                # shellcheck disable=SC2059
+                if mac_update_prompt_yn "$(printf "$L_SYSTEM_MAJOR_CONFIRM" "$title")" n y; then
                     MAJOR_ALLOWED=1
                 fi
             fi
@@ -208,9 +207,9 @@ print_warn "$L_SYSTEM_WARNING_TIME"
 print_warn "$L_SYSTEM_WARNING_RESTART"
 echo ""
 if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
-    read -r -p "  $L_CONTINUE_PROMPT [T/n]: " CONFIRM
-    CONFIRM="${CONFIRM:-T}"
-    if [[ "$CONFIRM" =~ ^[Nn] ]]; then
+    # Mandatory even when update_all.sh confirmed the run (a restart is
+    # consequential); an unanswered prompt lands in the declined branch.
+    if ! mac_update_prompt_yn "$L_CONTINUE_PROMPT [T/n]: " n y; then
         print_info "$L_UPDATE_CANCELED"
         if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
             touch "$MAC_UPDATE_SESSION_DIR/system_skipped_by_user" 2>/dev/null || true
@@ -224,9 +223,7 @@ if [ "$ANY_RESTART" = true ]; then
     print_warn "$L_SYSTEM_RESTART_REQUIRED"
     print_info "$L_SYSTEM_RESTART_AFTER_INFO"
     if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
-        read -r -p "  $L_SYSTEM_CONFIRM_RESTART " AUTO_RESTART
-        AUTO_RESTART="${AUTO_RESTART:-T}"
-        if [[ "$AUTO_RESTART" =~ ^[Nn] ]]; then
+        if ! mac_update_prompt_yn "$L_SYSTEM_CONFIRM_RESTART " n y; then
             # A deliberate decline is the user's choice, not a failure: never
             # install restart-required labels without -R, but still install the
             # no-restart labels and report the step as skipped by the user.

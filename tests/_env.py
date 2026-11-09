@@ -54,3 +54,37 @@ def isolate_host_tools(env: dict[str, str]) -> dict[str, str]:
     else:
         env["PATH"] = stub + ":" + path
     return env
+
+
+def install_app_state_stubs(bin_dir) -> None:
+    """Stub `defaults` (CFBundleIdentifier only) and `osascript` (is-running probe).
+
+    Fake `.app` directories carry no Info.plist, so the bundle id is derived from
+    the directory name (`Foo Bar.app` -> `com.test.FooBar`). The probe answers from
+    environment variables: FAKE_RUNNING_IDS (space-separated ids -> true),
+    FAKE_UNKNOWN_IDS (ids whose probe fails -> unknown); everything else -> false.
+    Any other `defaults` query falls through to the real tool."""
+    from pathlib import Path
+
+    d = Path(bin_dir)
+    (d / "defaults").write_text(
+        "#!/bin/bash\n"
+        'case "$*" in\n'
+        "  *CFBundleIdentifier*)\n"
+        '    for a in "$@"; do p="$q"; q="$a"; done; p="${p%/Contents/Info}"\n'
+        '    n="$(basename "$p" .app | tr -d " ")"\n'
+        '    echo "com.test.$n"; exit 0 ;;\n'
+        "esac\n"
+        'exec /usr/bin/defaults "$@"\n',
+        encoding="utf-8",
+    )
+    (d / "osascript").write_text(
+        "#!/bin/bash\n"
+        'id="$(printf "%s" "$*" | sed -n \'s/.*application id "\\([^"]*\\)".*/\\1/p\')"\n'
+        'for u in $FAKE_UNKNOWN_IDS; do [ "$u" = "$id" ] && exit 1; done\n'
+        'for r in $FAKE_RUNNING_IDS; do [ "$r" = "$id" ] && { echo true; exit 0; }; done\n'
+        "echo false\n",
+        encoding="utf-8",
+    )
+    for n in ("defaults", "osascript"):
+        (d / n).chmod(0o755)
