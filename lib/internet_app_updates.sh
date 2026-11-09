@@ -82,10 +82,24 @@ google_keystone_check() {
             GOOGLE_KEYSTONE_EXIT=$?
             [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
         fi
-        if [ "$triggered" -eq 0 ] && [ -x "$sys_updater" ]; then
-            output=$(run_with_timeout "$updater_timeout" "$sys_updater" --wake-all 2>&1)
-            GOOGLE_KEYSTONE_EXIT=$?
-            [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+        # Google Drive (com.google.drivefs) is registered ONLY with the system-scope
+        # GoogleUpdater. Waking the user scope never re-checks it, and a binary run
+        # without --system acts in user scope even when it is the system install.
+        # On 2026-11-08 the last scheduled system check was 14 h old (the Mac slept),
+        # the user-scope wake produced nothing for Drive, and it was reported
+        # "updater triggered (no response)". Wake the system scope as well; it is the
+        # same --wake-all --system the vendor's own LaunchDaemon runs.
+        if [ -x "$sys_updater" ]; then
+            local sys_out sys_rc
+            sys_out=$(run_with_timeout "$updater_timeout" "$sys_updater" --wake-all --system 2>&1)
+            sys_rc=$?
+            command -v internet_diag_log >/dev/null 2>&1 && \
+                internet_diag_log "GoogleUpdater system-scope wake (--wake-all --system): exit=$sys_rc"
+            if [ "$triggered" -eq 0 ]; then
+                output="$sys_out"
+                GOOGLE_KEYSTONE_EXIT=$sys_rc
+                [ "$sys_rc" -eq 0 ] && triggered=1
+            fi
         fi
         if [ ! -x "$user_updater" ] && [ ! -x "$sys_updater" ]; then
             if [ -n "$agent" ] && [ -f "$agent" ]; then
@@ -2207,7 +2221,7 @@ EOF_DOCKER_ROW
         elif [ "$rel" = "older" ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$VER")"
             INTERNET_LAST_VERIFIED=0
-            print_warn "$STATUS_DOCKER"
+            print_warn "$(internet_status_body "$STATUS_DOCKER")"
             return 0
         elif [ "$rel" = "unknown" ]; then
             print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
@@ -2221,7 +2235,7 @@ EOF_DOCKER_ROW
         if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$VER" "$R")"
             INTERNET_LAST_VERIFIED=1
-            print_info "$STATUS_DOCKER"
+            print_info "$(internet_status_body "$STATUS_DOCKER")"
             return 0
         fi
 
@@ -2240,7 +2254,7 @@ EOF_DOCKER_ROW
         if [ "$docker_running" -eq 1 ]; then
             STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "$R")"
             INTERNET_LAST_VERIFIED=1
-            print_warn "$STATUS_DOCKER"
+            print_warn "$(internet_status_body "$STATUS_DOCKER")"
             return 0
         fi
 
@@ -2270,13 +2284,13 @@ EOF_DOCKER_ROW
             elif [ "$vrc" -eq 4 ]; then
                 STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${R:-?}")"
                 INTERNET_LAST_VERIFIED=0
-                print_warn "$STATUS_DOCKER"
+                print_warn "$(internet_status_body "$STATUS_DOCKER")"
                 return 0
             elif [ "$vrc" -eq 3 ]; then
                 STATUS_DOCKER="$L_INTERNET_STATUS_INSTALL_ERROR"
                 INTERNET_LAST_VERIFIED=0
                 INTERNET_HARD_FAIL=1
-                print_warn "$STATUS_DOCKER"
+                print_warn "$(internet_status_body "$STATUS_DOCKER")"
                 return 1
             fi
             internet_diag_log "Docker Desktop: vendor direct install rc=$vrc — falling back to docker desktop update"
@@ -2347,7 +2361,7 @@ EOF_DOCKER_ROW
 
         STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$new_ver" "$R")"
         INTERNET_LAST_VERIFIED=1
-        print_warn "$STATUS_DOCKER"
+        print_warn "$(internet_status_body "$STATUS_DOCKER")"
         return 0
     else
         print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Docker Desktop")"
@@ -2672,7 +2686,7 @@ iu_dji_assistant() {
                     echo "DJI Assistant 2" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
                 fi
             fi
-            print_warn "$STATUS_DJI"
+            print_warn "$(internet_status_body "$STATUS_DJI")"
         else
             # A vendor that ships no auto-updater is a permanent fact about that vendor, not
             # a fault in this run. Reported as information for the same reason Antigravity's

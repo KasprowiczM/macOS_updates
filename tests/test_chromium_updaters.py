@@ -476,6 +476,7 @@ exit 0
 
             cmd = f"""
                 export HOME="{tmpdir}"
+                export MAC_UPDATE_GOOGLE_SYS_UPDATER=""
                 source "{REPO_ROOT}/i18n/lang_en.sh"
                 source "{REPO_ROOT}/lib/version.sh"
                 source "{REPO_ROOT}/lib/proc.sh"

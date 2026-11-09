@@ -73,6 +73,28 @@ internet_registry_method_for() {
     return 1
 }
 
+# internet_effective_method <app> <config_method>
+# The method that actually decides an app's update, for reporting
+# (logs/version_history.tsv). A row in config/vendor_feeds.txt makes the vendor
+# feed the source of truth for silent_launch / docker_cli / sparkle_appcast apps:
+# internet_handler_vendor_truth (or Docker's verified DMG path) compares versions
+# and installs directly; the configured method is only the fallback when the
+# feed is unusable. Same rule as scripts/report_update_coverage.sh (vendor_feed).
+# Other methods are returned unchanged. Every returned name is either a config
+# method (with a handler, rule 6a) or "vendor_feed" (internet_handler_vendor_truth).
+internet_effective_method() {
+    local app="$1" method="$2"
+    case "$method" in
+        silent_launch|docker_cli|sparkle_appcast)
+            if command -v vendor_feed_row >/dev/null 2>&1 && vendor_feed_row "$app" >/dev/null 2>&1; then
+                printf 'vendor_feed\n'
+                return 0
+            fi
+            ;;
+    esac
+    printf '%s\n' "$method"
+}
+
 _internet_dispatch_config_path() {
     echo "${SCRIPT_DIR}/config/internet_dispatch_order.txt"
 }

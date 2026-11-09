@@ -776,7 +776,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         )
 
         legacy_handled_methods = {
-            "github_dmg", "msupdate", "mau_fallback_self_update",
+            "github_dmg", "mozilla_dmg", "msupdate", "mau_fallback_self_update",
             "docker_cli", "brew_cask", "appstore_gui"
         }
 
@@ -838,7 +838,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                 f"iu_{method}",
             ]
             found = any(h in handler_code for h in handler_names) or method in {
-                "keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"
+                "keystone", "github_dmg", "mozilla_dmg", "msupdate", "docker_cli", "sparkle_appcast"
             }
             self.assertTrue(
                 found,
@@ -2699,6 +2699,9 @@ class I18nCompletenessTests(unittest.TestCase):
             "L_INTERNET_STATUS_UPDATE_IN_PROGRESS",
             "L_INTERNET_STATUS_MANAGED_BREW",
             "L_INTERNET_STATUS_MANAGED_APPSTORE",
+            # Feed state (P1-1/P1-2): current per cached check / feed regressed.
+            "L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT",
+            "L_INTERNET_STATUS_FEED_REGRESSED_FMT",
         }
 
         for key in all_status_keys:

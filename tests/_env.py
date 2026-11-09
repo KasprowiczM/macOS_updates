@@ -5,10 +5,26 @@ import os
 from typing import Any
 
 
+_FEED_STATE_SEQ = [0]
+
+
+def fresh_feed_state_file() -> str:
+    """A new, not-yet-existing vendor feed state path (lib/python/feed_state.py).
+
+    Each call returns a distinct path so one test's feed observations can never
+    become another test's cached proof or high-water mark."""
+    _FEED_STATE_SEQ[0] += 1
+    return os.path.join(host_stub_dir(), f"feed_state_{os.getpid()}_{_FEED_STATE_SEQ[0]}.json")
+
+
 def shell_env(**extra: Any) -> dict[str, str]:
-    """Return a copy of os.environ without PYTHONPATH, plus extra environment variables."""
+    """Return a copy of os.environ without PYTHONPATH, plus extra environment variables.
+
+    MAC_UPDATE_FEED_STATE_FILE always points at a fresh per-call path unless the
+    caller passes one (tests must never share, or touch the real, feed state)."""
     env = dict(os.environ)
     env.pop("PYTHONPATH", None)
+    env["MAC_UPDATE_FEED_STATE_FILE"] = fresh_feed_state_file()
     for k, v in extra.items():
         if v is None:
             env.pop(k, None)
