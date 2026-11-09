@@ -12,6 +12,9 @@ USER_NAME="$(id -un)"
 PLIST_LABEL="com.${USER_NAME}.macos-updates"
 PLIST_PATH="${HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
 
+# launchd's default PATH lacks Homebrew; set one explicitly.
+LAUNCHD_PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
+
 WEEKDAY=1  # 1 = Monday
 HOUR=9     # 09:00 AM
 
@@ -49,6 +52,9 @@ if [ "$MODE" = "check" ]; then
             sch_day=$(grep -A1 '<key>Weekday</key>' "$PLIST_PATH" | grep -o '[0-9]*' || echo "?")
             sch_hr=$(grep -A1 '<key>Hour</key>' "$PLIST_PATH" | grep -o '[0-9]*' || echo "?")
             echo "   StartCalendarInterval: Weekday $sch_day at ${sch_hr}:00"
+            if ! grep -A1 '<key>PATH</key>' "$PLIST_PATH" | grep -q '/opt/homebrew/bin'; then
+                echo "⚠️  Plist has no EnvironmentVariables.PATH with Homebrew; scheduled runs cannot find brew/mas. Re-run: bash scripts/install_launchagent.sh"
+            fi
         fi
         exit 0
     elif [ -f "$PLIST_PATH" ]; then
@@ -102,6 +108,8 @@ cat <<PLISTEOF > "$PLIST_PATH"
     </array>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>PATH</key>
+        <string>${LAUNCHD_PATH}</string>
         <key>MAC_UPDATE_NONINTERACTIVE</key>
         <string>1</string>
         <key>MAC_UPDATE_NOTIFY</key>
@@ -128,17 +136,31 @@ chmod 644 "$PLIST_PATH"
 xattr -d com.apple.quarantine "$PLIST_PATH" 2>/dev/null || true
 
 CURRENT_UID="$(id -u)"
-# Unload/bootout previous instance if present
-launchctl bootout "gui/${CURRENT_UID}/${PLIST_LABEL}" 2>/dev/null \
-    || launchctl bootout "gui/${CURRENT_UID}" "$PLIST_PATH" 2>/dev/null \
-    || launchctl unload -w "$PLIST_PATH" 2>/dev/null \
+# Remove a previous instance. bootout only: `unload -w` would persist a
+# "disabled" override that can survive into the new install.
+launchctl bootout "gui/${CURRENT_UID}/${PLIST_LABEL}" >/dev/null 2>&1 \
+    || launchctl bootout "gui/${CURRENT_UID}" "$PLIST_PATH" >/dev/null 2>&1 \
     || true
 
-# Modern bootstrap + enable (macOS 10.10+ / macOS 27) with fallback to legacy load -w
-if ! launchctl bootstrap "gui/${CURRENT_UID}" "$PLIST_PATH" 2>/dev/null; then
-    launchctl load -w "$PLIST_PATH" 2>/dev/null || true
+# Clear any stale "disabled" override first, then bootstrap with a fallback to
+# legacy load; keep stderr for diagnostics.
+launchctl enable "gui/${CURRENT_UID}/${PLIST_LABEL}" >/dev/null 2>&1 || true
+BOOT_ERR="$(launchctl bootstrap "gui/${CURRENT_UID}" "$PLIST_PATH" 2>&1)"
+if [ $? -ne 0 ]; then
+    BOOT_ERR_LEGACY="$(launchctl load -w "$PLIST_PATH" 2>&1)"
+    BOOT_ERR="${BOOT_ERR}${BOOT_ERR_LEGACY:+
+$BOOT_ERR_LEGACY}"
 fi
-launchctl enable "gui/${CURRENT_UID}/${PLIST_LABEL}" 2>/dev/null || true
+launchctl enable "gui/${CURRENT_UID}/${PLIST_LABEL}" >/dev/null 2>&1 || true
+
+# Never claim success without proof that the service is loaded.
+if ! PRINT_OUT="$(launchctl print "gui/${CURRENT_UID}/${PLIST_LABEL}" 2>&1)"; then
+    echo "❌ LaunchAgent was NOT loaded: $PLIST_LABEL" >&2
+    [ -n "$BOOT_ERR" ] && echo "$BOOT_ERR" >&2
+    [ -n "$PRINT_OUT" ] && echo "$PRINT_OUT" >&2
+    echo "   Plist: $PLIST_PATH" >&2
+    exit 1
+fi
 
 echo "✅ Installed and loaded LaunchAgent: $PLIST_LABEL"
 echo "   Schedule: Weekday $WEEKDAY at $HOUR:00"
