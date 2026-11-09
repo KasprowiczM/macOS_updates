@@ -350,6 +350,25 @@ def read_npm_cli_details(filepath: str | Path) -> dict[str, dict[str, str]]:
     return details
 
 
+def read_deferred_running(session_dir: str | Path) -> list[tuple[str, str]]:
+    """(cask, app) pairs from $SESSION_DIR/brew_deferred_running.txt (`cask|App.app`)."""
+    path = Path(session_dir) / "brew_deferred_running.txt"
+    out: list[tuple[str, str]] = []
+    if not path.is_file():
+        return out
+    seen: set[str] = set()
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        cask, _, app = line.partition("|")
+        cask = cask.strip()
+        if cask and cask not in seen:
+            seen.add(cask)
+            out.append((cask, app.strip()))
+    return out
+
+
 def collect_run_items(
     session_dir: str | Path,
     step_results: dict[str, str] | None = None,
@@ -689,15 +708,34 @@ def collect_run_items(
                 "details": "Casks check/update unconfirmed",
             })
         elif pbc_val.isdigit() and int(pbc_val) > 0:
-            items.append({
-                "name": "Homebrew Casks pending queue",
-                "id": "brew_casks",
-                "category": "brew_cask",
-                "old_version": None,
-                "new_version": None,
-                "status": "pending",
-                "details": f"{pbc_val} updates pending",
-            })
+            # Casks deferred because their app is open are listed one by one
+            # below; the generic queue item covers only the remainder.
+            deferred_items = read_deferred_running(sdir)
+            rest = int(pbc_val) - len(deferred_items)
+            if rest > 0:
+                items.append({
+                    "name": "Homebrew Casks pending queue",
+                    "id": "brew_casks",
+                    "category": "brew_cask",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": f"{rest} updates pending",
+                })
+
+    # Homebrew casks deferred because their app (or declared quit target) is open
+    deferred_detail = os.environ.get(
+        "L_BREW_CASK_DEFERRED_DETAIL", "app is open — quit it and re-run")
+    for cask_tok, app_name in read_deferred_running(sdir):
+        items.append({
+            "name": cask_tok,
+            "id": cask_tok,
+            "category": "brew_cask",
+            "old_version": None,
+            "new_version": None,
+            "status": "pending",
+            "details": f"{app_name}: {deferred_detail}" if app_name else deferred_detail,
+        })
 
     # Homebrew orphan casks
     orphan_file = sdir / "brew_orphan_casks.txt"

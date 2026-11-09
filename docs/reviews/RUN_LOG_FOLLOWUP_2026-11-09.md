@@ -27,6 +27,19 @@ A review of the scheduled (launchd) path and the interactive path, prompted by r
 
 `update_all.sh --doctor` (read-only readiness report, exit 0/10/1), cheap pre-flight (disk, battery, network) with `caffeinate`, sudo keep-alive limit, additive run-summary fields (`advisories`, per-step `duration_seconds`, inventory counts), log rotation for `run_summary_*.json`, and a follow-up hardening making every curl fetch https-only.
 
+## Independent review round
+
+1. Localized yes letters (`j`, `s`, `o`, plus `y`, `t`) are accepted by `mac_update_prompt_yn`; `n` is no, anything else no.
+2. Casks without an `app` artifact are deferred when a declared `uninstall` quit/signal bundle ID is running or unknown, or the cask JSON is unreadable; none declared means upgrade.
+3. Deferred casks count in `pending_brew_casks` and appear as pending `brew_cask` run-summary items (no duplicate "still outdated" report, still soft).
+4. The sudo keep-alive stops when the parent shell is gone; `MAC_UPDATE_SUDO_KEEPALIVE_MAX` now defaults to 14400.
+5. The network pre-flight retries the whole probe pass (`MAC_UPDATE_PREFLIGHT_NET_RETRIES`, `MAC_UPDATE_PREFLIGHT_NET_RETRY_WAIT`) before aborting; `--doctor` stays single-pass.
+6. `--doctor` "last run" ignores dry-run and inventory-only summaries and says so when no real run exists.
+7. A timed-out macOS prompt prints "no answer within N s", writes `system_prompt_timeout` and the banner reads "skipped: no answer" (exit `10`, status codes unchanged).
+8. `docs/agents/exit_codes.md` battery row corrected: the system step is `skipped`, the run degraded, the master exits `0`.
+9. `install_launchagent.sh --uninstall` no longer falls back to `launchctl unload -w`.
+10. The run-log filter keeps passing output to the terminal when the log cannot be opened.
+
 ## Not verified live
 
 - No real scheduled launchd run was observed; the plist `PATH`, the load check and the bootout flow are covered by tests with stubbed `launchctl`.

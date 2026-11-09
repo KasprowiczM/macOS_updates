@@ -625,3 +625,24 @@ exit 0
 if __name__ == "__main__":
     unittest.main()
 
+
+
+class QuitBundleIdTests(unittest.TestCase):
+    def test_quit_and_signal_ids(self) -> None:
+        from brew_casks import cask_quit_ids_facts, quit_bundle_ids
+        cask = {"artifacts": [
+            {"pkg": ["x.pkg"]},
+            {"uninstall": [{"quit": ["com.a", "com.b"],
+                            "signal": [["TERM", "com.c"], ["KILL", "com.a"]]}]},
+        ]}
+        self.assertEqual(quit_bundle_ids(cask), ["com.a", "com.b", "com.c"])
+        self.assertEqual(quit_bundle_ids({"artifacts": [
+            {"uninstall": [{"quit": "com.s"}]}]}), ["com.s"])
+        self.assertEqual(quit_bundle_ids({"artifacts": [
+            {"uninstall": [{"signal": ["TERM", "com.p"]}]}]}), ["com.p"])
+        self.assertEqual(quit_bundle_ids({"artifacts": [{"font": ["F.ttf"]}]}), [])
+        import json
+        self.assertEqual(cask_quit_ids_facts(json.dumps({"casks": [cask]})), "com.a;com.b;com.c")
+        self.assertEqual(cask_quit_ids_facts(json.dumps({"casks": [{"artifacts": []}]})), "")
+        self.assertEqual(cask_quit_ids_facts("not json"), "UNREADABLE")
+        self.assertEqual(cask_quit_ids_facts('{"casks": []}'), "UNREADABLE")
