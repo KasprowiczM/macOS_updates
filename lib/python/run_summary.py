@@ -142,6 +142,16 @@ MAX_ADVISORIES = 50
 MAX_ADVISORY_TEXT = 500
 
 
+
+def _detail(key: str, default: str, *args: object) -> str:
+    """Item detail text: the localized L_* string from the environment (exported by
+    i18n/loader.sh) with the English default; a malformed override falls back."""
+    fmt = os.environ.get(key) or default
+    try:
+        return fmt % args if args else fmt
+    except (TypeError, ValueError):
+        return default % args if args else default
+
 def read_advisories(session_dir: str | Path | None) -> list[dict[str, str]]:
     """Advisories the child steps appended to $SESSION_DIR/advisories.txt.
 
@@ -665,7 +675,7 @@ def collect_run_items(
                 "old_version": None,
                 "new_version": None,
                 "status": "pending",
-                "details": f"{pending_mau_val} updates pending",
+                "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", pending_mau_val),
             })
 
     # Homebrew Formulae pending queue
@@ -690,7 +700,7 @@ def collect_run_items(
                 "old_version": None,
                 "new_version": None,
                 "status": "pending",
-                "details": f"{pbf_val} updates pending",
+                "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", pbf_val),
             })
 
     # Homebrew Casks pending queue
@@ -720,7 +730,7 @@ def collect_run_items(
                     "old_version": None,
                     "new_version": None,
                     "status": "pending",
-                    "details": f"{rest} updates pending",
+                    "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", rest),
                 })
 
     # Homebrew casks deferred because their app (or declared quit target) is open
@@ -791,7 +801,7 @@ def collect_run_items(
                 "old_version": None,
                 "new_version": None,
                 "status": "pending",
-                "details": f"{pas_val} updates pending",
+                "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", pas_val),
             })
 
     # System updates installed in this run
@@ -968,9 +978,9 @@ def collect_run_items(
                     m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*→\s*([0-9][0-9a-zA-Z._-]*)', text)
                     if m:
                         old_ver, new_ver = m.group(1), m.group(2)
-                        details = f"vendor {new_ver} > installed {old_ver} — quit the app so its updater can install it"
+                        details = _detail("L_SUMMARY_DETAIL_VENDOR_AHEAD_FMT", "vendor %s > installed %s — quit the app so its updater can install it", new_ver, old_ver)
                     else:
-                        details = "update pending — quit the app so its updater can install it"
+                        details = _detail("L_SUMMARY_DETAIL_UPDATE_PENDING_QUIT", "update pending — quit the app so its updater can install it")
                 elif code == "behind":
                     m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*<\s*([0-9][0-9a-zA-Z._-]*)', text)
                     if m:

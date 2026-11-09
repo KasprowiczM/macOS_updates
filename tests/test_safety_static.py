@@ -2706,6 +2706,9 @@ class I18nCompletenessTests(unittest.TestCase):
             # Feed state (P1-1/P1-2): current per cached check / feed regressed.
             "L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT",
             "L_INTERNET_STATUS_FEED_REGRESSED_FMT",
+            # GitHub rate limit: parameterised, so classified error_soft by code in
+            # internet_status_code and counted soft via _soft_fail_from_codes.
+            "L_INTERNET_STATUS_GITHUB_RATELIMIT_FMT",
         }
 
         for key in all_status_keys:

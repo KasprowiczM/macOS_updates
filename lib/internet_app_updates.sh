@@ -248,6 +248,8 @@ iu_firefox_developer_edition() {
             FF_VER_DISPLAY="$VER (kanał $LATEST_FF)"
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
+        elif internet_defer_running_app "/Applications/Firefox Developer Edition.app" STATUS_FIREFOX "$VER" "$LATEST_FF"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_FF" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_APPLE_SILICON" "Firefox Developer Edition" "$LATEST_FF")"
@@ -267,10 +269,10 @@ iu_firefox_developer_edition() {
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
                             STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_FIREFOX="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_FF:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
                                 STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -491,6 +493,7 @@ iu_keepassxc() {
 
         LATEST_KPX_TAG=$(github_latest_tag "keepassxreboot/keepassxc")
         LATEST_KPX=$(echo "$LATEST_KPX_TAG" | sed 's/^v//')
+        [ "$LATEST_KPX" = "?" ] || github_lookup_record "KeePassXC" "$LATEST_KPX"
         KPX_RELATION="$(internet_version_relation "$LATEST_KPX" "$VER")"
         # Arch detection for DMG URL with safe fallback
         KPX_UNAME="$(uname -m 2>/dev/null || echo "arm64")"
@@ -500,7 +503,9 @@ iu_keepassxc() {
             KPX_REBUILD="$(github_rebuild_asset "keepassxreboot/keepassxc" "$LATEST_KPX_TAG" "KeePassXC" "$LATEST_KPX" "$KPX_ARCH" "/Applications/KeePassXC.app")"
         fi
 
-        if [ "$LATEST_KPX" = "?" ]; then
+        if [ "$LATEST_KPX" = "?" ] && github_lookup_handled "KeePassXC" "$VER"; then
+            STATUS_KEEPASSXC="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_KPX" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             if silent_launch_app "KeePassXC"; then
                 print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "KeePassXC → Check for updates")"
@@ -514,6 +519,8 @@ iu_keepassxc() {
         elif [ "$KPX_RELATION" = "current" ] && [ -z "$KPX_REBUILD" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "KeePassXC" "$VER (remote: $LATEST_KPX)")"
             STATUS_KEEPASSXC="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/KeePassXC.app" STATUS_KEEPASSXC "$VER" "${LATEST_KPX}${KPX_REBUILD:+ (rebuild)}"; then
+            :
         else
             # Either a newer version, or a same-version rebuild published after
             # this bundle was installed (2.8.0-1: Qt fix for the macOS 27.2
@@ -557,10 +564,10 @@ iu_keepassxc() {
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "KeePassXC" "$NEW_VER")"
                             STATUS_KEEPASSXC="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "KeePassXC")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_KEEPASSXC="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_KPX:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "KeePassXC")"
                                 STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -2050,6 +2057,8 @@ iu_visual_studio_code() {
             elif [ "$VSCODE_RELATION" = "current" ]; then
                 print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER (remote: $LATEST_VSCODE)")"
                 STATUS_VSCODE="$L_INTERNET_STATUS_CURRENT"
+            elif internet_defer_running_app "/Applications/Visual Studio Code.app" STATUS_VSCODE "$VER" "$LATEST_VSCODE"; then
+                :
             else
                 print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
                 print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "Visual Studio Code" "$LATEST_VSCODE")"
@@ -2080,10 +2089,10 @@ iu_visual_studio_code() {
                                 print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Visual Studio Code" "$NEW_VER")"
                                 STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                             else
-                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
                                 if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                     STATUS_VSCODE="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_VSCODE:-?}")"
                                 else
+                                    print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
                                     STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
                                 fi
                             fi
@@ -2118,9 +2127,12 @@ iu_codeedit() {
 
         LATEST_CE_TAG=$(github_latest_tag "CodeEditApp/CodeEdit")
         LATEST_CE=$(echo "$LATEST_CE_TAG" | sed 's/^v//')
+        [ "$LATEST_CE" = "?" ] || github_lookup_record "CodeEdit" "$LATEST_CE"
         CE_RELATION="$(internet_version_relation "$LATEST_CE" "$VER")"
 
-        if [ "$LATEST_CE" = "?" ]; then
+        if [ "$LATEST_CE" = "?" ] && github_lookup_handled "CodeEdit" "$VER"; then
+            STATUS_CODEEDIT="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_CE" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             if silent_launch_app "CodeEdit"; then
                 STATUS_CODEEDIT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
@@ -2133,6 +2145,8 @@ iu_codeedit() {
         elif [ "$CE_RELATION" = "current" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "CodeEdit" "$VER (remote: $LATEST_CE)")"
             STATUS_CODEEDIT="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/CodeEdit.app" STATUS_CODEEDIT "$VER" "$LATEST_CE"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_CE" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "CodeEdit" "$LATEST_CE")"
@@ -2152,10 +2166,10 @@ iu_codeedit() {
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "CodeEdit" "$NEW_VER")"
                             STATUS_CODEEDIT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "CodeEdit")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_CODEEDIT="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_CE:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "CodeEdit")"
                                 STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -2468,6 +2482,8 @@ for url, digest in entries:
         elif [ "$LEDGER_RELATION" = "current" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "$LEDGER_NAME" "$VER (remote: $LATEST_LEDGER)")"
             STATUS_LEDGER="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "$LEDGER_APP" STATUS_LEDGER "$VER" "$LATEST_LEDGER"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_LEDGER" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "$LEDGER_NAME" "$LATEST_LEDGER")"
@@ -2523,10 +2539,10 @@ sys.exit(0 if exp_hex and exp_hex == act else 1)
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "$LEDGER_NAME" "$NEW_VER")"
                             STATUS_LEDGER="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$SRC_APP")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_LEDGER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_LEDGER:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$SRC_APP")"
                                 STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi
@@ -2562,13 +2578,12 @@ iu_trezor_suite() {
         # Monorepo: trezor-suite publishes both suite (desktop) and connect (library)
         # releases. /releases/latest may return a connect release. Filter to desktop-only
         # tags matching v?NN.N.N (no slashes, no connect prefix).
-        LATEST_TS_TAG=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 3 --retry-delay 2 \
-            -H "User-Agent: macos-updates-toolkit" \
-            ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} \
-            "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" 2>/dev/null \
-            | python3 -c 'import json,sys,re
+        LATEST_TS_TAG="?"
+        TS_BODY="$(mktemp "${TMPDIR:-/tmp}/ghapi.XXXXXX")" || TS_BODY=""
+        if [ -n "$TS_BODY" ] && github_api_fetch "trezor/trezor-suite" "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" "$TS_BODY"; then
+            LATEST_TS_TAG=$(python3 -c 'import json,sys,re
 try:
-    releases=json.load(sys.stdin)
+    releases=json.load(open(sys.argv[1]))
     for r in releases:
         tag=r.get("tag_name","")
         if not r.get("prerelease") and re.match(r"^v?\d{2}\.\d+\.\d+$", tag):
@@ -2576,11 +2591,16 @@ try:
     else:
         print("?")
 except Exception:
-    print("?")' 2>/dev/null)
+    print("?")' "$TS_BODY" 2>/dev/null)
+        fi
+        [ -n "$TS_BODY" ] && rm -f "$TS_BODY"
         LATEST_TS=$(echo "$LATEST_TS_TAG" | sed 's/^v//')
+        [ "$LATEST_TS" = "?" ] || github_lookup_record "Trezor Suite" "$LATEST_TS"
         TS_RELATION="$(internet_version_relation "$LATEST_TS" "$VER")"
 
-        if [ "$LATEST_TS" = "?" ]; then
+        if [ "$LATEST_TS" = "?" ] && github_lookup_handled "Trezor Suite" "$VER"; then
+            STATUS_TREZOR="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_TS" = "?" ]; then
             print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
             STATUS_TREZOR="$L_INTERNET_STATUS_OFFLINE"
         elif [ "$TS_RELATION" = "unknown" ]; then
@@ -2589,6 +2609,8 @@ except Exception:
         elif [ "$TS_RELATION" = "current" ]; then
             print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Trezor Suite" "$VER (remote: $LATEST_TS)")"
             STATUS_TREZOR="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/Trezor Suite.app" STATUS_TREZOR "$VER" "$LATEST_TS"; then
+            :
         else
             print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_TS" "$VER")"
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_ARM" "Trezor Suite" "$LATEST_TS")"
@@ -2608,10 +2630,10 @@ except Exception:
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Trezor Suite" "$NEW_VER")"
                             STATUS_TREZOR="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
                         else
-                            print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Trezor Suite.app")"
                             if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
                                 STATUS_TREZOR="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_TS:-?}")"
                             else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Trezor Suite.app")"
                                 STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
                             fi
                         fi

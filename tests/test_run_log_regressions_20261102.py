@@ -269,7 +269,9 @@ class KeePassXCRebuildTests(unittest.TestCase):
             bindir.mkdir()
             (root / "release.json").write_text(json.dumps(RELEASE))
             curl = bindir / "curl"
-            curl.write_text(f'#!/bin/sh\ncat "{root / "release.json"}"\n')
+            curl.write_text(
+                '#!/bin/sh\nout=""; prev=""\nfor a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\n'
+                f'cat "{root / "release.json"}" > "$out"\nprintf 200\n')
             curl.chmod(0o755)
             app = root / "KeePassXC.app"
             app.mkdir()

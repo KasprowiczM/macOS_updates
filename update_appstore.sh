@@ -323,7 +323,7 @@ else
         print_warn "$MAS_TOR1_OUT"
     elif [ "$MAS_TOR1_EXIT" -eq 0 ]; then
         printf '%s\n' "$MAS_TOR1_OUT"
-        print_ok "mas upgrade command completed; the final queue check will verify installation."
+        print_ok "${L_APPSTORE_MAS_UPGRADE_COMPLETED:-mas upgrade command completed; the final queue check will verify installation.}"
 
         # Second measurement, then one retry in the INVOKING USER's session for
         # whatever the sudo pass left behind. App Store receipts and the signed-in
@@ -335,7 +335,7 @@ else
         MAS_TOR1_LEFT="$(mas_probe_outdated)"
         MAS_TOR1_LEFT_IDS="$(mas_outdated_ids "$MAS_TOR1_LEFT")"
         if [ -n "$MAS_TOR1_LEFT_IDS" ]; then
-            print_warn "sudo mas upgrade left these App Store updates pending; retrying in the user session:"
+            print_warn "${L_APPSTORE_MAS_RETRY_USER_SESSION:-sudo mas upgrade left these App Store updates pending; retrying in the user session:}"
             printf '%s\n' "$MAS_TOR1_LEFT" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }'
             for MAS_RETRY_ID in $MAS_TOR1_LEFT_IDS; do
                 retry_line="$(printf '%s\n' "$MAS_TOR1_LEFT" | grep "^[[:space:]]*$MAS_RETRY_ID" | head -n 1)"
