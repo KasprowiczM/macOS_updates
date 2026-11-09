@@ -29,7 +29,7 @@
 | `scripts/check_vendor_feeds.sh` | Read-only diagnostic query of vendor feeds and Omaha updaters (table and `--json`) |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
 | `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
-| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule |
+| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key |
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
 | `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
@@ -48,7 +48,7 @@
 | `lib/internet_i18n.sh` | Localized printf message formatting helpers for internet app updaters |
 | `lib/internet_registry.sh` | Parser and validator for `config/internet_app_methods.txt` mapping apps to update handlers |
 | `lib/internet_status.sh` | Internet app status code mapping and summary report formatting (v1.5.0) |
-| `lib/platform.sh` | Supported macOS platform and Apple Silicon architecture guards |
+| `lib/platform.sh` | Supported macOS platform and Apple Silicon architecture guards; `mac_update_ensure_homebrew_path` (runs when sourced) puts Homebrew on `PATH` for launchd runs |
 | `lib/proc.sh` | Shared process execution, timeout, and child process management helpers |
 | `lib/severity.sh` | Shared severity classification and exit code contract helpers across orchestrator scripts |
 | `lib/ui.sh` | Terminal UX helpers: formatting, colors, and TTY-aware progress reporting |
@@ -99,6 +99,8 @@
 | `MAC_UPDATE_PARENT_CONFIRMED` | unset | Exported as `1` by `update_all.sh` once its master confirmation succeeded; children skip their own redundant confirmation |
 | `MAC_UPDATE_DOCTOR_PROBE_AX` | `0` | `--doctor` only: set to `1` to probe Accessibility with `osascript` (can show a macOS permission prompt) |
 | `MAC_UPDATE_PREFLIGHT_HOSTS` | `api.github.com formulae.brew.sh itunes.apple.com` | HTTPS hosts probed by pre-flight / `--doctor` (test override) |
+| `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Seconds (clamp 10-900, 0 = wait forever) a mid-run yes/no prompt waits (`mac_update_prompt_yn`, `lib/ui.sh`); a timeout is a safe "no" |
+| `MAC_UPDATE_HOMEBREW_PREFIX` | `/opt/homebrew` | Test-only override of the prefix `mac_update_ensure_homebrew_path` adds to `PATH` |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
 ## update_all.sh Step Order

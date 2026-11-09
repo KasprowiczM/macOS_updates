@@ -2,6 +2,7 @@
 
 ## Current status (v1.5.5, 2026-10-12)
 
+- 2026-11-09 review follow-up ([record](../reviews/RUN_LOG_FOLLOWUP_2026-11-09.md)): launchd `PATH`, LaunchAgent load check, prompt timeouts, open-cask deferral, feed state and `--doctor`/pre-flight are implemented and covered by tests, but **not yet observed live** (paths 10-13 below). Paths 2 and 3 remain unaccepted.
 - 2026-11-02 run ([follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-11-02.md)): **621 tests pass**. Path 5 success branch observed again (KeePassXC 2.8.0 → 2.8.0-1 rebuild, `.DIGEST` verified); Path 7 Case A observed for a native updater (HyperFrames b637 → b666, toolkit quit the app it launched). Paths 2 and 3 remain unaccepted.
 - Release gate: **600 tests pass** (`bash run_tests.sh`, now with the host-tool guard), shell/Python syntax and secret scan pass; the suite also passes under `/usr/bin/python3` 3.9 (2026-10-30 follow-up on macOS 27.2, still v1.5.5).
 - 2026-10-29 run ([follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-30.md)): macOS 27.2 was offered and the user declined the automatic restart. That exposed the declined-restart error now fixed (exit 10, "skipped by user"). Paths 2 and 3 remain unaccepted.
@@ -57,6 +58,10 @@ When running `update_all.sh`, inspect the execution log in `logs/update_all_<YYY
 | **7** | **Preserve User Apps & Quit Toolkit-Launched** | An app was closed prior to run; toolkit launched it in background for update trigger. | Launch: Bundle ID recorded in `toolkit_launched.txt`.<br>Quit: `internet_app_quit_gracefully` quits app.<br>Failure to quit:<br>`L_INTERNET_APP_STILL_RUNNING_FMT`<br>`"%s was launched for update and did not exit within 60s"` | User-opened apps are untouched. Apps opened by toolkit are recorded in `toolkit_launched.txt` and closed cleanly at end of Step 4. If an open app is outdated, warns `NEEDS_RESTART` without closing it. | `[ ]` partial 2026-10-11 — Warp quit cleanly; Claude Desktop did not quit within 60 s (likely relaunched by its updater; v1.5.5 re-sends the graceful quit) |
 | **8** | **Docker Desktop verified DMG (v1.5.2)** | Docker Desktop is closed and behind its appcast. | `L_INTERNET_VENDOR_DIRECT_FMT`<br>`"Installing Docker Desktop %s from the vendor (desktop.docker.com) …"` | DMG verified (Gatekeeper, bundle ID, Team ID), swapped with rollback; engine never started. A running Docker reports `NEEDS_RESTART`. | `[x]` 2026-09-28 — 4.92.0 → 4.93.0, `codesign --verify --deep --strict` + `spctl` pass |
 | **9** | **Chromium updater history proof (v1.5.2)** | Gemini / Google Drive / Comet current, updater checked within 6 h. | `L_INTERNET_STATUS_OMAHA_RECENT_FMT`<br>`"✅ Up to date (vendor updater check at %s)"` | `current_vendor`, updater not woken, no 45 s wait. | `[x]` 2026-09-28 — Gemini 14:10, Drive 14:10, Comet 14:40; Step 4 11 min → 2 min |
+| **10** | **Scheduled launchd run finds Homebrew** | LaunchAgent re-installed with the `PATH` key, then a scheduled run fires. | Log shows Homebrew and `mas` steps running, no "Homebrew is not installed". | `[ ]` |
+| **11** | **Google Drive system-scope proof** | Drive current; run wakes the system-scope updater. | Proof accepted within the 6 h window, or a logged refusal reason. | `[ ]` |
+| **12** | **Prompt timeout and open-cask deferral** | Interactive run left unanswered; a cask app is open. | Timeout takes the safe "no" after `MAC_UPDATE_PROMPT_TIMEOUT`; open-app cask deferred (`brew_deferred_running.txt`), step soft. | `[ ]` |
+| **13** | **`--doctor` and pre-flight on a real run** | `bash update_all.sh --doctor`, then a full run. | Doctor exits 0/10/1 without a log; the run keeps the Mac awake (`caffeinate`) and honours the disk/battery/network policy. | `[ ]` |
 
 ---
 

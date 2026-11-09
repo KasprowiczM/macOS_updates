@@ -32,6 +32,14 @@ This page describes the structural rules of the toolkit (shell, Python, session 
   - `appstore_ios_pending.txt` — Tracks iOS/iPadOS apps awaiting installation or verification after Track 2 GUI execution.
   - `internet_status_codes.txt` — Machine-readable status codes (`current_verified`, `current_vendor`, `rollout_hold`, `behind`, `needs_restart`, `feed_stale`, `unverified`, etc.) per internet app for severity and run summary generation.
 
+## Session files and persistent state (2026-11-09)
+
+- `brew_deferred_running.txt` — `cask|App.app` rows for casks deferred because their app was open or its running state unknown.
+- `advisories.txt` — `source|severity|text` rows (severity `security` or `info`), appended by steps (currently `brew doctor`) and merged into the run summary's `advisories` field and the final "Advisories" block.
+- **Persistent feed state:** `~/.local/state/mac-update/feed_state.json` (`MAC_UPDATE_FEED_STATE_FILE`, mode 0600, same-directory temp + `os.replace`) via `lib/python/feed_state.py`. It outlives the session directory and holds, per app, the last good vendor version/time, a high-water mark and the last error. Corrupt or unknown files load as empty state.
+- Run summary stays format 4 with additive fields: top-level `advisories`, `steps.<step>.duration_seconds`, `counts.inventory_entries_added` / `inventory_entries_removed`.
+- Pre-flight (`lib/preflight.sh`) runs before step 0 on real runs and keeps the Mac awake with `caffeinate -i -w $$`; `logs/` rotation (`lib/python/log_rotation.py`) also prunes `run_summary_*.json`.
+
 ## i18n
 - `i18n/loader.sh` reads `MAC_LANG` from `.mac_update_prefs`
 - Languages: `en` `pl` `es` `it` `pt` `de` `fr`
