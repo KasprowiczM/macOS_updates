@@ -895,6 +895,7 @@ L_DOCTOR_LAUNCHD_PATH_OK="Con el PATH mínimo de launchd se siguen encontrando: 
 L_DOCTOR_LAUNCHD_PATH_WARN="Con el PATH mínimo de launchd NO se encuentran: %s; las ejecuciones programadas omitirían sus pasos"
 L_DOCTOR_LAUNCHAGENT_ACTIVE="La ejecución programada (LaunchAgent) está activa"
 L_DOCTOR_LAUNCHAGENT_NOT_LOADED="El plist del LaunchAgent existe pero no está cargado; solución: bash scripts/install_launchagent.sh"
+L_DOCTOR_LAUNCHAGENT_PATH_WARN="El plist del LaunchAgent no tiene PATH de Homebrew: las ejecuciones programadas no encontrarán brew/mas; solución: bash scripts/install_launchagent.sh"
 L_DOCTOR_LAUNCHAGENT_NONE="No hay ejecución programada instalada (opcional: bash scripts/install_launchagent.sh)"
 L_DOCTOR_SUDO_OK="sudo está listo sin solicitar contraseña (credenciales en caché)"
 L_DOCTOR_SUDO_COLD="sudo no tiene credenciales en caché: una ejecución interactiva preguntará una vez; las desatendidas omiten los pasos con root"

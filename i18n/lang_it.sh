@@ -895,6 +895,7 @@ L_DOCTOR_LAUNCHD_PATH_OK="Con il PATH minimo di launchd vengono ancora trovati: 
 L_DOCTOR_LAUNCHD_PATH_WARN="Con il PATH minimo di launchd NON vengono trovati: %s: le esecuzioni pianificate salterebbero i relativi passaggi"
 L_DOCTOR_LAUNCHAGENT_ACTIVE="L'esecuzione pianificata (LaunchAgent) è attiva"
 L_DOCTOR_LAUNCHAGENT_NOT_LOADED="Il plist del LaunchAgent esiste ma non è caricato; soluzione: bash scripts/install_launchagent.sh"
+L_DOCTOR_LAUNCHAGENT_PATH_WARN="Il plist del LaunchAgent non ha il PATH di Homebrew: le esecuzioni pianificate non troveranno brew/mas; soluzione: bash scripts/install_launchagent.sh"
 L_DOCTOR_LAUNCHAGENT_NONE="Nessuna esecuzione pianificata installata (opzionale: bash scripts/install_launchagent.sh)"
 L_DOCTOR_SUDO_OK="sudo è pronto senza richiesta (credenziali in cache)"
 L_DOCTOR_SUDO_COLD="sudo non ha credenziali in cache: un'esecuzione interattiva chiederà una volta; quelle non presidiate saltano i passaggi root"

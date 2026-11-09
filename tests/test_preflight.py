@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _env import isolate_host_tools, shell_env  # noqa: E402
+from _env import copy_toolkit, isolate_host_tools, shell_env  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LANG_EN = REPO_ROOT / "i18n" / "lang_en.sh"
@@ -260,6 +260,9 @@ class DoctorCheckTests(unittest.TestCase):
             script = root / "scripts" / "install_launchagent.sh"
             cases = [
                 ('echo "✅ LaunchAgent is active: x"; exit 0', "Scheduled run (LaunchAgent) is active", "rc=0"),
+                ('echo "✅ LaunchAgent is active: x"; echo "   Plist: p"; '
+                 'echo "⚠️  Plist has no EnvironmentVariables.PATH with Homebrew; x"; exit 0',
+                 "LaunchAgent plist has no Homebrew PATH", "rc=10"),
                 ('echo "⚠️  LaunchAgent plist exists but is not loaded: x"; exit 1', "plist exists but is not loaded", "rc=10"),
                 ('echo "ℹ️  LaunchAgent is not installed"; exit 0', "No scheduled run installed", "rc=3"),
             ]
@@ -465,12 +468,7 @@ class DoctorEntrypointTests(unittest.TestCase):
     """`bash update_all.sh --doctor` end to end in a throw-away copy of the toolkit."""
 
     def make_copy(self, root: Path) -> Path:
-        dest = root / "toolkit"
-        shutil.copytree(
-            REPO_ROOT, dest,
-            ignore=shutil.ignore_patterns(".git", "logs", "__pycache__", ".claude", "tests", "docs", "APPLICATIONS.md", "UPDATES.md"),
-        )
-        return dest
+        return Path(copy_toolkit(REPO_ROOT, root / "toolkit"))
 
     def snapshot(self, root: Path) -> set[str]:
         return {str(p.relative_to(root)) for p in root.rglob("*") if "__pycache__" not in p.parts}
