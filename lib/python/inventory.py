@@ -52,6 +52,17 @@ SYSTEM_APP_FRAGMENTS: list[str] = [
 ]
 
 
+def default_app_dirs() -> tuple[str, ...]:
+    """Application directories to scan: MAC_UPDATE_APP_DIRS (colon-separated,
+    used by tests and hermetic runs) or /Applications plus ~/Applications."""
+    override = os.environ.get("MAC_UPDATE_APP_DIRS", "").strip()
+    if override:
+        dirs = tuple(d for d in override.split(":") if d)
+        if dirs:
+            return dirs
+    return ("/Applications", os.path.expanduser("~/Applications"))
+
+
 def norm_name(s: str) -> str:
     """Normalize application name for loose comparisons.
 
@@ -154,11 +165,7 @@ def app_exists(
         if name == key or name in val_list:
             candidates.add(key)
             candidates.update(val_list)
-    search_dirs = (
-        app_dirs
-        if app_dirs is not None
-        else ("/Applications", os.path.expanduser("~/Applications"))
-    )
+    search_dirs = app_dirs if app_dirs is not None else default_app_dirs()
     for candidate in sorted(candidates):
         for applications_dir in search_dirs:
             if os.path.exists(os.path.join(applications_dir, candidate + ".app")):
@@ -397,15 +404,88 @@ def app_architecture(app_path: str | Path) -> str:
     return "unknown"
 
 
+# ── Update-method detection for newly found applications (read-only) ─────────
+
+_SANITIZE_RE = re.compile(r"[|\r\n\t]+")
+
+
+def _clean(text: str) -> str:
+    return _SANITIZE_RE.sub(" ", str(text)).strip()
+
+
+def _host_of(url: str) -> str:
+    from urllib.parse import urlparse
+
+    try:
+        return urlparse(str(url).strip()).hostname or ""
+    except ValueError:
+        return ""
+
+
+def _electron_updater_details(yml_path: str) -> tuple[str, str]:
+    """(provider, host) from an electron-builder app-update.yml; never the full URL."""
+    provider = host = ""
+    try:
+        with open(yml_path, encoding="utf-8", errors="replace") as handle:
+            for raw in handle:
+                line = raw.strip()
+                if line.startswith("provider:") and not provider:
+                    provider = line.split(":", 1)[1].strip().strip("\"'")
+                elif line.startswith("url:") and not host:
+                    host = _host_of(line.split(":", 1)[1].strip().strip("\"'"))
+                elif line.startswith("host:") and not host:
+                    host = line.split(":", 1)[1].strip().strip("\"'")
+    except OSError:
+        pass
+    return provider, host
+
+
+def detect_update_method(app_path: str | Path) -> dict[str, str]:
+    """Suggest how an installed application updates itself, from its bundle only.
+
+    Read-only: reads Info.plist, app-update.yml and looks for framework/receipt
+    directories; nothing is executed or fetched. Returns
+    {"method", "detail", "label"} where method is one of "mas", "sparkle",
+    "electron-updater", "squirrel", "unknown" and label is a short sanitized
+    string safe for a Markdown table cell (provider/host only, never a full URL).
+    """
+    app = str(app_path)
+    contents = os.path.join(app, "Contents")
+
+    def result(method: str, detail: str = "") -> dict[str, str]:
+        detail = _clean(detail)
+        label = f"{method} ({detail})" if detail else method
+        return {"method": method, "detail": detail, "label": label}
+
+    if os.path.isdir(os.path.join(contents, "_MASReceipt")) or os.path.isfile(
+        os.path.join(app, "Wrapper", "iTunesMetadata.plist")
+    ):
+        return result("mas", "Mac App Store")
+
+    info = _read_plist(os.path.join(contents, "Info.plist"))
+    feed = info.get("SUFeedURL")
+    if isinstance(feed, str) and feed.strip():
+        return result("sparkle", "feed " + (_host_of(feed) or "set"))
+
+    yml = os.path.join(contents, "Resources", "app-update.yml")
+    if os.path.isfile(yml):
+        provider, host = _electron_updater_details(yml)
+        detail = " ".join(part for part in (provider, host) if part)
+        return result("electron-updater", detail)
+
+    frameworks = os.path.join(contents, "Frameworks")
+    if os.path.isdir(os.path.join(frameworks, "Squirrel.framework")):
+        return result("squirrel")
+    if os.path.isdir(os.path.join(frameworks, "Sparkle.framework")):
+        return result("sparkle", "framework, no feed URL in Info.plist")
+    return result("unknown")
+
+
 def scan_installed_app_paths(
     app_dirs: tuple[str, ...] | None = None,
 ) -> tuple[dict[str, str], list[str]]:
     """Scan /Applications and ~/Applications for installed .app bundles."""
-    search_dirs = (
-        app_dirs
-        if app_dirs is not None
-        else ("/Applications", os.path.expanduser("~/Applications"))
-    )
+    search_dirs = app_dirs if app_dirs is not None else default_app_dirs()
     installed_app_paths: dict[str, str] = {}
 
     for applications_dir in search_dirs:

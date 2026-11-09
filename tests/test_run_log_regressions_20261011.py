@@ -138,6 +138,10 @@ class PostupdateNonBlockingTests(unittest.TestCase):
         script = (
             "print_info() { echo \"INFO: $*\"; }\n"
             'L_ALL_FILES_UPDATED_MSG="FILES_UPDATED"\n'
+            'L_ALL_INVENTORY_DONE_FMT="Inventory refreshed: %s changed, %s added, %s removed"\n'
+            'L_ALL_INVENTORY_BANNER="INVENTORY REFRESHED"\n'
+            'L_UPDATE_ALL_SUCCESS="ALL UPDATES COMPLETE"\n'
+            "OVERALL_EXIT=0; DEGRADED=0\n"
             f'STATUS_CODE_MD="{status_code}"\n'
             f"MAC_UPDATE_INVENTORY_ONLY={inventory_only}\n"
             "MAC_UPDATE_DRY_RUN=0\n"
@@ -164,7 +168,15 @@ class PostupdateNonBlockingTests(unittest.TestCase):
         for lang in LANGS:
             lang_text = read(f"i18n/lang_{lang}.sh")
             self.assertRegex(lang_text, r'(?m)^L_ALL_STEP_SOFT_WARNINGS_FMT="[^"]*%s[^"]*"$')
-        self.assertIn("reported warnings (soft) — macOS step not blocked", read("i18n/lang_en.sh"))
+        self.assertIn("warnings (soft) — macOS step not blocked", read("i18n/lang_en.sh"))
+
+    def test_soft_warning_line_never_makes_the_step_name_the_subject(self) -> None:
+        """2026-11-08 log: "Aplikacje internetowe zgłosił ostrzeżenia" (plural noun,
+        singular verb). The step name is now a label ("<step>: warnings ..."), so
+        no verb has to agree with it in any language or for any step name."""
+        for lang in LANGS:
+            value = re.search(r'(?m)^L_ALL_STEP_SOFT_WARNINGS_FMT="([^"]*)"$', read(f"i18n/lang_{lang}.sh")).group(1)
+            self.assertRegex(value, r"^%s ?: ", f"{lang}: step name must be followed by a colon, not a verb")
 
 
 class RunSummaryFailureTests(unittest.TestCase):
