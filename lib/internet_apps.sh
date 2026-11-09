@@ -125,6 +125,62 @@ except Exception:
 PYEOF
 }
 
+# ── Intel-only (x86_64-only) apps: generic, registry-driven, app-agnostic ──
+# Both helpers walk a methods registry (config/internet_app_methods.txt format)
+# and act on any installed app whose executable is x86_64-only, whatever its
+# update method. Needs lib/platform.sh, lib/ui.sh and the L_INTERNET_ROSETTA_* strings.
+
+# Before dispatch: reset the session's rosetta_missing_apps.txt; when an Intel-only
+# app is present and Rosetta is not, install it only on explicit opt-in
+# (MAC_UPDATE_INSTALL_ROSETTA=1). Never installs by default.
+internet_rosetta_preflight() {
+    local registry="$1" name method status_var rest path has_x86=0
+    [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && rm -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null
+    while IFS='|' read -r name method status_var rest; do
+        case "$name" in '#'*|'') continue ;; esac
+        path="$(internet_app_path "$name")"
+        if [ -d "$path" ] && [ "$(mac_update_app_architecture "$path")" = "x86_64-only" ]; then
+            has_x86=1
+            break
+        fi
+    done < "$registry"
+    if [ "$has_x86" -eq 1 ] && ! mac_update_rosetta_installed \
+        && [ "${MAC_UPDATE_INSTALL_ROSETTA:-0}" = "1" ]; then
+        print_step "Installing Rosetta via softwareupdate..."
+        softwareupdate --install-rosetta --agree-to-license
+        if mac_update_rosetta_installed; then
+            print_ok "Rosetta installed successfully"
+        else
+            print_warn "Rosetta installation could not be verified"
+        fi
+    fi
+    return 0
+}
+
+# After dispatch: every installed x86_64-only app reports the Rosetta requirement as
+# its final status (overriding the handler's), and is listed in
+# rosetta_missing_apps.txt when Rosetta is absent.
+internet_rosetta_finalize() {
+    local registry="$1" name method status_var rest path
+    while IFS='|' read -r name method status_var rest; do
+        case "$name" in '#'*|'') continue ;; esac
+        status_var="$(echo "$status_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        path="$(internet_app_path "$name")"
+        [ -d "$path" ] || continue
+        [ "$(mac_update_app_architecture "$path")" = "x86_64-only" ] || continue
+        if mac_update_rosetta_installed; then
+            eval "$status_var=\"\$L_INTERNET_ROSETTA_REQUIRED; \$L_INTERNET_ROSETTA_EOL\""
+        else
+            eval "$status_var=\"\$L_INTERNET_ROSETTA_REQUIRED \$L_INTERNET_ROSETTA_NOT_INSTALLED; \$L_INTERNET_ROSETTA_EOL\""
+            [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && echo "$name" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
+        fi
+    done < "$registry"
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" ]; then
+        sort -u "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" -o "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
+    fi
+    return 0
+}
+
 internet_app_path() {
     local app_name="$1" candidate bundle_id
     case "$app_name" in
@@ -172,16 +228,6 @@ internet_app_path() {
         "Docker Desktop")
             [ -d "/Applications/Docker.app" ] && echo "/Applications/Docker.app" && return 0
             [ -d "${HOME}/Applications/Docker.app" ] && echo "${HOME}/Applications/Docker.app" && return 0
-            ;;
-        "DJI Assistant 2")
-            for candidate in \
-                "/Applications/DJI Assistant 2(Consumer Drones Series).app" \
-                "${HOME}/Applications/DJI Assistant 2(Consumer Drones Series).app" \
-                "/Applications/DJI Assistant 2.app" \
-                "${HOME}/Applications/DJI Assistant 2.app"
-            do
-                [ -d "$candidate" ] && echo "$candidate" && return 0
-            done
             ;;
     esac
     for candidate in "/Applications/${app_name}.app" "${HOME}/Applications/${app_name}.app"; do

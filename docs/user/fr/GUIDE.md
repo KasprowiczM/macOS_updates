@@ -28,7 +28,7 @@ macOS Updates orchestre les mises à jour sur **Mac Apple Silicon sous macOS 13+
 bash scripts/report_update_coverage.sh
 ```
 
-États : **verified direct**, **triggered-unverified**, **externally managed**, **manual**, **unknown**. Un lancement silencieux ne prouve pas une mise à jour. Inkscape utilise Homebrew ; UniFi/WiFiman/Picsart Track 2 ; Office `msupdate` ; Teams son propre updater avec repli MAU `TEAMS21` observé et vérifié. Seuls IPMIView et DJI Assistant 2 restent manuels.
+États : **verified direct**, **triggered-unverified**, **externally managed**, **manual**, **unknown**. Un lancement silencieux ne prouve pas une mise à jour. Inkscape utilise Homebrew ; UniFi/WiFiman/Picsart Track 2 ; Office `msupdate` ; Teams son propre updater avec repli MAU `TEAMS21` observé et vérifié. Seul IPMIView reste manuel.
 
 ## Ajouter une app Internet
 

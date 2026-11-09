@@ -73,7 +73,7 @@ The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 | `chromium_updater` | 1 | verified direct | Chromium-based updater proof (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: verified DMG from its appcast when idle; fallback `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Teams self-updater plus an observed, verified `TEAMS21` MAU fallback when Microsoft offers it |
-| `manual` | 2 | manual | IPMIView and DJI Assistant 2 — notification only |
+| `manual` | 1 | manual | IPMIView — notification only |
 
 ---
 
