@@ -26,7 +26,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _env import isolate_host_tools, shell_env  # noqa: E402
+from _env import copy_toolkit, isolate_host_tools, shell_env  # noqa: E402
 from test_preflight import base_stubs, write_stub  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -60,13 +60,8 @@ def lang_keys(lang: str) -> dict[str, str]:
 
 
 def make_toolkit_copy(root: Path) -> Path:
-    dest = root / "toolkit"
-    shutil.copytree(
-        REPO_ROOT, dest,
-        ignore=shutil.ignore_patterns(".git", "logs", "__pycache__", ".claude", "tests", "docs",
-                                      "APPLICATIONS.md", "UPDATES.md", ".mac-update.lock"),
-    )
-    return dest
+    """Tracked toolkit files only (tests/_env.py:copy_toolkit); never private or untracked content."""
+    return Path(copy_toolkit(REPO_ROOT, root / "toolkit"))
 
 
 # ── real runs in a throw-away copy (all steps but the final system step skipped) ──
@@ -498,8 +493,7 @@ class InventoryHonestyTests(unittest.TestCase):
 
     def setup_workspace(self, root: Path) -> tuple[Path, Path, Path, dict]:
         script_dir = root / "toolkit"
-        shutil.copytree(REPO_ROOT / "lib", script_dir / "lib", ignore=shutil.ignore_patterns("__pycache__"))
-        shutil.copytree(REPO_ROOT / "config", script_dir / "config")
+        copy_toolkit(REPO_ROOT, script_dir)
         (script_dir / "config" / "npm_global_clis.txt").write_text("# no CLIs in the fixture\n", encoding="utf-8")
         apps = root / "Applications"
         apps.mkdir()
@@ -609,6 +603,57 @@ class InventoryHonestyTests(unittest.TestCase):
             self.assertRegex(out, r"Inventory version fields changed: [1-9]")
             self.assertIn("Inventory entries added: 2, removed: 0", out)
             self.assertNotIn("Inventory version fields changed: 0", out)
+
+
+class CopyToolkitHelperTests(unittest.TestCase):
+    """tests/_env.py:copy_toolkit must not depend on whatever else lives in the checkout."""
+
+    def build_checkout(self, root: Path) -> Path:
+        repo = root / "checkout"
+        for rel, body in {
+            "update_all.sh": "#!/bin/sh\n", "VERSION": "1.0.0\n", "lib/a.sh": "a\n", "lib/python/m.py": "m\n",
+            "config/c.txt": "c\n", "i18n/lang_en.sh": "L_X=1\n", "scripts/s.sh": "s\n", "templates/t": "t\n",
+            "tests/t.py": "t\n", "docs/d.md": "d\n",
+            # private / untracked-style content that must never be copied
+            "APPLICATIONS.md": "private\n", "UPDATES.md": "private\n", ".env": "SECRET=1\n", ".env.local": "x\n",
+            "logs/run.log": "log\n", "scratch/n.txt": "n\n", ".claude/settings.json": "{}\n",
+            "skills/live/x/SKILL.md": "x\n", ".antigravitycli/1.json": "{}\n",
+        }.items():
+            path = repo / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(body, encoding="utf-8")
+        os.symlink(root / "does-not-exist", repo / "lib" / "dangling")
+        os.symlink(root / "does-not-exist", repo / "skills" / "dangling")
+        os.symlink(root / "does-not-exist", repo / ".agents-skills")
+        return repo
+
+    def assert_copy(self, out: Path) -> None:
+        for rel in ("update_all.sh", "VERSION", "lib/a.sh", "lib/python/m.py", "config/c.txt",
+                    "i18n/lang_en.sh", "scripts/s.sh", "templates/t"):
+            self.assertTrue((out / rel).is_file(), rel)
+        for rel in ("APPLICATIONS.md", "UPDATES.md", ".env", ".env.local", "logs", "scratch", ".claude",
+                    "skills", ".antigravitycli", "tests", "docs", "lib/dangling", ".agents-skills"):
+            self.assertFalse(os.path.lexists(out / rel), rel)
+
+    def test_fallback_without_git_ignores_private_content_and_dangling_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self.build_checkout(Path(tmp))  # not a git repository: allowlist path
+            self.assert_copy(Path(copy_toolkit(repo, Path(tmp) / "out")))
+
+    @unittest.skipUnless(shutil.which("git"), "git not available")
+    def test_tracked_files_only_when_git_is_available(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self.build_checkout(Path(tmp))
+            env = shell_env(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
+            for args in (["init", "-q"], ["add", "update_all.sh", "VERSION", "lib/a.sh", "lib/python/m.py",
+                                           "config/c.txt", "i18n/lang_en.sh", "scripts/s.sh", "templates/t",
+                                           "APPLICATIONS.md", "logs/run.log"]):
+                subprocess.run(["git", "-C", str(repo), *args], env=env, check=True, capture_output=True)
+            out = Path(copy_toolkit(repo, Path(tmp) / "out"))
+            self.assert_copy(out)  # tracked-but-private files (APPLICATIONS.md, logs/) are still refused
+            (repo / "lib" / "untracked.sh").write_text("u\n", encoding="utf-8")
+            again = Path(copy_toolkit(repo, Path(tmp) / "out2"))
+            self.assertFalse((again / "lib" / "untracked.sh").exists(), "untracked files are never copied")
 
 
 class TextAndDocsTests(unittest.TestCase):
