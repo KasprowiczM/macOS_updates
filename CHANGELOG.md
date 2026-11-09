@@ -6,6 +6,37 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Fixed (2026-11-09 review follow-up)
+
+Version stays 1.5.5 (lockstep policy). Evidence: [review record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-09.md).
+
+- **Scheduled runs could not find Homebrew or `mas` (high).** launchd's default `PATH` lacks `/opt/homebrew/bin`, so scheduled runs reported "Homebrew is not installed". `lib/platform.sh` now runs `mac_update_ensure_homebrew_path` when sourced (the prefix override `MAC_UPDATE_HOMEBREW_PREFIX` is for tests only) and the generated plist sets `EnvironmentVariables.PATH`. Existing installs must re-run `scripts/install_launchagent.sh`; `--check` warns when the plist has no `PATH` key.
+- **LaunchAgent install could report success without loading (high).** The installer now verifies with `launchctl print` that the service is loaded; on failure it prints the launchctl error and exits non-zero. Re-install cleanup uses `bootout` only (`unload -w` is left to `--uninstall`'s fallback chain).
+- **Prompts could wait forever (high).** A mid-run Homebrew question waited about 51 minutes on 2026-11-04. All mid-run prompts go through `mac_update_prompt_yn` (`lib/ui.sh`) with `MAC_UPDATE_PROMPT_TIMEOUT` (default 120 s, clamp 10-900, 0 = wait forever); a timeout is a safe "no". Unrecognised typed input now counts as "no" (previously anything not starting with N was yes). When `update_all.sh` already confirmed (`MAC_UPDATE_PARENT_CONFIRMED=1`), the Homebrew and App Store steps do not ask again; the macOS step still asks.
+- **Open cask apps were upgraded (high).** A cask whose app is open, or whose running state is unknown, is now deferred with a "quit the app" message, recorded in session file `brew_deferred_running.txt`; the step ends soft (exit 10) and deferred casks are excluded from the final "still outdated" check and the pending count.
+- **Google Drive never had fresh proof (medium).** Drive is registered only with the system-scope GoogleUpdater, but the run's wake reached only the user scope, so the newest proof was older than the 6 h window. `google_keystone_check` now also runs `--wake-all --system`, and refused proofs are logged with a reason (`too_old`, `version_mismatch`, `no_event_for_app`, ...). The 6 h window and the "NO_UPDATE for a different build is not proof" rule are unchanged. Not yet observed in a live run.
+- **Feed failures were opaque (medium).** Feed fetches log curl exit code, HTTP status, time and bytes to the internet diagnostics; fetch failure and parse failure are distinct (`vendor_feed_lookup` return codes 1/2/3); fetches are https-only and use `--retry-all-errors`.
+- **Proton Mail "stale feed" was a vendor-side regression (medium).** The feed dropped from 1.16.1 to 1.16.0. The new persistent feed state (`~/.local/state/mac-update/feed_state.json`) remembers the highest version a vendor ever published; a feed below it reports `current_feed_regressed` (informational, no launch, never an install target).
+- **Chronic-warning streak over-counted (medium).** `skipped` steps are now neutral, and dry-run and inventory-only runs are excluded; a reported streak of 10 was really 4.
+- **`build_inventory.sh` reported zero changes (low).** The counts file was written after an early exit in inventory-only mode. It now reports the real number of changed version fields and added/removed entries under its own banner.
+- **Text (low).** No doubled status emoji; "(cask)" statuses capitalised; sha512 base64 checksums are streamed in 1 MiB chunks.
+- **Hardening:** every remaining curl fetch is https-only (`--proto '=https'`).
+
+### Added (2026-11-09)
+
+- **`bash update_all.sh --doctor`:** read-only readiness report (platform, tools, launchd `PATH`, LaunchAgent, sudo/Touch ID, Xcode license, disk, power, network, toolkit git state, last run). No sudo prompt, no run log, no summary; exit `0` ok / `10` warnings / `1` hard problem. Accessibility is probed only with `MAC_UPDATE_DOCTOR_PROBE_AX=1`. Implemented in the new `lib/preflight.sh`.
+- **Pre-flight on real runs:** free space below `MAC_UPDATE_MIN_FREE_GB` (default 15) degrades the run; on battery below `MAC_UPDATE_MIN_BATTERY` (default 30) only the macOS step is skipped, softly; no reachable host (`MAC_UPDATE_PREFLIGHT_HOSTS`) exits `1` before any step. Dry runs and inventory-only runs skip it. The run is kept awake with `caffeinate -i -w $$` (`MAC_UPDATE_NO_CAFFEINATE=1` opts out).
+- **New status codes:** `feed_unreachable` (soft, exit 10; the native updater is still launched and the app counts as unverified), `current_cached` (informational, no launch; deliberately not counted as verified under rule 6b), `current_feed_regressed` (see above). `MAC_UPDATE_FEED_CACHE_TTL_H` (default 24, 0-168, 0 disables) bounds cached proof; `MAC_UPDATE_FEED_STATE_FILE` overrides the state path (module `lib/python/feed_state.py`, mode 0600, atomic writes).
+- **Advisories:** `brew doctor` warnings are appended to session file `advisories.txt` (`source|severity|text`, severity `security` or `info`) and shown in a new "Advisories" block of the final summary. Security advisories (for example the root-certificate one) get their own warning line; the suggested sudo fix script is never run; the "Homebrew is in good condition" line is no longer printed when warnings exist.
+- **Run summary (still format 4, additive):** top-level `advisories`, `steps.<step>.duration_seconds`, `counts.inventory_entries_added` / `inventory_entries_removed`; per-step durations in the final block.
+- **Inventory:** new apps show their installed version and a suggested update method (`detect_update_method` in `lib/python/inventory.py`).
+- `MAC_UPDATE_SUDO_KEEPALIVE_MAX` (default 3600 s, clamp 300-14400) stops the sudo keep-alive.
+
+### Changed (2026-11-09)
+
+- **Truthful method labels:** `logs/version_history.tsv` reports `vendor_feed` for feed-driven apps (`internet_effective_method`), Firefox uses `mozilla_dmg`, and IPMIView is shown as an App Store iPad app.
+- **Logs:** run logs are ANSI-free; `logs/` rotation also covers `run_summary_*.json` (`lib/python/log_rotation.py`), keeps at least 30 and never touches `run_summary_latest.json` or `version_history.tsv`. The step header says "total".
+
 ### Fixed (2026-11-02 run-log follow-up, macOS 27.2)
 
 Version stays 1.5.5 (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-02.md).

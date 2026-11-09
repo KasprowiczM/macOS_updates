@@ -23,6 +23,7 @@ bash install.sh                         # One-line new-user install (see docs/IN
 bash build_inventory.sh                 # Build APPLICATIONS.md from this Mac only
 bash update_all.sh                      # Full update (all 7 steps, 0-6)
 bash update_all.sh --dry-run -y         # Preview without mutations
+bash update_all.sh --doctor             # Read-only readiness report (exit 0 ok / 10 warnings / 1 problem)
 bash scripts/report_update_coverage.sh  # Coverage by update method category
 bash scripts/check_vendor_feeds.sh      # Vendor truth table (read-only)
 bash dev_sync/dev-sync-import.sh        # Restore private overlay (owners only)
@@ -41,9 +42,9 @@ bash -n update_all.sh                   # Syntax check
 
 | Role | Model | Purpose |
 |------|-------|---------|
-| **Orchestrator** | `claude-sonnet-4-6` | Default — daily work, planning, coordinating subagents |
-| **Advisor** | `claude-opus-4-7` | Architecture, code review, ADRs — NO implementation code |
-| **Worker** | `claude-haiku-4-5-20251001` | Fast tasks: boilerplate, refactors, log summaries |
+| **Orchestrator** | `claude-sonnet-5-5` | Default — daily work, planning, coordinating subagents |
+| **Advisor** | `claude-opus-5-5` | Architecture, code review, ADRs — NO implementation code |
+| **Worker** | `claude-haiku-5-5` | Fast tasks: boilerplate, refactors, log summaries |
 
 ## Reference Docs
 
