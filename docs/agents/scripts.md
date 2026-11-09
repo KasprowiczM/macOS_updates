@@ -18,6 +18,7 @@
 | `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON (format 4) |
 | `lib/python/cli_duplicates.py` | Known-prefix npm duplicate discovery and version/process guards for native CLI cleanup |
 | `lib/python/http_fetch.py` | HTTPS download helper used by tests and the fetch adapter |
+| `lib/python/log_rotation.py` | Rotation of `logs/`: run logs, `run_summary_*.json` (including stray names), stale temp files; never `run_summary_latest.json` / `version_history.tsv` |
 | `lib/python/run_lock.py` | Exclusive run lock (`.mac-update.lock`); `kill(pid,0)` EPERM counts as alive |
 | `lib/fetch.sh` | HTTPS-only download with emptiness and size checks (no curl-pipe-to-sh) |
 | `lib/native_installers.sh` | Per-vendor CLI install/update (Claude positional `latest`, Codex `--release latest`, OpenCode repair) |
@@ -51,6 +52,7 @@
 | `lib/proc.sh` | Shared process execution, timeout, and child process management helpers |
 | `lib/severity.sh` | Shared severity classification and exit code contract helpers across orchestrator scripts |
 | `lib/ui.sh` | Terminal UX helpers: formatting, colors, and TTY-aware progress reporting |
+| `lib/preflight.sh` | Read-only readiness checks: `update_all.sh --doctor` (exit 0/10/1) and the cheap pre-run subset (disk, power, network) with `caffeinate` policy |
 | `lib/version.sh` | Package, bundle, and application version extraction and three-way comparison helpers |
 | `lib/vendor_feeds.sh` | Vendor feed lookup and parsing helper |
 | `lib/vendor_direct.sh` | Verified vendor direct download, Gatekeeper validation, and atomic swap |
@@ -70,7 +72,7 @@
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 
-`update_all.sh` supports `--dry-run`, `--yes`, `--verify-only`, `--bootstrap-cli` (explicitly install missing CLI tools), and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
+`update_all.sh` supports `--doctor` (read-only readiness report: no sudo, no run log, no summary; exit 0 ok / 10 warnings / 1 hard problem), `--dry-run`, `--yes`, `--verify-only`, `--bootstrap-cli` (explicitly install missing CLI tools), and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
 
 ### Environment Variables
 
@@ -87,6 +89,13 @@
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; the AppleScript `quit` is re-sent while it keeps running, never force-killed (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Interval in seconds (1–60) between repeated graceful `quit` requests inside `MAC_UPDATE_QUIT_WAIT` (v1.5.5) |
 | `MAC_UPDATE_PACKAGE_REVISION_FILE` | `~/.local/state/mac-update/package_revisions.tsv` | Package revision installed per product+version (`KeePassXC\|2.8.0\|1`); detects same-version vendor rebuilds |
+| `MAC_UPDATE_MIN_FREE_GB` | `15` | Pre-flight / `--doctor`: warn (degraded run) when free space on the system volume is below this many GB |
+| `MAC_UPDATE_MIN_BATTERY` | `30` | Pre-flight: on battery below this percent the macOS system step is skipped softly (other steps run) |
+| `MAC_UPDATE_NO_CAFFEINATE` | `0` | Set to `1` to not run `caffeinate -i -w $$` for the duration of a real run |
+| `MAC_UPDATE_SUDO_KEEPALIVE_MAX` | `3600` | Seconds after which the sudo keep-alive stops refreshing (clamped 300-14400) |
+| `MAC_UPDATE_PARENT_CONFIRMED` | unset | Exported as `1` by `update_all.sh` once its master confirmation succeeded; children skip their own redundant confirmation |
+| `MAC_UPDATE_DOCTOR_PROBE_AX` | `0` | `--doctor` only: set to `1` to probe Accessibility with `osascript` (can show a macOS permission prompt) |
+| `MAC_UPDATE_PREFLIGHT_HOSTS` | `api.github.com formulae.brew.sh itunes.apple.com` | HTTPS hosts probed by pre-flight / `--doctor` (test override) |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
 ## update_all.sh Step Order

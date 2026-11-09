@@ -45,6 +45,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/platform.sh"
 . "$SCRIPT_DIR/lib/version.sh"
 . "$SCRIPT_DIR/lib/run_lock.sh"
+. "$SCRIPT_DIR/lib/preflight.sh"
 
 save_step_status_codes() {
     if [ -n "${SESSION_DIR:-}" ] && [ -d "$SESSION_DIR" ]; then
@@ -74,7 +75,7 @@ write_machine_summary() {
     python3 -c '
 import json, os, sys
 sys.path.insert(0, os.path.join(sys.argv[1], "lib", "python"))
-from run_summary import build_run_summary, write_run_summary, merge_pending, collect_run_items, format_terminal_summary
+from run_summary import build_run_summary, write_run_summary, merge_pending, collect_run_items, format_terminal_summary, read_advisories, read_step_durations
 
 script_dir = sys.argv[1]
 session_dir = sys.argv[2]
@@ -148,6 +149,8 @@ summary = build_run_summary(
     run_id=os.environ.get("MAC_UPDATE_RUN_ID"),
     items=items,
     step_codes=step_codes,
+    advisories=read_advisories(session_dir),
+    step_durations=read_step_durations(session_dir),
 )
 
 logs_dir = os.path.join(script_dir, "logs")
@@ -194,8 +197,94 @@ mark_stale_summary_failed() {
     return 0
 }
 
+# ── Per-step wall-clock durations ────────────────────────────
+# Steps run strictly one after another, so a single start marker is enough.
+# step_timer_stop appends "<key>=<seconds>" to $SESSION_DIR/step_durations.txt
+# (read back by write_machine_summary and the closing summary lines). Dry runs
+# and skipped steps never call it, so only steps that really ran carry a time.
+_STEP_T0=0
+step_timer_start() {
+    _STEP_T0="$(date +%s)"
+}
+step_timer_stop() {
+    local key="$1" now
+    [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && return 0
+    [ -n "${SESSION_DIR:-}" ] && [ -d "$SESSION_DIR" ] || return 0
+    now="$(date +%s)"
+    echo "$key=$((now - _STEP_T0))" >> "$SESSION_DIR/step_durations.txt"
+}
+_fmt_duration() {
+    local s="$1"
+    if [ "$s" -ge 60 ]; then
+        printf '%dm %02ds' $((s / 60)) $((s % 60))
+    else
+        printf '%ds' "$s"
+    fi
+}
+# " (1m 05s)" for a step that ran, nothing otherwise.
+step_duration_suffix() {
+    local secs
+    [ -n "${SESSION_DIR:-}" ] && [ -f "$SESSION_DIR/step_durations.txt" ] || return 0
+    secs="$(sed -n "s/^$1=//p" "$SESSION_DIR/step_durations.txt" | tail -n 1)"
+    case "$secs" in
+        ''|*[!0-9]*) return 0 ;;
+    esac
+    printf ' (%s)' "$(_fmt_duration "$secs")"
+}
+
+# Step banner. The parenthesised time is the TOTAL elapsed since the start of
+# the run (the step's own duration is in the closing summary); the label says so.
+step_header() {
+    local step_num="$1" step_total="$2" title="$3" elapsed
+    elapsed="$(printf "$L_ALL_STEP_ELAPSED_TOTAL_FMT" "$(ui_elapsed)")"
+    if ui_is_tty; then
+        echo ""
+        echo -e "\033[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+        echo -e "\033[0;36m  Step ${step_num}/${step_total}: ${title}\033[0m  \033[0;90m(${elapsed})\033[0m"
+        echo -e "\033[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+        echo ""
+    else
+        echo ""
+        echo "=== Step ${step_num}/${step_total}: ${title} (${elapsed}) ==="
+        echo ""
+    fi
+}
+
+# Run-log filter (P2-1): the terminal keeps its colours, the file does not.
+# One process reads the combined stdout/stderr, echoes it unchanged to the
+# original stdout and appends the same bytes minus ANSI escape sequences to the
+# log. It reads with sysread (no line buffering), so prompts without a trailing
+# newline still reach the terminal at once, and an escape sequence split across
+# two reads is carried over instead of leaking into the log.
+log_strip_ansi_tee() {
+    perl -e '
+        $| = 1;
+        open(my $log, ">>", $ARGV[0]) or exit 1;
+        select((select($log), $| = 1)[0]);
+        my $carry = "";
+        while (sysread(STDIN, my $buf, 65536)) {
+            print STDOUT $buf;
+            my $text = $carry . $buf;
+            $carry = "";
+            $carry = $1 if $text =~ s/(\e(?:\[[0-9;?]*[ -\/]*)?)\z//;
+            $text =~ s/\e\[[0-9;?]*[ -\/]*[@-~]//g;
+            print $log $text;
+        }
+        print $log $carry if length $carry;
+    ' "$1"
+}
+
 export UI_START_EPOCH=$(date +%s)
 mac_update_parse_cli "$@"
+
+# --doctor: a read-only report. It runs before the platform guard (so an
+# unsupported platform is reported, not just fatal) and before everything that
+# mutates or records: no session dir, no run log, no lock, no sudo, no summary.
+if [ "${MAC_UPDATE_DOCTOR:-0}" = "1" ]; then
+    . "$SCRIPT_DIR/i18n/loader.sh"
+    preflight_doctor
+    exit $?
+fi
 
 mac_update_require_supported_platform || exit 1
 
@@ -286,6 +375,9 @@ if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
         exit 0
     fi
 fi
+# The master confirmation covers the whole run: children may skip their own
+# redundant "continue? [Y/n]" questions when they see this (P1-5).
+export MAC_UPDATE_PARENT_CONFIRMED=1
 
 # ============================================================
 # SESJA — katalog tymczasowy
@@ -332,15 +424,16 @@ chmod 600 "$LOG_FILE" 2>/dev/null || {
     exit 1
 }
 
-# Rotate: prune oldest beyond MAX_LOGS
-if [ -d "$LOGS_DIR" ]; then
-    # shellcheck disable=SC2012  # ls -t is fine; filenames are controlled
-    ls -1t "$LOGS_DIR"/update_all_*.log 2>/dev/null \
-        | tail -n +$((MAX_LOGS + 1)) \
-        | while IFS= read -r old_log; do
-            [ -n "$old_log" ] && rm -f "$old_log"
-        done
-fi
+# Rotate (lib/python/log_rotation.py): run logs keep the newest MAX_LOGS, run
+# summaries at least 30 (the chronic-streak window reads them); stray summaries
+# with non-timestamp names (e.g. run_summary_<epoch>.json) share that budget.
+# run_summary_latest.json and version_history.tsv are never touched.
+_keep_summaries=$((MAX_LOGS < 30 ? 30 : MAX_LOGS))
+PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from log_rotation import rotate_logs
+rotate_logs(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
+' "$LOGS_DIR" "$MAX_LOGS" "$((_keep_summaries - 1))" 2>/dev/null || true
 
 print_info "Run log: $LOG_FILE"
 
@@ -396,11 +489,22 @@ if [ "$_needs_sudo" -eq 1 ]; then
 
     # Keep the timestamp warm for the whole run. Started at most once; the PID
     # is killed in cleanup_session_dir() on every exit path including INT/TERM.
+    # It also stops by itself after MAC_UPDATE_SUDO_KEEPALIVE_MAX seconds
+    # (default 3600, clamped 300-14400): a run that sat 51 minutes on an
+    # unanswered question must not keep refreshing root credentials forever.
+    _ka_max="${MAC_UPDATE_SUDO_KEEPALIVE_MAX:-3600}"
+    case "$_ka_max" in
+        ''|*[!0-9]*) _ka_max=3600 ;;
+    esac
+    [ "$_ka_max" -lt 300 ] && _ka_max=300
+    [ "$_ka_max" -gt 14400 ] && _ka_max=14400
     if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] && sudo -n true 2>/dev/null; then
         (
             _macupd_sleep_pid=""
+            _macupd_deadline=$(( $(date +%s) + _ka_max ))
             trap '[ -n "$_macupd_sleep_pid" ] && kill "$_macupd_sleep_pid" 2>/dev/null; exit 0' INT TERM
             while true; do
+                [ "$(date +%s)" -lt "$_macupd_deadline" ] || exit 0
                 sudo -n true 2>/dev/null || exit 0
                 sleep 50 &
                 _macupd_sleep_pid=$!
@@ -415,8 +519,14 @@ fi
 # AFTER the interactive confirmation read above (tee on FD 0 is fine but
 # we already consumed user input).
 exec 3>&1 4>&2
-exec > >(tee -a "$LOG_FILE") 2>&1
+if command -v perl >/dev/null 2>&1; then
+    exec > >(log_strip_ansi_tee "$LOG_FILE") 2>&1
+else
+    # No perl: keep the log, colours included, rather than lose it.
+    exec > >(tee -a "$LOG_FILE") 2>&1
+fi
 TEE_PID=$!
+CAFFEINATE_PID=""
 
 cleanup_session_dir() {
     # Kill sudo keep-alive first (BUG-3 fix) — must run on all exit paths
@@ -425,6 +535,12 @@ cleanup_session_dir() {
         kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
         wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
         SUDO_KEEPALIVE_PID=""
+    fi
+    # caffeinate -w $$ ends with this shell anyway; stop it now so it cannot
+    # hold the log pipe open while we wait for the log filter to drain.
+    if [ -n "${CAFFEINATE_PID:-}" ]; then
+        kill "$CAFFEINATE_PID" 2>/dev/null || true
+        CAFFEINATE_PID=""
     fi
     if [ "${MAC_UPDATE_SUMMARY_DONE:-0}" != "1" ] && [ -n "${START_TIME:-}" ] && [ -n "${SESSION_DIR:-}" ]; then
         write_machine_summary interrupted || true
@@ -584,7 +700,7 @@ DEGRADED=0
 # VERIFY-ONLY MODE (--verify-only)
 # ============================================================
 if [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
-    ui_step_header 0 0 "Verification of Installed Application Versions (--verify-only)"
+    step_header 0 0 "Verification of Installed Application Versions (--verify-only)"
     print_info "Capturing current application versions..."
     if ! internet_capture_versions "$SESSION_DIR/internet_verify.txt"; then
         print_error "Failed to capture current application versions"
@@ -656,6 +772,29 @@ sys.exit(0)
 fi
 
 # ============================================================
+# PRE-FLIGHT (real runs only): cheap read-only checks before any step
+# ============================================================
+# Policy (lib/preflight.sh): low free disk => degraded run; battery below
+# MAC_UPDATE_MIN_BATTERY with the macOS step enabled => that step is skipped
+# softly; no network at all => abort here with exit 1 before anything runs.
+# Dry runs and the inventory-only path (build_inventory.sh) skip all of it.
+if [ "${MAC_UPDATE_DRY_RUN:-0}" != "1" ] && [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" != "1" ]; then
+    if ! preflight_run_cheap; then
+        OVERALL_EXIT=1
+        exit 1
+    fi
+    [ "${PREFLIGHT_DEGRADED:-0}" = "1" ] && DEGRADED=1
+    # Keep the Mac awake for the whole run. Started outside the sudo block on
+    # purpose (it has nothing to do with the sudo keep-alive rules), detached
+    # from the log pipe, and bound to this shell with -w so it cannot outlive it.
+    if [ "${MAC_UPDATE_NO_CAFFEINATE:-0}" != "1" ] && command -v caffeinate >/dev/null 2>&1; then
+        caffeinate -i -w $$ </dev/null >/dev/null 2>&1 &
+        CAFFEINATE_PID=$!
+        print_info "$L_PREFLIGHT_AWAKE"
+    fi
+fi
+
+# ============================================================
 # STEP 0: Scan new applications
 # ============================================================
 ui_master_progress 0 6
@@ -667,7 +806,8 @@ elif mac_update_dry_run_msg "prescan.py (APPLICATIONS.md scan)"; then
     RESULT_SCAN="[DRY-RUN] skipped"
     STATUS_CODE_SCAN="skipped"
 else
-ui_step_header 0 6 "$L_ALL_STEP0"
+step_header 0 6 "$L_ALL_STEP0"
+step_timer_start
 
 # Write the pre-scan Python script to session dir
 cat > "$SESSION_DIR/prescan.py" << 'PYEOF'
@@ -693,6 +833,7 @@ from inventory import (
     installed_app_version,
     app_architecture,
     scan_installed_app_paths,
+    detect_update_method,
 )
 
 programy_md_path = os.path.join(script_dir, 'APPLICATIONS.md')
@@ -757,6 +898,11 @@ for app_name, app_p in installed_app_paths.items():
         SKIP_DISCOVERY_APPS.add(app_name)
 
 new_apps = []
+new_app_info = {}
+new_formulae = []
+new_casks = []
+new_mas = []
+unhandled = []
 
 # Always persist a current installed-app snapshot for the post-scan inventory
 # refresh. The session directory is private and removed by the orchestrator.
@@ -790,8 +936,17 @@ for app in installed_apps:
 if new_apps:
     any_new_found = True
     print(f"  ⚠️  Nowe aplikacje nieobecne w APPLICATIONS.md ({len(new_apps)} szt.):")
+    method_fmt = os.environ.get('L_PRESCAN_NEW_APP_METHOD_FMT', 'suggested update method: %s')
+    method_unknown = os.environ.get('L_PRESCAN_NEW_APP_METHOD_UNKNOWN',
+                                    'suggested update method: unknown (no known updater framework found)')
     for app in new_apps:
-        print(f"       → {app}")
+        app_p = installed_app_paths.get(app, '')
+        app_ver = installed_app_version(app_p) if app_p else '?'
+        detected = detect_update_method(app_p) if app_p else {'method': 'unknown', 'label': 'unknown'}
+        new_app_info[app] = (app_ver, detected)
+        hint = method_unknown if detected['method'] == 'unknown' else method_fmt % detected['label']
+        ver_part = f" {app_ver}" if app_ver not in ('', '?') else ''
+        print(f"       → {app}{ver_part} — {hint}")
     with open(os.path.join(session_dir, 'new_apps.txt'), 'w') as f:
         f.write('\n'.join(new_apps) + '\n')
 else:
@@ -1064,7 +1219,17 @@ if os.path.exists(new_apps_file):
             app_path = installed_app_paths.get(app_name, '')
             arch = app_architecture(app_path) if app_path else "unknown"
             arch_marker = f" [{arch}]" if arch != "unknown" else ""
-            return f"| {app_name}{arch_marker} | 🆕 do skategoryzowania | — |\n"
+            # Version and detected updater go into the "Strona aktualizacji" column;
+            # column 1 (name + markers) and column 2 stay exactly as norm_name /
+            # strip_inventory_markers / the removed-app check expect them.
+            app_ver, detected = new_app_info.get(app_name, ('?', {'label': ''}))
+            note_parts = []
+            if app_ver not in ('', '?'):
+                note_parts.append(f"v{app_ver}".replace('|', ' '))
+            if detected.get('label'):
+                note_parts.append(detected['label'])
+            note = ' · '.join(note_parts) if note_parts else '—'
+            return f"| {app_name}{arch_marker} | 🆕 do skategoryzowania | {note} |\n"
 
         new_rows = ''.join(_format_unhandled_row(a) for a in unhandled)
         # POPRAWKA: sprawdź czy sekcja 🆕 już istnieje — jeśli tak, dołącz do niej
@@ -1196,6 +1361,35 @@ for grp in report.get("skipped_groups", []):
     fmt = os.environ.get('L_PRESCAN_GROUP_SYNC_SKIPPED_FMT', 'Inventory group %s was not synchronized: its data source returned nothing (kept unchanged)')
     print("  ⚠️  " + (fmt % grp))
 
+# Entries this run added to / removed from APPLICATIONS.md. Step 5 reads this
+# file for the closing summary, the machine summary and the inventory banner.
+try:
+    import json
+    _added = set()
+    for _a in unhandled:
+        if not row_exists(original_content, _a):
+            _added.add('app:' + _a)
+    for _n, _v in new_formulae:
+        _added.add('formula:' + _n)
+    for _n, _v in new_casks:
+        _added.add('cask:' + _n)
+    for _i, _n, _v in new_mas:
+        _added.add('mas:' + str(_i))
+    for _i in report.get('mas_added', []):
+        _added.add('mas:' + str(_i))
+    for _c in report.get('clis_added', []):
+        _added.add('cli:' + str(_c))
+    _removed = set()
+    for _a in removed_apps:
+        _removed.add('app:' + _a)
+    for _kind in ('mas_removed', 'group3_removed', 'formulae_removed', 'casks_removed', 'clis_removed'):
+        for _x in report.get(_kind, []):
+            _removed.add(_kind + ':' + str(_x))
+    with open(os.path.join(session_dir, 'inventory_apps.json'), 'w', encoding='utf-8') as _fh:
+        json.dump({'added': sorted(_added), 'removed': sorted(_removed)}, _fh)
+except Exception as _exc:  # reporting side-file; never fail the scan over it
+    print(f"  (inventory change record not written: {_exc})")
+
 if content != original_content:
     atomic_write_text(programy_md_path, content)
     print("\n  📝 APPLICATIONS.md zaktualizowany o nowe aplikacje i synchronizację grup")
@@ -1263,6 +1457,7 @@ else
     STATUS_CODE_SCAN="warn"
     OVERALL_EXIT=1
 fi
+step_timer_stop prescan
 fi
 
 # ============================================================
@@ -1272,6 +1467,11 @@ fi
 if [ "${MAC_UPDATE_SKIP_SYSTEM:-0}" = "1" ]; then
     print_info "Skipped final macOS step (--skip-system)"
     RESULT_SYSTEM="$L_ALL_RESULT_SKIPPED"
+    STATUS_CODE_SYSTEM="skipped"
+elif [ "${PREFLIGHT_SKIP_SYSTEM:-0}" = "1" ]; then
+    # Pre-flight found the battery below MAC_UPDATE_MIN_BATTERY (it already
+    # printed why and marked the run degraded). Only this step is skipped.
+    RESULT_SYSTEM="$L_ALL_SYSTEM_SKIPPED_BATTERY"
     STATUS_CODE_SYSTEM="skipped"
 else
     SYSTEM_DEFERRED=1
@@ -1293,7 +1493,8 @@ if [ "${MAC_UPDATE_SKIP_APPSTORE:-0}" = "1" ]; then
     RESULT_APPSTORE="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_APPSTORE="skipped"
 else
-ui_step_header 1 6 "$L_SCRIPT_TITLE_APPSTORE"
+step_header 1 6 "$L_SCRIPT_TITLE_APPSTORE"
+step_timer_start
 
 if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
     chmod +x "$SCRIPT_DIR/update_appstore.sh"
@@ -1330,6 +1531,7 @@ else
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
 fi
+step_timer_stop appstore
 fi
 
 # ============================================================
@@ -1344,7 +1546,8 @@ if [ "${MAC_UPDATE_SKIP_NPM:-0}" = "1" ]; then
     RESULT_NPMCLI="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_NPMCLI="skipped"
 else
-ui_step_header 2 6 "Native CLI + npm"
+step_header 2 6 "Native CLI + npm"
+step_timer_start
 if mac_update_dry_run_msg "update_npm_cli.sh"; then
     RESULT_NPMCLI="[DRY-RUN] skipped"
     STATUS_CODE_NPMCLI="skipped"
@@ -1367,6 +1570,7 @@ else
         BLOCKING_EXIT=1
     fi
 fi
+step_timer_stop npmcli
 fi
 
 # ============================================================
@@ -1381,7 +1585,8 @@ if [ "${MAC_UPDATE_SKIP_BREW:-0}" = "1" ]; then
     RESULT_BREW="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_BREW="skipped"
 else
-ui_step_header 3 6 "$L_SCRIPT_TITLE_BREW"
+step_header 3 6 "$L_SCRIPT_TITLE_BREW"
+step_timer_start
 
 if mac_update_dry_run_msg "update_brew.sh"; then
     RESULT_BREW="[DRY-RUN] skipped"
@@ -1412,6 +1617,7 @@ else
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
 fi
+step_timer_stop brew
 fi
 
 # ============================================================
@@ -1426,7 +1632,8 @@ if [ "${MAC_UPDATE_SKIP_INTERNET:-0}" = "1" ]; then
     RESULT_INTERNET="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_INTERNET="skipped"
 else
-ui_step_header 4 6 "$L_SCRIPT_TITLE_INTERNET"
+step_header 4 6 "$L_SCRIPT_TITLE_INTERNET"
+step_timer_start
 
 if mac_update_dry_run_msg "update_internet_apps.sh"; then
     RESULT_INTERNET="[DRY-RUN] skipped"
@@ -1460,6 +1667,7 @@ else
     OVERALL_EXIT=1
     BLOCKING_EXIT=1
 fi
+step_timer_stop internet
 fi
 
 # ============================================================
@@ -1474,7 +1682,8 @@ if [ "${MAC_UPDATE_SKIP_POSTUPDATE:-0}" = "1" ]; then
     RESULT_MD="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_MD="skipped"
 else
-ui_step_header 5 6 "$L_ALL_STEP5_DESC"
+step_header 5 6 "$L_ALL_STEP5_DESC"
+step_timer_start
 if mac_update_dry_run_msg "postupdate.py (APPLICATIONS.md / UPDATES.md)"; then
     RESULT_MD="[DRY-RUN] skipped"
     STATUS_CODE_MD="skipped"
@@ -1689,7 +1898,9 @@ for line in lines:
         new_ver = version_for_table_row(name, all_new_versions)
         if new_ver is not None:
             old_ver = m.group(4).strip()
-            if old_ver != new_ver and new_ver != '?':
+            # A "🆕 do skategoryzowania" placeholder is not a version: overwriting it
+            # would erase the marker and count a brand-new row as a changed field.
+            if old_ver != new_ver and new_ver != '?' and not old_ver.startswith('🆕'):
                 line = f"{m.group(1)}{name}{m.group(3)}{new_ver}{m.group(5)}{m.group(6)}{m.group(7)}"
                 updated_count += 1
     new_lines.append(line)
@@ -1803,7 +2014,55 @@ atomic_write_text(programy_md_path, content)
 
 print(f"  ✅ APPLICATIONS.md zaktualizowany (zmieniono {updated_count} wersji)")
 
+# Hand the numbers computed above to the machine-readable summary and the
+# closing banner. build_run_summary has always accepted a `counts` mapping and
+# the caller never passed one, so every run_summary_*.json once carried
+# "counts": {}. This runs BEFORE the inventory-only early exit below: until
+# 2026-11-09 that exit came first, so build_inventory.sh never wrote
+# run_counts.json and the summary reported "inventory version fields changed: 0"
+# right after this step had printed the real number (5-11 changed fields).
+def _write_run_counts():
+    _observed = len(updated_items)
+    _inv_added = _inv_removed = 0
+    try:
+        with open(os.path.join(session_dir, "inventory_apps.json"), encoding="utf-8") as _f:
+            _inv = json.load(_f)
+        _inv_added = len(_inv.get("added", []))
+        _inv_removed = len(_inv.get("removed", []))
+    except (OSError, ValueError, AttributeError):
+        pass
+    _counts = {
+        "appstore_upgraded": len(appstore_upgrades),
+        "brew_formulae_upgraded": len(formula_upgrades),
+        "brew_casks_upgraded": len(cask_upgrades),
+        "brew_new_packages": len(formula_new) + len(cask_new),
+        "native_cli_npm_changed": len(npm_cli_upgrades) + len(npm_cli_new),
+        "internet_app_versions_changed": len(internet_upgrades),
+        "system_upgraded": len(system_upgrades),
+        "inventory_version_fields_changed": updated_count,
+        "inventory_entries_added": _inv_added,
+        "inventory_entries_removed": _inv_removed,
+        "observed_package_changes": _observed,
+    }
+    for _k in ("internet_verified", "internet_behind", "internet_unverified"):
+        _p = os.path.join(session_dir, _k)
+        if os.path.isfile(_p):
+            try:
+                with open(_p, encoding="utf-8") as _f:
+                    _counts[_k] = int(_f.read().strip())
+            except (ValueError, OSError):
+                pass
+    try:
+        with open(os.path.join(session_dir, "run_counts.json"), "w", encoding="utf-8") as _cf:
+            json.dump(_counts, _cf)
+        # Plain numbers for the shell banner: changed added removed.
+        with open(os.path.join(session_dir, "inventory_counts.txt"), "w", encoding="utf-8") as _tf:
+            _tf.write(f"{updated_count} {_inv_added} {_inv_removed}\n")
+    except Exception as _exc:  # never fail the run over a reporting side-file
+        print(f"  (run counts not recorded: {_exc})")
+
 if os.environ.get('MAC_UPDATE_INVENTORY_ONLY') == '1':
+    _write_run_counts()
     print(f"  ✅ {os.environ.get('L_POSTUPDATE_INVENTORY_MODE_SKIPPED_UPDATES_MD', 'Inventory mode: skipped entry in UPDATES.md')}")
     sys.exit(0)
 
@@ -1962,37 +2221,9 @@ _observed = len(updated_items)
 print(f"     {os.environ.get('L_POSTUPDATE_INVENTORY_FIELDS_CHANGED', 'Inventory version fields changed: %s') % updated_count}")
 print(f"     {os.environ.get('L_POSTUPDATE_OBSERVED_PACKAGE_CHANGES', 'Observed package/CLI changes: %s') % _observed}")
 
-# Hand the same numbers to the machine-readable summary. build_run_summary has
-# always accepted a `counts` mapping and the caller never passed one, so every
-# run_summary_*.json ever written carried "counts": {} — 26 of them on this Mac.
-# Anything consuming the JSON (monitoring, the run-log review) had to re-parse
-# the human log to learn how many packages actually moved. These are the counts
-# already printed above, written once, from the step that computed them.
-_counts = {
-    "appstore_upgraded": len(appstore_upgrades),
-    "brew_formulae_upgraded": len(formula_upgrades),
-    "brew_casks_upgraded": len(cask_upgrades),
-    "brew_new_packages": len(formula_new) + len(cask_new),
-    "native_cli_npm_changed": len(npm_cli_upgrades) + len(npm_cli_new),
-    "internet_app_versions_changed": len(internet_upgrades),
-    "system_upgraded": len(system_upgrades),
-    "inventory_version_fields_changed": updated_count,
-    "observed_package_changes": _observed,
-}
-for _k in ("internet_verified", "internet_behind", "internet_unverified"):
-    _p = os.path.join(session_dir, _k)
-    if os.path.isfile(_p):
-        try:
-            with open(_p, encoding="utf-8") as _f:
-                _counts[_k] = int(_f.read().strip())
-        except (ValueError, OSError):
-            pass
-try:
-    _counts_path = os.path.join(session_dir, "run_counts.json")
-    with open(_counts_path, "w", encoding="utf-8") as _cf:
-        json.dump(_counts, _cf)
-except Exception as _exc:  # never fail the run over a reporting side-file
-    print(f"  (run counts not recorded: {_exc})")
+# Closing numbers for the machine-readable summary were already written by
+# _write_run_counts() above (it must run before the inventory-only early exit).
+_write_run_counts()
 
 PYEOF
 
@@ -2017,6 +2248,7 @@ else
     OVERALL_EXIT=1
 fi
 fi
+step_timer_stop postupdate
 fi
 
 # ============================================================
@@ -2024,7 +2256,8 @@ fi
 # ============================================================
 if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
     ui_master_progress 6 6
-    ui_step_header 6 6 "$L_SYSTEM_UPDATE_TITLE"
+    step_header 6 6 "$L_SYSTEM_UPDATE_TITLE"
+    step_timer_start
     if mac_update_dry_run_msg "update_system.sh (final step)"; then
         RESULT_SYSTEM="[DRY-RUN] skipped"
         STATUS_CODE_SYSTEM="skipped"
@@ -2054,6 +2287,8 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
             OVERALL_EXIT=1
         fi
     fi
+
+    step_timer_stop system
 
     # Postupdate runs before the reboot-capable system step. If softwareupdate
     # returns normally, replace the pending marker in the newest history entry.
@@ -2108,21 +2343,30 @@ DURATION_SECS=$((DURATION % 60))
 
 echo ""
 # Three honest reporting states: clean / completed-with-warnings / failed.
+# The inventory-only path (build_inventory.sh) updates nothing, so it never
+# says "ALL UPDATES COMPLETE" — it has its own banners.
 _summary_msg="$L_UPDATE_ALL_SUCCESS"
-if [ "$OVERALL_EXIT" -ne 0 ]; then
+if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
+    _summary_msg="$L_ALL_INVENTORY_BANNER"
+    if [ "$OVERALL_EXIT" -ne 0 ]; then
+        _summary_msg="$L_ALL_INVENTORY_BANNER_ERROR"
+    elif [ "$DEGRADED" -ne 0 ]; then
+        _summary_msg="$L_ALL_INVENTORY_BANNER_WARN"
+    fi
+elif [ "$OVERALL_EXIT" -ne 0 ]; then
     _summary_msg="${L_ALL_SUMMARY_ERROR:-UPDATE COMPLETED WITH ERRORS}"
 elif [ "$DEGRADED" -ne 0 ]; then
     _summary_msg="${L_ALL_SUMMARY_WARN:-UPDATE COMPLETED WITH WARNINGS}"
 fi
 ui_print_box "$_summary_msg"
 echo ""
-printf '  %-26s %s\n' "$L_ALL_LABEL_SCAN" "$RESULT_SCAN"
-printf '  %-26s %s\n' "$L_ALL_LABEL_APPSTORE" "$RESULT_APPSTORE"
-printf '  %-26s %s\n' "$L_ALL_LABEL_NPMCLI" "$RESULT_NPMCLI"
-printf '  %-26s %s\n' "$L_ALL_LABEL_BREW" "$RESULT_BREW"
-printf '  %-26s %s\n' "$L_ALL_LABEL_INTERNET" "$RESULT_INTERNET"
-printf '  5. %-23s %s\n' "$L_ALL_UPDATE_APPS_LABEL" "$RESULT_MD"
-printf '  %-26s %s\n' "$L_ALL_LABEL_SYSTEM" "$RESULT_SYSTEM"
+printf '  %-26s %s%s\n' "$L_ALL_LABEL_SCAN" "$RESULT_SCAN" "$(step_duration_suffix prescan)"
+printf '  %-26s %s%s\n' "$L_ALL_LABEL_APPSTORE" "$RESULT_APPSTORE" "$(step_duration_suffix appstore)"
+printf '  %-26s %s%s\n' "$L_ALL_LABEL_NPMCLI" "$RESULT_NPMCLI" "$(step_duration_suffix npmcli)"
+printf '  %-26s %s%s\n' "$L_ALL_LABEL_BREW" "$RESULT_BREW" "$(step_duration_suffix brew)"
+printf '  %-26s %s%s\n' "$L_ALL_LABEL_INTERNET" "$RESULT_INTERNET" "$(step_duration_suffix internet)"
+printf '  5. %-23s %s%s\n' "$L_ALL_UPDATE_APPS_LABEL" "$RESULT_MD" "$(step_duration_suffix postupdate)"
+printf '  %-26s %s%s\n' "$L_ALL_LABEL_SYSTEM" "$RESULT_SYSTEM" "$(step_duration_suffix system)"
 echo ""
 echo -e "  $(printf "$L_ALL_DURATION_FMT" "$MINUTES" "$DURATION_SECS")"
 echo ""
@@ -2138,6 +2382,8 @@ elif [ "$DEGRADED" -ne 0 ]; then
     else
         print_warn "${L_ALL_WARN_NOT_BLOCKING:-Some updates could not be verified. This did not block the macOS system update.}"
     fi
+elif [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
+    print_ok "$L_ALL_INVENTORY_BANNER"
 else
     print_ok "$L_UPDATE_ALL_SUCCESS"
 fi
@@ -2147,7 +2393,12 @@ elif [ "${STATUS_CODE_MD:-}" = "ok" ]; then
     # Only claim written files when step 5 really succeeded (a skipped or
     # failed inventory step must not be reported as having updated them).
     if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
-        print_info "Inventory refreshed: APPLICATIONS.md (UPDATES.md history intentionally unchanged)."
+        # Real numbers from step 5 (inventory_counts.txt: changed added removed).
+        _inv_changed=0; _inv_added=0; _inv_removed=0
+        if [ -f "$SESSION_DIR/inventory_counts.txt" ]; then
+            read -r _inv_changed _inv_added _inv_removed < "$SESSION_DIR/inventory_counts.txt" || true
+        fi
+        print_info "$(printf "$L_ALL_INVENTORY_DONE_FMT" "${_inv_changed:-0}" "${_inv_added:-0}" "${_inv_removed:-0}")"
     else
         print_info "$L_ALL_FILES_UPDATED_MSG"
     fi
@@ -2181,13 +2432,13 @@ fi
 bash "$SCRIPT_DIR/scripts/report_chronic_warnings.sh" || true
 
 _ui_summary="$(printf '%s %s\n' \
-    "$L_ALL_LABEL_SCAN" "$RESULT_SCAN" \
-    "$L_ALL_LABEL_APPSTORE" "$RESULT_APPSTORE" \
-    "$L_ALL_LABEL_NPMCLI" "$RESULT_NPMCLI" \
-    "$L_ALL_LABEL_BREW" "$RESULT_BREW" \
-    "$L_ALL_LABEL_INTERNET" "$RESULT_INTERNET" \
-    "5. $L_ALL_UPDATE_APPS_LABEL" "$RESULT_MD" \
-    "$L_ALL_LABEL_SYSTEM" "$RESULT_SYSTEM"
+    "$L_ALL_LABEL_SCAN" "$RESULT_SCAN$(step_duration_suffix prescan)" \
+    "$L_ALL_LABEL_APPSTORE" "$RESULT_APPSTORE$(step_duration_suffix appstore)" \
+    "$L_ALL_LABEL_NPMCLI" "$RESULT_NPMCLI$(step_duration_suffix npmcli)" \
+    "$L_ALL_LABEL_BREW" "$RESULT_BREW$(step_duration_suffix brew)" \
+    "$L_ALL_LABEL_INTERNET" "$RESULT_INTERNET$(step_duration_suffix internet)" \
+    "5. $L_ALL_UPDATE_APPS_LABEL" "$RESULT_MD$(step_duration_suffix postupdate)" \
+    "$L_ALL_LABEL_SYSTEM" "$RESULT_SYSTEM$(step_duration_suffix system)"
     printf '%s\n' "$(printf "$L_ALL_DURATION_FMT" "$MINUTES" "$DURATION_SECS")")"
 ui_summary_table "$_ui_summary"
 
