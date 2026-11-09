@@ -175,7 +175,7 @@ iu_google_chrome() {
 
         local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
         local vh_json=""
-        vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+        vh_json="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 "$vh_url" 2>/dev/null || true)"
         local pub_ver=""
         if [ -n "$vh_json" ]; then
             pub_ver="$(printf '%s\n' "$vh_json" | PYTHONPATH="$_LIB_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
@@ -220,7 +220,7 @@ iu_firefox_developer_edition() {
         fi
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        LATEST_FF=$(curl -fsSL --max-time 20 --retry 2 \
+        LATEST_FF=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 2 \
             "https://product-details.mozilla.org/1.0/firefox_versions.json" \
             | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('FIREFOX_DEVEDITION','?'))" \
             2>/dev/null || echo "?")
@@ -253,7 +253,7 @@ iu_firefox_developer_edition() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_APPLE_SILICON" "Firefox Developer Edition" "$LATEST_FF")"
             FF_URL="https://download.mozilla.org/?product=firefox-devedition-latest&os=osx&lang=pl"
             TEMP_DMG="$(make_temp_dmg Firefox_DevEd)"
-            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL"; then
                 FF_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$FF_MOUNT" ]; then
                     if [ -d "$FF_MOUNT/Firefox Developer Edition.app" ]; then
@@ -468,7 +468,7 @@ iu_protonvpn() {
 # must match the download; a missing or unparseable digest refuses the install.
 keepassxc_digest_ok() {
     local file="$1" url="$2" asset="$3" digest_text expected actual
-    digest_text="$(curl -fsSL --max-time 20 --retry 2 "${url}.DIGEST" 2>/dev/null)" || digest_text=""
+    digest_text="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 2 "${url}.DIGEST" 2>/dev/null)" || digest_text=""
     expected="$(printf '%s\n' "$digest_text" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
 from vendor_feeds import digest_for
@@ -532,7 +532,7 @@ iu_keepassxc() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$KPX_TARGET_LABEL ($KPX_ARCH)")"
             KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/${KPX_ASSET}"
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
-            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" \
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" \
                 && keepassxc_digest_ok "$TEMP_DMG" "$KPX_URL" "$KPX_ASSET"; then
                 KPX_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$KPX_MOUNT" ]; then
@@ -2027,7 +2027,7 @@ iu_visual_studio_code() {
         VER=$(app_version "/Applications/Visual Studio Code.app")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
 
-        VSCODE_JSON=$(curl -fsSL --max-time 30 --retry 3 --retry-delay 2 "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest" 2>/dev/null || true)
+        VSCODE_JSON=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 30 --retry 3 --retry-delay 2 "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest" 2>/dev/null || true)
         LATEST_VSCODE=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('productVersion', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
         VSCODE_URL=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('url', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
         VSCODE_SHA256=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('sha256hash', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
@@ -2058,7 +2058,7 @@ iu_visual_studio_code() {
                 rm -rf "$TEMP_DIR" 2>/dev/null || true
                 mkdir -p "$TEMP_DIR"
 
-                if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
+                if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
                     if [ -n "$VSCODE_SHA256" ]; then
                         if ! echo "$VSCODE_SHA256  $TEMP_ZIP" | shasum -a 256 -c >/dev/null 2>&1; then
                             print_warn "$(printf "$L_INTERNET_VSCODE_CHECKSUM_MISMATCH" "$TEMP_ZIP")"
@@ -2139,7 +2139,7 @@ iu_codeedit() {
             # TODO(H5): Publisher digest is unverified for CodeEdit download
             CE_URL="https://github.com/CodeEditApp/CodeEdit/releases/download/${LATEST_CE_TAG}/CodeEdit.dmg"
             TEMP_DMG="$(make_temp_dmg CodeEdit)"
-            if curl -fsSL --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL"; then
                 CE_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$CE_MOUNT" ]; then
                     if [ -d "$CE_MOUNT/CodeEdit.app" ]; then
@@ -2426,7 +2426,7 @@ iu_ledger() {
         VER=$(app_version "$LEDGER_APP")
         print_info "$(internet_msg "$L_INTERNET_INSTALLED_APP" "$LEDGER_NAME" "$VER")"
 
-        LEDGER_YML=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
+        LEDGER_YML=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
         LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
         # electron-builder's latest-mac.yml lists the .zip first and repeats
         # that entry's digest as the top-level `sha512:`. Taking the first
@@ -2470,7 +2470,7 @@ for url, digest in entries:
             fi
             LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
-            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL"; then
                 if [ -n "$LEDGER_SHA512" ]; then
                     ACTUAL_SHA512=$(shasum -a 512 "$TEMP_DMG" | awk '{print $1}')
                     if ! python3 -c "
@@ -2550,7 +2550,7 @@ iu_trezor_suite() {
         # Monorepo: trezor-suite publishes both suite (desktop) and connect (library)
         # releases. /releases/latest may return a connect release. Filter to desktop-only
         # tags matching v?NN.N.N (no slashes, no connect prefix).
-        LATEST_TS_TAG=$(curl -fsSL --max-time 20 --retry 3 --retry-delay 2 \
+        LATEST_TS_TAG=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 3 --retry-delay 2 \
             -H "User-Agent: macos-updates-toolkit" \
             ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} \
             "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" 2>/dev/null \
@@ -2583,7 +2583,7 @@ except Exception:
             # TODO(H5): Publisher digest is unverified for Trezor Suite download
             TS_URL="https://github.com/trezor/trezor-suite/releases/download/${LATEST_TS_TAG}/Trezor-Suite-${LATEST_TS}-mac-arm64.dmg"
             TEMP_DMG="$(make_temp_dmg TrezorSuite)"
-            if curl -fsSL --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL"; then
+            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL"; then
                 TS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$TS_MOUNT" ]; then
                     if [ -d "$TS_MOUNT/Trezor Suite.app" ]; then
