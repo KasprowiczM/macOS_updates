@@ -49,6 +49,14 @@ A review of the scheduled (launchd) path and the interactive path, prompted by r
 - **DJI Assistant 2** removed from the product. Its handler was the only test of the Intel-only path; the generic helpers now carry it and the tests use a fake x86_64 bundle.
 - Not verified live: no real update run, no launch of either app.
 
+## First live run on the merged branch (four defects)
+
+- **GitHub rate limit shown as "no connection".** The API lookups recorded no HTTP status; the anonymous limit (60/h) was exhausted. `github_api_fetch` now logs curl exit, HTTP status and `x-ratelimit-*` per lookup and stores the outcome for the handler; rate limiting (403/429 with remaining 0) gets its own soft status with the reset time and the `GITHUB_TOKEN` hint, and `current_cached` applies when a successful lookup within `MAC_UPDATE_FEED_CACHE_TTL_H` listed exactly the installed version. Tests use a stub `curl`; the real API is never contacted.
+- **Download before the running check.** The six download-then-`copy_verified_app` handlers (Firefox Developer Edition, KeePassXC, Visual Studio Code, CodeEdit, Ledger, Trezor Suite) call `internet_defer_running_app` first; `copy_verified_app` keeps its second check before the swap, and a deferral prints no copy error.
+- **English text in a Polish run.** Deferral messages, the two `mas upgrade` lines and the run-summary item details now come from `L_*` keys in all seven languages (the Python module reads them from the environment, English default).
+- **Prompt helper.** Unrecognised input is asked again (two re-asks, then the timeout default; input ending right after a stray answer is never a yes). Terminal type-ahead is flushed with `termios.tcflush` before the first read; nothing is drained when stdin is not a terminal. The flush is covered by a pty test.
+- Not verified live: a real rate-limited run, a Firefox update with the app open, a Polish run of the changed texts.
+
 ## Not verified live
 
 - No real scheduled launchd run was observed; the plist `PATH`, the load check and the bootout flow are covered by tests with stubbed `launchctl`.

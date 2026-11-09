@@ -269,7 +269,7 @@ copy_verified_app() {
     # This common transaction never closes an application from the user's session.
     if ! replacement_app_is_idle "$dest"; then
         INTERNET_COPY_DEFERRED=1
-        print_warn "Application is running or its state is unknown; replacement deferred: $app_label"
+        print_warn "$(internet_msg "$L_INTERNET_COPY_DEFERRED_RUNNING_FMT" "$app_label")"
         return 2
     fi
 
@@ -310,7 +310,7 @@ copy_verified_app() {
     if ! replacement_app_is_idle "$dest"; then
         INTERNET_COPY_DEFERRED=1
         rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        print_warn "Application became active; replacement deferred: $app_label"
+        print_warn "$(internet_msg "$L_INTERNET_COPY_DEFERRED_ACTIVE_FMT" "$app_label")"
         return 2
     fi
 
@@ -835,6 +835,11 @@ while IFS='|' read -r _c_app _c_meth _c_var; do
             ;;
         feed_unreachable)
             # The vendor feed failed and the app's updater ran without proof.
+            _soft_fail_from_codes=1
+            ;;
+        error_soft)
+            # Includes the GitHub rate-limit status (a parameterised message that
+            # the exact-match scan below cannot recognise).
             _soft_fail_from_codes=1
             ;;
         feed_stale)

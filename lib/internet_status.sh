@@ -58,6 +58,7 @@ internet_status_code() {
         "needs_restart|$L_INTERNET_STATUS_NEEDS_RESTART_FMT" \
         "feed_stale|$L_INTERNET_STATUS_FEED_STALE_FMT" \
         "current_cached|$L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT" \
+        "error_soft|$L_INTERNET_STATUS_GITHUB_RATELIMIT_FMT" \
         "current_feed_regressed|$L_INTERNET_STATUS_FEED_REGRESSED_FMT"
     do
         c="${item%%|*}"
