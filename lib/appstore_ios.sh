@@ -94,7 +94,7 @@ EOF
     fi
 
     local resp
-    if ! resp="$(curl -fsS --max-time 20 "$url" 2>/dev/null)"; then
+    if ! resp="$(curl -fsS --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 "$url" 2>/dev/null)"; then
         return 2
     fi
 

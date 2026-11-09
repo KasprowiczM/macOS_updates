@@ -18,7 +18,7 @@ fetch_to_file() {
     esac
     tmp="${dest}.part"
     rm -f "$tmp" "$dest"
-    if ! curl -fsSL --proto =https --proto-redir =https --max-filesize "$max_bytes" --max-time "$timeout_s" --retry 2 --retry-delay 1 \
+    if ! curl -fsSL --proto =https --proto-redir =https --tlsv1.2 --max-filesize "$max_bytes" --max-time "$timeout_s" --retry 2 --retry-delay 1 \
         -o "$tmp" "$url"; then
         rm -f "$tmp"
         return 1
