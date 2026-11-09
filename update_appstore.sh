@@ -249,12 +249,9 @@ fi
 APPSTORE_CONFIRMED=0
 appstore_confirm() {
     [ "${MAC_UPDATE_YES:-0}" = "1" ] && return 0
-    read -r -p "  ${1:-$L_CONFIRM_UPDATE} [T/n]: " CONFIRM
-    CONFIRM="${CONFIRM:-T}"
-    case "$CONFIRM" in
-        [Nn]*) return 1 ;;
-    esac
-    return 0
+    # Already confirmed once by update_all.sh: do not ask again mid-run.
+    [ "${MAC_UPDATE_PARENT_CONFIRMED:-0}" = "1" ] && return 0
+    mac_update_prompt_yn "${1:-$L_CONFIRM_UPDATE} [T/n]: " n y
 }
 if [ -n "$NATIVE_OUTDATED" ]; then
     echo -e "${YELLOW}  $L_RUN_TWO_TRACKS${NC}"
@@ -266,6 +263,8 @@ if [ -n "$NATIVE_OUTDATED" ]; then
     echo ""
     if ! appstore_confirm; then
         print_info "$L_UPDATE_CANCELED"
+        # An unanswered prompt skipped the updates: soft, not a clean "no".
+        [ "${MAC_UPDATE_PROMPT_TIMED_OUT:-0}" = "1" ] && exit 10
         exit 0
     fi
     APPSTORE_CONFIRMED=1
