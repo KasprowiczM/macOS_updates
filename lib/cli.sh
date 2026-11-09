@@ -39,7 +39,7 @@ Environment (also set by flags):
   MAC_UPDATE_MIN_FREE_GB=15          Pre-flight: warn below this many free GB
   MAC_UPDATE_MIN_BATTERY=30          Pre-flight: skip the macOS step on battery below this percent
   MAC_UPDATE_NO_CAFFEINATE=1         Do not keep the Mac awake during the run
-  MAC_UPDATE_SUDO_KEEPALIVE_MAX=3600 Stop refreshing sudo after this many seconds (300-14400)
+  MAC_UPDATE_SUDO_KEEPALIVE_MAX=14400 Stop refreshing sudo after this many seconds (300-14400)
 EOF
 }
 

@@ -189,13 +189,41 @@ preflight_check_power() {
     esac
 }
 
+# Retry budget for a real run (a single blip must not abort it); --doctor stays
+# a single fast pass. Clamped integers from the environment.
+preflight_net_retries() {
+    local v
+    v="$(_pf_int "${MAC_UPDATE_PREFLIGHT_NET_RETRIES:-}" 3)"
+    [ "$v" -lt 1 ] && v=1
+    [ "$v" -gt 10 ] && v=10
+    echo "$v"
+}
+preflight_net_retry_wait() {
+    local v
+    v="$(_pf_int "${MAC_UPDATE_PREFLIGHT_NET_RETRY_WAIT:-}" 10)"
+    [ "$v" -gt 60 ] && v=60
+    echo "$v"
+}
+
 # 0 all hosts reachable · 10 some unreachable · 1 none reachable · 3 undetermined (no curl).
+# With the argument "retry" a pass that reaches no host at all is repeated (see above)
+# before it counts as down.
 preflight_check_network() {
-    local hosts
+    local hosts retries wait n=0
     hosts="$(preflight_hosts)"
     preflight_net_probe
     if [ "$?" -eq 2 ]; then
         return 3
+    fi
+    if [ "${1:-}" = "retry" ]; then
+        retries="$(preflight_net_retries)"
+        wait="$(preflight_net_retry_wait)"
+        while [ "$PREFLIGHT_NET_OK_COUNT" -eq 0 ] && [ "$n" -lt "$retries" ]; do
+            n=$((n + 1))
+            _pf_line 3 "$(printf "$L_PREFLIGHT_NET_RETRY_FMT" "$n" "$retries")"
+            [ "$wait" -gt 0 ] && sleep "$wait"
+            preflight_net_probe
+        done
     fi
     if [ "$PREFLIGHT_NET_OK_COUNT" -eq "$PREFLIGHT_NET_TOTAL" ]; then
         _pf_line 0 "$(printf "$L_DOCTOR_NET_OK" "$PREFLIGHT_NET_OK_COUNT" "$PREFLIGHT_NET_TOTAL")"
@@ -230,7 +258,7 @@ preflight_run_cheap() {
         _pf_line 0 "$(printf "$L_DOCTOR_POWER_BATTERY_OK" "$PREFLIGHT_BATTERY_PCT")"
     fi
 
-    preflight_check_network
+    preflight_check_network retry
     rc=$?
     if [ "$rc" -eq 1 ]; then
         _pf_line 1 "$L_PREFLIGHT_NET_ABORT"
@@ -413,31 +441,51 @@ preflight_check_toolkit() {
     _pf_line 0 "$(printf "$L_DOCTOR_TOOLKIT_OK" "$ver" "${branch:-origin}")"
 }
 
-# Age and result class of logs/run_summary_latest.json.
+# Age and result class of the newest REAL run in logs/ (dry runs and
+# inventory-only runs are ignored: they say nothing about the last update).
 preflight_check_lastrun() {
-    local file parsed age cls word
-    file="${MAC_UPDATE_LOGS_DIR:-${SCRIPT_DIR:-$_PF_REPO}/logs}/run_summary_latest.json"
-    if [ ! -f "$file" ]; then
+    local dir parsed age cls word
+    dir="${MAC_UPDATE_LOGS_DIR:-${SCRIPT_DIR:-$_PF_REPO}/logs}"
+    if [ ! -f "$dir/run_summary_latest.json" ] && ! ls "$dir"/run_summary_*.json >/dev/null 2>&1; then
         _pf_line 3 "$L_DOCTOR_LASTRUN_NONE"
         return $?
     fi
     parsed="$(python3 -c '
-import datetime, json, sys
-try:
-    with open(sys.argv[1], encoding="utf-8") as fh:
-        data = json.load(fh)
-    stamp = data.get("completed_at") or data.get("timestamp") or ""
-    when = datetime.datetime.fromisoformat(stamp)
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=datetime.timezone.utc)
-    age = int((datetime.datetime.now(datetime.timezone.utc) - when).total_seconds())
-    cls = str(data.get("exit_class") or "unknown")
-    if str(data.get("run_status", "completed")) != "completed":
-        cls = "error"
-    print(max(age, 0), cls)
-except Exception:
+import datetime, glob, json, os, sys
+now = datetime.datetime.now(datetime.timezone.utc)
+best = None
+seen = 0
+for path in glob.glob(os.path.join(sys.argv[1], "run_summary_*.json")):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        seen += 1
+        flags = data.get("flags") or {}
+        if isinstance(flags, dict) and (flags.get("dry_run") or flags.get("inventory_only")):
+            continue
+        stamp = data.get("completed_at") or data.get("timestamp") or ""
+        when = datetime.datetime.fromisoformat(stamp)
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=datetime.timezone.utc)
+        age = max(int((now - when).total_seconds()), 0)
+        cls = str(data.get("exit_class") or "unknown")
+        if str(data.get("run_status", "completed")) != "completed":
+            cls = "error"
+        if best is None or age < best[0]:
+            best = (age, cls)
+    except Exception:
+        continue
+if best is not None:
+    print(best[0], best[1])
+elif seen:
+    print("? none")
+else:
     print("? unknown")
-' "$file" 2>/dev/null)"
+' "$dir" 2>/dev/null)"
+    if [ "$parsed" = "? none" ]; then
+        _pf_line 3 "$L_DOCTOR_LASTRUN_NO_REAL"
+        return $?
+    fi
     age="${parsed%% *}"
     cls="${parsed#* }"
     case "$cls" in

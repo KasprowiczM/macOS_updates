@@ -51,6 +51,57 @@ def pkg_app_hints(cask: dict) -> list[str]:
     return hints
 
 
+def quit_bundle_ids(cask: dict) -> list[str]:
+    """Bundle IDs a cask declares under uninstall -> quit, plus the bundle ID of
+    each uninstall -> signal target (``[["TERM", "com.x"]]`` or ``{"TERM": ...}``).
+    Order-preserving, de-duplicated; no declaration -> []."""
+    ids: list[str] = []
+
+    def add(value: object) -> None:
+        if isinstance(value, str) and value and value not in ids:
+            ids.append(value)
+
+    for art in cask.get("artifacts", []):
+        if not isinstance(art, dict):
+            continue
+        uninst = art.get("uninstall")
+        if isinstance(uninst, dict):
+            uninst = [uninst]
+        if not isinstance(uninst, list):
+            continue
+        for entry in uninst:
+            if not isinstance(entry, dict):
+                continue
+            quits = entry.get("quit", [])
+            if isinstance(quits, str):
+                quits = [quits]
+            if isinstance(quits, list):
+                for q in quits:
+                    add(q)
+            sigs = entry.get("signal", [])
+            if isinstance(sigs, dict):
+                sigs = list(sigs.items())
+            if isinstance(sigs, list):
+                if len(sigs) == 2 and all(isinstance(x, str) for x in sigs):
+                    sigs = [sigs]  # a single ["TERM", "id"] pair
+                for sig in sigs:
+                    if isinstance(sig, (list, tuple)) and len(sig) >= 2:
+                        add(sig[1])
+    return ids
+
+
+def cask_quit_ids_facts(text: str) -> str:
+    """';'-joined quit/signal bundle IDs from `brew info --json=v2 --cask <t>`
+    (empty string when none are declared); 'UNREADABLE' when the JSON cannot be read."""
+    try:
+        cask = json.loads(text)["casks"][0]
+        if not isinstance(cask, dict):
+            raise TypeError
+    except (ValueError, KeyError, IndexError, TypeError):
+        return "UNREADABLE"
+    return ";".join(quit_bundle_ids(cask))
+
+
 def cask_primary_app(text: str) -> str:
     """First app target name ('X.app') or ''."""
     try:

@@ -32,6 +32,9 @@ echo "$@" >> "{self.launchctl_log}"
 if [ "$1" = "bootstrap" ] && [ -f "{self.tmp_path}/fail_bootstrap" ]; then
     exit 1
 fi
+if [ "$1" = "bootout" ] && [ -f "{self.tmp_path}/fail_bootout" ]; then
+    exit 1
+fi
 if [ "$1" = "list" ] || [ "$1" = "print" ]; then
     if [ -f "{self.tmp_path}/active_service" ]; then
         exit 0
@@ -174,6 +177,19 @@ exit 0
 
         launchctl_calls = self.launchctl_log.read_text(encoding="utf-8")
         self.assertIn("bootout gui/", launchctl_calls)
+
+    def test_uninstall_never_falls_back_to_unload(self) -> None:
+        subprocess.run(["/bin/bash", str(SCRIPT_PATH)], env=self.env, capture_output=True)
+        (self.tmp_path / "fail_bootout").touch()
+        self.launchctl_log.write_text("", encoding="utf-8")
+        result = subprocess.run(["/bin/bash", str(SCRIPT_PATH), "--uninstall"], env=self.env,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self._plist().exists())
+        calls = self.launchctl_log.read_text(encoding="utf-8").splitlines()
+        # service-target bootout, then plist-path bootout; nothing else
+        self.assertEqual(len([c for c in calls if c.startswith("bootout ")]), 2, calls)
+        self.assertFalse([c for c in calls if "unload" in c], calls)
 
 
 if __name__ == "__main__":

@@ -190,9 +190,41 @@ class RealRunPolicyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             stubs = Path(tmp)
             base_stubs(stubs, net_ok=False)
-            out = self.policy(stubs)
+            out = self.policy(stubs, MAC_UPDATE_PREFLIGHT_NET_RETRY_WAIT="0")
             self.assertIn("No network: none of the required hosts is reachable over HTTPS", out)
             self.assertIn("rc=1", out)
+            # default 3 retries, one localized line each, then the abort
+            self.assertIn("Network not reachable yet — retrying (1/3)", out)
+            self.assertIn("Network not reachable yet — retrying (3/3)", out)
+            self.assertNotIn("(4/3)", out)
+
+    def test_network_blip_recovers_without_aborting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stubs = Path(tmp)
+            base_stubs(stubs)
+            # first full pass (3 hosts) fails, everything after succeeds
+            count = stubs / "count"
+            write_stub(stubs, "curl",
+                       f'n=$(cat "{count}" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "{count}"; '
+                       f'[ "$n" -le 3 ] && exit 6; exit 0')
+            out = self.policy(stubs, MAC_UPDATE_PREFLIGHT_NET_RETRY_WAIT="0")
+            self.assertIn("retrying (1/3)", out)
+            self.assertNotIn("retrying (2/3)", out)
+            self.assertNotIn("No network", out)
+            self.assertIn("rc=0", out)
+
+    def test_retry_env_is_clamped_and_doctor_is_single_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stubs = Path(tmp)
+            base_stubs(stubs, net_ok=False)
+            for raw, want in (("", "3"), ("abc", "3"), ("0", "1"), ("99", "10"), ("5", "5")):
+                proc = run_bash("preflight_net_retries", stubs, MAC_UPDATE_PREFLIGHT_NET_RETRIES=raw)
+                self.assertEqual(proc.stdout.strip(), want, raw)
+            for raw, want in (("", "10"), ("0", "0"), ("500", "60")):
+                proc = run_bash("preflight_net_retry_wait", stubs, MAC_UPDATE_PREFLIGHT_NET_RETRY_WAIT=raw)
+                self.assertEqual(proc.stdout.strip(), want, raw)
+            proc = run_bash("preflight_check_network; echo rc=$?", stubs)  # doctor form
+            self.assertNotIn("retrying", proc.stdout)
 
     def test_partial_network_does_not_abort(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -354,6 +386,29 @@ class DoctorCheckTests(unittest.TestCase):
             started = run_bash("preflight_check_lastrun; echo rc=$?", MAC_UPDATE_LOGS_DIR=str(logs))
             self.assertIn("result: failed", started.stdout)
             self.assertIn("rc=10", started.stdout)
+
+    def test_last_run_ignores_dry_and_inventory_only_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            logs = Path(tmp)
+            now = datetime.now(timezone.utc)
+
+            def put(name, age_h, cls, **flags):
+                (logs / name).write_text(json.dumps({
+                    "completed_at": (now - timedelta(hours=age_h)).isoformat(),
+                    "exit_class": cls, "run_status": "completed", "flags": flags}), encoding="utf-8")
+
+            put("run_summary_100.json", 50, "warnings", dry_run=False)
+            put("run_summary_200.json", 1, "clean", dry_run=True)
+            put("run_summary_latest.json", 1, "clean", dry_run=True)
+            proc = run_bash("preflight_check_lastrun; echo rc=$?", MAC_UPDATE_LOGS_DIR=str(logs))
+            self.assertIn("2d 2h ago, result: completed with warnings", proc.stdout)
+            put("run_summary_300.json", 2, "clean", inventory_only=True)
+            proc = run_bash("preflight_check_lastrun", MAC_UPDATE_LOGS_DIR=str(logs))
+            self.assertIn("completed with warnings", proc.stdout)
+            (logs / "run_summary_100.json").unlink()
+            proc = run_bash("preflight_check_lastrun; echo rc=$?", MAC_UPDATE_LOGS_DIR=str(logs))
+            self.assertIn("no previous real run", proc.stdout)
+            self.assertIn("rc=3", proc.stdout)
 
     def test_last_run_missing_and_corrupt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

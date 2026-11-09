@@ -82,6 +82,29 @@ EOF_RUNNING_TARGETS
 
 
 
+# brew_cask_running_quit_id <ids "a.b.c;d.e.f"|UNREADABLE>
+#   For casks without an app target: prints the first declared quit/signal bundle
+#   ID that is running or of unknown state (or UNREADABLE when the cask JSON could
+#   not be read, which defers); nothing when none is declared or all are closed.
+brew_cask_running_quit_id() {
+    local ids="$1" bid state
+    if [ "$ids" = "UNREADABLE" ]; then
+        printf '%s\n' "UNREADABLE"
+        return 0
+    fi
+    while IFS= read -r bid; do
+        [ -n "$bid" ] || continue
+        state="$(internet_app_running_state "$bid")"
+        if [ "$state" != "false" ]; then
+            printf '%s\n' "$bid"
+            return 0
+        fi
+    done <<EOF_QUIT_IDS
+$(printf '%s' "$ids" | tr ';' '\n')
+EOF_QUIT_IDS
+    return 0
+}
+
 # ============================================================
 print_header "$L_BREW_TITLE"
 if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
@@ -441,17 +464,25 @@ EOF_TARGETS
         fi
         # An app that is open is never replaced (critical_rules 15). Unknown
         # running state defers too, exactly like the app-copy transaction.
+        deferred_app=""
         if [ -n "$targets_str" ]; then
             deferred_app="$(brew_cask_running_app "$targets_str")"
-            if [ -n "$deferred_app" ]; then
-                print_warn "$(internet_msg "$L_BREW_CASK_RUNNING_FMT" "$cask" "${cask_recorded_ver:-?}" "${cask_ver:-?}" "$deferred_app")"
-                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
-                    echo "$cask|$deferred_app" >> "$MAC_UPDATE_SESSION_DIR/brew_deferred_running.txt"
-                fi
-                DEFERRED_RUNNING_CASKS="$DEFERRED_RUNNING_CASKS $cask"
-                SOFT_FAIL=1
-                continue
+        elif [ -z "$cask_json" ]; then
+            deferred_app="UNREADABLE"
+        else
+            # No app target (pkg casks): honour the quit/signal bundle IDs the
+            # cask itself declares; none declared (fonts, drivers, CLIs) -> upgrade.
+            deferred_app="$(printf '%s' "$cask_json" | brew_cask_quit_ids)"
+            deferred_app="$(brew_cask_running_quit_id "$deferred_app")"
+        fi
+        if [ -n "$deferred_app" ]; then
+            print_warn "$(internet_msg "$L_BREW_CASK_RUNNING_FMT" "$cask" "${cask_recorded_ver:-?}" "${cask_ver:-?}" "$deferred_app")"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+                echo "$cask|$deferred_app" >> "$MAC_UPDATE_SESSION_DIR/brew_deferred_running.txt"
             fi
+            DEFERRED_RUNNING_CASKS="$DEFERRED_RUNNING_CASKS $cask"
+            SOFT_FAIL=1
+            continue
         fi
         UPGRADEABLE_CASKS="$UPGRADEABLE_CASKS $cask"
         if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
@@ -530,6 +561,11 @@ if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
     PENDING_BREW_CASKS="$(printf '%s\n' "$REMAINING_CASKS" | wc -l | tr -d ' ')"
     [ -n "$REMAINING_FORMULAE" ] || PENDING_BREW_FORMULAE=0
     [ -n "$REMAINING_CASKS" ] || PENDING_BREW_CASKS=0
+    # Deferred (app open) casks are still pending: count them, the run summary
+    # lists each one from brew_deferred_running.txt.
+    DEFERRED_COUNT=0
+    for dcask in $DEFERRED_RUNNING_CASKS; do DEFERRED_COUNT=$((DEFERRED_COUNT + 1)); done
+    PENDING_BREW_CASKS=$((PENDING_BREW_CASKS + DEFERRED_COUNT))
     printf '%s\n' "$PENDING_BREW_FORMULAE" > "$MAC_UPDATE_SESSION_DIR/pending_brew_formulae"
     printf '%s\n' "$PENDING_BREW_CASKS" > "$MAC_UPDATE_SESSION_DIR/pending_brew_casks"
 fi
