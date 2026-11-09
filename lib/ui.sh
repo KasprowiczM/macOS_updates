@@ -50,6 +50,94 @@ ui_print_header() {
 
 print_header() { ui_print_header "$1"; }
 
+# ── Bounded yes/no prompt (Bash 3.2) ─────────────────────────
+# A prompt that waits forever turns one unattended-looking run into an hour of
+# silence (2026-11-04: 51 minutes on a brew question). Every mid-run question
+# goes through here so it has a lifetime and a safe default.
+#
+#   mac_update_prompt_timeout     -> effective seconds (0 = wait forever)
+#   mac_update_prompt_yn <prompt> <timeout-default y|n> [<enter-default y|n>]
+#       returns 0 for yes, 1 for no. Typed n* is no; y*/t*/j*/s*/o* (the localized yes letters) is yes; an empty answer (or
+#       end of input) uses the enter-default. Any other text is NOT an answer (a stray
+#       type-ahead key must not silently cancel a step): one localized "please answer
+#       yes or no" line is printed and the question is asked again, at most twice;
+#       only then the timeout default applies. When stdin is a terminal, keys typed
+#       before the first question are discarded (mac_update_prompt_drain_input).
+#       No answer within MAC_UPDATE_PROMPT_TIMEOUT seconds
+#       (default 120, clamped 10-900, 0 = no limit) uses the timeout-default,
+#       prints a notice and sets MAC_UPDATE_PROMPT_TIMED_OUT=1.
+mac_update_prompt_timeout() {
+    local v="${MAC_UPDATE_PROMPT_TIMEOUT:-120}"
+    case "$v" in
+        ''|*[!0-9]*) v=120 ;;
+    esac
+    if [ "$v" -ne 0 ]; then
+        [ "$v" -lt 10 ] && v=10
+        [ "$v" -gt 900 ] && v=900
+    fi
+    printf '%s\n' "$v"
+}
+
+# Discard keys typed ahead during a long run, so they cannot answer a later
+# question. Terminal only (never touches pipes or files), instant (no read timeout)
+# and loses nothing else: tcflush on the input queue of stdin.
+mac_update_prompt_drain_input() {
+    [ -t 0 ] || return 0
+    command -v python3 >/dev/null 2>&1 || return 0
+    python3 -c 'import sys, termios; termios.tcflush(0, termios.TCIFLUSH)' 2>/dev/null || true
+    return 0
+}
+
+mac_update_prompt_yn() {
+    local prompt="$1" tdef="${2:-n}" edef="${3:-}" ans="" rc=0 t started reasks=0
+    [ -n "$edef" ] || edef="$tdef"
+    MAC_UPDATE_PROMPT_TIMED_OUT=0
+    t="$(mac_update_prompt_timeout)"
+    mac_update_prompt_drain_input
+    while :; do
+        printf '  %s' "$prompt"
+        started=$SECONDS
+        if [ "$t" -gt 0 ]; then
+            read -r -t "$t" ans
+            rc=$?
+        else
+            read -r ans
+            rc=$?
+        fi
+        # Bash 3.2 returns 1 (not >128) when `read -t` expires, so a failed read that
+        # used the whole window is a timeout; an earlier failure is end of input.
+        if [ "$rc" -gt 128 ] || { [ "$rc" -ne 0 ] && [ "$t" -gt 0 ] && [ $((SECONDS - started)) -ge "$t" ]; }; then
+            MAC_UPDATE_PROMPT_TIMED_OUT=1
+            echo ""
+            # shellcheck disable=SC2059
+            print_info "$(printf "${L_PROMPT_TIMEOUT_FMT:-No answer within %ss — assuming \"%s\"}" "$t" "$tdef")"
+            [ "$tdef" = "y" ] && return 0
+            return 1
+        fi
+        case "$ans" in
+            [Nn]*) return 1 ;;
+            [YyTtJjSsOo]*) return 0 ;;
+            '')
+                # Input ended right after an unrecognised answer: never a yes.
+                if [ "$rc" -ne 0 ] && [ "$reasks" -gt 0 ]; then return 1; fi
+                break
+                ;;
+            *)
+                # Unrecognised text is never a yes, and not silently a no either.
+                if [ "$rc" -ne 0 ]; then return 1; fi  # end of input mid-word: never re-ask
+                if [ "$reasks" -ge 2 ]; then
+                    [ "$tdef" = "y" ] && return 0
+                    return 1
+                fi
+                reasks=$((reasks + 1))
+                print_info "${L_PROMPT_INVALID_ANSWER:-Please answer y (yes) or n (no).}"
+                ;;
+        esac
+    done
+    [ "$edef" = "y" ] && return 0
+    return 1
+}
+
 # Centered single-line boxed message (summary banners).
 ui_print_box() {
     local text="$1"

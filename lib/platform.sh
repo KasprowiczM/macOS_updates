@@ -178,3 +178,24 @@ mac_update_clt_status() {
     return 0
 }
 
+
+# Guarantee Homebrew is on PATH. launchd starts jobs with
+# /usr/bin:/bin:/usr/sbin:/sbin, where `command -v brew` and `mas` fail.
+# Only prepends when the directory exists and is not already present, so a
+# user toolchain already ahead of it keeps its precedence. The prefix is
+# overridable for hermetic tests (MAC_UPDATE_HOMEBREW_PREFIX).
+mac_update_ensure_homebrew_path() {
+    local prefix="${MAC_UPDATE_HOMEBREW_PREFIX:-/opt/homebrew}"
+    local dir
+    for dir in "$prefix/sbin" "$prefix/bin"; do
+        [ -d "$dir" ] || continue
+        case ":$PATH:" in
+            *":$dir:"*) ;;
+            *) PATH="$dir${PATH:+:$PATH}" ;;
+        esac
+    done
+    export PATH
+    return 0
+}
+
+mac_update_ensure_homebrew_path

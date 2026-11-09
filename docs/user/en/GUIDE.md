@@ -59,7 +59,7 @@ The registry maps 43 apps to 11 methods (`config/internet_app_methods.txt`; the 
 | `chromium_updater` | Comet | verified direct | Chromium-based updater proof |
 | `docker_cli` | Docker Desktop | verified direct | Idle: verified DMG from Docker's appcast; running: left alone (quit it to update); fallback `docker desktop update` |
 | `mau_fallback_self_update` | Microsoft Teams | triggered-unverified | Teams self-updater plus an observed, verified `TEAMS21` MAU fallback when offered |
-| `manual` | IPMIView, DJI Assistant 2 | manual | Notification only |
+| `manual` | IPMIView | manual | Notification only |
 
 ## Adding an internet app
 

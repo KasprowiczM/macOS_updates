@@ -73,7 +73,7 @@ Le registre ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 | `chromium_updater` | 1 | verified direct | Preuve du programme de mise à jour basé sur Chromium (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop : DMG vérifié depuis son appcast quand l'app est inactive ; repli `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Mise à jour propre à Teams plus repli MAU `TEAMS21` observé et vérifié quand Microsoft le propose |
-| `manual` | 2 | manual | IPMIView et DJI Assistant 2 : notification uniquement |
+| `manual` | 1 | manual | IPMIView : notification uniquement |
 
 ---
 
@@ -85,6 +85,7 @@ Le registre ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 |--------|-------|
 | `-y`, `--yes` | Ignore la demande de confirmation |
 | `-h`, `--help` | Affiche l'aide et termine avec le code `0` |
+| `--doctor` | Rapport de préparation en lecture seule (plateforme, outils, `PATH` launchd, LaunchAgent, sudo, disque, alimentation, réseau, dernière exécution) ; pas de demande sudo, pas de journal d'exécution ; sortie `0` ok / `10` avertissements / `1` problème |
 | `--dry-run` | Prévisualise chaque étape, ne modifie rien et ne demande jamais d'identifiants |
 | `--verify-only` | Vérifie les versions installées par rapport à l'historique sans rien modifier |
 | `--json-summary` | Affiche un objet JSON de résultat sur stdout après l'exécution |
@@ -103,6 +104,12 @@ Le registre ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 
 Une option `-…` inconnue termine avec le code `2` après affichage de l'aide.
 
+**Contrôle préalable (exécutions réelles uniquement) :** avant l'étape 0, l'exécution vérifie l'espace disque libre, la batterie et le réseau. Un espace faible dégrade l'exécution, une batterie faible ignore seulement l'étape macOS (en douceur), et l'absence d'hôte joignable met fin à l'exécution avec le code `1` avant toute étape. Le Mac reste éveillé grâce à `caffeinate` pendant l'exécution (`MAC_UPDATE_NO_CAFFEINATE=1` désactive cela). Lancez `bash update_all.sh --doctor` pour voir les mêmes contrôles sans rien exécuter.
+
+**Questions :** chaque question posée pendant l'exécution expire après `MAC_UPDATE_PROMPT_TIMEOUT` secondes avec la réponse sûre « non » ; une saisie non reconnue vaut aussi « non ». Après la confirmation générale, les étapes Homebrew et App Store ne redemandent pas ; l'étape macOS demande toujours.
+
+**Applications ouvertes :** un cask Homebrew dont l'application est ouverte n'est jamais mis à jour ; il est reporté avec le message « quittez l'application » et l'étape se termine par un avertissement léger (code `10`).
+
 ## Variables d'environnement
 
 Chaque option a une variable équivalente (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_SKIP_SYSTEM=1`, …) ; voici les plus courantes qui n'ont pas d'option. La liste complète avec les valeurs par défaut se trouve dans [docs/agents/scripts.md](docs/agents/scripts.md#environment-variables).
@@ -114,7 +121,10 @@ Chaque option a une variable équivalente (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_S
 | `MAC_UPDATE_NO_SUDO` | *définie automatiquement* | Exportée par `update_all.sh` sans TTY ; les scripts enfants ignorent alors les pistes root au lieu d'échouer |
 | `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | `1` désactive le rafraîchissement en arrière-plan de l'horodatage `sudo` |
 | `MAC_UPDATE_STALE_DAYS` | `45` | Nombre de jours après lesquels une app non vérifiée est signalée comme périmée |
-| `MAC_UPDATE_MAX_LOGS` | `30` | Journaux d'exécution conservés dans `logs/` |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Journaux d'exécution conservés dans `logs/` (les résumés d'exécution sont aussi rotés) |
+| `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Secondes (10–900, `0` = attendre indéfiniment) pendant lesquelles une question oui/non en cours d'exécution attend ; l'expiration vaut « non » |
+| `MAC_UPDATE_MIN_FREE_GB` | `15` | Contrôle préalable : un espace disque libre inférieur à cette valeur dégrade l'exécution |
+| `MAC_UPDATE_MIN_BATTERY` | `30` | Contrôle préalable : sur batterie, en dessous de ce pourcentage, seule l'étape macOS est ignorée |
 | `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `15` | Pause laissant un programme de mise à jour lancé réécrire `Info.plist` (`0` la désactive, plafonnée à 120 ; ignorée si aucune app n'a été lancée) |
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Secondes (0–300) dont dispose une app lancée par l'outil pour se fermer après le `quit` doux ; jamais forcée (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Secondes (1–60) entre deux demandes `quit` douces dans la fenêtre d'attente (v1.5.5) |

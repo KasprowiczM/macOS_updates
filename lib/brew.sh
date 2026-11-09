@@ -308,6 +308,16 @@ print(cask_guard_facts(sys.stdin.read()))
 ' 2>/dev/null
 }
 
+# brew_cask_quit_ids — same stdin; stdout: bundle IDs from the cask's uninstall quit/signal
+# declarations joined by ';' (empty = none), or UNREADABLE when the JSON is unusable
+brew_cask_quit_ids() {
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from brew_casks import cask_quit_ids_facts
+print(cask_quit_ids_facts(sys.stdin.read()))
+' 2>/dev/null || printf 'UNREADABLE\n'
+}
+
 # brew_cask_primary_app — same stdin; stdout: X.app or empty
 brew_cask_primary_app() {
     PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
@@ -317,3 +327,13 @@ print(cask_primary_app(sys.stdin.read()))
 ' 2>/dev/null
 }
 
+# brew_doctor_advisories — stdin: filtered `brew doctor` output;
+# stdout: one `brew_doctor|<security|info>|<text>` advisory per line (run-summary contract)
+brew_doctor_advisories() {
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from brew_casks import doctor_advisories
+for line in doctor_advisories(sys.stdin.read()):
+    print(line)
+' 2>/dev/null
+}

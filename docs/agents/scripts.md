@@ -18,6 +18,7 @@
 | `lib/python/run_summary.py` | Pure Python library for building machine-readable run summary JSON (format 4) |
 | `lib/python/cli_duplicates.py` | Known-prefix npm duplicate discovery and version/process guards for native CLI cleanup |
 | `lib/python/http_fetch.py` | HTTPS download helper used by tests and the fetch adapter |
+| `lib/python/log_rotation.py` | Rotation of `logs/`: run logs, `run_summary_*.json` (including stray names), stale temp files; never `run_summary_latest.json` / `version_history.tsv` |
 | `lib/python/run_lock.py` | Exclusive run lock (`.mac-update.lock`); `kill(pid,0)` EPERM counts as alive |
 | `lib/fetch.sh` | HTTPS-only download with emptiness and size checks (no curl-pipe-to-sh) |
 | `lib/native_installers.sh` | Per-vendor CLI install/update (Claude positional `latest`, Codex `--release latest`, OpenCode repair) |
@@ -28,7 +29,7 @@
 | `scripts/check_vendor_feeds.sh` | Read-only diagnostic query of vendor feeds and Omaha updaters (table and `--json`) |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
 | `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
-| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule |
+| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key |
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
 | `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
@@ -47,10 +48,11 @@
 | `lib/internet_i18n.sh` | Localized printf message formatting helpers for internet app updaters |
 | `lib/internet_registry.sh` | Parser and validator for `config/internet_app_methods.txt` mapping apps to update handlers |
 | `lib/internet_status.sh` | Internet app status code mapping and summary report formatting (v1.5.0) |
-| `lib/platform.sh` | Supported macOS platform and Apple Silicon architecture guards |
+| `lib/platform.sh` | Supported macOS platform and Apple Silicon architecture guards; `mac_update_ensure_homebrew_path` (runs when sourced) puts Homebrew on `PATH` for launchd runs |
 | `lib/proc.sh` | Shared process execution, timeout, and child process management helpers |
 | `lib/severity.sh` | Shared severity classification and exit code contract helpers across orchestrator scripts |
 | `lib/ui.sh` | Terminal UX helpers: formatting, colors, and TTY-aware progress reporting |
+| `lib/preflight.sh` | Read-only readiness checks: `update_all.sh --doctor` (exit 0/10/1) and the cheap pre-run subset (disk, power, network) with `caffeinate` policy |
 | `lib/version.sh` | Package, bundle, and application version extraction and three-way comparison helpers |
 | `lib/vendor_feeds.sh` | Vendor feed lookup and parsing helper |
 | `lib/vendor_direct.sh` | Verified vendor direct download, Gatekeeper validation, and atomic swap |
@@ -61,6 +63,7 @@
 | `lib/python/cli_retention.py` | Vendor CLI version retention and pruning helpers |
 | `lib/python/system_updates.py` | Pure-function helpers for softwareupdate catalog parsing, label extraction, and reboot classification |
 | `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha text log + `updater_history.jsonl`, VersionHistory) |
+| `lib/python/feed_state.py` | Persistent per-app vendor feed state (last good version, high-water mark): cached proof on a failed fetch, vendor-side feed regressions; atomic 0600 writes |
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
 | `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
 | `config/vendor_appcasts.txt` | Sparkle appcasts used only to prove an installed rollout-channel build is a published vendor release (never an install source) |
@@ -70,7 +73,7 @@
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 
-`update_all.sh` supports `--dry-run`, `--yes`, `--verify-only`, `--bootstrap-cli` (explicitly install missing CLI tools), and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
+`update_all.sh` supports `--doctor` (read-only readiness report: no sudo, no run log, no summary; exit 0 ok / 10 warnings / 1 hard problem), `--dry-run`, `--yes`, `--verify-only`, `--bootstrap-cli` (explicitly install missing CLI tools), and selective `--skip-*` flags (see `lib/cli.sh`). It evaluates child script step severity: exit 0 indicates clean success, exit 10 indicates soft/degraded results (logged as warnings, non-blocking), and exit 1/127 indicates hard failures (blocking).
 
 ### Environment Variables
 
@@ -87,6 +90,19 @@
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; the AppleScript `quit` is re-sent while it keeps running, never force-killed (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Interval in seconds (1–60) between repeated graceful `quit` requests inside `MAC_UPDATE_QUIT_WAIT` (v1.5.5) |
 | `MAC_UPDATE_PACKAGE_REVISION_FILE` | `~/.local/state/mac-update/package_revisions.tsv` | Package revision installed per product+version (`KeePassXC\|2.8.0\|1`); detects same-version vendor rebuilds |
+| `MAC_UPDATE_FEED_STATE_FILE` | `~/.local/state/mac-update/feed_state.json` | Per-app vendor feed state (last successful version + time, high-water mark, last error); never an install source |
+| `MAC_UPDATE_FEED_CACHE_TTL_H` | `24` | Hours (0–168, 0 disables) a successful feed check that listed the installed version stays valid proof when the feed is unreachable — the app is then reported current from the cached check and not launched |
+| `MAC_UPDATE_MIN_FREE_GB` | `15` | Pre-flight / `--doctor`: warn (degraded run) when free space on the system volume is below this many GB |
+| `MAC_UPDATE_MIN_BATTERY` | `30` | Pre-flight: on battery below this percent the macOS system step is skipped softly (other steps run) |
+| `MAC_UPDATE_NO_CAFFEINATE` | `0` | Set to `1` to not run `caffeinate -i -w $$` for the duration of a real run |
+| `MAC_UPDATE_SUDO_KEEPALIVE_MAX` | `14400` | Seconds after which the sudo keep-alive stops refreshing (clamped 300-14400); it also stops as soon as the parent shell is gone |
+| `MAC_UPDATE_PARENT_CONFIRMED` | unset | Exported as `1` by `update_all.sh` once its master confirmation succeeded; children skip their own redundant confirmation |
+| `MAC_UPDATE_DOCTOR_PROBE_AX` | `0` | `--doctor` only: set to `1` to probe Accessibility with `osascript` (can show a macOS permission prompt) |
+| `MAC_UPDATE_PREFLIGHT_NET_RETRIES` | `3` | Extra network probe passes before a real run aborts for "no network" (clamp 1-10); `--doctor` does one pass |
+| `MAC_UPDATE_PREFLIGHT_NET_RETRY_WAIT` | `10` | Seconds between those passes (clamp 0-60; tests use 0) |
+| `MAC_UPDATE_PREFLIGHT_HOSTS` | `api.github.com formulae.brew.sh itunes.apple.com` | HTTPS hosts probed by pre-flight / `--doctor` (test override) |
+| `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Seconds (clamp 10-900, 0 = wait forever) a mid-run yes/no prompt waits (`mac_update_prompt_yn`, `lib/ui.sh`); a timeout is a safe "no" |
+| `MAC_UPDATE_HOMEBREW_PREFIX` | `/opt/homebrew` | Test-only override of the prefix `mac_update_ensure_homebrew_path` adds to `PATH` |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
 
 ## update_all.sh Step Order

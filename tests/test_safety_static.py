@@ -639,7 +639,12 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertLess(inventory_guard, history_builder)
         build = self.read_script("build_inventory.sh")
         self.assertIn("MAC_UPDATE_INVENTORY_ONLY=1", build)
-        self.assertIn("UPDATES.md history intentionally unchanged", text)
+        # The closing line is localized (L_ALL_INVENTORY_DONE_FMT) and carries the real numbers.
+        self.assertIn("L_ALL_INVENTORY_DONE_FMT", text)
+        for lang in ("en", "pl", "es", "it", "pt", "de", "fr"):
+            lang_text = (REPO_ROOT / "i18n" / f"lang_{lang}.sh").read_text(encoding="utf-8")
+            self.assertRegex(lang_text, r'(?m)^L_ALL_INVENTORY_DONE_FMT="[^"]*%s[^"]*%s[^"]*%s[^"]*"$')
+        self.assertIn("UPDATES.md", (REPO_ROOT / "i18n" / "lang_en.sh").read_text(encoding="utf-8").split("L_ALL_INVENTORY_DONE_FMT=")[1].split("\n")[0])
 
     def test_prescan_recognizes_formatted_inventory_cells(self) -> None:
         inventory_py = (REPO_ROOT / "lib" / "python" / "inventory.py").read_text(encoding="utf-8")
@@ -776,7 +781,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         )
 
         legacy_handled_methods = {
-            "github_dmg", "msupdate", "mau_fallback_self_update",
+            "github_dmg", "mozilla_dmg", "msupdate", "mau_fallback_self_update",
             "docker_cli", "brew_cask", "appstore_gui"
         }
 
@@ -838,7 +843,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                 f"iu_{method}",
             ]
             found = any(h in handler_code for h in handler_names) or method in {
-                "keystone", "github_dmg", "msupdate", "docker_cli", "sparkle_appcast"
+                "keystone", "github_dmg", "mozilla_dmg", "msupdate", "docker_cli", "sparkle_appcast"
             }
             self.assertTrue(
                 found,
@@ -1166,9 +1171,10 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertGreater(dry_pos, -1)
         self.assertGreater(update_pos, -1)
         # dry-run early exit must appear before first brew update
-        early = text.find("[DRY-RUN] Would run: brew update")
+        early = text.find("$L_BREW_DRYRUN_WOULD_RUN_FULL")
         self.assertGreater(early, -1)
         self.assertLess(early, update_pos)
+        self.assertIn("[DRY-RUN] Would run: brew update", self.read_script("i18n/lang_en.sh"))
 
     def test_brew_asaf_filter_keeps_internal_blank_lines_in_warning_block(self) -> None:
         text = self.read_script("update_brew.sh")
@@ -1364,9 +1370,8 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn('"classification_counts":', text)
 
     def test_target_aliases_contains_all_multi_name_apps(self) -> None:
-        """TARGET_ALIASES must define aliases for DJI Assistant 2, OpenCode, zoom.us, Visual Studio Code, and Brave Browser."""
+        """TARGET_ALIASES must define aliases for OpenCode, zoom.us, Visual Studio Code, and Brave Browser."""
         text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
-        self.assertIn('"DJI Assistant 2":', text)
         self.assertIn('"OpenCode":', text)
         self.assertIn('"zoom.us":', text)
         self.assertIn('"Visual Studio Code":', text)
@@ -2698,6 +2703,12 @@ class I18nCompletenessTests(unittest.TestCase):
             "L_INTERNET_STATUS_UPDATE_IN_PROGRESS",
             "L_INTERNET_STATUS_MANAGED_BREW",
             "L_INTERNET_STATUS_MANAGED_APPSTORE",
+            # Feed state (P1-1/P1-2): current per cached check / feed regressed.
+            "L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT",
+            "L_INTERNET_STATUS_FEED_REGRESSED_FMT",
+            # GitHub rate limit: parameterised, so classified error_soft by code in
+            # internet_status_code and counted soft via _soft_fail_from_codes.
+            "L_INTERNET_STATUS_GITHUB_RATELIMIT_FMT",
         }
 
         for key in all_status_keys:

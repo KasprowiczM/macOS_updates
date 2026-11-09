@@ -73,7 +73,7 @@ El registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 | `chromium_updater` | 1 | verified direct | Prueba del actualizador basado en Chromium (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: DMG verificado de su appcast cuando está inactivo; alternativa `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Actualizador propio de Teams más un fallback MAU `TEAMS21` observado y verificado cuando Microsoft lo ofrece |
-| `manual` | 2 | manual | IPMIView y DJI Assistant 2: solo notificación |
+| `manual` | 1 | manual | IPMIView: solo notificación |
 
 ---
 
@@ -85,6 +85,7 @@ El registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 |--------|--------|
 | `-y`, `--yes` | Omite la confirmación |
 | `-h`, `--help` | Muestra la ayuda y sale con `0` |
+| `--doctor` | Informe de preparación solo de lectura (plataforma, herramientas, `PATH` de launchd, LaunchAgent, sudo, disco, energía, red, última ejecución); sin petición de sudo ni registro de ejecución; salida `0` ok / `10` avisos / `1` problema |
 | `--dry-run` | Previsualiza cada paso, no modifica nada y nunca pide credenciales |
 | `--verify-only` | Verifica las versiones instaladas contra el historial sin modificar nada |
 | `--json-summary` | Imprime un objeto JSON con el resultado en stdout al terminar |
@@ -103,6 +104,12 @@ El registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 
 Una opción `-…` desconocida termina con código `2` tras mostrar la ayuda.
 
+**Comprobación previa (solo en ejecuciones reales):** antes del paso 0 la ejecución comprueba el espacio libre en disco, la batería y la red. Poco espacio degrada la ejecución, una batería baja omite solo el paso de macOS (de forma leve) y si no hay ningún host accesible termina con código `1` antes de cualquier paso. El Mac se mantiene despierto con `caffeinate` durante la ejecución (`MAC_UPDATE_NO_CAFFEINATE=1` lo desactiva). Ejecuta `bash update_all.sh --doctor` para ver las mismas comprobaciones sin ejecutar nada.
+
+**Preguntas:** cada pregunta durante la ejecución caduca tras `MAC_UPDATE_PROMPT_TIMEOUT` segundos con la respuesta segura "no"; la entrada no reconocida también cuenta como "no". Tras la confirmación principal, los pasos de Homebrew y App Store no vuelven a preguntar; el paso de macOS sí sigue preguntando.
+
+**Apps abiertas:** un cask de Homebrew cuya app está abierta nunca se actualiza; se aplaza con el mensaje "cierra la app" y el paso termina con un aviso leve (código `10`).
+
 ## Variables de entorno
 
 Cada opción tiene una variable equivalente (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE_SKIP_SYSTEM=1`, …); a continuación las más usadas que no tienen opción propia. La lista completa con valores por defecto está en [docs/agents/scripts.md](docs/agents/scripts.md#environment-variables).
@@ -114,7 +121,10 @@ Cada opción tiene una variable equivalente (`MAC_UPDATE_DRY_RUN=1`, `MAC_UPDATE
 | `MAC_UPDATE_NO_SUDO` | *se define automáticamente* | Lo exporta `update_all.sh` si no hay TTY; los scripts hijos omiten las pistas con root en lugar de fallar |
 | `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | `1` desactiva el refresco en segundo plano de la marca de tiempo de `sudo` |
 | `MAC_UPDATE_STALE_DAYS` | `45` | Días tras los cuales una app sin verificar se marca como obsoleta |
-| `MAC_UPDATE_MAX_LOGS` | `30` | Registros de ejecución conservados en `logs/` |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Registros de ejecución conservados en `logs/` (los resúmenes de ejecución también rotan) |
+| `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Segundos (10–900, `0` = esperar siempre) que espera una pregunta sí/no durante la ejecución; al agotarse el tiempo cuenta como "no" |
+| `MAC_UPDATE_MIN_FREE_GB` | `15` | Comprobación previa: espacio libre por debajo de este valor degrada la ejecución |
+| `MAC_UPDATE_MIN_BATTERY` | `30` | Comprobación previa: con batería por debajo de este porcentaje solo se omite el paso de macOS |
 | `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `15` | Pausa para que un actualizador de proveedor iniciado reescriba `Info.plist` (`0` la desactiva, máximo 120; se omite si no se inició ninguna app) |
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Segundos (0–300) que tiene una app iniciada por la herramienta para cerrarse tras el `quit` suave; nunca se fuerza (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Segundos (1–60) entre peticiones `quit` suaves repetidas dentro de la ventana de espera (v1.5.5) |

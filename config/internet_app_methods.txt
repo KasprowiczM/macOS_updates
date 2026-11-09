@@ -1,12 +1,20 @@
 # Canonical update method per internet app (config/internet_apps.txt order)
 # Format: AppName|method|STATUS_VAR[|feed_url]
-# Methods: keystone | github_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual | sparkle_appcast
+# Methods: keystone | github_dmg | mozilla_dmg | silent_launch | msupdate | mau_fallback_self_update | docker_cli | brew_cask | appstore_gui | manual | sparkle_appcast | chromium_updater
 # keystone is for Google products ONLY (the agent updates nothing else).
+# mozilla_dmg: Mozilla product-details version + verified DMG (Firefox Developer Edition).
+# Effective method: an app with a row in config/vendor_feeds.txt is decided by
+# that vendor feed (internet_handler_vendor_truth: compare, then direct install
+# or the app's own updater). For silent_launch / docker_cli / sparkle_appcast
+# rows the method below is only the fallback; reports and
+# logs/version_history.tsv record "vendor_feed" (internet_effective_method).
+# appstore_gui: iPad/iOS App Store apps (Wrapper/iTunesMetadata.plist), updated
+# by App Store Track 2; `mas list` does not show them.
 # silent_launch opportunistically verifies against a Sparkle/electron-updater
 # feed when the bundle exposes one, and reports "launched (unverified)" when it
 # does not — there is no separate vendor_latest method.
 Google Chrome|keystone|STATUS_CHROME
-Firefox Developer Edition|github_dmg|STATUS_FIREFOX
+Firefox Developer Edition|mozilla_dmg|STATUS_FIREFOX
 Brave Browser|brew_cask|STATUS_BRAVE
 ChatGPT / Codex|silent_launch|STATUS_CHATGPT
 Claude|silent_launch|STATUS_CLAUDE_APP
@@ -21,6 +29,8 @@ Cursor|silent_launch|STATUS_CURSOR
 Open Design|silent_launch|STATUS_OPENDESIGN
 HyperFrames|silent_launch|STATUS_HYPERFRAMES
 Superset|silent_launch|STATUS_SUPERSET
+DeepSeek Harness|silent_launch|STATUS_DEEPSEEK
+Grok Bot|silent_launch|STATUS_GROKBOT
 Obsidian|brew_cask|STATUS_OBSIDIAN
 ProtonVPN|brew_cask|STATUS_PROTONVPN
 KeePassXC|github_dmg|STATUS_KEEPASSXC
@@ -45,9 +55,8 @@ CapCut|brew_cask|STATUS_CAPCUT
 Ledger Live|github_dmg|STATUS_LEDGER
 Trezor Suite|github_dmg|STATUS_TREZOR
 Remote Desktop Manager|silent_launch|STATUS_RDMANAGER
-IPMIView|manual|STATUS_IPMIVIEW
+IPMIView|appstore_gui|STATUS_IPMIVIEW
 Inkscape|brew_cask|STATUS_INKSCAPE
-DJI Assistant 2|manual|STATUS_DJI
 UniFi|appstore_gui|STATUS_UNIFI
 WiFiman|appstore_gui|STATUS_WIFIMAN
 Picsart|appstore_gui|STATUS_PICSART

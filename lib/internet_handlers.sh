@@ -30,6 +30,26 @@ internet_handler_app_installed() {
     [ -n "$app_path" ] && [ -d "$app_path" ]
 }
 
+# internet_status_body <status>
+# The status text without its leading mark (✅ ⚠️ ⏳ ℹ️ ⏸ ❌) and spaces, for
+# print_ok / print_warn / print_info, which add their own mark. Printing the
+# raw status produced "✅ ✅ Up to date" and "⚠️  ⚠️  Vendor feed stale".
+internet_status_body() {
+    local s="$1" g
+    for g in "✅" "⚠️" "⚠" "⏳" "ℹ️" "ℹ" "⏸️" "⏸" "❌"; do
+        case "$s" in
+            "$g"*) s="${s#"$g"}"; break ;;
+        esac
+    done
+    while :; do
+        case "$s" in
+            " "*) s="${s# }" ;;
+            *) break ;;
+        esac
+    done
+    printf '%s' "$s"
+}
+
 internet_handler_silent_launch() {
     local app_display="$1"
     local launch_target="$2"
@@ -163,6 +183,62 @@ internet_handler_keystone() {
 
 # Standard silent-launch block with optional extra info line.
 #
+# ── GitHub-hosted apps: lookup failures and running-app deferral ─────────────
+# github_lookup_record <app> <version>: remember a successful GitHub lookup in the
+# persistent feed state (same file and TTL as the vendor feeds).
+github_lookup_record() {
+    command -v vendor_feed_state_record >/dev/null 2>&1 || return 0
+    vendor_feed_state_record "$1" ok "$2"
+    return 0
+}
+
+# github_lookup_handled <app> <installed>: call after a GitHub lookup returned "?".
+# Returns 0 and sets GITHUB_UNAVAILABLE_STATUS when the situation is fully handled:
+#  - a successful lookup younger than MAC_UPDATE_FEED_CACHE_TTL_H listed exactly the
+#    installed version -> current_cached (not counted as verified, no launch);
+#  - the API rate limit is exhausted -> a distinct soft status naming the reset time
+#    and GITHUB_TOKEN (never "no connection").
+# Returns 1 for every other cause; the caller keeps its offline handling.
+github_lookup_handled() {
+    local app="$1" installed="$2" proof age outcome cause rem reset hhmm
+    GITHUB_UNAVAILABLE_STATUS=""
+    if command -v vendor_feed_state_cached_proof >/dev/null 2>&1 \
+        && proof="$(vendor_feed_state_cached_proof "$app" "$installed")" && [ -n "$proof" ]; then
+        age="${proof#*|}"
+        GITHUB_UNAVAILABLE_STATUS="$(printf "$L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT" "$age" "$installed")"
+        INTERNET_LAST_VERIFIED=0
+        print_ok "$(internet_status_body "$GITHUB_UNAVAILABLE_STATUS")"
+        return 0
+    fi
+    outcome="$(github_last_outcome 2>/dev/null)"
+    cause="${outcome%%|*}"
+    if [ "$cause" = "ratelimit" ]; then
+        rem="${outcome#*|}"; rem="${rem#*|}"; rem="${rem%%|*}"
+        reset="${outcome##*|}"
+        hhmm="$(github_reset_time "$reset")"
+        print_warn "$(internet_msg "$L_INTERNET_GITHUB_RATELIMIT_FMT" "$app" "$hhmm")"
+        GITHUB_UNAVAILABLE_STATUS="$(printf "$L_INTERNET_STATUS_GITHUB_RATELIMIT_FMT" "$hhmm")"
+        return 0
+    fi
+    return 1
+}
+
+# internet_defer_running_app <dest .app path> <status_var> <installed> <latest>
+# Handlers that download first and install through copy_verified_app call this
+# BEFORE downloading: a running (or unknown-state) app is reported NEEDS_RESTART
+# without fetching the payload. copy_verified_app still re-checks right before the
+# swap (the app may be opened during the download). Returns 0 when deferred.
+internet_defer_running_app() {
+    local dest="$1" status_var="$2" installed="$3" latest="$4"
+    [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && return 1
+    command -v replacement_app_is_idle >/dev/null 2>&1 || return 1
+    replacement_app_is_idle "$dest" && return 1
+    print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$latest" "$installed")"
+    internet_diag_log "Download skipped for $dest: application is running or its state is unknown"
+    internet_handler_set_status "$status_var" "$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$installed" "${latest:-?}")"
+    return 0
+}
+
 # Opportunistic verification: an app whose only documented update path is its
 # own updater may still publish a machine-readable version feed (Sparkle
 # SUFeedURL, or electron-updater Contents/Resources/app-update.yml). When one
@@ -227,7 +303,7 @@ internet_handler_sparkle_check() {
     print_info "$(internet_msg "$L_INTERNET_SPARKLE_FEED_FOUND" "$feed_url")"
 
     local xml
-    xml="$(curl -fsSL --max-time 15 --retry 2 "$feed_url" 2>/dev/null || true)"
+    xml="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "$feed_url" 2>/dev/null || true)"
     if [ -z "$xml" ]; then
         print_warn "$L_INTERNET_STATUS_OFFLINE"
         internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
@@ -357,7 +433,7 @@ internet_handler_vendor_latest() {
         if [ -n "$base_url" ]; then
             base_url="${base_url%/}"
             local manifest_yml
-            manifest_yml="$(curl -fsSL --max-time 15 --retry 2 "${base_url}/latest-mac.yml" 2>/dev/null || curl -fsSL --max-time 15 --retry 2 "${base_url}/latest.yml" 2>/dev/null || true)"
+            manifest_yml="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "${base_url}/latest-mac.yml" 2>/dev/null || curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "${base_url}/latest.yml" 2>/dev/null || true)"
             if [ -n "$manifest_yml" ]; then
                 remote_ver="$(echo "$manifest_yml" | grep -E '^version:' | head -1 | cut -d':' -f2 | tr -d ' "')"
             else
@@ -374,7 +450,7 @@ internet_handler_vendor_latest() {
     # 3. Try custom feed_url override
     if [ -z "$remote_ver" ] && [ -n "$feed_url_override" ]; then
         local body
-        body="$(curl -fsSL --max-time 15 --retry 2 "$feed_url_override" 2>/dev/null || true)"
+        body="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "$feed_url_override" 2>/dev/null || true)"
         if [ -n "$body" ]; then
             remote_ver="$(echo "$body" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
             [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | sed -n 's/.*<sparkle:shortVersionString>\([^<]*\)<\/sparkle:shortVersionString>.*/\1/p' | head -1 || true)"
@@ -432,6 +508,56 @@ internet_handler_vendor_latest() {
     fi
 }
 
+# internet_handler_vendor_feed_failed <app> <app_path> <launch_target> <installed> <lookup_rc>
+# The vendor feed could not be used this run (lookup_rc 3 = fetched but no usable
+# version; anything else = fetch failure, see internet_diag.txt for curl/HTTP).
+#
+# 1. Cached proof: a successful check younger than MAC_UPDATE_FEED_CACHE_TTL_H
+#    (default 24 h) listed exactly the installed version -> current, NO launch.
+#    Status code current_cached. It is deliberately NOT counted as "verified":
+#    critical_rules 6b reserves that word for a remote version compared in this
+#    run, and a cached observation is older evidence. It is not a warning either:
+#    the comparison did happen, against the vendor's own feed, within the TTL.
+# 2. Otherwise the historical native-updater fallback runs (the app's own updater
+#    remains the recovery path), but the status says "feed unreachable" /
+#    "feed unreadable" (code feed_unreachable, soft) instead of a bare
+#    "launched (unverified)", so the summary names the real cause.
+internet_handler_vendor_feed_failed() {
+    local app="$1" app_path="$2" launch_target="$3" I="$4" lrc="${5:-2}"
+    local reason="fetch"
+    [ "$lrc" -eq 3 ] && reason="parse"
+    command -v vendor_feed_state_record >/dev/null 2>&1 && vendor_feed_state_record "$app" fail "$reason"
+
+    local proof=""
+    if command -v vendor_feed_state_cached_proof >/dev/null 2>&1 \
+        && proof="$(vendor_feed_state_cached_proof "$app" "$I")" && [ -n "$proof" ]; then
+        local age="${proof#*|}"
+        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT" "$age" "$I")"
+        INTERNET_LAST_VERIFIED=0
+        INTERNET_LAST_LAUNCH_OK=0
+        command -v internet_diag_log >/dev/null 2>&1 && \
+            internet_diag_log "Vendor feed $app: $reason failure; cached proof ${proof%%|*} = installed $I (age ${age} h) - not launched"
+        print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
+        return 0
+    fi
+
+    if [ "$reason" = "parse" ]; then
+        print_warn "$(printf "$L_INTERNET_VENDOR_FEED_UNPARSEABLE_FMT" "$app")"
+    else
+        print_warn "$(printf "${L_INTERNET_VENDOR_FEED_UNREACHABLE_FMT:-Vendor feed for %s unreachable}" "$app")"
+    fi
+    internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
+    if [ "${INTERNET_LAST_LAUNCH_OK:-0}" -eq 1 ]; then
+        if [ "$reason" = "parse" ]; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_FEED_UNREADABLE"
+        else
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_FEED_UNREACHABLE"
+        fi
+    fi
+    INTERNET_LAST_VERIFIED=0
+    return 0
+}
+
 # ── Vendor Truth Handler (v1.5.0) ───────────────────────────
 # Consults the vendor feed first, launches updater only if needed,
 # and supports vendor direct download/installation when configured.
@@ -445,11 +571,12 @@ internet_handler_vendor_truth() {
     INTERNET_LAST_VERIFIED=0
     INTERNET_LAST_LAUNCH_OK=0
 
-    local row
-    row="$(vendor_feed_lookup "$app" 2>/dev/null || true)"
+    local row lrc
+    row="$(vendor_feed_lookup "$app" 2>/dev/null)"
+    lrc=$?
     if [ -z "$row" ]; then
-        print_warn "$(printf "${L_INTERNET_VENDOR_FEED_UNREACHABLE_FMT:-Vendor feed for %s unreachable}" "$app")"
-        internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
+        [ "$lrc" -eq 0 ] && lrc=2
+        internet_handler_vendor_feed_failed "$app" "$app_path" "$launch_target" "$I" "$lrc"
         return
     fi
 
@@ -457,13 +584,14 @@ internet_handler_vendor_truth() {
     IFS='|' read -r R URL CK CS ART HOST POLICY <<EOF
 $row
 EOF
+    command -v vendor_feed_state_record >/dev/null 2>&1 && vendor_feed_state_record "$app" ok "$R"
 
     local rel
     rel="$(version_cmp "$R" "$I")"
     if [ "$rel" = "equal" ]; then
         INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$I")"
         INTERNET_LAST_VERIFIED=1
-        print_ok "$INTERNET_LAST_STATUS"
+        print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
         return 0
     elif [ "$rel" = "older" ]; then
         # The primary feed lists only the stable release. Before calling it stale,
@@ -477,23 +605,39 @@ EOF
             && [ -n "$_appcast_channel" ]; then
             INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT" "$I")"
             INTERNET_LAST_VERIFIED=1
-            print_ok "$INTERNET_LAST_STATUS"
+            print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
+            return 0
+        fi
+        # High-water mark (2026-11-08, Proton Mail): the vendor already published
+        # a version >= the installed one, and its feed now lists an older one.
+        # That is a regression of the feed, not of this Mac: report current,
+        # never warn, never launch, never install from it. The status has its own
+        # code (current_feed_regressed) because no live feed confirms the
+        # installed version this run.
+        local _hw=""
+        if command -v vendor_feed_state_high_water >/dev/null 2>&1 \
+            && _hw="$(vendor_feed_state_high_water "$app" "$I")" && [ -n "$_hw" ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_REGRESSED_FMT" "$I" "$_hw" "$R")"
+            INTERNET_LAST_VERIFIED=0
+            command -v internet_diag_log >/dev/null 2>&1 && \
+                internet_diag_log "Vendor feed $app: feed lists $R < installed $I, but the vendor published $_hw before (high-water) - reported current"
+            print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
             return 0
         fi
         INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$I")"
         INTERNET_LAST_VERIFIED=0
-        print_warn "$INTERNET_LAST_STATUS"
+        print_warn "$(internet_status_body "$INTERNET_LAST_STATUS")"
         return 0
     elif [ "$rel" = "unknown" ]; then
         INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
         INTERNET_LAST_VERIFIED=0
-        print_warn "$INTERNET_LAST_STATUS"
+        print_warn "$(internet_status_body "$INTERNET_LAST_STATUS")"
         return 0
     elif [ "$rel" = "newer" ]; then
         if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
             INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$I" "$R")"
             INTERNET_LAST_VERIFIED=1
-            print_info "$INTERNET_LAST_STATUS"
+            print_info "$(internet_status_body "$INTERNET_LAST_STATUS")"
             return 0
         fi
 
@@ -675,7 +819,7 @@ omaha_read_increment() {
 omaha_chrome_version_history_public() {
     local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
     local vh_json=""
-    vh_json="$(curl -fsSL --max-time 15 "$vh_url" 2>/dev/null || true)"
+    vh_json="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 "$vh_url" 2>/dev/null || true)"
     [ -n "$vh_json" ] || return 0
     printf '%s\n' "$vh_json" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
@@ -717,33 +861,49 @@ omaha_history_proof() {
     shift 2
     local files short build max_age res
     files="$(omaha_history_files_for_logs "$@")"
-    [ -n "$files" ] || return 1
+    if [ -z "$files" ]; then
+        command -v internet_diag_log >/dev/null 2>&1 && \
+            internet_diag_log "Omaha history proof refused for $appid: no updater_history.jsonl next to: $*"
+        return 1
+    fi
     short="$(app_version "$app_path")"
     build=""
     if command -v app_build_version >/dev/null 2>&1; then
         build="$(app_build_version "$app_path")"
     fi
     max_age="${MAC_UPDATE_OMAHA_MAX_AGE_H:-6}"
-    res="$(printf '%s\n' "$files" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+    # Line 1: HH:MM when proven, empty otherwise. Line 2: why (logged on refusal).
+    local out why
+    out="$(printf '%s\n' "$files" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
-from vendor_feeds import omaha_history_status
+from vendor_feeds import omaha_history_explain
 appid, short, build = sys.argv[1], sys.argv[2], sys.argv[3]
 try:
     max_age = float(sys.argv[4])
 except Exception:
     max_age = 6.0
+paths = sys.stdin.read().splitlines()
 chunks = []
-for path in sys.stdin.read().splitlines():
+for path in paths:
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
             chunks.append(fh.read())
     except Exception:
         pass
-res = omaha_history_status("\n".join(chunks), appid, [short, build], max_age)
-if res:
-    print(res[1])
+ex = omaha_history_explain("\n".join(chunks), appid, [short, build], max_age)
+proof = ex["proof"]
+print(proof[1] if proof else "")
+print("reason=%s state=%s version=%s age_h=%s max_age_h=%s installed=%s/%s files=%d" % (
+    ex["reason"], ex.get("state", "-") or "-", ex.get("version", "-") or "-",
+    ex.get("age_h", "-"), max_age, short or "-", build or "-", len(paths)))
 ' "$appid" "$short" "$build" "$max_age" 2>/dev/null || true)"
-    [ -n "$res" ] || return 1
+    res="$(printf '%s\n' "$out" | sed -n 1p)"
+    why="$(printf '%s\n' "$out" | sed -n 2p)"
+    if [ -z "$res" ]; then
+        command -v internet_diag_log >/dev/null 2>&1 && \
+            internet_diag_log "Omaha history proof refused for $appid: ${why:-history unreadable}"
+        return 1
+    fi
     INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OMAHA_RECENT_FMT" "$res")"
     INTERNET_LAST_VERIFIED=1
     return 0

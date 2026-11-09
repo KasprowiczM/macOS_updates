@@ -41,7 +41,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 
 | Method | Apps |
 |--------|------|
-| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager, Open Design, HyperFrames, Superset; direct-first choices in `config/vendor_direct_first.txt`. Open Design, HyperFrames and Superset are verify-only: only their native updater installs |
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager, Open Design, HyperFrames, Superset, DeepSeek Harness, Grok Bot; direct-first choices in `config/vendor_direct_first.txt`. Open Design, HyperFrames, Superset, DeepSeek Harness and Grok Bot are verify-only: only their native updater installs (DeepSeek: its own electron-updater `nightly-mac.yml`; Grok Bot: the Cursor "sand" Squirrel endpoint compiled into the app) |
 | Mozilla product-details/download + DMG | Firefox Developer Edition |
 | GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
 | Google Keystone | Google Chrome, Google Drive, Gemini |
@@ -53,7 +53,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 | Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
 | Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
 | App Store GUI Track 2 | UniFi, WiFiman, Picsart |
-| Manual only | IPMIView, DJI Assistant 2 |
+| Manual only | IPMIView |
 
 These methods are not equivalent proof levels:
 
@@ -263,6 +263,7 @@ pre-release differs from the stable target, so the next run returns it to stable
 - **Command Line Tools on macOS 27:** Homebrew 7.0+ sets `minimum_version "27.0.0"` for CLT on macOS 27. Older CLT versions (e.g., 26.x CLT from macOS 26) trigger `CLT does not support macOS 27` Tier 2 warnings under `brew doctor`.
 - **Installer Packages (`.pkg`) Default to arm64:** On macOS 27, package installers without an explicit `hostArchitecture` tag default to `arm64`. Any custom `.pkg` scripts must specify hostArchitecture or be verified arm64-native.
 - **Launchd Quarantined Plist Rejection:** `launchd` on macOS 27 strictly rejects loading property lists carrying extended quarantine attributes (`com.apple.quarantine`). `scripts/install_launchagent.sh` must strip quarantine (`xattr -d com.apple.quarantine`) and use domain-targeted `launchctl bootstrap gui/$(id -u)` and `launchctl enable` instead of legacy `load -w`.
+- **Launchd needs an explicit `PATH` (2026-11-09):** a launchd job starts with a minimal `PATH` that lacks Homebrew, so scheduled runs reported "Homebrew is not installed" and could not find `mas`. The generated plist sets `EnvironmentVariables.PATH` and `lib/platform.sh` runs `mac_update_ensure_homebrew_path` at source time. `scripts/install_launchagent.sh` must verify with `launchctl print` that the service is loaded (never report success from `bootstrap` alone) and clean up with `bootout`, never `unload -w`; `--check` warns about plists without the `PATH` key, so existing installs must re-run the installer.
 - **TCC.db Inaccessibility:** Direct read or query of `TCC.db` is blocked by SIP on macOS 27. Permission checks (such as Accessibility for Track 2 App Store updates) must use API/AppleScript probes (`osascript`) rather than SQLite inspection.
 - **TLS 1.2+ / ATS for Update Handlers:** Network requests and sparkle/vendor feed downloads must comply with App Transport Security and TLS 1.2+ minimums.
 
@@ -291,6 +292,14 @@ pre-release differs from the stable target, so the next run returns it to stable
 - **MAU version pins:** `mau_quarantine_expired_ids` lists only Office `DeferralDays` quarantines. A
   `DeferralVersions` pin equal to the installed build is MAU bookkeeping and must not be reported as
   released or expired (it contradicted `mau_clean_stale_deferrals` and produced a false message).
+- **Casks never replace an open app (2026-11-09):** `update_brew.sh` defers a cask whose target app is running, or whose running state is unknown (`brew_cask_running_app`), with a "quit the app" message. A cask without an `app` artifact (pkg casks) is deferred when any bundle ID it declares under `uninstall` -> `quit` (or as an `uninstall` -> `signal` target) is running or of unknown state (`brew_cask_running_quit_id`, tri-state `internet_app_running_state`), or when its cask JSON cannot be read; a cask that declares no quit/signal bundle ID (fonts, drivers, CLIs) upgrades as before because nothing of the user's would be closed. The deferral is recorded in `$MAC_UPDATE_SESSION_DIR/brew_deferred_running.txt` (`cask|App.app` or `cask|bundle.id`), the step ends soft (exit 10), deferred casks are excluded from the generic final "still outdated" report, are counted in `pending_brew_casks`, and each appears in the run summary as a `brew_cask` item with status `pending`.
+- **Every mid-run prompt has a lifetime (2026-11-09):** questions go through `mac_update_prompt_yn` (`lib/ui.sh`). `MAC_UPDATE_PROMPT_TIMEOUT` (default 120 s, clamp 10-900, 0 = wait forever) ends the wait with the safe answer "no" (`MAC_UPDATE_PROMPT_TIMED_OUT=1`, soft exit 10 where the step declines); unrecognised typed input is also "no". After `update_all.sh` confirmed (`MAC_UPDATE_PARENT_CONFIRMED=1`) the Homebrew and App Store steps do not ask again; the macOS step still asks because a restart is consequential, and its timeout lands in the existing declined branch. Never add a bare `read` for a mid-run question.
+- **Persistent feed state and three status codes (2026-11-09):** `~/.local/state/mac-update/feed_state.json` (`MAC_UPDATE_FEED_STATE_FILE`, mode 0600, atomic; `lib/python/feed_state.py`) keeps per app the last good vendor version and time, a high-water mark and the last error. It is evidence, never an install source.
+  - `feed_unreachable` (soft, exit 10): the fetch failed or the feed could not be parsed and no valid cached proof exists; the native updater is still launched and the app counts as unverified.
+  - `current_cached` (informational, no launch): the fetch failed but a successful check no older than `MAC_UPDATE_FEED_CACHE_TTL_H` (default 24, 0-168, 0 disables) listed the installed version. It is deliberately **not** counted as verified (rule 6b): no remote version was compared in this run.
+  - `current_feed_regressed` (informational, no launch): the feed lists a version below one the vendor already published (high-water mark >= installed), so the vendor feed regressed (Proton Mail 1.16.1 then 1.16.0). Never an install target.
+  - Fetch and parse failures are distinct (`vendor_feed_lookup` return 1 = not configured, 2 = fetch failed, 3 = parse failed); fetches are https-only.
+- **Google system-scope proof (2026-11-09):** Google Drive is registered only with the system-scope GoogleUpdater, so `google_keystone_check` also runs `--wake-all --system`. Refused proofs are logged with a reason; the 6 h window and the different-build rule are unchanged.
 
 ## 16. Only Installed Applications & CLI Toolchains (v1.5.0)
 

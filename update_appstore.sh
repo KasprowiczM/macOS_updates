@@ -249,12 +249,9 @@ fi
 APPSTORE_CONFIRMED=0
 appstore_confirm() {
     [ "${MAC_UPDATE_YES:-0}" = "1" ] && return 0
-    read -r -p "  ${1:-$L_CONFIRM_UPDATE} [T/n]: " CONFIRM
-    CONFIRM="${CONFIRM:-T}"
-    case "$CONFIRM" in
-        [Nn]*) return 1 ;;
-    esac
-    return 0
+    # Already confirmed once by update_all.sh: do not ask again mid-run.
+    [ "${MAC_UPDATE_PARENT_CONFIRMED:-0}" = "1" ] && return 0
+    mac_update_prompt_yn "${1:-$L_CONFIRM_UPDATE} [T/n]: " n y
 }
 if [ -n "$NATIVE_OUTDATED" ]; then
     echo -e "${YELLOW}  $L_RUN_TWO_TRACKS${NC}"
@@ -266,6 +263,8 @@ if [ -n "$NATIVE_OUTDATED" ]; then
     echo ""
     if ! appstore_confirm; then
         print_info "$L_UPDATE_CANCELED"
+        # An unanswered prompt skipped the updates: soft, not a clean "no".
+        [ "${MAC_UPDATE_PROMPT_TIMED_OUT:-0}" = "1" ] && exit 10
         exit 0
     fi
     APPSTORE_CONFIRMED=1
@@ -324,7 +323,7 @@ else
         print_warn "$MAS_TOR1_OUT"
     elif [ "$MAS_TOR1_EXIT" -eq 0 ]; then
         printf '%s\n' "$MAS_TOR1_OUT"
-        print_ok "mas upgrade command completed; the final queue check will verify installation."
+        print_ok "${L_APPSTORE_MAS_UPGRADE_COMPLETED:-mas upgrade command completed; the final queue check will verify installation.}"
 
         # Second measurement, then one retry in the INVOKING USER's session for
         # whatever the sudo pass left behind. App Store receipts and the signed-in
@@ -336,7 +335,7 @@ else
         MAS_TOR1_LEFT="$(mas_probe_outdated)"
         MAS_TOR1_LEFT_IDS="$(mas_outdated_ids "$MAS_TOR1_LEFT")"
         if [ -n "$MAS_TOR1_LEFT_IDS" ]; then
-            print_warn "sudo mas upgrade left these App Store updates pending; retrying in the user session:"
+            print_warn "${L_APPSTORE_MAS_RETRY_USER_SESSION:-sudo mas upgrade left these App Store updates pending; retrying in the user session:}"
             printf '%s\n' "$MAS_TOR1_LEFT" | awk '$1 ~ /^[0-9]+$/ { print "  • " $0 }'
             for MAS_RETRY_ID in $MAS_TOR1_LEFT_IDS; do
                 retry_line="$(printf '%s\n' "$MAS_TOR1_LEFT" | grep "^[[:space:]]*$MAS_RETRY_ID" | head -n 1)"

@@ -64,7 +64,7 @@ class InventoryMarkerTests(unittest.TestCase):
     def test_markers_are_not_part_of_the_bundle_name(self) -> None:
         self.assertEqual(strip_inventory_markers("HyperFrames [arm64]"), "HyperFrames")
         self.assertEqual(strip_inventory_markers("Superset [arm64] 🆕"), "Superset")
-        self.assertEqual(strip_inventory_markers("DJI Assistant 2 [x86_64-only]"), "DJI Assistant 2")
+        self.assertEqual(strip_inventory_markers("Fixture Intel App [x86_64-only]"), "Fixture Intel App")
 
     def test_marked_row_of_an_installed_app_is_not_removed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -269,8 +269,15 @@ class KeePassXCRebuildTests(unittest.TestCase):
             bindir.mkdir()
             (root / "release.json").write_text(json.dumps(RELEASE))
             curl = bindir / "curl"
-            curl.write_text(f'#!/bin/sh\ncat "{root / "release.json"}"\n')
+            curl.write_text(
+                '#!/bin/sh\nout=""; prev=""\nfor a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\n'
+                f'cat "{root / "release.json"}" > "$out"\nprintf 200\n')
             curl.chmod(0o755)
+            # `stat -f %B` (bundle birth time) is BSD-only; GNU stat treats -f as
+            # filesystem status. Stub it so the logic runs the same on Linux CI.
+            stat = bindir / "stat"
+            stat.write_text('#!/bin/sh\ncase "$*" in "-f %B"*) date +%s ;; *) exec /usr/bin/env -u PATH stat "$@" ;; esac\n')
+            stat.chmod(0o755)
             app = root / "KeePassXC.app"
             app.mkdir()
             script = (

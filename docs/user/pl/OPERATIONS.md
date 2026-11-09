@@ -31,6 +31,8 @@ Krok 6 jest ostatni, ponieważ może zrestartować Maca. Odraczają go blokując
 
 Podgląd bez zmian: `bash update_all.sh --dry-run -y`
 
+Sprawdzenie gotowości bez uruchamiania czegokolwiek: `bash update_all.sh --doctor` (tylko odczyt; kod 0 ok, 10 ostrzeżenia, 1 problem). Pytania w trakcie przebiegu wygasają po `MAC_UPDATE_PROMPT_TIMEOUT` sekundach (domyślnie 120) z odpowiedzią „nie”, a cask Homebrew, którego aplikacja jest otwarta, zostaje odroczony, nie aktualizowany.
+
 ## Diagnostyka awarii
 
 | Nieudany krok | Sprawdź te pliki |
@@ -88,4 +90,4 @@ brew outdated
 softwareupdate -l
 ```
 
-Dla aplikacji **triggered-unverified** sprawdź ekran Informacje/wersję — samo uruchomienie aktualizatora nie potwierdza ukończenia. Ręczne pozostają tylko IPMIView i DJI Assistant 2.
+Dla aplikacji **triggered-unverified** sprawdź ekran Informacje/wersję — samo uruchomienie aktualizatora nie potwierdza ukończenia. Ręczny pozostaje tylko IPMIView.

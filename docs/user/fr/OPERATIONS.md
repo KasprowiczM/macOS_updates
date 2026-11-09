@@ -31,6 +31,8 @@ L’étape 6 s’exécute en dernier car elle peut redémarrer le Mac. Les erreu
 
 Aperçu sans modifications : `bash update_all.sh --dry-run -y`
 
+Vérification de préparation sans rien exécuter : `bash update_all.sh --doctor` (lecture seule ; code 0 ok, 10 avertissements, 1 problème). Les questions pendant l'exécution expirent après `MAC_UPDATE_PROMPT_TIMEOUT` secondes (par défaut 120) avec « non », et un cask Homebrew dont l'application est ouverte est reporté, pas mis à jour.
+
 ## Analyse des échecs
 
 | Étape en échec | Fichiers à vérifier |
