@@ -15,6 +15,19 @@ def is_ok(status: Any) -> bool:
     return str(status or "").startswith("OK")
 
 
+def is_skipped(status: Any) -> bool:
+    """A skipped step carries no evidence either way: it is neutral in a streak."""
+    return isinstance(status, dict) and status.get("code") == "skipped"
+
+
+def is_eligible_run(summary: dict[str, Any]) -> bool:
+    """Dry-run and inventory-only runs execute nothing, so they are not evidence."""
+    flags = summary.get("flags")
+    if isinstance(flags, dict) and (flags.get("dry_run") or flags.get("inventory_only")):
+        return False
+    return True
+
+
 def load_summaries(logs_dir: str, window: int) -> list[dict[str, Any]]:
     logs_path = Path(logs_dir)
     if not logs_path.is_dir() or window <= 0:
@@ -24,13 +37,20 @@ def load_summaries(logs_dir: str, window: int) -> list[dict[str, Any]]:
         path for path in logs_path.glob("run_summary_20*.json") if path.name != "run_summary_latest.json"
     )
     summaries: list[dict[str, Any]] = []
-    for path in files[-window:]:
+    for path in reversed(files):
+        if len(summaries) >= window:
+            break
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             continue
-        if isinstance(data, dict) and data.get("run_status", "completed") == "completed":
+        if (
+            isinstance(data, dict)
+            and data.get("run_status", "completed") == "completed"
+            and is_eligible_run(data)
+        ):
             summaries.append(data)
+    summaries.reverse()  # oldest first
     return summaries
 
 
@@ -50,6 +70,8 @@ def find_chronic_streaks(logs_dir: str, window: int = 10, threshold: int = 3) ->
             if step not in steps:
                 break  # step absent from this run — trailing streak ends here
             status = steps.get(step, "")
+            if is_skipped(status):
+                continue  # neither extends nor ends the streak
             if is_ok(status):
                 break
             streak += 1
