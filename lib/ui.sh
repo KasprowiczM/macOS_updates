@@ -57,7 +57,7 @@ print_header() { ui_print_header "$1"; }
 #
 #   mac_update_prompt_timeout     -> effective seconds (0 = wait forever)
 #   mac_update_prompt_yn <prompt> <timeout-default y|n> [<enter-default y|n>]
-#       returns 0 for yes, 1 for no. Typed n*/y*/t* wins; an empty answer (or
+#       returns 0 for yes, 1 for no. Typed n* is no; y*/t*/j*/s*/o* (the localized yes letters) is yes; an empty answer (or
 #       end of input) uses the enter-default; other text means no (defaults to the
 #       timeout default). No answer within MAC_UPDATE_PROMPT_TIMEOUT seconds
 #       (default 120, clamped 10-900, 0 = no limit) uses the timeout-default,
@@ -100,7 +100,7 @@ mac_update_prompt_yn() {
     fi
     case "$ans" in
         [Nn]*) return 1 ;;
-        [YyTt]*) return 0 ;;
+        [YyTtJjSsOo]*) return 0 ;;
         '') ;;
         *) return 1 ;;  # unrecognised text is never a yes
     esac

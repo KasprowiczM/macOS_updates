@@ -308,6 +308,16 @@ print(cask_guard_facts(sys.stdin.read()))
 ' 2>/dev/null
 }
 
+# brew_cask_quit_ids — same stdin; stdout: bundle IDs from the cask's uninstall quit/signal
+# declarations joined by ';' (empty = none), or UNREADABLE when the JSON is unusable
+brew_cask_quit_ids() {
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from brew_casks import cask_quit_ids_facts
+print(cask_quit_ids_facts(sys.stdin.read()))
+' 2>/dev/null || printf 'UNREADABLE\n'
+}
+
 # brew_cask_primary_app — same stdin; stdout: X.app or empty
 brew_cask_primary_app() {
     PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '

@@ -185,6 +185,29 @@ EOF
         self.assertEqual(res.returncode, 10, f"Output:\n{res.stdout}\n{res.stderr}")
         self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
         self.assertEqual((self.session_dir / "pending_system").read_text().strip(), "3")
+        self.assertFalse((self.session_dir / "system_prompt_timeout").exists())
+
+    def test_unanswered_prompt_is_reported_as_timeout_not_as_user_choice(self) -> None:
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}",
+                   MAC_UPDATE_SESSION_DIR=str(self.session_dir), MAC_UPDATE_YES="0",
+                   MAC_LANG="en", MAC_UPDATE_PROMPT_TIMEOUT="10")
+        res = subprocess.run(
+            ["bash", "-c", f'sleep 14 | bash "{REPO_ROOT}/update_system.sh"'],
+            env=env, capture_output=True, text=True, timeout=60)
+        out = res.stdout + res.stderr
+        self.assertEqual(res.returncode, 10, out)
+        self.assertIn("No answer within 10 s — macOS updates not installed this run", out)
+        self.assertNotIn("skipped at your request", out)
+        self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
+        self.assertTrue((self.session_dir / "system_prompt_timeout").exists())
+        self.assertNotIn("softwareupdate -i", log_file.read_text())
+
+    def test_master_maps_timeout_marker_to_no_answer_text(self) -> None:
+        text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
+        self.assertIn('-f "$SESSION_DIR/system_prompt_timeout"', text)
+        self.assertIn("L_ALL_RESULT_SKIPPED_NO_ANSWER", text)
 
     def test_declined_restart_installs_no_restart_labels_and_is_skipped_by_user(self) -> None:
         """2026-10-29: declining the restart prompt printed "installing with automatic
