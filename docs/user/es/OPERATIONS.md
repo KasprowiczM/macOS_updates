@@ -31,6 +31,8 @@ El paso 6 se ejecuta al final porque puede reiniciar el Mac. Los errores bloquea
 
 Vista previa sin cambios: `bash update_all.sh --dry-run -y`
 
+Comprobación de preparación sin ejecutar nada: `bash update_all.sh --doctor` (solo lectura; código 0 ok, 10 avisos, 1 problema). Las preguntas durante la ejecución caducan tras `MAC_UPDATE_PROMPT_TIMEOUT` segundos (por defecto 120) con "no", y un cask de Homebrew cuya app está abierta se aplaza, no se actualiza.
+
 ## Análisis de fallos
 
 | Paso fallido | Archivos a revisar |
