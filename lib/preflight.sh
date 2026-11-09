@@ -306,7 +306,16 @@ preflight_check_launchagent() {
         return $?
     fi
     case "$out" in
-        *"✅"*|*[Aa]ctive*) _pf_line 0 "$L_DOCTOR_LAUNCHAGENT_ACTIVE" ;;
+        *"✅"*|*[Aa]ctive*)
+            _pf_line 0 "$L_DOCTOR_LAUNCHAGENT_ACTIVE"
+            # `--check` appends a warning line (exit stays 0) when the plist lacks
+            # EnvironmentVariables.PATH with Homebrew: surface it as its own warning.
+            if printf '%s\n' "$out" | grep -q '^⚠️'; then
+                _pf_line 10 "$L_DOCTOR_LAUNCHAGENT_PATH_WARN"
+                return 10
+            fi
+            return 0
+            ;;
         *) _pf_line 3 "$L_DOCTOR_LAUNCHAGENT_NONE" ;;
     esac
 }
