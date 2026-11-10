@@ -6,7 +6,7 @@
 
 **Sitio web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repositorio:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licencia:** [MIT](LICENSE) · **Cambios:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.5.5** — Orquestador de actualizaciones en un solo comando, listo para producción, para **Macs con Apple Silicon y macOS 13–27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
+> **v1.6.0** — Orquestador de actualizaciones en un solo comando, listo para producción, para **Macs con Apple Silicon y macOS 13–27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
 
 | De un vistazo | |
 |---------------|--|
