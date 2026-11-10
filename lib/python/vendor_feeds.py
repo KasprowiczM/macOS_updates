@@ -485,17 +485,34 @@ def select_open_design_metadata(obj: dict) -> dict | None:
 
 
 def select_hyperframes_latest(obj: dict) -> dict | None:
-    """static.heygen.ai/hyperframes-oss/desktop/latest.json (verify only).
+    """static.heygen.ai/hyperframes-oss/desktop/latest.json.
 
     The desktop app's updater names builds "b<N>"; the installed bundle carries
-    the same label in HFBuildLabel (lib/python/inventory.py).
+    the same label in HFBuildLabel (lib/python/inventory.py). The install target
+    is the Apple Silicon zip only (``arm64.url`` + hex ``arm64.sha256``); the
+    top-level ``url`` is a universal archive and the ``x64`` entry is Intel. A
+    feed without a well-formed arm64 zip and checksum stays verify-only
+    (url None), so nothing is ever installed without a vendor checksum.
     """
     if not isinstance(obj, dict):
         return None
     build = obj.get("build")
     if not isinstance(build, str) or not re.fullmatch(r"b\d+", build.strip()):
         return None
-    return {"version": build.strip(), "url": None, "checksum_kind": None, "checksum": None}
+    url = checksum = None
+    arm = obj.get("arm64")
+    if isinstance(arm, dict):
+        u = arm.get("url")
+        s = arm.get("sha256")
+        if (isinstance(u, str) and u.startswith("https://") and u.lower().endswith(".zip")
+                and isinstance(s, str) and re.fullmatch(r"[0-9a-fA-F]{64}", s.strip())):
+            url, checksum = u.strip(), s.strip().lower()
+    return {
+        "version": build.strip(),
+        "url": url,
+        "checksum_kind": "sha256hex" if checksum else None,
+        "checksum": checksum,
+    }
 
 
 def dmg_package_revision(release: dict, product: str, version: str, arch: str) -> dict | None:

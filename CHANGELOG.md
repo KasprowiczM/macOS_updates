@@ -6,6 +6,16 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Fixed (2026-11-10 run-log follow-up)
+
+Version stays 1.5.5 (lockstep policy). Evidence: [run-log record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-10.md).
+
+- **HyperFrames and Superset did not update from a hidden launch (high).** Both now install direct-only from their verified Apple Silicon zip through `vendor_direct_install` / `copy_verified_app` (allowlisted https host, vendor checksum, exactly one bundle with the installed bundle ID, Team ID match, Gatekeeper, staged swap with rollback); a running app is reported "quit the app" without a download. HyperFrames: `select_hyperframes_latest` returns `arm64.url` + `arm64.sha256` (`static.heygen.ai`); its build label (`HFBuildLabel`, b879 < b891 < b1000) is the version for both the pre-copy check and the post-install verification. Superset (upstream project now "paradev"; the bundle is still `Superset.app`): arm64 zip + sha512 from `latest-mac.yml` on `github.com`. Neither app is launched, not even when the download fails.
+- **Open Design is never launched or quit (high).** Its launcher hands off to a versioned payload, and LaunchServices launches of 0.27.0 exited about a second after start on 2026-11-06 and 2026-11-10; its own updater installs only while the app runs and the user confirms. Behind is now reported as "Open the app to update: 0.27.0 → 0.27.1" (soft `behind`); the version is still read from the launcher's `runtime.json`, and the toolkit never writes the launcher's state.
+- **New `config/vendor_launch_policy.txt` (medium).** `direct-only` and `never-launch` apps also skip the native-updater launch after an unreachable feed; that case reports "Vendor feed unreachable — version not checked (app not launched)" (`feed_unreachable`). New strings in all seven languages.
+- **No quit while an app may still be starting (medium).** `silent_launch_app` records launch times in `toolkit_launched_at.txt`; the first graceful `quit` waits until the app has been up `MAC_UPDATE_QUIT_MIN_AGE` seconds (default 30, 0-300). Never a force-kill; user-opened apps are untouched as before.
+- **Checked, unchanged:** the run's "Superset updated to 2.0.8" was a real before/after change of the installed bundle.
+
 ### Fixed (2026-11-09 review follow-up)
 
 Version stays 1.5.5 (lockstep policy). Evidence: [review record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-09.md).
