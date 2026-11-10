@@ -428,6 +428,9 @@ silent_launch_app() {
         if [ ! -f "$track_file" ] || ! grep -Fqx "$bid" "$track_file" 2>/dev/null; then
             printf '%s\n' "$bid" >> "$track_file"
         fi
+        # Launch time, so a quit never lands while the app is still starting
+        # (internet_wait_launch_min_age, MAC_UPDATE_QUIT_MIN_AGE).
+        printf '%s|%s\n' "$bid" "$(date +%s 2>/dev/null)" >> "$MAC_UPDATE_SESSION_DIR/toolkit_launched_at.txt"
     fi
 
     return 0
@@ -1002,6 +1005,7 @@ do
         "$L_INTERNET_STATUS_CASK_MISSING"|\
         "$L_INTERNET_STATUS_FEED_UNREACHABLE"|\
         "$L_INTERNET_STATUS_FEED_UNREADABLE"|\
+        "$L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH"|\
         "$L_INTERNET_STATUS_LAUNCH_FAILED")
             INTERNET_SOFT_FAIL=1
             ;;

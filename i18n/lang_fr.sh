@@ -780,6 +780,7 @@ L_ALL_SUMMARY_INVENTORY_CHANGES="Champs de version modifiés dans l'inventaire :
 # ── Internet (v1.5.0) ──────────────────────────────────────────
 L_INTERNET_STATUS_FEED_STALE_FMT="⚠️  Flux du fabricant obsolète (flux %s < installé %s)"
 L_INTERNET_STATUS_BEHIND_FMT="⚠️  En retard : %s < %s (fabricant)"
+L_INTERNET_STATUS_OPEN_TO_UPDATE_FMT="⚠️  Ouvrez l'application pour mettre à jour : %s → %s disponible"
 L_INTERNET_STATUS_NEEDS_RESTART_FMT="⚠️  Mise à jour %s → %s en attente — quittez l'application pour que son outil de mise à jour l'installe"
 L_INTERNET_STATUS_VENDOR_CURRENT_FMT="✅ À jour (%s, flux du fabricant)"
 L_INTERNET_STATUS_VENDOR_NOUPDATE="✅ À jour (mise à jour du fabricant : aucune mise à jour)"
@@ -797,6 +798,7 @@ L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT="✅ À jour selon la vérification m�
 L_INTERNET_STATUS_FEED_REGRESSED_FMT="✅ À jour — le flux du fabricant a régressé (installé %s, déjà publié en %s ; le flux indique maintenant %s)"
 L_INTERNET_STATUS_FEED_UNREACHABLE="⏳ Flux du fabricant inaccessible — outil de mise à jour de l'application lancé (non vérifié)"
 L_INTERNET_STATUS_FEED_UNREADABLE="⏳ Flux du fabricant illisible — outil de mise à jour de l'application lancé (non vérifié)"
+L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH="⚠️  Flux du fabricant inaccessible — version non vérifiée (application non lancée)"
 L_INTERNET_VENDOR_FEED_UNPARSEABLE_FMT="Le flux du fabricant pour %s n'a fourni aucune version exploitable — retour à l'outil de mise à jour propre à l'application"
 L_INTERNET_LAUNCH_CYCLE_FMT="Lancement de %s pour que son outil de mise à jour installe %s (elle sera fermée ensuite)"
 L_INTERNET_APP_STILL_RUNNING_FMT="%s a été lancé pour la mise à jour et ne s'est pas arrêté dans les %s s"

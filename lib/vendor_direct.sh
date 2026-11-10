@@ -73,6 +73,37 @@ internet_quit_wait_seconds() {
     _vd_clamp_int "${MAC_UPDATE_QUIT_WAIT:-60}" 60 0 300
 }
 
+# Minimum seconds between the toolkit launching an app and the toolkit asking
+# it to quit (MAC_UPDATE_QUIT_MIN_AGE, default 30, 0-300).
+internet_quit_min_age_seconds() {
+    _vd_clamp_int "${MAC_UPDATE_QUIT_MIN_AGE:-30}" 30 0 300
+}
+
+# internet_wait_launch_min_age <bundle id>
+# silent_launch_app records "bundle_id|epoch" in toolkit_launched_at.txt. If the
+# app was launched less than MAC_UPDATE_QUIT_MIN_AGE seconds ago, wait out the
+# remainder. Before 2026-11-10 an app launched shortly before the end-of-step
+# settle could receive its quit a few seconds after launch, while its vendor
+# launcher was still starting. No record (or an unparseable one) means no wait.
+internet_wait_launch_min_age() {
+    local bid="$1" f launched now min age
+    [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] || return 0
+    f="$MAC_UPDATE_SESSION_DIR/toolkit_launched_at.txt"
+    [ -f "$f" ] || return 0
+    launched="$(awk -F'|' -v b="$bid" '$1 == b { t = $2 } END { print t }' "$f" 2>/dev/null)"
+    case "$launched" in ''|*[!0-9]*) return 0 ;; esac
+    min="$(internet_quit_min_age_seconds)"
+    now="$(date +%s 2>/dev/null)"
+    case "$now" in ''|*[!0-9]*) return 0 ;; esac
+    age=$((now - launched))
+    [ "$age" -lt 0 ] && age=0
+    if [ "$age" -lt "$min" ]; then
+        _vd_diag "Quit of $bid deferred $((min - age))s: launched ${age}s ago (minimum ${min}s)"
+        sleep $((min - age))
+    fi
+    return 0
+}
+
 # Ask a toolkit-launched app to quit, politely and repeatedly.
 #
 # Only ever called for apps the toolkit itself launched (toolkit_launched.txt).
@@ -85,6 +116,12 @@ internet_quit_wait_seconds() {
 internet_app_quit_gracefully() {
     local bid="$1"
     _vd_valid_bundle_id "$bid" || return 1
+    if ! internet_app_is_running "$bid"; then
+        return 0
+    fi
+    # Never ask an app to quit while it may still be starting: a quit that
+    # lands mid-start can interrupt the vendor's launch/update handoff.
+    internet_wait_launch_min_age "$bid"
     if ! internet_app_is_running "$bid"; then
         return 0
     fi
