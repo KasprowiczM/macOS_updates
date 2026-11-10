@@ -50,3 +50,22 @@ The Superset feed lives in the renamed `paradevai/paradev` repository and its DM
 No `update_all.sh` run. No real direct install of HyperFrames or Superset (only the artifact inspection above and tests with fake bundles). Open Design's exit cause on LaunchServices launches is not established.
 
 Observed in passing (not changed here): the step headers in that run log print durations that do not fit their steps (the internet step header said about one minute, the inventory step about seven), which looks like an off-by-one in the per-step duration labels.
+
+## Live verification after the fixes (2026-11-10)
+
+A one-shot LaunchAgent (`scripts/install_launchagent.sh --once-in 2`) was installed, verified as loaded, and fired at the scheduled minute. The launchd-started run was non-interactive with `--skip-system` and finished with exit 0 (degraded).
+
+Observed:
+
+- Homebrew and `mas` were found under launchd; no "Homebrew is not installed"; no sudo prompt; pre-flight and `caffeinate` ran.
+- HyperFrames was installed direct-only from the vendor zip (checksum, bundle ID, Team ID, Gatekeeper) with no launch; the installed bundle passes `codesign --verify --deep --strict` and is a notarized Developer ID app.
+- Superset was reported current from the vendor feed without a launch.
+- Open Design was not launched; it was reported as "open the app to update".
+- A GitHub API rate limit was reported as a rate limit with its reset time, not as a connection failure.
+- The LaunchAgent was removed afterwards with `--uninstall`; the service and the plist are gone.
+
+Still open:
+
+- Why Open Design's packaged app exits right after start when launched through LaunchServices on this machine while a direct start of its executable works. This is the vendor app's behaviour, not caused by the toolkit; the toolkit no longer launches it.
+- Two text nits seen in that run: a never-launch app still prints the generic "updates automatically" line, and one run-summary detail ("behind vendor version") is not localized.
+- A prompt timeout, an open-cask deferral, and acceptance paths 2 and 3.
