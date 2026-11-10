@@ -20,7 +20,7 @@ sudo env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS   # explicit IDs, never a
 
 ## 3. App Store — Two tracks
 - **Track 1:** `sudo mas upgrade` — native macOS apps
-- **Track 2:** AppleScript GUI (`osascript`) — iPad apps (UniFi, WiFiman, myCANAL, Picsart)
+- **Track 2:** AppleScript GUI (`osascript`) — iPad apps (UniFi, WiFiman, Picsart, IPMIView)
   - Requires Accessibility permission in System Settings
   - This is a separate track, not a fallback for Track 1; unexpected GUI states fail honestly
   - `mas outdated` cannot prove the state of iPad apps, so Track 2 keeps its own result
@@ -52,8 +52,8 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
 | Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
 | Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
-| App Store GUI Track 2 | UniFi, WiFiman, Picsart |
-| Manual only | IPMIView |
+| App Store GUI Track 2 | UniFi, WiFiman, Picsart, IPMIView |
+| Manual only | none registered at present (the `manual` method and its notification handler remain available) |
 
 These methods are not equivalent proof levels:
 
@@ -259,7 +259,7 @@ pre-release differs from the stable target, so the next run returns it to stable
 ## 14. macOS 27 Golden Gate Constraints and Ecosystem Rules
 
 - **Xcode License Gate after App Store Update:** macOS 27 invalidates or requires re-acceptance of the Xcode license agreement upon upgrading Xcode via `mas`. `update_brew.sh` and any toolchain consumers must gate on `xcodebuild -license check` (`brew_xcode_license_ok` in `lib/brew.sh`; never `-checkFirstLaunchStatus`, which returns 69 on a licensed Xcode 27.2 whenever first-launch components are pending) and prompt the user to accept (`sudo xcodebuild -license accept`) before running Homebrew commands to avoid catastrophic failure across the entire Homebrew step.
-- **Rosetta Translation Lifecycle & EOL 28:** macOS 27 drops preinstalled Rosetta; Apple Silicon systems do not retain it across upgrades. Any Intel-only x86_64 apps (e.g. DJI Assistant 2) must be flagged with `[x86_64: Rosetta missing — will not run]` (or warning in inventory) and warned that Rosetta is completely removed in macOS 28. Do not attempt silent background reinstallation of Rosetta.
+- **Rosetta Translation Lifecycle & EOL 28:** macOS 27 drops preinstalled Rosetta; Apple Silicon systems do not retain it across upgrades. Any installed Intel-only x86_64 app (detected generically from its executable, whatever its update method) must be flagged with `[x86_64: Rosetta missing — will not run]` (or warning in inventory) and warned that Rosetta is completely removed in macOS 28. Never reinstall Rosetta silently: the preflight (`internet_rosetta_preflight`) runs `softwareupdate --install-rosetta` only on explicit opt-in (`MAC_UPDATE_INSTALL_ROSETTA=1`).
 - **Command Line Tools on macOS 27:** Homebrew 7.0+ sets `minimum_version "27.0.0"` for CLT on macOS 27. Older CLT versions (e.g., 26.x CLT from macOS 26) trigger `CLT does not support macOS 27` Tier 2 warnings under `brew doctor`.
 - **Installer Packages (`.pkg`) Default to arm64:** On macOS 27, package installers without an explicit `hostArchitecture` tag default to `arm64`. Any custom `.pkg` scripts must specify hostArchitecture or be verified arm64-native.
 - **Launchd Quarantined Plist Rejection:** `launchd` on macOS 27 strictly rejects loading property lists carrying extended quarantine attributes (`com.apple.quarantine`). `scripts/install_launchagent.sh` must strip quarantine (`xattr -d com.apple.quarantine`) and use domain-targeted `launchctl bootstrap gui/$(id -u)` and `launchctl enable` instead of legacy `load -w`.

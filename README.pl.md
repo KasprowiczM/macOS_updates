@@ -12,11 +12,11 @@
 |-----------|--|
 | Platforma | wyłącznie Apple Silicon (arm64) · macOS 13 Ventura do macOS 27 · Bash 3.2 + Python 3 |
 | Potok | 7 kroków (0–6), aktualizacja systemu macOS zawsze na końcu |
-| Rejestr | 43 aplikacje internetowe · 11 metod aktualizacji (zob. [Metody aktualizacji](#metody-aktualizacji)) |
+| Rejestr | 47 aplikacje internetowe · 11 metod aktualizacji (zob. [Metody aktualizacji](#metody-aktualizacji)) |
 | Języki | EN, PL, ES, FR, DE, IT, PT (CLI i dokumentacja) |
-| Testy | 591 testów automatycznych (`bash run_tests.sh`) |
+| Testy | 846 testów automatycznych (`bash run_tests.sh`) |
 
-**Nowość w v1.5.5:** Aktualizacja Homebrew usuwająca `python3` w trakcie przebiegu nie psuje już kroku inwentarza/raportu (powłoka ponownie przeszukuje `PATH`), a nieudany krok raportujący nie odkłada już aktualizacji macOS. Komunikaty końcowe są uczciwe: brak twierdzenia o zaktualizowanych plikach po błędzie, a ostrzeżenia o starym feedzie lub niezamkniętej aplikacji nie są już opisywane jako niezweryfikowane aktualizacje. Aplikacje uruchomione przez narzędzie dostają wielokrotną prośbę o zamknięcie (bez wymuszania). Wcześniejsze wydania 1.5.x (stary feed producenta jako ostrzeżenie, pobieranie ChatGPT/Proton od producenta, natywne CLI przed npm, ochrona podmiany pakietów) opisuje [CHANGELOG.md](CHANGELOG.md).
+**Nowość w v1.6.0:** Uruchomienia planowane (launchd) znajdują Homebrew i `mas`, a instalator sprawdza, że zadanie zostało załadowane (doszły `--minute` i `--once-in`). Otwarte aplikacje nigdy nie są zamykane ani podmieniane, także casky Homebrew. Każde pytanie w trakcie przebiegu wygasa z bezpieczną odpowiedzią „nie”. `bash update_all.sh --doctor` to raport gotowości tylko do odczytu, a rzeczywiste przebiegi mają kontrolę wstępną. Trwały stan feedów producentów zastępuje niejasne ostrzeżenia „przestarzały feed”, a HyperFrames, Superset i Open Design są instalowane lub sprawdzane bez ukrytych uruchomień. Wcześniejsze wydania 1.5.x opisuje [CHANGELOG.md](CHANGELOG.md).
 
 **Prawda od producenta (od v1.5.0):** wersja każdej aplikacji jest porównywana z feedem jej producenta, zanim cokolwiek zostanie uruchomione. Aktualne aplikacje zostają nietknięte; nieaktualne aktualizuje ich własny updater albo instalacja od producenta z weryfikacją podpisu i Team ID. Aktualizowane jest wyłącznie to, co jest zainstalowane (`--bootstrap-cli` celowo instaluje brakujące CLI). Aplikacje usunięte ręcznie są rozpoznawane i nigdy nie wracają. **Aplikacje, które masz otwarte, nigdy nie są zamykane. Skrypt zamyka tylko to, co sam uruchomił.** Stan producentów sprawdzisz bez zmian w systemie: `bash scripts/check_vendor_feeds.sh`.
 
@@ -59,21 +59,21 @@ bash build_inventory.sh                  # przebudowa APPLICATIONS.md z tego Mac
 
 ### Metody aktualizacji
 
-Rejestr ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) przypisuje 43 aplikacje do 11 metod:
+Rejestr ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) przypisuje 47 aplikacje do 11 metod:
 
 | Metoda | Aplikacje | Pokrycie | Jak aktualizuje |
 |--------|----------:|----------|-----------------|
 | `brew_cask` | 11 | externally managed | Cask Homebrew (greedy tylko dla tych tokenów) z ochroną przed cofnięciem wersji, np. Brave, Obsidian, Spotify, Inkscape |
-| `silent_launch` | 9 | triggered-unverified | Własny updater aplikacji; oportunistyczne sprawdzenie feedu Sparkle / electron-updater, w przeciwnym razie „uruchomiono (niezweryfikowane)”. Nigdy nie podmienia samej aplikacji |
-| `github_dmg` | 6 | verified direct | DMG od producenta/z GitHuba z weryfikacją podpisu i Team ID, podmiana etapowa z rollbackiem (Firefox Developer Edition, KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
+| `silent_launch` | 14 | triggered-unverified | Własny updater aplikacji jako rozwiązanie zapasowe; oportunistyczne sprawdzenie feedu Sparkle / electron-updater, w przeciwnym razie „uruchomiono (niezweryfikowane)”. Aplikacje z feedem producenta (ChatGPT / Codex, Claude, Cursor, Warp, OpenCode, Proton Mail, ...) są oceniane według tego feedu i instalowane ze zweryfikowanego artefaktu producenta, gdy są w tyle. Bez feedu ta metoda nigdy nie podmienia samej aplikacji |
+| `github_dmg` | 5 | verified direct | DMG od producenta/z GitHuba z weryfikacją podpisu i Team ID, podmiana etapowa z rollbackiem (KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
 | `msupdate` | 5 | verified direct | Microsoft AutoUpdate (`msupdate`): Word, Excel, PowerPoint, Outlook, OneNote |
 | `keystone` | 3 | verified direct | Updater Google (Omaha) weryfikowany historią aktualizacji: Chrome, Gemini, Google Drive |
-| `appstore_gui` | 3 | externally managed | App Store Tor 2 (AppleScript): UniFi, WiFiman, Picsart |
+| `appstore_gui` | 4 | externally managed | App Store Tor 2 (AppleScript): UniFi, WiFiman, Picsart, IPMIView |
 | `sparkle_appcast` | 1 | verified direct | Appcast Sparkle (Proton Drive) |
 | `chromium_updater` | 1 | verified direct | Dowód z updatera opartego na Chromium (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: zweryfikowany DMG z appcastu, gdy aplikacja nie pracuje; zapasowo `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Własny updater Teams plus obserwowany, weryfikowany fallback MAU `TEAMS21`, gdy Microsoft go oferuje |
-| `manual` | 1 | manual | IPMIView — tylko powiadomienie |
+| `mozilla_dmg` | 1 | verified direct | Wersja z product-details Mozilli plus zweryfikowany DMG, podmiana etapowa z rollbackiem (Firefox Developer Edition) |
 
 ---
 
@@ -109,6 +109,8 @@ Nieznana opcja `-…` kończy działanie kodem `2` po wypisaniu pomocy.
 **Pytania:** każde pytanie w trakcie przebiegu wygasa po `MAC_UPDATE_PROMPT_TIMEOUT` sekundach z bezpieczną odpowiedzią „nie”; nierozpoznane dane wejściowe także oznaczają „nie”. Po potwierdzeniu w głównym skrypcie kroki Homebrew i App Store nie pytają ponownie; krok macOS nadal pyta.
 
 **Otwarte aplikacje:** cask Homebrew, którego aplikacja jest otwarta, nigdy nie jest aktualizowany; zostaje odroczony z komunikatem „zamknij aplikację”, a krok kończy się miękkim ostrzeżeniem (kod `10`).
+
+**Aplikacje direct-only i never-launch:** `config/vendor_launch_policy.txt` wymienia aplikacje, których narzędzie nigdy nie uruchamia. Aplikacja `direct-only` (HyperFrames, Superset) jest aktualizowana wyłącznie ze zweryfikowanego artefaktu producenta; aplikacja `never-launch` (Open Design) jest tylko sprawdzana, a gdy jest w tyle, zgłaszana jako „otwórz aplikację, aby zaktualizować”. Żadna nie jest otwierana ani zamykana, także jako rozwiązanie zapasowe po niedostępnym feedzie.
 
 ## Zmienne środowiskowe
 
@@ -179,6 +181,7 @@ bash scripts/setup_touchid_sudo.sh              # instalacja / naprawa
 bash scripts/setup_touchid_sudo.sh --uninstall
 
 bash scripts/install_launchagent.sh --check
+bash scripts/install_launchagent.sh --once-in 5
 bash scripts/install_launchagent.sh --uninstall
 ```
 
@@ -191,6 +194,8 @@ macOS nadpisują — uruchom skrypt ponownie po dużej aktualizacji.
 
 LaunchAgent uruchamia `update_all.sh -y --skip-system` ze zmiennymi
 `MAC_UPDATE_NONINTERACTIVE=1` i `MAC_UPDATE_NOTIFY=1`.
+
+Plist ustawia jawny `PATH` (`/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin`), bo domyślny `PATH` launchd nie zawiera Homebrew, a instalator sprawdza przez `launchctl print`, że zadanie jest załadowane; w przeciwnym razie wypisuje błąd launchctl i kończy się kodem niezerowym. `--minute N` (0-59) ustawia minutę, `--once-in N` (1-1440 minut od teraz) instaluje jednorazowy przebieg testowy i nie łączy się z `--day`/`--hour`/`--minute`, a `--check` ostrzega o plist bez klucza `PATH` (starszą instalację napraw ponownym uruchomieniem instalatora).
 
 - **Wykonuje:** Homebrew, natywne CLI + npm, aplikacje internetowe, inwentarz i historię.
 - **Nie aktualizuje systemu macOS** — `--skip-system` jest celowe. Na Apple Silicon

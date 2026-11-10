@@ -12,11 +12,11 @@
 |------------------|--|
 | Plateforme | Apple Silicon (arm64) uniquement · de macOS 13 Ventura à macOS 27 · Bash 3.2 + Python 3 |
 | Pipeline | 7 étapes (0–6), la mise à jour de macOS vient toujours en dernier |
-| Registre | 43 applications Internet · 11 méthodes de mise à jour (voir [Méthodes de mise à jour](#méthodes-de-mise-à-jour)) |
+| Registre | 47 applications Internet · 11 méthodes de mise à jour (voir [Méthodes de mise à jour](#méthodes-de-mise-à-jour)) |
 | Langues | EN, PL, ES, FR, DE, IT, PT (CLI et documentation) |
-| Tests | 591 tests automatisés (`bash run_tests.sh`) |
+| Tests | 846 tests automatisés (`bash run_tests.sh`) |
 
-**Nouveautés de la v1.5.5 :** Une mise à jour Homebrew qui supprime `python3` en cours d'exécution ne casse plus l'étape d'inventaire/rapport (le shell recherche à nouveau dans `PATH`), et une étape de rapport en échec ne repousse plus les mises à jour de macOS. Les messages finaux sont honnêtes : plus d'affirmation « fichiers mis à jour » après un échec, et les avertissements de flux périmé ou d'application non fermée ne sont plus présentés comme des mises à jour non vérifiées. Les applications lancées par l'outil reçoivent des demandes de fermeture répétées (jamais de forçage). Les versions 1.5.x précédentes (flux périmés en avertissement, téléchargements éditeur pour ChatGPT/Proton, CLI natives avant npm, protection du remplacement de paquets) sont décrites dans [CHANGELOG.md](CHANGELOG.md).
+**Nouveautés de la v1.6.0 :** Les exécutions planifiées (launchd) trouvent Homebrew et `mas`, et l'installateur vérifie que la tâche est chargée (ajout de `--minute` et `--once-in`). Les apps ouvertes ne sont jamais fermées ni remplacées, casks Homebrew compris. Chaque question en cours d'exécution expire avec la réponse sûre « non ». `bash update_all.sh --doctor` est un rapport de préparation en lecture seule, et les exécutions réelles ajoutent des contrôles préalables. L'état persistant des flux éditeur remplace les avertissements opaques de « flux obsolète », et HyperFrames, Superset et Open Design sont installés ou vérifiés sans lancement caché. Les versions 1.5.x antérieures sont décrites dans [CHANGELOG.md](CHANGELOG.md).
 
 **Vérité de l'éditeur (depuis v1.5.0) :** la version de chaque application est comparée au flux de son propre éditeur avant toute exécution. Les applications à jour ne sont pas modifiées ; les applications obsolètes sont mises à jour par leur propre programme de mise à jour, ou installées depuis l'éditeur avec vérification de la signature et du Team ID. Seuls les logiciels installés sont mis à jour (`--bootstrap-cli` installe volontairement les CLI manquantes). Les applications supprimées manuellement sont détectées et jamais réinstallées. **Les applications que vous avez ouvertes ne sont jamais fermées : l'outil ne quitte que ce qu'il a lancé lui-même.** Vérifiez l'état des éditeurs en lecture seule avec `bash scripts/check_vendor_feeds.sh`.
 
@@ -59,21 +59,21 @@ bash build_inventory.sh                  # reconstruit APPLICATIONS.md depuis ce
 
 ### Méthodes de mise à jour
 
-Le registre ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) associe 43 applications à 11 méthodes :
+Le registre ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) associe 47 applications à 11 méthodes :
 
 | Méthode | Apps | Couverture | Fonctionnement |
 |---------|-----:|------------|----------------|
 | `brew_cask` | 11 | externally managed | Cask Homebrew (greedy uniquement pour ces jetons) avec protection contre la rétrogradation, p. ex. Brave, Obsidian, Spotify, Inkscape |
-| `silent_launch` | 9 | triggered-unverified | Le programme de mise à jour propre à l'app ; vérification opportuniste auprès d'un flux Sparkle / electron-updater, sinon « lancé (non vérifié) ». Ne remplace jamais l'app elle-même |
-| `github_dmg` | 6 | verified direct | DMG de l'éditeur/GitHub avec vérification de la signature et du Team ID, remplacement par étapes avec retour arrière (Firefox Developer Edition, KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
+| `silent_launch` | 14 | triggered-unverified | Le programme de mise à jour propre à l'app en repli ; vérification opportuniste contre un flux Sparkle / electron-updater, sinon « lancée (non vérifiée) ». Les apps dotées d'un flux éditeur (ChatGPT / Codex, Claude, Cursor, Warp, OpenCode, Proton Mail, ...) sont décidées par ce flux et, si elles sont en retard, installées depuis l'artefact éditeur vérifié. Sans flux, la méthode ne remplace jamais l'app elle-même |
+| `github_dmg` | 5 | verified direct | DMG de l'éditeur/GitHub avec vérification de la signature et du Team ID, remplacement par étapes avec retour arrière (KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
 | `msupdate` | 5 | verified direct | Microsoft AutoUpdate (`msupdate`) : Word, Excel, PowerPoint, Outlook, OneNote |
 | `keystone` | 3 | verified direct | Programme de mise à jour Google (Omaha), contrôlé via son historique : Chrome, Gemini, Google Drive |
-| `appstore_gui` | 3 | externally managed | App Store Piste 2 (AppleScript) : UniFi, WiFiman, Picsart |
+| `appstore_gui` | 4 | externally managed | App Store Piste 2 (AppleScript) : UniFi, WiFiman, Picsart, IPMIView |
 | `sparkle_appcast` | 1 | verified direct | Appcast Sparkle (Proton Drive) |
 | `chromium_updater` | 1 | verified direct | Preuve du programme de mise à jour basé sur Chromium (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop : DMG vérifié depuis son appcast quand l'app est inactive ; repli `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Mise à jour propre à Teams plus repli MAU `TEAMS21` observé et vérifié quand Microsoft le propose |
-| `manual` | 1 | manual | IPMIView : notification uniquement |
+| `mozilla_dmg` | 1 | verified direct | Version product-details de Mozilla plus DMG vérifié, remplacement par étapes avec rollback (Firefox Developer Edition) |
 
 ---
 
@@ -109,6 +109,8 @@ Une option `-…` inconnue termine avec le code `2` après affichage de l'aide.
 **Questions :** chaque question posée pendant l'exécution expire après `MAC_UPDATE_PROMPT_TIMEOUT` secondes avec la réponse sûre « non » ; une saisie non reconnue vaut aussi « non ». Après la confirmation générale, les étapes Homebrew et App Store ne redemandent pas ; l'étape macOS demande toujours.
 
 **Applications ouvertes :** un cask Homebrew dont l'application est ouverte n'est jamais mis à jour ; il est reporté avec le message « quittez l'application » et l'étape se termine par un avertissement léger (code `10`).
+
+**Apps direct-only et never-launch :** `config/vendor_launch_policy.txt` liste les apps que l'outil ne lance jamais. Une app `direct-only` (HyperFrames, Superset) n'est mise à jour que depuis son artefact éditeur vérifié ; une app `never-launch` (Open Design) est seulement vérifiée et, si elle est en retard, signalée « ouvrez l'app pour la mettre à jour ». Aucune n'est ouverte ni quittée, pas même en repli après un flux injoignable.
 
 ## Variables d'environnement
 
@@ -176,6 +178,7 @@ bash scripts/setup_touchid_sudo.sh              # installer / réparer
 bash scripts/setup_touchid_sudo.sh --uninstall
 
 bash scripts/install_launchagent.sh --check
+bash scripts/install_launchagent.sh --once-in 5
 bash scripts/install_launchagent.sh --uninstall
 ```
 
@@ -188,6 +191,8 @@ que les mises à jour de macOS effacent : relancez-le après une mise à jour ma
 
 Le LaunchAgent lance `update_all.sh -y --skip-system` avec
 `MAC_UPDATE_NONINTERACTIVE=1` et `MAC_UPDATE_NOTIFY=1`.
+
+Le plist définit un `PATH` explicite (`/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin`) car celui de launchd n'inclut pas Homebrew, et l'installateur vérifie avec `launchctl print` que la tâche est chargée ; sinon il affiche l'erreur de launchctl et se termine avec un code non nul. `--minute N` (0-59) fixe la minute, `--once-in N` (1-1440 minutes à partir de maintenant) installe une exécution de test unique et ne se combine pas avec `--day`/`--hour`/`--minute`, et `--check` signale un plist sans clé `PATH` (relancez l'installateur pour réparer une ancienne installation).
 
 - **Exécute :** Homebrew, CLI natives + npm, applications Internet, inventaire/historique.
 - **N'exécute pas les mises à jour de macOS** : `--skip-system` est voulu. Sur

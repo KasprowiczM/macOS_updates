@@ -22,7 +22,7 @@ This page describes the structural rules of the toolkit (shell, Python, session 
 - Path: `mktemp -d "${TMPDIR:-/tmp}/mac_update.XXXXXX"` stored in `$MAC_UPDATE_SESSION_DIR`
 - All temp files go here. Guard every use: `[ -n "$MAC_UPDATE_SESSION_DIR" ]`
 - The master script registers cleanup traps and uses mode `700` where supported.
-- **Key session files used in v1.5.0:**
+- **Key session files:**
   - `toolkit_launched.txt` — Records bundle identifiers and names of applications launched by the toolkit during the update session; used to ensure the toolkit only quits what it launched itself and leaves user-opened apps untouched.
   - `google_omaha_init.txt` — Session-scoped marker indicating Google Keystone / GoogleUpdater daemon was triggered, preventing redundant `--wake-all` wakeups across Chrome, Gemini, and Drive.
   - `brew_cask_targets.txt` — Maps installed Homebrew casks to their `.app` bundle targets (`cask_token|Target.app`) for target validation and downgrade protection.
@@ -35,8 +35,11 @@ This page describes the structural rules of the toolkit (shell, Python, session 
 ## Session files and persistent state (2026-11-09)
 
 - `brew_deferred_running.txt` — `cask|App.app` rows for casks deferred because their app was open or its running state unknown.
+- `toolkit_launched_at.txt` — `bundle_id|epoch` rows written by `silent_launch_app` next to `toolkit_launched.txt`; `internet_app_quit_gracefully` waits until the app has been up `MAC_UPDATE_QUIT_MIN_AGE` seconds before its first graceful `quit`, so an app that is still starting is never quit.
+- `rosetta_missing_apps.txt` — installed Intel-only apps when Rosetta is absent (`internet_rosetta_finalize`).
 - `advisories.txt` — `source|severity|text` rows (severity `security` or `info`), appended by steps (currently `brew doctor`) and merged into the run summary's `advisories` field and the final "Advisories" block.
 - **Persistent feed state:** `~/.local/state/mac-update/feed_state.json` (`MAC_UPDATE_FEED_STATE_FILE`, mode 0600, same-directory temp + `os.replace`) via `lib/python/feed_state.py`. It outlives the session directory and holds, per app, the last good vendor version/time, a high-water mark and the last error. Corrupt or unknown files load as empty state.
+- **Other persistent state** (all under `~/.local/state/mac-update/`, outside the session directory): `package_revisions.tsv` (`MAC_UPDATE_PACKAGE_REVISION_FILE`, same-version package revisions such as KeePassXC `2.8.0-1`) and `mau_quarantine.tsv` (`MAC_UPDATE_MAU_STATE_FILE`, arming time of toolkit-set Office deferrals). `logs/version_history.tsv` and `logs/run_summary_*.json` live in the repository's gitignored `logs/`.
 - Run summary stays format 4 with additive fields: top-level `advisories`, `steps.<step>.duration_seconds`, `counts.inventory_entries_added` / `inventory_entries_removed`.
 - Pre-flight (`lib/preflight.sh`) runs before step 0 on real runs and keeps the Mac awake with `caffeinate -i -w $$`; `logs/` rotation (`lib/python/log_rotation.py`) also prunes `run_summary_*.json`.
 
@@ -56,7 +59,7 @@ This page describes the structural rules of the toolkit (shell, Python, session 
 ## Data Files
 - `APPLICATIONS.md` / `UPDATES.md` are auto-maintained — manual edits will be overwritten
 
-## Recent changes (v1.5.3 to v1.5.5)
+## Recent changes (v1.5.3 to v1.5.5; 1.6.0 is described in `CHANGELOG.md`)
 
 v1.5.5 hardens the master process against toolchain changes made by its own children: every long-lived orchestrator enables `shopt -s checkhash` (and `update_all.sh` runs `hash -r` between steps) so a `python3` link removed by a Homebrew upgrade cannot leave a stale hashed path. Step 5 is reporting-only and never defers macOS updates; a failed summary write relabels the stale `run_status: "started"` file as `"failed"`. Toolkit-launched apps receive a repeated graceful `quit` (`MAC_UPDATE_QUIT_WAIT`, `MAC_UPDATE_QUIT_RESEND`; never force-killed), and soft internet warnings that carry no pending update use their own wording (`L_INTERNET_WARNINGS_ONLY`).
 

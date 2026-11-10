@@ -26,6 +26,7 @@ bash update_all.sh --dry-run -y         # Preview without mutations
 bash update_all.sh --doctor             # Read-only readiness report (exit 0 ok / 10 warnings / 1 problem)
 bash scripts/report_update_coverage.sh  # Coverage by update method category
 bash scripts/check_vendor_feeds.sh      # Vendor truth table (read-only)
+bash scripts/install_launchagent.sh --check  # Weekly schedule status (install: --day/--hour/--minute, test: --once-in N)
 bash dev_sync/dev-sync-import.sh        # Restore private overlay (owners only)
 bash run_tests.sh                       # Full test suite (bash -n, py_compile, unittest, secret scan)
 bash -n update_all.sh                   # Syntax check
@@ -55,7 +56,7 @@ Load only when relevant to your task:
 - @docs/agents/critical_rules.md — softwareupdate -R, sudo mas (macOS 15.7.2+/14.8.2+/26.1+ entitlement change), App Store two-track, version detection, update methods per app, APPLICATIONS.md structure
 - @docs/agents/exit_codes.md — the 0 / 10 / 1 severity contract and which failures defer the macOS system update
 - @docs/agents/troubleshooting.md — common failures + fixes, skills directory
-- @docs/agents/acceptance_checklist.md — live acceptance paths for v1.5.x
+- @docs/agents/acceptance_checklist.md — live acceptance paths (v1.5.x to v1.6.0)
 - @docs/agents/mcp_setup.md — MCP server absolute path requirement, PATH env fix
 - @docs/agents/security.md — secret handling and deny rules
 - docs/agents/maintenance_prompt.md — universal, harness-agnostic prompt for a periodic verify-review-fix session
