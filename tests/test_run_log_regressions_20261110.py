@@ -231,7 +231,9 @@ class HandlerDecisionTests(unittest.TestCase):
                 ("Superset", "com.superset.desktop", self.SS_ROW,
                  {"CFBundleIdentifier": "com.superset.desktop", "CFBundleShortVersionString": "2.0.7"})):
             app = make_bundle(self.tmp / name, name, info)
-            out, actions = self.probe(name, bid, row, app, running=True)
+            # A `defaults` stub keeps the installed version readable on Linux CI.
+            out, actions = self.probe(name, bid, row, app, running=True,
+                                      env={"PATH": self._defaults_stub() + ":" + os.environ.get("PATH", "")})
             self.assertEqual(actions, [], name)
             self.assertIn("CODE=needs_restart", out, name)
 
