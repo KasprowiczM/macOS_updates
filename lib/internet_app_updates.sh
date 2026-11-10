@@ -2392,9 +2392,12 @@ iu_cursor() {
     internet_dispatch_silent_launch "⚡ Cursor" "Cursor" "STATUS_CURSOR" "Cursor" "Cursor → Cursor → Check for updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
 }
 
-# Open Design, HyperFrames, Superset: the vendor feed (config/vendor_feeds.txt,
-# verify only) decides; only a behind app is launched so its own updater can
-# install. Open Design's version is the active launcher payload and HyperFrames'
+# Open Design, HyperFrames, Superset: the vendor feed (config/vendor_feeds.txt)
+# decides, and none of them is ever launched (config/vendor_launch_policy.txt).
+# HyperFrames and Superset (upstream project now "paradev", bundle still
+# Superset.app) install direct-only from their checksummed arm64 zip through
+# vendor_direct_install. Open Design is verify-only: behind -> "open the app to
+# update". Open Design's version is the active launcher payload and HyperFrames'
 # is its build label (lib/python/inventory.py vendor_installed_version).
 iu_opendesign() {
     internet_dispatch_silent_launch "🎨 Open Design" "Open Design" "STATUS_OPENDESIGN" "Open Design" "Open Design → Check for Updates" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Open Design")"

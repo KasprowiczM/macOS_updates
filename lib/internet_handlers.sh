@@ -508,6 +508,33 @@ internet_handler_vendor_latest() {
     fi
 }
 
+# internet_launch_policy <app>
+# Prints the app's launch policy from config/vendor_launch_policy.txt:
+# "direct-only" (install only from the verified vendor artifact, never launch),
+# "never-launch" (verify only, never launch or quit) or "default".
+internet_launch_policy() {
+    local app="$1" cfg line name pol
+    cfg="${_INTERNET_HANDLERS_DIR}/../config/vendor_launch_policy.txt"
+    if [ -n "$app" ] && [ -f "$cfg" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            line="${line%%#*}"
+            case "$line" in *'|'*) ;; *) continue ;; esac
+            name="${line%%|*}"
+            pol="${line#*|}"
+            name="${name#"${name%%[![:space:]]*}"}"
+            name="${name%"${name##*[![:space:]]}"}"
+            pol="${pol#"${pol%%[![:space:]]*}"}"
+            pol="${pol%"${pol##*[![:space:]]}"}"
+            if [ "$name" = "$app" ]; then
+                case "$pol" in
+                    direct-only|never-launch) printf '%s\n' "$pol"; return 0 ;;
+                esac
+            fi
+        done < "$cfg"
+    fi
+    printf 'default\n'
+}
+
 # internet_handler_vendor_feed_failed <app> <app_path> <launch_target> <installed> <lookup_rc>
 # The vendor feed could not be used this run (lookup_rc 3 = fetched but no usable
 # version; anything else = fetch failure, see internet_diag.txt for curl/HTTP).
@@ -521,7 +548,9 @@ internet_handler_vendor_latest() {
 # 2. Otherwise the historical native-updater fallback runs (the app's own updater
 #    remains the recovery path), but the status says "feed unreachable" /
 #    "feed unreadable" (code feed_unreachable, soft) instead of a bare
-#    "launched (unverified)", so the summary names the real cause.
+#    "launched (unverified)", so the summary names the real cause. Apps in
+#    config/vendor_launch_policy.txt are never launched: they report
+#    "version not checked (app not launched)" (also feed_unreachable).
 internet_handler_vendor_feed_failed() {
     local app="$1" app_path="$2" launch_target="$3" I="$4" lrc="${5:-2}"
     local reason="fetch"
@@ -545,6 +574,14 @@ internet_handler_vendor_feed_failed() {
         print_warn "$(printf "$L_INTERNET_VENDOR_FEED_UNPARSEABLE_FMT" "$app")"
     else
         print_warn "$(printf "${L_INTERNET_VENDOR_FEED_UNREACHABLE_FMT:-Vendor feed for %s unreachable}" "$app")"
+    fi
+    # Apps that must never be launched (config/vendor_launch_policy.txt) get no
+    # native-updater fallback: report the unchecked state honestly instead.
+    if [ "$(internet_launch_policy "$app")" != "default" ]; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH"
+        INTERNET_LAST_VERIFIED=0
+        INTERNET_LAST_LAUNCH_OK=0
+        return 0
     fi
     internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
     if [ "${INTERNET_LAST_LAUNCH_OK:-0}" -eq 1 ]; then
@@ -660,7 +697,26 @@ EOF
             return 0
         fi
 
+        # Launch policy (config/vendor_launch_policy.txt). never-launch: verify
+        # only, the user opens the app to update. direct-only: the verified
+        # vendor artifact is the only install path; without one (or with direct
+        # installs disabled, or a staged rollout) the app is reported the same
+        # way and never launched.
+        local launch_policy
+        launch_policy="$(internet_launch_policy "$app")"
+        if [ "$launch_policy" = "never-launch" ] || {
+            [ "$launch_policy" = "direct-only" ] && { [ "$ART" = "-" ] || [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" = "0" ]; }; }; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OPEN_TO_UPDATE_FMT" "$I" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            INTERNET_LAST_LAUNCH_OK=0
+            command -v internet_diag_log >/dev/null 2>&1 && \
+                internet_diag_log "Vendor truth $app: $I < $R; launch policy $launch_policy - not launched"
+            print_warn "$(internet_status_body "$INTERNET_LAST_STATUS")"
+            return 0
+        fi
+
         local is_vdf=0
+        [ "$launch_policy" = "direct-only" ] && is_vdf=1
         local vdf_file="${_INTERNET_HANDLERS_DIR}/../config/vendor_direct_first.txt"
         if [ -f "$vdf_file" ]; then
             while IFS= read -r line || [ -n "$line" ]; do
@@ -686,7 +742,7 @@ EOF
             fi
         fi
 
-        if [ "$bypass_launch" -eq 0 ]; then
+        if [ "$bypass_launch" -eq 0 ] && [ "$launch_policy" = "default" ]; then
             local WAIT="${MAC_UPDATE_STAGE_WAIT:-90}"
             case "$WAIT" in ''|*[!0-9]*) WAIT=90 ;; esac
             [ "$WAIT" -gt 600 ] && WAIT=600
@@ -778,7 +834,8 @@ EOF
                     # A failed public download must not remove the vendor's
                     # supported updater as a recovery path. Report only the
                     # launch; a later verified version check proves completion.
-                    if [ "$bypass_launch" -eq 1 ]; then
+                    # direct-only apps are never launched (vendor_launch_policy.txt).
+                    if [ "$bypass_launch" -eq 1 ] && [ "$launch_policy" != "direct-only" ]; then
                         internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
                     fi
                     return 0

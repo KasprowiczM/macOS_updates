@@ -1,0 +1,24 @@
+# ============================================================
+# config/vendor_launch_policy.txt — apps the toolkit must never launch
+# Format: App Name|policy   (App Name must match vendor_feeds.txt)
+#   direct-only   behind -> install only from the verified vendor artifact
+#                 (vendor_direct_install). Never launched: not as a first
+#                 step, not as a fallback after a failed download, not when
+#                 the feed is unreachable. Without an artifact (or with
+#                 MAC_UPDATE_VENDOR_DIRECT=0) it is reported "open the app to
+#                 update".
+#   never-launch  verify only. Behind -> "open the app to update" (soft);
+#                 the app is never launched or quit by the toolkit.
+# Apps not listed keep the default behaviour of internet_handler_vendor_truth.
+# Comments start with #.
+#
+# Open Design (2026-11-10): the /Applications bundle is a launcher that hands
+# off to a versioned payload; LaunchServices launches (open -gjF, Dock) of
+# 0.27.0 exited after ~1 s without starting, and its own updater installs only
+# while the app runs and the user confirms (or the in-app silent-update setting
+# is on). A hidden launch therefore cannot update it, and quitting it may hit
+# a start in progress. Its version is read from the launcher's runtime.json.
+# ============================================================
+HyperFrames|direct-only
+Superset|direct-only
+Open Design|never-launch
