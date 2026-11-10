@@ -2693,6 +2693,8 @@ class I18nCompletenessTests(unittest.TestCase):
             # Added in v1.5.0:
             "L_INTERNET_STATUS_FEED_STALE_FMT",
             "L_INTERNET_STATUS_BEHIND_FMT",
+            # 2026-11-10: "open the app to update" is a behind status (code behind).
+            "L_INTERNET_STATUS_OPEN_TO_UPDATE_FMT",
             "L_INTERNET_STATUS_NEEDS_RESTART_FMT",
             "L_INTERNET_STATUS_VENDOR_CURRENT_FMT",
             "L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT",
@@ -3176,6 +3178,8 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
             ("test_vendor_truth_handlers.py", 'internet_handler_sparkle_check "Remote Desktop Manager" "/Applications/Remote Desktop Manager.app" "Remote Desktop Manager"'): "Mock sparkle handler test parameter",
             ("test_vendor_truth_handlers.py", 'internet_handler_sparkle_check "Docker Desktop" "/Applications/Docker.app" "Docker"'): "Mock sparkle handler test parameter",
             ("test_vendor_truth_handlers.py", 'internet_handler_vendor_truth "Claude" "/Applications/Claude.app" "Claude"'): "Mock vendor truth handler test parameter",
+            # test_run_log_regressions_20261110.py: vendor_direct_install contract (installed path mapped to a fake bundle)
+            ("test_run_log_regressions_20261110.py", 'vendor_direct_install "/Applications/HyperFrames.app" "https://static.heygen.ai/x-arm64.zip" zip sha256hex "{sha}" static.heygen.ai "{expected}"'): "vendor_direct_install requires /Applications/ path",
             # test_xcode_license_gate.py: Mock xcode-select developer path
             ("test_xcode_license_gate.py", 'xcode-select() {{ echo "/Applications/Xcode.app/Contents/Developer"; }}'): "Mock xcode-select developer path",
             ("test_xcode_license_gate.py", 'self.create_mock_script("xcode-select", \'echo "/Applications/Xcode.app/Contents/Developer"\')'): "Mock xcode-select developer path",

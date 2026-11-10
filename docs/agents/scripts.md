@@ -67,7 +67,8 @@
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
 | `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
 | `config/vendor_appcasts.txt` | Sparkle appcasts used only to prove an installed rollout-channel build is a published vendor release (never an install source) |
-| `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds (Cursor, OpenCode) |
+| `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds (Cursor, OpenCode, ChatGPT, Proton Mail/Drive, HyperFrames, Superset) |
+| `config/vendor_launch_policy.txt` | Apps the toolkit never launches: `direct-only` (HyperFrames, Superset: verified vendor artifact only, no launch fallback) and `never-launch` (Open Design: verify only, "open the app to update") |
 | `config/cask_oracles.txt` | Read-only Homebrew Cask version oracle mappings for verifying unverified apps |
 | `tests/_env.py` | Helper for test subprocess environments that strips PYTHONPATH so child shell processes do not inherit it |
 
@@ -89,6 +90,7 @@
 | `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; the AppleScript `quit` is re-sent while it keeps running, never force-killed (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Interval in seconds (1–60) between repeated graceful `quit` requests inside `MAC_UPDATE_QUIT_WAIT` (v1.5.5) |
+| `MAC_UPDATE_QUIT_MIN_AGE` | `30` | Seconds (0–300) a toolkit-launched app must have been running before the toolkit sends its first graceful `quit` (launch times in `toolkit_launched_at.txt`, 2026-11-10) |
 | `MAC_UPDATE_PACKAGE_REVISION_FILE` | `~/.local/state/mac-update/package_revisions.tsv` | Package revision installed per product+version (`KeePassXC\|2.8.0\|1`); detects same-version vendor rebuilds |
 | `MAC_UPDATE_FEED_STATE_FILE` | `~/.local/state/mac-update/feed_state.json` | Per-app vendor feed state (last successful version + time, high-water mark, last error); never an install source |
 | `MAC_UPDATE_FEED_CACHE_TTL_H` | `24` | Hours (0–168, 0 disables) a successful feed check that listed the installed version stays valid proof when the feed is unreachable — the app is then reported current from the cached check and not launched |

@@ -20,7 +20,8 @@ internet_status_code() {
         # Vendor feed fetch/parse failed and no cached proof existed; the app's own
         # updater was launched. Soft, and named for its cause (P1-1, 2026-11-08).
         "$L_INTERNET_STATUS_FEED_UNREACHABLE"|\
-        "$L_INTERNET_STATUS_FEED_UNREADABLE") echo "feed_unreachable"; return 0 ;;
+        "$L_INTERNET_STATUS_FEED_UNREADABLE"|\
+        "$L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH") echo "feed_unreachable"; return 0 ;;
         "$L_INTERNET_STATUS_MANAGED_BREW") echo "managed_brew"; return 0 ;;
         "$L_INTERNET_STATUS_MANAGED_APPSTORE") echo "managed_appstore"; return 0 ;;
         "$L_INTERNET_STATUS_MANUAL_UPDATE") echo "manual"; return 0 ;;
@@ -55,6 +56,7 @@ internet_status_code() {
         "update_available|$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" \
         "behind|$L_INTERNET_STATUS_BEHIND_FMT" \
         "behind|$L_INTERNET_STATUS_CASK_BEHIND_FMT" \
+        "behind|$L_INTERNET_STATUS_OPEN_TO_UPDATE_FMT" \
         "needs_restart|$L_INTERNET_STATUS_NEEDS_RESTART_FMT" \
         "feed_stale|$L_INTERNET_STATUS_FEED_STALE_FMT" \
         "current_cached|$L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT" \

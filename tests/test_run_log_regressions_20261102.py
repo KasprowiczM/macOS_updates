@@ -199,16 +199,19 @@ class VendorFeedTests(unittest.TestCase):
         body = json.dumps({"build": "b656", "sha": "3393b1d", "arm64": {"url": "https://x/y.zip"}})
         res = evaluate_feed("json", body, "hyperframes_latest")
         self.assertEqual(res["version"], "b656")
+        # No arm64 sha256 -> no install target (2026-11-10: direct-only needs a checksum).
         self.assertIsNone(res["url"])
         self.assertEqual(version_compare("b656", "b637"), 1)
         self.assertIsNone(evaluate_feed("json", json.dumps({"build": "latest"}), "hyperframes_latest"))
 
-    def test_feeds_are_verify_only_and_methods_are_native(self) -> None:
+    def test_feeds_and_registry_methods(self) -> None:
+        # 2026-11-10: HyperFrames and Superset install direct-only from a verified
+        # zip; Open Design stays verify-only (see test_run_log_regressions_20261110).
         feeds = read("config/vendor_feeds.txt")
         methods = read("config/internet_app_methods.txt")
-        for app in ("Open Design", "HyperFrames", "Superset"):
+        for app, artifact in (("Open Design", "-"), ("HyperFrames", "zip"), ("Superset", "zip")):
             row = next(line for line in feeds.splitlines() if line.startswith(app + "|"))
-            self.assertEqual(row.split("|")[4], "-", msg=f"{app} must not install from the vendor")
+            self.assertEqual(row.split("|")[4], artifact, msg=app)
             self.assertIn(f"{app}|silent_launch|", methods)
             self.assertIn(app, read("config/internet_apps.txt").splitlines())
 
