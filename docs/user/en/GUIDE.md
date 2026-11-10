@@ -45,21 +45,21 @@ Shows five evidence-based states:
 
 ### Update method categories
 
-The registry maps 43 apps to 11 methods (`config/internet_app_methods.txt`; the README has the full per-method table):
+The registry maps 47 apps to 11 methods (`config/internet_app_methods.txt`; the README has the full per-method table):
 
 | Method | Examples | Coverage state | AI agent hint |
 |--------|----------|----------------|---------------|
 | `brew_cask` | Brave, Obsidian, Inkscape | externally managed | Homebrew cask, greedy only for these tokens, with downgrade protection |
-| `silent_launch` | Claude, Cursor, Warp | triggered-unverified | Launches the app's own updater; verify the About/version screen |
-| `github_dmg` | Firefox Developer Edition, KeePassXC | verified direct | `scripts/scaffold_internet_app.sh "App" github_dmg`; signature and Team ID are verified |
+| `silent_launch` | Claude, Cursor, Warp | triggered-unverified | Fallback: launches the app's own updater; verify the About/version screen. Apps with a vendor feed are decided by that feed and installed from the verified vendor artifact when behind; `config/vendor_launch_policy.txt` lists apps that are never launched |
+| `github_dmg` | KeePassXC, Visual Studio Code | verified direct | `scripts/scaffold_internet_app.sh "App" github_dmg`; signature and Team ID are verified |
 | `msupdate` | Microsoft Word, Excel, Outlook | verified direct | Shared Office `msupdate` handler |
 | `keystone` | Chrome, Gemini, Google Drive | verified direct | Google updater (Omaha) handler in `lib/internet_app_updates.sh` |
-| `appstore_gui` | UniFi, WiFiman, Picsart | externally managed | App Store GUI Track 2 |
+| `appstore_gui` | UniFi, WiFiman, Picsart, IPMIView | externally managed | App Store GUI Track 2 |
 | `sparkle_appcast` | Proton Drive | verified direct | Sparkle appcast |
 | `chromium_updater` | Comet | verified direct | Chromium-based updater proof |
 | `docker_cli` | Docker Desktop | verified direct | Idle: verified DMG from Docker's appcast; running: left alone (quit it to update); fallback `docker desktop update` |
 | `mau_fallback_self_update` | Microsoft Teams | triggered-unverified | Teams self-updater plus an observed, verified `TEAMS21` MAU fallback when offered |
-| `manual` | IPMIView | manual | Notification only |
+| `mozilla_dmg` | Firefox Developer Edition | verified direct | Mozilla product-details version plus verified DMG, staged swap and rollback |
 
 ## Adding an internet app
 

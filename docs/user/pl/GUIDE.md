@@ -28,7 +28,7 @@ macOS Updates koordynuje aktualizacje na **Macach Apple Silicon z macOS 13+** w 
 bash scripts/report_update_coverage.sh
 ```
 
-Pokazuje stany: **verified direct**, **triggered-unverified**, **externally managed**, **manual** i **unknown**. Ciche uruchomienie nie jest dowodem zakończonej aktualizacji. Inkscape obsługuje Homebrew; UniFi/WiFiman/Picsart — App Store Track 2; Office — `msupdate`; Teams — własny updater z obserwowanym, weryfikowanym fallbackiem MAU `TEAMS21`. Ręczny jest tylko IPMIView.
+Pokazuje stany: **verified direct**, **triggered-unverified**, **externally managed**, **manual** i **unknown**. Ciche uruchomienie nie jest dowodem zakończonej aktualizacji. Inkscape obsługuje Homebrew; UniFi/WiFiman/Picsart — App Store Track 2; Office — `msupdate`; Teams — własny updater z obserwowanym, weryfikowanym fallbackiem MAU `TEAMS21`. Obecnie żadna zarejestrowana aplikacja nie jest „manual”; IPMIView obsługuje App Store Track 2.
 
 ## Dodawanie aplikacji z internetu
 
