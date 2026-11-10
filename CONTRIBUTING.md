@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to **macOS Updates** (v1.5.5, MIT license). Project site: <https://macos-updates.64bit.site>. Security issues: see [SECURITY.md](SECURITY.md) (do not open a public issue).
+Thank you for contributing to **macOS Updates** (v1.6.0, MIT license). Project site: <https://macos-updates.64bit.site>. Security issues: see [SECURITY.md](SECURITY.md) (do not open a public issue).
 
 ## Requirements
 
@@ -55,7 +55,7 @@ When behavior changes, update in the same pull request:
 
 ## Release & Versioning Policy (Lockstep with Ascendo)
 
-Starting with version 1.5.5, release numbers of `macOS_updates` and the companion cross-platform project [Ascendo](https://github.com/KasprowiczM/ascendo) proceed in lockstep. Ports of changes or parity updates between the two repositories share the identical version number.
+Starting with version 1.5.5, release numbers of `macOS_updates` and the companion cross-platform project [Ascendo](https://github.com/KasprowiczM/ascendo) proceed in lockstep. Ports of changes or parity updates between the two repositories share the identical version number. Version 1.6.0 was released here first at the owner's request; the Ascendo parity port to 1.6.0 is pending.
 
 Documentation hygiene:
 

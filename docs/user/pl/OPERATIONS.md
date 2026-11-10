@@ -90,4 +90,4 @@ brew outdated
 softwareupdate -l
 ```
 
-Dla aplikacji **triggered-unverified** sprawdź ekran Informacje/wersję — samo uruchomienie aktualizatora nie potwierdza ukończenia. Ręczny pozostaje tylko IPMIView.
+Dla aplikacji **triggered-unverified** sprawdź ekran Informacje/wersję — samo uruchomienie aktualizatora nie potwierdza ukończenia. Otwarte aplikacje nigdy nie są zamykane ani podmieniane; zamknij je i uruchom ponownie, gdy raport wskaże „zamknij aplikację, aby aktualizator mógł ją zainstalować”.

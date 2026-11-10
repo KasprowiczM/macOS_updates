@@ -1,6 +1,6 @@
 # Démarrage rapide (Français)
 
-**Mac Apple Silicon requis** · macOS 13+ · **v1.5.5**
+**Mac Apple Silicon requis** · macOS 13+ · **v1.6.0**
 
 ## Installation en une ligne
 
