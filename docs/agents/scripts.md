@@ -29,7 +29,7 @@
 | `scripts/check_vendor_feeds.sh` | Read-only diagnostic query of vendor feeds and Omaha updaters (table and `--json`) |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
 | `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
-| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key |
+| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key; `--day/--hour/--minute` set the weekly time, `--once-in N` installs a one-shot test run N minutes from now |
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
 | `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
