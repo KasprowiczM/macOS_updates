@@ -94,4 +94,4 @@ brew outdated
 softwareupdate -l
 ```
 
-For **triggered-unverified** apps, verify the About/version screen: launching the vendor updater does not prove completion. Manual coverage remains limited to IPMIView.
+For **triggered-unverified** apps, verify the About/version screen: launching the vendor updater does not prove completion. Apps you have open are never closed or replaced; quit them and re-run when the report says "quit the app so its updater can install".

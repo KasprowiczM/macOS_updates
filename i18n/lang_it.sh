@@ -805,6 +805,7 @@ L_ALL_SUMMARY_INVENTORY_CHANGES="Campi di versione modificati nell'inventario: %
 # ── Internet (v1.5.0) ──────────────────────────────────────────
 L_INTERNET_STATUS_FEED_STALE_FMT="⚠️  Feed del produttore non aggiornato (feed %s < installato %s)"
 L_INTERNET_STATUS_BEHIND_FMT="⚠️  Indietro: %s < %s (produttore)"
+L_INTERNET_STATUS_OPEN_TO_UPDATE_FMT="⚠️  Apri l'app per aggiornare: %s → %s disponibile"
 L_INTERNET_STATUS_NEEDS_RESTART_FMT="⚠️  Aggiornamento %s → %s in sospeso — chiudi l'app affinché il suo programma di aggiornamento possa installarlo"
 L_INTERNET_STATUS_VENDOR_CURRENT_FMT="✅ Aggiornato (%s, feed del produttore)"
 L_INTERNET_STATUS_VENDOR_NOUPDATE="✅ Aggiornato (updater del produttore: nessun aggiornamento)"
@@ -822,6 +823,7 @@ L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT="✅ Aggiornato secondo il controllo m
 L_INTERNET_STATUS_FEED_REGRESSED_FMT="✅ Aggiornato — il feed del produttore è regredito (installato %s, già pubblicato come %s; il feed ora indica %s)"
 L_INTERNET_STATUS_FEED_UNREACHABLE="⏳ Feed del produttore non raggiungibile — avviato l'updater dell'app (non verificato)"
 L_INTERNET_STATUS_FEED_UNREADABLE="⏳ Feed del produttore illeggibile — avviato l'updater dell'app (non verificato)"
+L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH="⚠️  Feed del produttore non raggiungibile — versione non verificata (app non avviata)"
 L_INTERNET_VENDOR_FEED_UNPARSEABLE_FMT="Il feed del produttore per %s non ha fornito una versione utilizzabile — passaggio all'updater proprietario dell'app"
 L_INTERNET_LAUNCH_CYCLE_FMT="Avvio di %s per consentire al suo updater di installare %s (verrà chiusa successivamente)"
 L_INTERNET_APP_STILL_RUNNING_FMT="%s è stato avviato per l'aggiornamento e non è terminato entro %s s"

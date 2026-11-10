@@ -6,9 +6,40 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-10
+
+Released here first at the owner's request; the Ascendo parity port to 1.6.0 is pending (lockstep policy, see `CONTRIBUTING.md`).
+
+### Highlights
+
+- **Scheduled runs work.** The weekly LaunchAgent carries an explicit `PATH`, finds Homebrew and `mas`, and the installer verifies with `launchctl print` that the job is loaded; `--minute` and `--once-in` were added.
+- **Open apps are never closed or replaced**, including Homebrew casks: a cask whose app is running (or whose state is unknown) is deferred with a "quit the app" message.
+- **Nothing waits forever.** Every mid-run question has a timeout (`MAC_UPDATE_PROMPT_TIMEOUT`) and the safe answer is "no".
+- **`bash update_all.sh --doctor`** gives a read-only readiness report; real runs get pre-flight checks (disk, battery, network) and keep the Mac awake.
+- **Vendor feeds are remembered.** Persistent feed state adds `feed_unreachable`, `current_cached` and `current_feed_regressed` instead of opaque "stale feed" warnings.
+- **Direct-only and never-launch apps** (HyperFrames, Superset, Open Design) are installed or checked without hidden launches (`config/vendor_launch_policy.txt`).
+- **Honest reporting:** advisories block for `brew doctor`, per-step durations, ANSI-free logs, run summary still format 4 (additive fields).
+- Documentation was swept and all seven languages aligned.
+
+### Fixed (2026-11-10 run-log follow-up)
+
+Evidence: [run-log record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-10.md).
+
+- **HyperFrames and Superset did not update from a hidden launch (high).** Both now install direct-only from their verified Apple Silicon zip through `vendor_direct_install` / `copy_verified_app` (allowlisted https host, vendor checksum, exactly one bundle with the installed bundle ID, Team ID match, Gatekeeper, staged swap with rollback); a running app is reported "quit the app" without a download. HyperFrames: `select_hyperframes_latest` returns `arm64.url` + `arm64.sha256` (`static.heygen.ai`); its build label (`HFBuildLabel`, b879 < b891 < b1000) is the version for both the pre-copy check and the post-install verification. Superset (upstream project now "paradev"; the bundle is still `Superset.app`): arm64 zip + sha512 from `latest-mac.yml` on `github.com`. Neither app is launched, not even when the download fails.
+- **Open Design is never launched or quit (high).** Its launcher hands off to a versioned payload, and LaunchServices launches of 0.27.0 exited about a second after start on 2026-11-06 and 2026-11-10; its own updater installs only while the app runs and the user confirms. Behind is now reported as "Open the app to update: 0.27.0 → 0.27.1" (soft `behind`); the version is still read from the launcher's `runtime.json`, and the toolkit never writes the launcher's state.
+- **New `config/vendor_launch_policy.txt` (medium).** `direct-only` and `never-launch` apps also skip the native-updater launch after an unreachable feed; that case reports "Vendor feed unreachable — version not checked (app not launched)" (`feed_unreachable`). New strings in all seven languages.
+- **No quit while an app may still be starting (medium).** `silent_launch_app` records launch times in `toolkit_launched_at.txt`; the first graceful `quit` waits until the app has been up `MAC_UPDATE_QUIT_MIN_AGE` seconds (default 30, 0-300). Never a force-kill; user-opened apps are untouched as before.
+- **Checked, unchanged:** the run's "Superset updated to 2.0.8" was a real before/after change of the installed bundle.
+
+
+### Added (2026-11-10)
+
+- **`scripts/install_launchagent.sh --minute N` and `--once-in N`.** The weekly schedule accepts a minute, and `--once-in N` (1-1440 minutes from now) installs a one-shot job as a test aid; `--check` and the success line show the exact time.
+- **Universal maintenance prompt.** `docs/agents/maintenance_prompt.md` holds a harness-agnostic prompt for a periodic verify-review-fix session (last run log, live state, review, fixes with tests, evidence).
+
 ### Fixed (2026-11-09 review follow-up)
 
-Version stays 1.5.5 (lockstep policy). Evidence: [review record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-09.md).
+Evidence: [review record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-09.md).
 
 - **Scheduled runs could not find Homebrew or `mas` (high).** launchd's default `PATH` lacks `/opt/homebrew/bin`, so scheduled runs reported "Homebrew is not installed". `lib/platform.sh` now runs `mac_update_ensure_homebrew_path` when sourced (the prefix override `MAC_UPDATE_HOMEBREW_PREFIX` is for tests only) and the generated plist sets `EnvironmentVariables.PATH`. Existing installs must re-run `scripts/install_launchagent.sh`; `--check` warns when the plist has no `PATH` key.
 - **LaunchAgent install could report success without loading (high).** The installer now verifies with `launchctl print` that the service is loaded; on failure it prints the launchctl error and exits non-zero. Re-install cleanup and `--uninstall` use `bootout` only (service target, then plist path); `unload -w` is never used because it leaves a persistent disabled override.
@@ -43,7 +74,7 @@ Version stays 1.5.5 (lockstep policy). Evidence: [review record](docs/reviews/RU
 
 ### Fixed (2026-11-02 run-log follow-up, macOS 27.2)
 
-Version stays 1.5.5 (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-02.md).
+Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-02.md).
 
 - **KeePassXC rebuild never installed (high).** 2.8.0 (Qt 6.11.1) crashes on macOS 27.2 when a database is unlocked; upstream's fix is the same-version package `2.8.0-1` (Qt 6.11.2). `dmg_package_revision` + `github_rebuild_asset` detect a newer package revision of the installed version (recorded in `~/.local/state/mac-update/package_revisions.tsv`, override `MAC_UPDATE_PACKAGE_REVISION_FILE`), and every KeePassXC download is checked against the publisher `.DIGEST`.
 - **New apps deleted on the next run (high).** `app_exists` now ignores the `[arm64]` / 🆕 markers prescan writes.
@@ -52,7 +83,7 @@ Version stays 1.5.5 (lockstep policy). Evidence: [run-log follow-up](docs/review
 
 ### Fixed (2026-10-30 run-log follow-up, macOS 27.2)
 
-Version stays 1.5.5 (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-30.md).
+Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-30.md).
 
 - **Managed Node.js moved to an alpha (high).** `detect_latest_node_version` took the head of `nodejs.org/dist/index.json`, which became `v27.0.0-alpha.0.0.0` on 2026-10-29, and `n latest` installed it; npm 12.2.1 then warned on every call. The new `lib/python/node_releases.py` selects the newest stable `vX.Y.Z` (the shell fallback is restricted the same way) and `n` installs that exact version, so the next run returns to stable (v26.13.0 today).
 - **Declined restart failed the whole run (high).** Answering "n" to the automatic-restart prompt printed "will not be installed" followed by "installing with automatic restart", exited `1` and showed step 6 as an error. It now installs the no-restart labels, skips the restart-required ones (never without `-R`), writes `system_skipped_by_user` and exits `10` with a localized message (`L_SYSTEM_RESTART_DECLINED_FMT`, 7 languages).

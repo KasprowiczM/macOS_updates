@@ -6,17 +6,17 @@
 
 **Sito web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licenza:** [MIT](LICENSE) · **Modifiche:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.5.5** — Orchestratore di aggiornamenti con un solo comando, pronto per la produzione, per **Mac Apple Silicon con macOS 13–27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
+> **v1.6.0** — Orchestratore di aggiornamenti con un solo comando, pronto per la produzione, per **Mac Apple Silicon con macOS 13–27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
 
 | In breve | |
 |----------|--|
 | Piattaforma | Solo Apple Silicon (arm64) · da macOS 13 Ventura a macOS 27 · Bash 3.2 + Python 3 |
 | Flusso | 7 passaggi (0–6), l'aggiornamento di macOS è sempre l'ultimo |
-| Registro | 43 app da Internet · 11 metodi di aggiornamento (vedi [Metodi di aggiornamento](#metodi-di-aggiornamento)) |
+| Registro | 47 app da Internet · 11 metodi di aggiornamento (vedi [Metodi di aggiornamento](#metodi-di-aggiornamento)) |
 | Lingue | EN, PL, ES, FR, DE, IT, PT (CLI e documentazione) |
-| Test | 591 test automatici (`bash run_tests.sh`) |
+| Test | 846 test automatici (`bash run_tests.sh`) |
 
-**Novità della v1.5.5:** Un upgrade di Homebrew che rimuove `python3` durante l'esecuzione non interrompe più il passaggio di inventario/report (la shell cerca di nuovo in `PATH`), e un passaggio di report fallito non rinvia più gli aggiornamenti di macOS. I messaggi finali sono onesti: nessuna dichiarazione «file aggiornati» dopo un errore, e gli avvisi su feed obsoleti o app non chiuse non sono più presentati come aggiornamenti non verificati. Alle app avviate dallo strumento viene chiesto ripetutamente di chiudersi (mai forzato). Le versioni 1.5.x precedenti (feed obsoleti come avvisi, download del produttore per ChatGPT/Proton, CLI native prima di npm, protezione della sostituzione dei pacchetti) sono descritte in [CHANGELOG.md](CHANGELOG.md).
+**Novità della v1.6.0:** Le esecuzioni pianificate (launchd) trovano Homebrew e `mas`, e l'installer verifica che il job sia caricato (aggiunti `--minute` e `--once-in`). Le app aperte non vengono mai chiuse né sostituite, cask Homebrew inclusi. Ogni domanda durante l'esecuzione scade con la risposta sicura «no». `bash update_all.sh --doctor` è un rapporto di prontezza in sola lettura e le esecuzioni reali aggiungono controlli preliminari. Lo stato persistente dei feed dei produttori sostituisce gli opachi avvisi di «feed obsoleto», e HyperFrames, Superset e Open Design vengono installati o verificati senza avvii nascosti. Le versioni 1.5.x precedenti sono descritte in [CHANGELOG.md](CHANGELOG.md).
 
 **Verità del produttore (dalla v1.5.0):** la versione di ciascuna applicazione viene verificata rispetto al feed del rispettivo produttore prima di qualsiasi azione. Le app aggiornate non vengono toccate; quelle obsolete vengono aggiornate dall'updater della stessa app oppure installate dal produttore con verifica di firma e Team ID. Viene aggiornato solo il software installato (`--bootstrap-cli` installa deliberatamente le CLI mancanti). Le app rimosse manualmente vengono riconosciute e mai reinstallate. **Le app che hai aperto non vengono mai chiuse: lo strumento chiude solo ciò che ha avviato lui stesso.** Controlla lo stato dei produttori in sola lettura con `bash scripts/check_vendor_feeds.sh`.
 
@@ -59,21 +59,21 @@ bash build_inventory.sh                  # ricostruisce APPLICATIONS.md da quest
 
 ### Metodi di aggiornamento
 
-Il registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) associa 43 app a 11 metodi:
+Il registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) associa 47 app a 11 metodi:
 
 | Metodo | App | Copertura | Come aggiorna |
 |--------|----:|-----------|---------------|
 | `brew_cask` | 11 | externally managed | Cask Homebrew (greedy solo per questi token) con protezione dal downgrade, ad es. Brave, Obsidian, Spotify, Inkscape |
-| `silent_launch` | 9 | triggered-unverified | L'updater proprio dell'app; controllo opportunistico su un feed Sparkle / electron-updater, altrimenti «avviata (non verificata)». Non sostituisce mai l'app stessa |
-| `github_dmg` | 6 | verified direct | DMG del produttore/GitHub con verifica di firma e Team ID, sostituzione a fasi con rollback (Firefox Developer Edition, KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
+| `silent_launch` | 14 | triggered-unverified | L'updater proprio dell'app come ripiego; controllo opportunistico su un feed Sparkle / electron-updater, altrimenti «avviata (non verificata)». Le app con feed del produttore (ChatGPT / Codex, Claude, Cursor, Warp, OpenCode, Proton Mail, ...) sono decise da quel feed e, se indietro, installate dall'artefatto verificato del produttore. Senza feed il metodo non sostituisce mai l'app stessa |
+| `github_dmg` | 5 | verified direct | DMG del produttore/GitHub con verifica di firma e Team ID, sostituzione a fasi con rollback (KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
 | `msupdate` | 5 | verified direct | Microsoft AutoUpdate (`msupdate`): Word, Excel, PowerPoint, Outlook, OneNote |
 | `keystone` | 3 | verified direct | Updater di Google (Omaha), verificato con la sua cronologia: Chrome, Gemini, Google Drive |
-| `appstore_gui` | 3 | externally managed | App Store Corsia 2 (AppleScript): UniFi, WiFiman, Picsart |
+| `appstore_gui` | 4 | externally managed | App Store Corsia 2 (AppleScript): UniFi, WiFiman, Picsart, IPMIView |
 | `sparkle_appcast` | 1 | verified direct | Appcast Sparkle (Proton Drive) |
 | `chromium_updater` | 1 | verified direct | Prova dell'updater basato su Chromium (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: DMG verificato dal suo appcast quando è inattivo; ripiego `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Aggiornamento autonomo di Teams più fallback MAU `TEAMS21` osservato e verificato quando Microsoft lo offre |
-| `manual` | 1 | manual | IPMIView: solo notifica |
+| `mozilla_dmg` | 1 | verified direct | Versione da product-details di Mozilla più DMG verificato, sostituzione a stadi con rollback (Firefox Developer Edition) |
 
 ---
 
@@ -109,6 +109,8 @@ Un'opzione `-…` sconosciuta termina con codice `2` dopo aver stampato l'aiuto.
 **Domande:** ogni domanda durante l'esecuzione scade dopo `MAC_UPDATE_PROMPT_TIMEOUT` secondi con la risposta sicura "no"; anche un input non riconosciuto vale "no". Dopo la conferma principale, i passaggi Homebrew e App Store non chiedono di nuovo; il passaggio macOS chiede ancora.
 
 **App aperte:** un cask Homebrew la cui app è aperta non viene mai aggiornato; viene rinviato con il messaggio "chiudi l'app" e il passaggio termina con un avviso non bloccante (codice `10`).
+
+**App direct-only e never-launch:** `config/vendor_launch_policy.txt` elenca le app che lo strumento non avvia mai. Un'app `direct-only` (HyperFrames, Superset) viene aggiornata solo dal suo artefatto verificato del produttore; un'app `never-launch` (Open Design) viene solo verificata e, se indietro, segnalata come «apri l'app per aggiornare». Nessuna viene aperta o chiusa, nemmeno come ripiego dopo un feed irraggiungibile.
 
 ## Variabili d'ambiente
 
@@ -175,6 +177,7 @@ bash scripts/setup_touchid_sudo.sh              # installa / ripara
 bash scripts/setup_touchid_sudo.sh --uninstall
 
 bash scripts/install_launchagent.sh --check
+bash scripts/install_launchagent.sh --once-in 5
 bash scripts/install_launchagent.sh --uninstall
 ```
 
@@ -187,6 +190,8 @@ aggiornamenti di macOS cancellano: rieseguilo dopo un aggiornamento maggiore.
 
 Il LaunchAgent esegue `update_all.sh -y --skip-system` con
 `MAC_UPDATE_NONINTERACTIVE=1` e `MAC_UPDATE_NOTIFY=1`.
+
+Il plist imposta un `PATH` esplicito (`/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin`) perché quello predefinito di launchd non include Homebrew, e l'installer verifica con `launchctl print` che il job sia caricato; altrimenti stampa l'errore di launchctl ed esce con codice diverso da zero. `--minute N` (0-59) imposta il minuto, `--once-in N` (1-1440 minuti da ora) installa un'esecuzione di prova singola e non si combina con `--day`/`--hour`/`--minute`, e `--check` avvisa di un plist senza la chiave `PATH` (per un'installazione vecchia, riesegui l'installer).
 
 - **Esegue:** Homebrew, CLI native + npm, app da Internet, inventario/cronologia.
 - **Non esegue gli aggiornamenti di macOS**: `--skip-system` è voluto. Su Apple

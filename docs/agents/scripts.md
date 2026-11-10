@@ -29,7 +29,7 @@
 | `scripts/check_vendor_feeds.sh` | Read-only diagnostic query of vendor feeds and Omaha updaters (table and `--json`) |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
 | `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
-| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key |
+| `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key; options `--day N`, `--hour N`, `--minute N` (0-59), `--once-in N` (one-shot test run 1-1440 minutes from now, exclusive with the weekly options), `--check`, `--uninstall`; `--day/--hour/--minute` set the weekly time, `--once-in N` installs a one-shot test run N minutes from now |
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
 | `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
@@ -65,9 +65,12 @@
 | `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha text log + `updater_history.jsonl`, VersionHistory) |
 | `lib/python/feed_state.py` | Persistent per-app vendor feed state (last good version, high-water mark): cached proof on a failed fetch, vendor-side feed regressions; atomic 0600 writes |
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
+| `config/bun_version.txt` | Minimum floor version for Bun (`update_npm_cli.sh`) |
+| `config/npm_global_clis.txt` | `display_name\|package\|method\|brew_formula\|command` rows for the managed CLI toolchain (npm, self-update, native installer, `n`, `bun upgrade`) |
 | `config/vendor_feeds.txt` | Vendor truth feed configurations and download host allowlist |
 | `config/vendor_appcasts.txt` | Sparkle appcasts used only to prove an installed rollout-channel build is a published vendor release (never an install source) |
-| `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds (Cursor, OpenCode) |
+| `config/vendor_direct_first.txt` | Apps that bypass updater launch cycle and install directly from vendor feeds (Cursor, OpenCode, ChatGPT, Proton Mail/Drive, HyperFrames, Superset) |
+| `config/vendor_launch_policy.txt` | Apps the toolkit never launches: `direct-only` (HyperFrames, Superset: verified vendor artifact only, no launch fallback) and `never-launch` (Open Design: verify only, "open the app to update") |
 | `config/cask_oracles.txt` | Read-only Homebrew Cask version oracle mappings for verifying unverified apps |
 | `tests/_env.py` | Helper for test subprocess environments that strips PYTHONPATH so child shell processes do not inherit it |
 
@@ -89,6 +92,7 @@
 | `MAC_UPDATE_KEEP_CLI_VERSIONS` | `0` | Set to `1` to disable pruning of old versions for standalone CLIs (Codex, cursor-agent) |
 | `MAC_UPDATE_QUIT_WAIT` | `60` | Seconds (0–300) a toolkit-launched app gets to exit after the graceful `quit`; the AppleScript `quit` is re-sent while it keeps running, never force-killed (v1.5.5) |
 | `MAC_UPDATE_QUIT_RESEND` | `10` | Interval in seconds (1–60) between repeated graceful `quit` requests inside `MAC_UPDATE_QUIT_WAIT` (v1.5.5) |
+| `MAC_UPDATE_QUIT_MIN_AGE` | `30` | Seconds (0–300) a toolkit-launched app must have been running before the toolkit sends its first graceful `quit` (launch times in `toolkit_launched_at.txt`, 2026-11-10) |
 | `MAC_UPDATE_PACKAGE_REVISION_FILE` | `~/.local/state/mac-update/package_revisions.tsv` | Package revision installed per product+version (`KeePassXC\|2.8.0\|1`); detects same-version vendor rebuilds |
 | `MAC_UPDATE_FEED_STATE_FILE` | `~/.local/state/mac-update/feed_state.json` | Per-app vendor feed state (last successful version + time, high-water mark, last error); never an install source |
 | `MAC_UPDATE_FEED_CACHE_TTL_H` | `24` | Hours (0–168, 0 disables) a successful feed check that listed the installed version stays valid proof when the feed is unreachable — the app is then reported current from the cached check and not launched |
@@ -104,6 +108,38 @@
 | `MAC_UPDATE_PROMPT_TIMEOUT` | `120` | Seconds (clamp 10-900, 0 = wait forever) a mid-run yes/no prompt waits (`mac_update_prompt_yn`, `lib/ui.sh`); a timeout is a safe "no" |
 | `MAC_UPDATE_HOMEBREW_PREFIX` | `/opt/homebrew` | Test-only override of the prefix `mac_update_ensure_homebrew_path` adds to `PATH` |
 | `MAC_UPDATE_DEBUG` | `0` | Set to `1` to dump full session dir snapshots into the log on clean runs |
+| `MAC_UPDATE_NONINTERACTIVE` | `0` | Never prompt; skips App Store Track 2 GUI automation (flag `--non-interactive`; the LaunchAgent sets it) |
+| `MAC_UPDATE_NOTIFY` | `0` | Desktop notification when the run finishes (flag `--notify`; the LaunchAgent sets it) |
+| `MAC_UPDATE_NO_SUDO` | set automatically | Exported by `update_all.sh` when sudo would be needed (App Store or macOS step enabled, not a dry run) but there is no TTY; child scripts skip root-only tracks and report soft (`10`) |
+| `MAC_UPDATE_NO_SUDO_KEEPALIVE` | `0` | Set to `1` to disable the background sudo timestamp refresher |
+| `MAC_UPDATE_ALLOW_MAJOR_UPGRADE` | `0` | Set to `1` to allow an explicitly confirmed major macOS upgrade; otherwise major releases are skipped (`update_system.sh`) |
+| `MAC_UPDATE_TREAT_APPSTORE_AX_AS_WARNING` | `0` | Treat App Store exit `2` (missing Accessibility) as a warning (flag `--treat-appstore-ax-as-warning`) |
+| `MAC_UPDATE_STALE_DAYS` | `45` | Days an unverified `silent_launch` app may stay unchanged before the internet step reports it as stale (`update_internet_apps.sh`) |
+| `MAC_UPDATE_MAX_LOGS` | `30` | Number of `update_all_*.log` files kept in `logs/` (run summaries rotate too) |
+| `MAC_UPDATE_INTERNET_SETTLE_SECONDS` | `15` | Pause that lets a launched vendor updater rewrite `Info.plist` (`0` disables, clamped to 120; skipped when no app was launched) |
+| `MAC_UPDATE_MAS_CHECK_TIMEOUT` | `120` | Timeout in seconds for `mas outdated` |
+| `MAC_UPDATE_MAS_UPGRADE_TIMEOUT` | `1800` | Timeout in seconds for `sudo mas upgrade` |
+| `MAC_UPDATE_APPSTORE_GUI_TIMEOUT` | `180` | Timeout in seconds for one App Store Track 2 GUI attempt |
+| `MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT` | `120` | Timeout in seconds for `msupdate --list` |
+| `MAC_UPDATE_MSUPDATE_INSTALL_TIMEOUT` | `1800` | Timeout in seconds for `msupdate --install` |
+| `MAC_UPDATE_NATIVE_INSTALLER_TIMEOUT` | `360` | Timeout in seconds for a vendor native CLI installer (`lib/native_installers.sh`) |
+| `MAC_UPDATE_MAU_DEFERRAL_DAYS` | `7` | Microsoft AutoUpdate quarantine window in days (clamped to Microsoft's 1-28) |
+| `MAC_UPDATE_MAU_QUARANTINE_MAX_DAYS` | `14` | Maximum age in days (1-90) of a toolkit-armed Office quarantine before it is released |
+| `MAC_UPDATE_MAU_KEEP_DEFERRALS` | `0` | Set to `1` to make the toolkit never touch MAU deferral preferences |
+| `MAC_UPDATE_MAU_CLEAR_DEFERRALS` | `0` | Set to `1` to remove active deferrals via `defaults delete` (test feed recovery, clear a stale quarantine) |
+| `MAC_UPDATE_MAU_IDLE_TIMEOUT` | `15` | Seconds to wait for Microsoft AutoUpdate to become idle before `msupdate` calls |
+| `MAC_UPDATE_BREW_LINK_OVERWRITE` | `0` | Set to `1` only for an explicit recovery run: allow `brew link --overwrite` for kegs whose links failed |
+| `MAC_UPDATE_INSTALL_ROSETTA` | `0` | Set to `1` to let the Intel-only app preflight run `softwareupdate --install-rosetta`; never installs by default |
+| `MAC_UPDATE_NVM_OWNS_NODE` | `0` | Set to `1` to hand Node/npm back to nvm deliberately instead of the managed toolchain |
+| `MAC_UPDATE_TOOLCHAIN_HOME` | `~/.local/share/mac-update` | Root of the managed Node/npm/Bun toolchain |
+| `MAC_UPDATE_MAX_PROFILE_BACKUPS` | `5` | Shell profile backups kept when `update_npm_cli.sh` rewrites its PATH block |
+| `MAC_UPDATE_SKIP_PROFILE_SCAN` | `0` | Set to `1` to skip the shell-profile scan (CI has no profiles) |
+| `MAC_UPDATE_CHRONIC_WINDOW` | `10` | Number of recent run summaries `scripts/report_chronic_warnings.sh` inspects |
+| `MAC_UPDATE_CHRONIC_THRESHOLD` | `3` | Minimum trailing non-OK streak that `scripts/report_chronic_warnings.sh` reports |
+| `MAC_UPDATE_REPO / `MAC_UPDATE_REF` / `MAC_UPDATE_DIR` / `MAC_UPDATE_LANG`` | see `install.sh` | `install.sh` only: clone URL, tag/branch/SHA to check out, clone directory (default `~/Dev_Env/macOS_updates`) and language picker bypass |
+| `MAC_UPDATE_NPX_PATH` / `MAC_UPDATE_NODE_PATH` | unset | `scripts/fix_mcp_configs.py`: override the `npx` / `node` path written into MCP configs |
+
+Flag equivalents (`MAC_UPDATE_DRY_RUN`, `MAC_UPDATE_YES`, `MAC_UPDATE_VERIFY_ONLY`, `MAC_UPDATE_JSON_SUMMARY`, `MAC_UPDATE_SKIP_<STEP>`, ...) are set by `lib/cli.sh`. Variables not listed above are internal state exported between scripts (`MAC_UPDATE_SESSION_DIR`, `MAC_UPDATE_RESULT_*`, `MAC_UPDATE_RUN_STATUS`, ...) or test-only path overrides (`MAC_UPDATE_APPS_DIR`, `MAC_UPDATE_CLT_DIR`, `MAC_UPDATE_ROSETTA_DIR`, `MAC_UPDATE_PAM_SUDO*`, `MAC_UPDATE_MAU_APP` / `_CLI` / `_PREFS_FILE` / `_STATE_FILE`, `MAC_UPDATE_GOOGLE_*`, `MAC_UPDATE_DISK_PATH`, `MAC_UPDATE_FORCE_TIMEOUT_FALLBACK`, `MAC_UPDATE_MOCK_ACTIVE_PROCESSES`, `MAC_UPDATE_LAUNCHAGENT_NOW_EPOCH`) and are not a stable interface.
 
 ## update_all.sh Step Order
 

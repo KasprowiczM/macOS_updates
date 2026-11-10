@@ -6,17 +6,17 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.5.5** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.6.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 | At a glance | |
 |-------------|--|
 | Platform | Apple Silicon (arm64) only · macOS 13 Ventura to macOS 27 · Bash 3.2 + Python 3 |
 | Pipeline | 7 steps (0–6), macOS system update always last |
-| Registry | 46 internet apps · 11 update methods (see [Update methods](#update-methods)) |
+| Registry | 47 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 591 automated tests (`bash run_tests.sh`) |
+| Tests | 846 automated tests (`bash run_tests.sh`) |
 
-**New in v1.5.5:** A Homebrew upgrade that removes `python3` mid-run no longer breaks the inventory/report step (the shell now re-searches `PATH`), and a failed reporting step no longer postpones macOS updates. Final messages are honest: no "files updated" claim after a failure, and stale-feed or quit-timeout warnings are no longer reported as unverified updates. Apps launched by the toolkit are asked to quit repeatedly (never force-killed). Earlier 1.5.x releases (stale manufacturer feeds as warnings, ChatGPT/Proton vendor downloads, native-CLI-first ordering, bundle-swap protection) are described in [CHANGELOG.md](CHANGELOG.md).
+**New in v1.6.0:** Scheduled (launchd) runs find Homebrew and `mas`, and the installer verifies that the job is loaded (`--minute` and `--once-in` added). Apps you have open are never closed or replaced, Homebrew casks included. Every mid-run question times out with the safe answer "no". `bash update_all.sh --doctor` is a read-only readiness report, and real runs add pre-flight checks. Persistent vendor-feed state replaces opaque "stale feed" warnings, and HyperFrames, Superset and Open Design are installed or checked without hidden launches. Earlier 1.5.x releases are described in [CHANGELOG.md](CHANGELOG.md).
 
 **Vendor truth (since v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. **Apps you have open are never closed — the toolkit only quits what it launched itself.** Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
 
@@ -59,21 +59,21 @@ bash build_inventory.sh                  # rebuild APPLICATIONS.md from this Mac
 
 ### Update methods
 
-The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) maps 43 apps to 11 methods:
+The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) maps 47 apps to 11 methods:
 
 | Method | Apps | Coverage | How it updates |
 |--------|-----:|----------|----------------|
 | `brew_cask` | 11 | externally managed | Homebrew cask (greedy only for these tokens) with downgrade protection, e.g. Brave, Obsidian, Spotify, Inkscape |
-| `silent_launch` | 9 | triggered-unverified | The app's own updater; opportunistic check against a Sparkle / electron-updater feed, otherwise reported as "launched (unverified)". Never replaces the app itself |
-| `github_dmg` | 6 | verified direct | Vendor/GitHub release DMG with signature and Team ID verification, staged swap and rollback (Firefox Developer Edition, KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
+| `silent_launch` | 14 | triggered-unverified | The app's own updater as a fallback; opportunistic check against a Sparkle / electron-updater feed, otherwise reported as "launched (unverified)". Apps that have a vendor feed (ChatGPT / Codex, Claude, Cursor, Warp, OpenCode, Proton Mail, ...) are decided by that feed instead and installed from the verified vendor artifact when behind. Without a feed the method never replaces the app itself |
+| `github_dmg` | 5 | verified direct | Vendor/GitHub release DMG with signature and Team ID verification, staged swap and rollback (KeePassXC, VS Code, CodeEdit, Ledger Live, Trezor Suite) |
 | `msupdate` | 5 | verified direct | Microsoft AutoUpdate (`msupdate`) for Word, Excel, PowerPoint, Outlook, OneNote |
 | `keystone` | 3 | verified direct | Google updater (Omaha), checked against its update history: Chrome, Gemini, Google Drive |
-| `appstore_gui` | 3 | externally managed | App Store Track 2 (AppleScript) for UniFi, WiFiman, Picsart |
+| `appstore_gui` | 4 | externally managed | App Store Track 2 (AppleScript) for UniFi, WiFiman, Picsart, IPMIView |
 | `sparkle_appcast` | 1 | verified direct | Sparkle appcast (Proton Drive) |
 | `chromium_updater` | 1 | verified direct | Chromium-based updater proof (Comet) |
 | `docker_cli` | 1 | verified direct | Docker Desktop: verified DMG from its appcast when idle; fallback `docker desktop update` |
 | `mau_fallback_self_update` | 1 | triggered-unverified | Teams self-updater plus an observed, verified `TEAMS21` MAU fallback when Microsoft offers it |
-| `manual` | 1 | manual | IPMIView — notification only |
+| `mozilla_dmg` | 1 | verified direct | Mozilla product-details version plus verified DMG, staged swap and rollback (Firefox Developer Edition) |
 
 ---
 
@@ -109,6 +109,8 @@ An unknown `-…` option exits `2` after printing usage.
 **Prompts:** every mid-run question times out after `MAC_UPDATE_PROMPT_TIMEOUT` seconds with the safe answer "no"; unrecognised input is also "no". After the master confirmation, the Homebrew and App Store steps do not ask again; the macOS step still asks.
 
 **Open apps:** a Homebrew cask whose app is open is never upgraded; it is deferred with a "quit the app" message and the step ends with a soft warning (exit `10`).
+
+**Direct-only and never-launch apps:** `config/vendor_launch_policy.txt` lists apps the toolkit never launches. A `direct-only` app (HyperFrames, Superset) is updated only from its verified vendor artifact; a `never-launch` app (Open Design) is only checked and, when behind, reported as "open the app to update". Neither is opened or quit, not even as a fallback after an unreachable feed.
 
 ## Environment variables
 
@@ -175,6 +177,7 @@ bash scripts/setup_touchid_sudo.sh              # install / repair
 bash scripts/setup_touchid_sudo.sh --uninstall
 
 bash scripts/install_launchagent.sh --check
+bash scripts/install_launchagent.sh --once-in 5
 bash scripts/install_launchagent.sh --uninstall
 ```
 
@@ -187,6 +190,8 @@ re-run it after a major upgrade.
 
 The LaunchAgent runs `update_all.sh -y --skip-system` with
 `MAC_UPDATE_NONINTERACTIVE=1` and `MAC_UPDATE_NOTIFY=1`.
+
+The plist sets an explicit `PATH` (`/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin`) because launchd's default lacks Homebrew, and the installer verifies with `launchctl print` that the job is loaded; otherwise it prints the launchctl error and exits non-zero. `--minute N` (0-59) sets the minute, `--once-in N` (1-1440 minutes from now) installs a one-shot test run and cannot be combined with `--day`/`--hour`/`--minute`, and `--check` warns about a plist without the `PATH` key (re-run the installer to fix an older install).
 
 - **Runs:** Homebrew, native CLI + npm, internet apps, inventory/history.
 - **Does not run macOS system updates** — `--skip-system` is deliberate. On Apple

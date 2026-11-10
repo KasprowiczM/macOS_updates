@@ -16,3 +16,11 @@ OpenCode
 ChatGPT / Codex
 Proton Mail
 Proton Drive
+
+# HyperFrames, Superset (2026-11-10): a hidden launch did not make their own
+# updaters install (HyperFrames sat idle; Superset only showed up as updated
+# after the toolkit quit it). Both publish a checksummed arm64 zip of the same
+# notarized bundle (same bundle ID and Team ID). See also vendor_launch_policy.txt:
+# they are never launched, not even when the direct install fails.
+HyperFrames
+Superset

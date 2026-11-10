@@ -20,7 +20,7 @@ sudo env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS   # explicit IDs, never a
 
 ## 3. App Store — Two tracks
 - **Track 1:** `sudo mas upgrade` — native macOS apps
-- **Track 2:** AppleScript GUI (`osascript`) — iPad apps (UniFi, WiFiman, myCANAL, Picsart)
+- **Track 2:** AppleScript GUI (`osascript`) — iPad apps (UniFi, WiFiman, Picsart, IPMIView)
   - Requires Accessibility permission in System Settings
   - This is a separate track, not a fallback for Track 1; unexpected GUI states fail honestly
   - `mas outdated` cannot prove the state of iPad apps, so Track 2 keeps its own result
@@ -31,7 +31,7 @@ sudo env MAS_NO_AUTO_INDEX=1 mas upgrade $MAS_TOR1_IDS   # explicit IDs, never a
 ```bash
 defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 ```
-- **Open Design / HyperFrames:** the bundle version is not what their updater ships. `app_version` (and the snapshots) read `lib/python/inventory.py:vendor_installed_version`: Open Design's active launcher payload from `~/Library/Application Support/Open Design/launcher/.../runtime.json` (only when `install.json` names this bundle), HyperFrames' `HFBuildLabel` (`b666`). Keep a single implementation.
+- **Open Design / HyperFrames:** the bundle version is not what their updater ships. `app_version` (and the snapshots) read `lib/python/inventory.py:vendor_installed_version`: Open Design's active launcher payload from `~/Library/Application Support/Open Design/launcher/.../runtime.json` (only when `install.json` names this bundle), HyperFrames' `HFBuildLabel` (`b666`). Keep a single implementation. The same `app_version` is used for the downloaded HyperFrames bundle in `vendor_direct_install`'s pre-copy check and for the post-install verification; build labels compare numerically (`b879 < b891 < b1000`).
 - **Same-version rebuilds (KeePassXC `2.8.0-1`):** the version cannot show them. `github_rebuild_asset` compares the release's highest `-N` package revision with the one recorded at install (`~/.local/state/mac-update/package_revisions.tsv`); ditto keeps the DMG's timestamps, so the bundle's creation time is only a first-run fallback. Downloads must match the publisher `.DIGEST`.
 - **Firefox Dev Edition:** `application.ini` → `grep "^Version=" | cut -d= -f2` gives the **base** version (no beta suffix). Compare with `sort -V` against Mozilla product-details and never downgrade (local may legitimately be ahead of the published beta).
 - **GitHub tags:** strip the leading `v` with `sed 's/^v//'` (never `tr -d 'v'`, which deletes every `v`) before comparing with `app_version()`.
@@ -41,7 +41,7 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 
 | Method | Apps |
 |--------|------|
-| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager, Open Design, HyperFrames, Superset, DeepSeek Harness, Grok Bot; direct-first choices in `config/vendor_direct_first.txt`. Open Design, HyperFrames, Superset, DeepSeek Harness and Grok Bot are verify-only: only their native updater installs (DeepSeek: its own electron-updater `nightly-mac.yml`; Grok Bot: the Cursor "sand" Squirrel endpoint compiled into the app) |
+| Vendor feed truth (verified) | ChatGPT / Codex, Claude, Cursor, Warp, Antigravity, Antigravity IDE, OpenCode, Proton Mail, Proton Drive, Remote Desktop Manager, Open Design, HyperFrames, Superset, DeepSeek Harness, Grok Bot; direct-first choices in `config/vendor_direct_first.txt`. DeepSeek Harness and Grok Bot are verify-only: only their native updater installs (DeepSeek: its own electron-updater `nightly-mac.yml`; Grok Bot: the Cursor "sand" Squirrel endpoint compiled into the app). HyperFrames (arm64 zip + sha256 from `latest.json`) and Superset (upstream project renamed "paradev"; bundle still `Superset.app`, arm64 zip + sha512 from `latest-mac.yml`) are **direct-only** and Open Design is **never-launch** (`config/vendor_launch_policy.txt`, 2026-11-10): none of the three is ever launched or quit by the toolkit. Open Design behind is reported "open the app to update" (soft `behind`) |
 | Mozilla product-details/download + DMG | Firefox Developer Edition |
 | GitHub API / Official Metadata + DMG | KeePassXC, Visual Studio Code, CodeEdit, Trezor Suite, Ledger Live |
 | Google Keystone | Google Chrome, Google Drive, Gemini |
@@ -52,8 +52,8 @@ defaults read "/Applications/App.app/Contents/Info" CFBundleShortVersionString
 | Native/npm/self-updating CLI | Node.js, npm, pnpm, bun, Claude Code CLI, Codex CLI, OpenCode CLI, Agy CLI, cursor-agent |
 | Homebrew cask (greedy only for brew_cask-designated tokens) | Brave Browser, Obsidian, Spotify, AppCleaner, CapCut, MEGAsync, ProtonVPN, zoom.us, LM Studio, Perplexity, Inkscape (avoids re-downloading :latest casks; downgrade guard in update_brew.sh protects against version regressions) |
 | Built-in auto-updater fallback (triggered-unverified) | Apps whose configured/embedded feed is unavailable or unparseable; a launch alone never proves an update |
-| App Store GUI Track 2 | UniFi, WiFiman, Picsart |
-| Manual only | IPMIView |
+| App Store GUI Track 2 | UniFi, WiFiman, Picsart, IPMIView |
+| Manual only | none registered at present (the `manual` method and its notification handler remain available) |
 
 These methods are not equivalent proof levels:
 
@@ -259,7 +259,7 @@ pre-release differs from the stable target, so the next run returns it to stable
 ## 14. macOS 27 Golden Gate Constraints and Ecosystem Rules
 
 - **Xcode License Gate after App Store Update:** macOS 27 invalidates or requires re-acceptance of the Xcode license agreement upon upgrading Xcode via `mas`. `update_brew.sh` and any toolchain consumers must gate on `xcodebuild -license check` (`brew_xcode_license_ok` in `lib/brew.sh`; never `-checkFirstLaunchStatus`, which returns 69 on a licensed Xcode 27.2 whenever first-launch components are pending) and prompt the user to accept (`sudo xcodebuild -license accept`) before running Homebrew commands to avoid catastrophic failure across the entire Homebrew step.
-- **Rosetta Translation Lifecycle & EOL 28:** macOS 27 drops preinstalled Rosetta; Apple Silicon systems do not retain it across upgrades. Any Intel-only x86_64 apps (e.g. DJI Assistant 2) must be flagged with `[x86_64: Rosetta missing — will not run]` (or warning in inventory) and warned that Rosetta is completely removed in macOS 28. Do not attempt silent background reinstallation of Rosetta.
+- **Rosetta Translation Lifecycle & EOL 28:** macOS 27 drops preinstalled Rosetta; Apple Silicon systems do not retain it across upgrades. Any installed Intel-only x86_64 app (detected generically from its executable, whatever its update method) must be flagged with `[x86_64: Rosetta missing — will not run]` (or warning in inventory) and warned that Rosetta is completely removed in macOS 28. Never reinstall Rosetta silently: the preflight (`internet_rosetta_preflight`) runs `softwareupdate --install-rosetta` only on explicit opt-in (`MAC_UPDATE_INSTALL_ROSETTA=1`).
 - **Command Line Tools on macOS 27:** Homebrew 7.0+ sets `minimum_version "27.0.0"` for CLT on macOS 27. Older CLT versions (e.g., 26.x CLT from macOS 26) trigger `CLT does not support macOS 27` Tier 2 warnings under `brew doctor`.
 - **Installer Packages (`.pkg`) Default to arm64:** On macOS 27, package installers without an explicit `hostArchitecture` tag default to `arm64`. Any custom `.pkg` scripts must specify hostArchitecture or be verified arm64-native.
 - **Launchd Quarantined Plist Rejection:** `launchd` on macOS 27 strictly rejects loading property lists carrying extended quarantine attributes (`com.apple.quarantine`). `scripts/install_launchagent.sh` must strip quarantine (`xattr -d com.apple.quarantine`) and use domain-targeted `launchctl bootstrap gui/$(id -u)` and `launchctl enable` instead of legacy `load -w`.
@@ -274,6 +274,7 @@ pre-release differs from the stable target, so the next run returns it to stable
 - **Rollout-channel proof (2026-10-25):** before reporting `feed_stale`, `internet_handler_vendor_truth` checks the app's Sparkle appcast from `config/vendor_appcasts.txt` (https, host must equal the app's allowed host in `vendor_feeds.txt`; the URL is config, never read from the plist). If the installed short version or build is published there in any channel (e.g. Proton Drive's `gradual-rollout`), the app is `current_verified`. This proves "current" only — a rollout item is never an install target (§16).
 - **Check before action:** Do not launch applications, virtual machines, or vendor updaters if the vendor feed reports the app is already up to date.
 - **Never terminate user-running applications:** Only quit what the toolkit itself launched, and always perform soft graceful termination (`quit`), never forced `kill`.
+  **Never quit an app that may still be starting (2026-11-10):** `silent_launch_app` records `bundle_id|epoch` in `$MAC_UPDATE_SESSION_DIR/toolkit_launched_at.txt`; `internet_app_quit_gracefully` waits until the app has been up `MAC_UPDATE_QUIT_MIN_AGE` seconds (default 30, 0-300) before the first `quit`. Apps in `config/vendor_launch_policy.txt` (`direct-only`, `never-launch`) are never launched at all, not even as a fallback after a failed download or an unreachable feed (`feed_unreachable`, "app not launched").
   An app that is already open when `update_all.sh` reaches it is in use: it is never quit, relaunched or
   replaced. The handler reports `NEEDS_RESTART` ("quit the app so its updater can install") and moves on.
   `silent_launch_app` records only apps that were **not** running before it opened them
