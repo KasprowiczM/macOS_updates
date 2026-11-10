@@ -1,6 +1,6 @@
 # Guía de usuario (Español)
 
-**Versión:** 1.5.5 · **Apple Silicon, macOS 13+**
+**Versión:** 1.6.0 · **Apple Silicon, macOS 13+**
 
 ## Qué hace
 
@@ -28,7 +28,7 @@ macOS Updates orquesta actualizaciones en **Macs Apple Silicon con macOS 13+**:
 bash scripts/report_update_coverage.sh
 ```
 
-Estados: **verified direct**, **triggered-unverified**, **externally managed**, **manual**, **unknown**. Un inicio silencioso no prueba una actualización. Inkscape usa Homebrew; UniFi/WiFiman/Picsart Track 2; Office `msupdate`; Teams su propio updater con fallback MAU `TEAMS21` observado y verificado. Solo IPMIView queda manual.
+Estados: **verified direct**, **triggered-unverified**, **externally managed**, **manual**, **unknown**. Un inicio silencioso no prueba una actualización. Inkscape usa Homebrew; UniFi/WiFiman/Picsart Track 2; Office `msupdate`; Teams su propio updater con fallback MAU `TEAMS21` observado y verificado. Actualmente ninguna app registrada es «manual»; IPMIView usa App Store Track 2.
 
 ## Añadir app de Internet
 
