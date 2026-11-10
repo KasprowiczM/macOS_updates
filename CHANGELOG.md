@@ -16,6 +16,12 @@ Version stays 1.5.5 (lockstep policy). Evidence: [run-log record](docs/reviews/R
 - **No quit while an app may still be starting (medium).** `silent_launch_app` records launch times in `toolkit_launched_at.txt`; the first graceful `quit` waits until the app has been up `MAC_UPDATE_QUIT_MIN_AGE` seconds (default 30, 0-300). Never a force-kill; user-opened apps are untouched as before.
 - **Checked, unchanged:** the run's "Superset updated to 2.0.8" was a real before/after change of the installed bundle.
 
+
+### Added (2026-11-10)
+
+- **`scripts/install_launchagent.sh --minute N` and `--once-in N`.** The weekly schedule accepts a minute, and `--once-in N` (1-1440 minutes from now) installs a one-shot job as a test aid; `--check` and the success line show the exact time.
+- **Universal maintenance prompt.** `docs/agents/maintenance_prompt.md` holds a harness-agnostic prompt for a periodic verify-review-fix session (last run log, live state, review, fixes with tests, evidence).
+
 ### Fixed (2026-11-09 review follow-up)
 
 Version stays 1.5.5 (lockstep policy). Evidence: [review record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-09.md).
