@@ -1,6 +1,6 @@
 # Quick Start (English)
 
-**Apple Silicon Mac required** · macOS 13+ · **v1.6.5**
+**Apple Silicon Mac required** · macOS 13+ · **v1.7.0**
 
 ## Safe setup and application sources
 

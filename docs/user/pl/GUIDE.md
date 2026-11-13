@@ -1,6 +1,6 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.6.5 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.7.0 · **Apple Silicon, macOS 13+**
 
 ## Bezpieczny setup i źródła aplikacji
 

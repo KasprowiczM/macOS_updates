@@ -1,6 +1,6 @@
 # Guida utente (Italiano)
 
-**Versione:** 1.6.5 · **Apple Silicon, macOS 13+**
+**Versione:** 1.7.0 · **Apple Silicon, macOS 13+**
 
 ## Configurazione sicura e fonti delle applicazioni
 
