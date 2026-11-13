@@ -58,9 +58,19 @@ if [ -n "$MAJOR" ] && [ "$MAJOR" -lt 13 ] 2>/dev/null; then
     fail "macOS 13 Ventura or later required."
 fi
 
-if ! command -v git >/dev/null 2>&1; then
-    info "git not found — installing Xcode Command Line Tools (may open a dialog)..."
-    xcode-select --install 2>/dev/null || true
+# The repository library is not available until after the clone.
+installer_git_usable() {
+    local git_path developer_dir
+    git_path="$(command -v git 2>/dev/null)" || return 1
+    if [ "$git_path" = /usr/bin/git ]; then
+        command -v xcode-select >/dev/null 2>&1 || return 1
+        developer_dir="$(xcode-select -p 2>/dev/null)" || return 1
+        [ -x "$developer_dir/usr/bin/git" ] || return 1
+    fi
+    return 0
+}
+if ! installer_git_usable; then
+    info "git is unavailable. Install Xcode Command Line Tools or git manually."
     fail "Install Xcode Command Line Tools, then re-run the installer."
 fi
 
@@ -92,6 +102,7 @@ cd "$MAC_UPDATE_DIR" || fail "Cannot cd to $MAC_UPDATE_DIR"
 
 SCRIPT_DIR="$MAC_UPDATE_DIR"
 export SCRIPT_DIR
+. "$SCRIPT_DIR/lib/platform.sh"
 . "$SCRIPT_DIR/i18n/loader.sh"
 
 # Language: English default; picker menu is English; then reload chosen locale.
@@ -121,24 +132,30 @@ fi
 
 info "$L_INSTALLER_RUNNING_SETUP"
 export MAC_UPDATE_NONINTERACTIVE=1
-bash "$MAC_UPDATE_DIR/setup.sh" || fail "$L_INSTALLER_SETUP_FAILED"
+bash "$MAC_UPDATE_DIR/setup.sh" --inspect
+setup_status=$?
+[ "$setup_status" -eq 0 ] || [ "$setup_status" -eq 10 ] || fail "$L_INSTALLER_SETUP_FAILED"
 
-if [ -x "$MAC_UPDATE_DIR/scripts/setup_touchid_sudo.sh" ]; then
-    info "Configuring Touch ID for sudo..."
-    bash "$MAC_UPDATE_DIR/scripts/setup_touchid_sudo.sh" || true
+if mac_update_tool_usable python3 && python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1; then
+    if [ "${MAC_UPDATE_SKIP_INVENTORY:-0}" != "1" ]; then
+        info "$L_INSTALLER_BUILDING_INVENTORY"
+        bash "$MAC_UPDATE_DIR/build_inventory.sh" -y || fail "$L_INSTALLER_INVENTORY_FAILED"
+    fi
+    info "$L_INSTALLER_COVERAGE_REPORT"
+    bash "$MAC_UPDATE_DIR/scripts/report_update_coverage.sh" || true
+else
+    setup_status=10
+    info "${L_INSTALLER_PYTHON_UNAVAILABLE:-Python 3 unavailable: inventory and coverage were not generated. Install Python 3 and retry.}"
 fi
-
-if [ "${MAC_UPDATE_SKIP_INVENTORY:-0}" != "1" ]; then
-    info "$L_INSTALLER_BUILDING_INVENTORY"
-    bash "$MAC_UPDATE_DIR/build_inventory.sh" -y || fail "$L_INSTALLER_INVENTORY_FAILED"
-fi
-
-info "$L_INSTALLER_COVERAGE_REPORT"
-bash "$MAC_UPDATE_DIR/scripts/report_update_coverage.sh" || true
 
 VER="$(tr -d '[:space:]' < "$MAC_UPDATE_DIR/VERSION" 2>/dev/null || echo unknown)"
 echo ""
-ok "$(printf "$L_INSTALLER_READY" "$VER" "$MAC_UPDATE_DIR")"
+if [ "$setup_status" -eq 0 ]; then
+    ok "$(printf "$L_INSTALLER_READY" "$VER" "$MAC_UPDATE_DIR")"
+else
+    info "$(printf "$L_INSTALLER_PARTIAL" "$VER" "$MAC_UPDATE_DIR")"
+    echo "    bash setup.sh --install-dependencies"
+fi
 echo ""
 echo -e "  ${BOLD}${L_INSTALLER_NEXT_STEPS}${NC}"
 echo "    cd $MAC_UPDATE_DIR"
@@ -149,3 +166,4 @@ echo ""
 echo "  $L_INSTALLER_ONLY_INSTALLED"
 echo "  $(printf "$L_INSTALLER_ADD_APPS_HINT" "$MAC_LANG")"
 echo ""
+exit "$setup_status"

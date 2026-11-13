@@ -84,7 +84,7 @@ if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
         print_info "Pending native updates (read-only, fast mode):"
         mas outdated 2>/dev/null || print_warn "mas outdated failed"
     else
-        print_warn "mas is not installed; a live run would install it through Homebrew"
+        print_warn "mas is not installed; install it separately to use this source"
     fi
     print_info "[DRY-RUN] Would run: sudo mas upgrade"
     print_info "[DRY-RUN] Would run: App Store GUI automation (AppleScript)"
@@ -92,73 +92,24 @@ if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
 fi
 
 # ============================================================
-# STEP 0: Check and install mas
+# STEP 0: Check mas without installing or upgrading it
 # ============================================================
 print_header "$L_APPSTORE_CHECKING_MAS"
-
-if ! command -v brew &> /dev/null; then
-    print_error "$L_HOMEBREW_NOT_FOUND"
-    print_info "$L_INSTALL_HOMEBREW_URL"
-    exit 1
+if ! command -v mas >/dev/null 2>&1; then
+    print_warn "source_unavailable: ${L_APPSTORE_SOURCE_UNAVAILABLE:-mas 4.1 or newer is required. Install or upgrade it separately, for example with Homebrew.}"
+    exit 10
 fi
-
-if ! command -v mas &> /dev/null; then
-    print_warn "$L_MAS_INSTALLING"
-    if brew install mas; then
-        print_ok "$L_MAS_INSTALLED"
-    else
-        print_error "Homebrew could not install mas."
-        exit 1
-    fi
-fi
-
-# Check version — only update if < 4.1 (avoid slow brew update)
 MAS_VER=$(mas version 2>/dev/null || echo "0.0.0")
 MAS_MAJOR=$(echo "$MAS_VER" | cut -d'.' -f1)
 MAS_MINOR=$(echo "$MAS_VER" | cut -d'.' -f2)
-MAS_MINOR=${MAS_MINOR:-0}
-print_ok "$L_MAS_VERSION $MAS_VER"
-
-case "$MAS_MAJOR" in
-    ''|*[!0-9]*)
-        print_error "Could not parse the installed mas version: $MAS_VER"
-        exit 1
-        ;;
+case "$MAS_MAJOR:$MAS_MINOR" in
+    *[!0-9:]*|:*|*:) MAS_MAJOR=0; MAS_MINOR=0 ;;
 esac
-case "$MAS_MINOR" in
-    ''|*[!0-9]*)
-        MAS_MINOR=0
-        ;;
-esac
-
 if [ "$MAS_MAJOR" -lt 4 ] || { [ "$MAS_MAJOR" -eq 4 ] && [ "$MAS_MINOR" -lt 1 ]; }; then
-    print_warn "$L_MAS_VERSION_OLD"
-    if ! HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade mas 2>/dev/null \
-        && ! brew upgrade mas; then
-        print_error "Homebrew could not upgrade mas."
-        exit 1
-    fi
-    MAS_VER=$(mas version 2>/dev/null || echo "?")
-    MAS_MAJOR=$(echo "$MAS_VER" | cut -d'.' -f1)
-    MAS_MINOR=$(echo "$MAS_VER" | cut -d'.' -f2)
-    MAS_MINOR=${MAS_MINOR:-0}
-    case "$MAS_MAJOR" in
-        ''|*[!0-9]*)
-            print_error "Could not parse the upgraded mas version: $MAS_VER"
-            exit 1
-            ;;
-    esac
-    case "$MAS_MINOR" in
-        ''|*[!0-9]*)
-            MAS_MINOR=0
-            ;;
-    esac
-    if [ "$MAS_MAJOR" -lt 4 ] || { [ "$MAS_MAJOR" -eq 4 ] && [ "$MAS_MINOR" -lt 1 ]; }; then
-        print_error "mas 4.1 or newer is required; detected: $MAS_VER"
-        exit 1
-    fi
-    print_ok "$L_MAS_VERSION_UPDATED $MAS_VER"
+    print_warn "source_unavailable: ${L_APPSTORE_SOURCE_UNAVAILABLE:-mas 4.1 or newer is required. Install or upgrade it separately, for example with Homebrew.}"
+    exit 10
 fi
+print_ok "$L_MAS_VERSION $MAS_VER"
 
 # ============================================================
 # STEP 1: Check App Store login

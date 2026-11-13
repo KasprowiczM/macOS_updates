@@ -418,9 +418,8 @@ class StaticShellSafetyTests(unittest.TestCase):
     def test_appstore_dry_run_exits_before_mutations(self) -> None:
         text = self.read_script("update_appstore.sh")
         dry_run_exit = text.index('print_info "[DRY-RUN] Would run: sudo mas upgrade"')
-        install_mas = text.index("if brew install mas; then")
+        self.assertNotIn("brew install mas", text)
         native_upgrade = text.index("sudo -n env MAS_NO_AUTO_INDEX=1 mas upgrade")
-        self.assertLess(dry_run_exit, install_mas)
         self.assertLess(dry_run_exit, native_upgrade)
 
     def test_appstore_skips_sudo_when_native_queue_is_empty(self) -> None:
@@ -876,6 +875,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                     f'. "{REPO_ROOT}/lib/version.sh"; '
                     f'. "{REPO_ROOT}/lib/internet_i18n.sh"; '
                     f'. "{REPO_ROOT}/lib/internet_handlers.sh"; '
+                    f'defaults() {{ echo "$@" >> "{tmp}/defaults.log"; return 1; }}; '
                     f'internet_handler_vendor_latest "TestApp" "{tmp}/TestApp.app" "TestApp"; '
                     f'echo "$INTERNET_LAST_STATUS"'
                 ],
@@ -912,6 +912,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                     f'app_version() {{ echo "1.0.0"; }}; '
                     f'internet_version_relation() {{ echo "newer"; }}; '
                     f'curl() {{ echo "version: 2.0.0"; }}; '
+                    f'defaults() {{ echo "$@" >> "{tmp}/defaults.log"; return 1; }}; '
                     f'internet_handler_vendor_latest "TestApp" "{tmp}/TestApp.app" "TestApp"; '
                     f'echo "$INTERNET_LAST_STATUS"'
                 ],
@@ -949,6 +950,7 @@ class StaticShellSafetyTests(unittest.TestCase):
                     f'app_version() {{ echo "1.0.0"; }}; '
                     f'internet_version_relation() {{ echo "equal"; }}; '
                     f'curl() {{ echo "version: 1.0.0"; }}; '
+                    f'defaults() {{ echo "$@" >> "{tmp}/defaults.log"; return 1; }}; '
                     f'internet_handler_vendor_latest "TestApp" "{tmp}/TestApp.app" "TestApp"; '
                     f'echo "$INTERNET_LAST_STATUS"'
                 ],
@@ -2679,6 +2681,7 @@ class I18nCompletenessTests(unittest.TestCase):
         soft_statuses = set(re.findall(r'L_INTERNET_STATUS_[A-Z0-9_]+', soft_block))
 
         benign_statuses = {
+            "L_INTERNET_STATUS_SOURCE_UNMANAGED",
             "L_INTERNET_STATUS_NO_DESKTOP_APP",
             "L_INTERNET_STATUS_CURRENT",
             "L_INTERNET_STATUS_CURRENT_FMT",
@@ -3079,6 +3082,11 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
             except ImportError:
                 from _env import isolate_host_tools
             isolate_host_tools(env)
+            from support import mock_defaults
+            fixture_bin = Path(tmpdir) / "bin"
+            fixture_bin.mkdir()
+            mock_defaults(fixture_bin)
+            env["PATH"] = str(fixture_bin) + os.pathsep + env["PATH"]
             res = subprocess.run(
                 ["bash", str(REPO_ROOT / "scripts" / "report_update_coverage.sh"), "--json"],
                 capture_output=True,

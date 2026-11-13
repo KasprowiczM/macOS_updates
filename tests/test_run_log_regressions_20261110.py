@@ -274,7 +274,8 @@ class HandlerDecisionTests(unittest.TestCase):
     def test_no_launch_apps_get_no_fallback_launch_on_feed_failure(self) -> None:
         for name in ("Open Design", "HyperFrames", "Superset"):
             app = make_bundle(self.tmp / name.replace(" ", ""), name, {"CFBundleIdentifier": "x.y"})
-            out, actions = self.probe(name, "x.y", None, app, lookup_rc=2)
+            out, actions = self.probe(name, "x.y", None, app, lookup_rc=2,
+                                      env={"PATH": self._defaults_stub() + ":" + os.environ.get("PATH", "")})
             self.assertEqual(actions, [], name)
             self.assertIn("CODE=feed_unreachable", out, name)
             self.assertIn("app not launched", out, name)
@@ -282,14 +283,8 @@ class HandlerDecisionTests(unittest.TestCase):
     def _defaults_stub(self) -> str:
         d = self.tmp / "bin"
         d.mkdir(exist_ok=True)
-        # `defaults read <bundle>/Contents/Info <key>` from the fake plist (CI has no defaults).
-        (d / "defaults").write_text(
-            "#!/bin/bash\n"
-            '[ "$1" = read ] || exit 1\n'
-            'exec python3 -I -c \'import plistlib,sys\nd=plistlib.load(open(sys.argv[1]+".plist","rb"))\n'
-            'v=d.get(sys.argv[2])\nsys.exit(1) if v is None else print(v)\' "$2" "$3"\n',
-            encoding="utf-8")
-        (d / "defaults").chmod(0o755)
+        from support import mock_defaults
+        mock_defaults(d)
         return str(d)
 
 

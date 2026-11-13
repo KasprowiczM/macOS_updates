@@ -2,10 +2,10 @@
 
 | Script | Purpose |
 |--------|---------|
-| `install.sh` | One-line new-user install: clone, `setup.sh`, `build_inventory.sh`, coverage report |
+| `install.sh` | Clone, language, readiness inspection, inventory and coverage when Python 3.9+ is usable; exit 10 for incomplete readiness |
 | `uninstall.sh` | Remove repo clone (optional `--purge` prefs) |
 | `build_inventory.sh` | Read-only scan — atomically refresh `APPLICATIONS.md` (apps, Homebrew and native CLI versions) without adding update history |
-| `setup.sh` | First-run (public users) — language, deps, paths |
+| `setup.sh` | Read-only readiness by default or `--inspect`; explicit dependency and shell-profile consent flags |
 | `migration_setup.sh` | First-run (owner) — phases 0a–16: language, cloud, deps, paths, app scan |
 | `update_all.sh` | Master: prescan → App Store → npm CLI → Homebrew → internet apps → postupdate/history → macOS final |
 | `update_system.sh` | per-label `softwareupdate -i <label> -R`, restart-required labels in one final batch |
@@ -28,7 +28,7 @@
 | `dev_sync/*.sh` | Export/import/verify private files to/from cloud storage |
 | `scripts/check_vendor_feeds.sh` | Read-only diagnostic query of vendor feeds and Omaha updaters (table and `--json`) |
 | `scripts/report_update_coverage.sh` | Report installed vs supported vs unknown apps (by method category) |
-| `scripts/setup_touchid_sudo.sh` | Per-machine Touch ID for sudo PAM configuration (`/etc/pam.d/sudo_local`) |
+| `scripts/setup_touchid_sudo.sh` | Optional standalone Touch ID configuration with terminal consent, preview binding, mandatory backup and exclusive PAM creation; foreign files refused |
 | `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key; options `--day N`, `--hour N`, `--minute N` (0-59), `--once-in N` (one-shot test run 1-1440 minutes from now, exclusive with the weekly options), `--check`, `--uninstall`; `--day/--hour/--minute` set the weekly time, `--once-in N` installs a one-shot test run N minutes from now |
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
@@ -64,6 +64,7 @@
 | `lib/python/system_updates.py` | Pure-function helpers for softwareupdate catalog parsing, label extraction, and reboot classification |
 | `lib/python/vendor_feeds.py` | Pure Python vendor feed parsers (Sparkle, JSON, YML, KV, Omaha text log + `updater_history.jsonl`, VersionHistory) |
 | `lib/python/feed_state.py` | Persistent per-app vendor feed state (last good version, high-water mark): cached proof on a failed fetch, vendor-side feed regressions; atomic 0600 writes |
+| `lib/python/setup_safety.py` | Preview fingerprints, regular-file-only shell appends and backup-first PAM changes; no subprocess execution |
 | `lib/python/inventory_sync.py` | Synchronization of all inventory groups without drift |
 | `config/bun_version.txt` | Minimum floor version for Bun (`update_npm_cli.sh`) |
 | `config/npm_global_clis.txt` | `display_name\|package\|method\|brew_formula\|command` rows for the managed CLI toolchain (npm, self-update, native installer, `n`, `bun upgrade`) |

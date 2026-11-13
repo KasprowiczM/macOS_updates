@@ -14,7 +14,14 @@ set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 JSON_OUT=0
-[ "${1:-}" = "--json" ] && JSON_OUT=1
+SHOW_SUPPORTED=0
+for arg in "$@"; do
+    case "$arg" in
+        --json) JSON_OUT=1 ;;
+        --show-supported) SHOW_SUPPORTED=1 ;;
+        *) echo "Usage: bash scripts/report_update_coverage.sh [--json] [--show-supported]" >&2; exit 1 ;;
+    esac
+done
 
 . "$SCRIPT_DIR/i18n/loader.sh"
 
@@ -22,9 +29,9 @@ export L_COVERAGE_TITLE L_COVERAGE_VERSION L_COVERAGE_INSTALLED_COUNT
 export L_COVERAGE_INSTALLED_HEADER L_COVERAGE_NOT_INSTALLED_HEADER
 export L_COVERAGE_NOT_INSTALLED_NOTE L_COVERAGE_UNKNOWN_HEADER
 export L_COVERAGE_UNKNOWN_HINT_INVENTORY L_COVERAGE_UNKNOWN_HINT_SCAFFOLD
-export L_COVERAGE_AND_MORE L_COVERAGE_AI_HINT MAC_LANG
+export L_COVERAGE_AND_MORE L_COVERAGE_AI_HINT MAC_LANG L_COVERAGE_CATALOG_COUNT L_COVERAGE_SOURCE_UNMANAGED
 
-exec python3 - "$SCRIPT_DIR" "$JSON_OUT" << 'PYEOF'
+exec python3 - "$SCRIPT_DIR" "$JSON_OUT" "$SHOW_SUPPORTED" << 'PYEOF'
 import json
 import os
 import plistlib
@@ -38,6 +45,7 @@ script_dir = sys.argv[1]
 sys.path.insert(0, os.path.join(script_dir, "lib", "python"))
 from inventory import app_architecture
 json_out = sys.argv[2] == "1"
+show_supported = sys.argv[3] == "1"
 lang = os.environ.get("MAC_LANG", "en")
 
 METHOD_LABELS = {
@@ -476,13 +484,10 @@ def load_mas_names():
 
 
 def load_brew_apps():
-    brew = shutil.which("brew")
-    if not brew:
-        return {}
-    tokens = [line.strip() for line in run_command([brew, "list", "--cask", "-1"]).splitlines() if line.strip()]
-    if not tokens:
-        return {}
-    raw = run_command([brew, "info", "--cask", "--json=v2"] + tokens, timeout=30)
+    raw = run_command([
+        "bash", "-c", '. "$1"; brew_installed_casks_json',
+        "coverage", os.path.join(script_dir, "lib", "brew.sh"),
+    ], timeout=30)
     try:
         data = json.loads(raw)
     except (TypeError, ValueError):
@@ -552,7 +557,9 @@ def classify(installed, target, method, mas_names, brew_apps, vendor_feeds=None,
         return "externally_managed", "app_store_mas"
     if method == "brew_cask":
         token = brew_apps.get(normalized_name, "")
-        return "externally_managed", "homebrew_cask" + (":" + token if token else "")
+        if token:
+            return "externally_managed", "homebrew_cask:" + token
+        return "manual", "source_unmanaged"
     if normalized_name in brew_apps:
         return "externally_managed", "homebrew_cask:" + brew_apps[normalized_name]
     if installed["bundle_id"].startswith("com.apple."):
@@ -607,7 +614,9 @@ for item in installed:
     if target:
         installed_targets.add(target)
     classification, managed_by = classify(item, target, method, mas_names, brew_apps, vendor_feeds, exclusions)
-    if managed_by == "vendor_feed":
+    if managed_by == "source_unmanaged":
+        label = os.environ.get("L_COVERAGE_SOURCE_UNMANAGED", "Source not confirmed; choose an update source")
+    elif managed_by == "vendor_feed":
         label = method_labels.get("vendor_feed", "vendor feed verified")
     elif classification == "externally_managed":
         label = managed_by
@@ -742,20 +751,22 @@ if intel_only_apps:
     for app in sorted(intel_only_apps):
         print(f"       · {app}")
 
-print("")
-print(f"  ⏭️  {not_inst_hdr} {len(not_installed_supported)}")
-if not_inst_note:
-    print(f"     ({not_inst_note})")
-for method in sorted(by_method):
-    missing = by_method[method]["not_installed"]
-    if not missing:
-        continue
-    label = method_labels.get(method, method)
-    hint = method_hints.get(method, f"See docs/user/{lang}/GUIDE.md")
-    print(f"     [{label}]")
-    for app in missing:
-        print(f"       · {app}")
-    print(f"       → {ai_hint} {hint}")
+print("\n  " + os.environ.get("L_COVERAGE_CATALOG_COUNT", "Catalog recipes: %s; use --show-supported to browse") % len(apps))
+if show_supported:
+    print("")
+    print(f"  ⏭️  {not_inst_hdr} {len(not_installed_supported)}")
+    if not_inst_note:
+        print(f"     ({not_inst_note})")
+    for method in sorted(by_method):
+        missing = by_method[method]["not_installed"]
+        if not missing:
+            continue
+        label = method_labels.get(method, method)
+        hint = method_hints.get(method, f"See docs/user/{lang}/GUIDE.md")
+        print(f"     [{label}]")
+        for app in missing:
+            print(f"       · {app}")
+        print(f"       → {ai_hint} {hint}")
 
 if classifications["unknown"]:
     print("")

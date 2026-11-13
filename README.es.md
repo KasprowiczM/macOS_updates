@@ -6,7 +6,7 @@
 
 **Sitio web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repositorio:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licencia:** [MIT](LICENSE) · **Cambios:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.0** — Orquestador de actualizaciones en un solo comando, listo para producción, para **Macs con Apple Silicon y macOS 13–27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
+> **v1.6.1** : Orquestador de actualizaciones en un solo comando, para **Macs con Apple Silicon y macOS 13-27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
 
 | De un vistazo | |
 |---------------|--|
@@ -14,11 +14,21 @@
 | Flujo | 7 pasos (0–6); la actualización de macOS va siempre al final |
 | Registro | 47 apps de Internet · 11 métodos de actualización (véase [Métodos de actualización](#métodos-de-actualización)) |
 | Idiomas | EN, PL, ES, FR, DE, IT, PT (CLI y documentación) |
-| Pruebas | 846 pruebas automáticas (`bash run_tests.sh`) |
+| Pruebas | 900 pruebas automáticas (`bash run_tests.sh`) |
+
+Novedades de v1.6.1: informes locales, reconocimiento del recibo de CapCut, consentimiento explícito en setup y mayor aislamiento de pruebas sin red. La etapa A aún no activa la resolución automática de fuentes ni el menú de instalación.
 
 **Novedades de la v1.6.0:** Las ejecuciones programadas (launchd) encuentran Homebrew y `mas`, y el instalador comprueba que el trabajo esté cargado (se añaden `--minute` y `--once-in`). Las apps abiertas nunca se cierran ni se reemplazan, tampoco los casks de Homebrew. Cada pregunta durante la ejecución caduca con la respuesta segura «no». `bash update_all.sh --doctor` es un informe de preparación de solo lectura y las ejecuciones reales añaden comprobaciones previas. El estado persistente de los feeds de fabricante sustituye las opacas advertencias de «feed obsoleto», y HyperFrames, Superset y Open Design se instalan o comprueban sin lanzamientos ocultos. Las versiones 1.5.x anteriores se describen en [CHANGELOG.md](CHANGELOG.md).
 
 **Verdad del proveedor (desde v1.5.0):** la versión de cada aplicación se compara con el feed de su propio proveedor antes de ejecutar cualquier acción. Las aplicaciones actualizadas no se tocan; las desactualizadas se actualizan mediante el actualizador del propio proveedor o se instalan desde el proveedor con verificación de firma y Team ID. Solo se actualiza el software que ya está instalado (`--bootstrap-cli` instala deliberadamente las CLI que faltan). Las aplicaciones eliminadas manualmente se detectan y nunca se reinstalan. **Las aplicaciones que tienes abiertas nunca se cierran: el kit de herramientas solo cierra lo que inició por sí mismo.** Comprueba el estado de los proveedores en modo de solo lectura con `bash scripts/check_vendor_feeds.sh`.
+
+## Configuración segura y fuentes de aplicaciones
+
+`bash setup.sh --inspect` comprueba la preparación sin instalar dependencias, cambiar perfiles ni configurar Touch ID. Una herramienta ausente deja su función no disponible. En un terminal, `bash setup.sh --install-dependencies` muestra dependencias opcionales y pregunta antes de cada instalación; `bash setup.sh --configure-shell` presenta por separado el cambio de perfil. Rechazar una dependencia no bloquea funciones independientes. Si falta Python, instálalo explícitamente antes de crear el inventario. Un `mas` ausente o antiguo se indica sin instalarlo ni actualizarlo automáticamente.
+
+El informe normal muestra aplicaciones instaladas. `bash scripts/report_update_coverage.sh --show-supported` muestra recetas ausentes del catálogo. Todavía no es un menú de instalación. Un recibo de App Store para CapCut conserva esa fuente incluso sin cask. Sin propiedad Homebrew confirmada se propone elegir fuente, sin adopción ni instalación. La resolución completa y selección interactiva corresponden a etapas posteriores.
+
+La investigación latest stable está en [SOURCE_RESEARCH.md](docs/catalog/SOURCE_RESEARCH.md). No se comparan ediciones distintas; una observación puntual no prueba qué canal suele ser más rápido.
 
 ---
 
@@ -28,7 +38,7 @@
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/KasprowiczM/macOS_updates/main/install.sh)"
 ```
 
-El instalador clona el repositorio, solicita el **idioma** (menú en inglés, 7 idiomas), instala las dependencias, genera **tu** archivo `APPLICATIONS.md` a partir de las apps ya instaladas en este Mac y muestra qué apps puede actualizar el proyecto. Nunca importa el inventario de otra persona ni instala apps por ti.
+El instalador clona el repositorio, pregunta el idioma, comprueba la preparación y crea el inventario de este Mac si Python está disponible. Las dependencias requieren una elección separada en setup. Touch ID y los perfiles no se modifican automáticamente.
 
 Consulta [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 
@@ -48,7 +58,7 @@ Consulta [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTAL
 | 5 | **Post-actualización/historial** — actualiza `APPLICATIONS.md` y añade a `UPDATES.md` de forma atómica |
 | 6 | **macOS (final)** — por etiqueta `softwareupdate -i <label> -R` (etiquetas que requieren reinicio en el lote final); se aplaza tras un fallo grave bloqueante en los pasos 1–4 o si no hay autorización |
 
-**Importante:** Las actualizaciones solo afectan al software ya instalado en tu Mac. Las apps compatibles que faltan se informan, no se instalan. El paso final de macOS puede reiniciar el Mac, por eso va el último y conserva el obligatorio `-R`. El paso 5 solo genera informes: un fallo ahí es un error, pero nunca aplaza el paso de macOS. Las apps instaladas desconocidas se listan para que tú (o un agente de IA) añadáis controladores.
+**Importante:** Las actualizaciones solo afectan al software ya instalado en tu Mac. Las aplicaciones ausentes del catálogo aparecen solo con `--show-supported`. El paso final de macOS puede reiniciar el Mac, por eso va el último y conserva el obligatorio `-R`. El paso 5 solo genera informes: un fallo ahí es un error, pero nunca aplaza el paso de macOS. Las apps instaladas desconocidas se listan para que tú (o un agente de IA) añadáis controladores.
 
 La cobertura es deliberadamente explícita: **verified direct** significa que el actualizador confirmó la ruta de paquete/versión; **triggered-unverified**, que se abrió la app para que su actualizador se ejecutara pero no se puede probar que terminó; **externally managed**, que el proveedor o el App Store gestionan el ciclo de actualización; **manual** requiere acción del usuario; **unknown** no tiene método registrado.
 
@@ -214,10 +224,10 @@ tú mismo cuando quieras aplicar las actualizaciones del App Store y de macOS.
 |-------------|------------------------------|
 | Mac con Apple Silicon (arm64) | — |
 | macOS 13 Ventura o posterior (probado hasta macOS 27) | — |
-| Xcode Command Line Tools | ✅ `setup.sh` / `install.sh` |
-| Homebrew | ✅ |
+| Xcode Command Line Tools | Instalación manual |
+| Homebrew | Instalación manual: https://brew.sh |
 | `mas` (CLI del App Store) | ✅ |
-| Python 3 | ✅ vía Homebrew si falta |
+| Python 3.9+ | Consentimiento explícito: `setup.sh --install-dependencies` |
 | `rclone` (opcional) | ✅ si se elige como proveedor de nube |
 
 Los Mac Intel y macOS 12 o anterior no son compatibles; los scripts terminan antes de hacer cualquier cambio.
@@ -235,7 +245,7 @@ Los Mac Intel y macOS 12 o anterior no son compatibles; los scripts terminan ant
 # Opción B — manual
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
-bash setup.sh
+bash setup.sh --inspect
 bash build_inventory.sh
 bash update_all.sh
 ```

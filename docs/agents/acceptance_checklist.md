@@ -1,5 +1,9 @@
 # Production Acceptance Checklist — Live Execution Paths (v1.5.x to v1.6.0)
 
+## Local 1.6.1 stage A
+
+Prepared locally, unpublished. See [implementation and test evidence](../implementation/STAGE_A_1.6.1.md). Fixture tests do not close any live acceptance path below. Full source resolution and the installation menu remain later stages.
+
 ## Current status (v1.6.0, 2026-11-10)
 
 - v1.6.0 (2026-11-10) is a documentation and version release on top of the branch state recorded below; it adds no live evidence beyond the 2026-11-09 and 2026-11-10 records. Release gate: **846 tests pass** (`bash run_tests.sh`). Paths 2, 3, 4, 6 and 12 remain unaccepted.

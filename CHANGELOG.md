@@ -6,6 +6,25 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-13 (local, unpublished)
+
+### Fixed
+
+- Filter internet dispatch, stale checks and status aggregation by local presence. A missing catalog cask no longer degrades a new Mac's run. App Store receipts are checked for CapCut and other cask catalog entries even when their handlers are not dispatched.
+- Distinguish unavailable Homebrew from an installed app with unconfirmed ownership. Neither case adopts or installs a catalog application. Empty inventory legends no longer list the entire catalog; coverage shows absent supported names only with `--show-supported`.
+- Make setup inspection read-only by default. Dependency installation and shell-profile configuration need separate terminal confirmation. The installer no longer invokes CLT installation or Touch ID setup. Missing or old `mas` is a soft unavailable source, never an automatic dependency install or upgrade during updates.
+- Detect unprovisioned Apple Git/Python shims before executing them. Bind optional profile and PAM changes to their previewed file state, reject symlinks/devices/FIFOs, require a PAM backup and create new PAM files exclusively. Foreign PAM content and the shared macOS 13 sudo file are left unchanged.
+- Guard unittest network and host-tool execution on both CI paths; fix fixtures that previously reached native tools or vendor feeds. Add `run_tests.sh --unit-only --pattern` and named guard diagnostics.
+
+### Added
+
+- Dated source-channel research for all 47 catalog rows, with public evidence, stable-channel exclusions, product identity conflicts and explicit unknowns. This is research, not an enabled channel advisor or installation menu.
+- New-user fixture coverage including mocked full `update_all.sh` scenarios, explicit setup consent, developer-tool shims and setup filesystem safety. All seven language packs and user guides are synchronized.
+
+### Scope
+
+This is stage A of the source-aware inventory plan. Structured snapshots, full source conflict resolution, migration, channel selection and the optional application installation menu remain future stages. No live app update, dependency installation, PAM change, release, tag or deployment was performed for this local implementation. Landing-page synchronization is separate.
+
 ## [1.6.0] - 2026-11-10
 
 Released here first at the owner's request; the Ascendo parity port to 1.6.0 is pending (lockstep policy, see `CONTRIBUTING.md`).

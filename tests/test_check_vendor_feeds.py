@@ -9,12 +9,31 @@ import stat
 import subprocess
 import tempfile
 import unittest
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _env import copy_toolkit
 
 
 class CheckVendorFeedsTests(unittest.TestCase):
+    def fixture_script(self, root: Path) -> Path:
+        toolkit = root / "toolkit"
+        copy_toolkit(REPO_ROOT, toolkit)
+        script = toolkit / "scripts" / "check_vendor_feeds.sh"
+        text = script.read_text()
+        marker = '. "$SCRIPT_DIR/lib/version.sh"'
+        mock = """
+internet_app_path() { printf '%s\n' "$MOCK_APP_ROOT"; }
+internet_app_snapshot_version() { echo "$*" >> "$MOCK_CALLS"; echo 1.0; }
+vendor_feed_lookup() { echo "$*" >> "$MOCK_CALLS"; echo '1.0|https://example.invalid/app.zip|-|-|zip|example.invalid'; }
+"""
+        text = text.replace(marker, marker + "\n" + mock)
+        text = text.replace('GOOGLE_LOG_SYS="/Library/Application Support/Google/GoogleUpdater/updater.log"', 'GOOGLE_LOG_SYS="$HOME/no-system-log"')
+        script.write_text(text)
+        return script
+
     def test_script_exists_and_is_executable(self) -> None:
         script = REPO_ROOT / "scripts" / "check_vendor_feeds.sh"
         self.assertTrue(script.is_file())
@@ -22,21 +41,19 @@ class CheckVendorFeedsTests(unittest.TestCase):
         self.assertTrue(bool(st.st_mode & stat.S_IXUSR))
 
     def test_check_vendor_feeds_json_mode(self) -> None:
-        # Run with mock PATH or direct invocation
-        res = subprocess.run(
-            ["bash", str(REPO_ROOT / "scripts" / "check_vendor_feeds.sh"), "--json"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        self.assertEqual(res.returncode, 0, f"Error:\n{res.stdout}\n{res.stderr}")
-        data = json.loads(res.stdout)
-        self.assertIsInstance(data, list)
-        app_names = [item["app"] for item in data]
-        self.assertIn("Google Chrome", app_names)
-        self.assertIn("Gemini", app_names)
-        self.assertIn("Comet", app_names)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            script = self.fixture_script(root)
+            env = dict(os.environ, HOME=tmpdir, MOCK_APP_ROOT=tmpdir, MOCK_CALLS=str(root / "calls"))
+            res = subprocess.run(["bash", str(script), "--json"], cwd=str(root),
+                                 capture_output=True, text=True, timeout=30, env=env)
+            self.assertEqual(res.returncode, 0, f"Error:\n{res.stdout}\n{res.stderr}")
+            data = json.loads(res.stdout)
+            app_names = [item["app"] for item in data]
+            self.assertIn("Google Chrome", app_names)
+            self.assertIn("Gemini", app_names)
+            self.assertIn("Comet", app_names)
+            self.assertTrue((root / "calls").read_text())
 
     def test_vendor_lookup_policy_does_not_contaminate_artifact_host(self) -> None:
         source = (REPO_ROOT / "scripts/check_vendor_feeds.sh").read_text()
@@ -70,8 +87,11 @@ class CheckVendorFeedsTests(unittest.TestCase):
             )
             env = dict(os.environ)
             env["HOME"] = str(fake_home)
+            env["MOCK_APP_ROOT"] = str(fake_home)
+            env["MOCK_CALLS"] = str(Path(tmpdir) / "calls")
+            script = self.fixture_script(Path(tmpdir))
             res = subprocess.run(
-                ["bash", str(REPO_ROOT / "scripts" / "check_vendor_feeds.sh"), "--json"],
+                ["bash", str(script), "--json"],
                 cwd=str(REPO_ROOT),
                 capture_output=True,
                 text=True,
@@ -83,6 +103,7 @@ class CheckVendorFeedsTests(unittest.TestCase):
             chrome_entry = next((item for item in data if item["app"] == "Google Chrome"), None)
             self.assertIsNotNone(chrome_entry)
             self.assertEqual(chrome_entry.get("omaha_status"), "noupdate")
+            self.assertTrue(Path(env["MOCK_CALLS"]).read_text())
 
 
 if __name__ == "__main__":

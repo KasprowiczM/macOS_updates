@@ -530,6 +530,11 @@ class InventoryHonestyTests(unittest.TestCase):
         session = root / "session"
         session.mkdir()
         env = isolate_host_tools(shell_env(HOME=str(root), MAC_UPDATE_APP_DIRS=str(apps), MAC_UPDATE_INVENTORY_ONLY="1"))
+        fixture_bin = root / "plist-stubs"
+        fixture_bin.mkdir()
+        from support import mock_defaults
+        mock_defaults(fixture_bin)
+        env["PATH"] = f"{fixture_bin}:{env['PATH']}"
         for key, value in lang_keys("en").items():
             env[key] = value
         return script_dir, session, apps, env
@@ -593,7 +598,6 @@ class InventoryHonestyTests(unittest.TestCase):
         self.assertIn("Inventory refreshed", lang_keys("en")["L_ALL_INVENTORY_DONE_FMT"])
         self.assertNotIn("Inventory refreshed", lang_keys("pl")["L_ALL_INVENTORY_DONE_FMT"])
 
-    @unittest.skipUnless(shutil.which("defaults") and shutil.which("lipo"), "macOS tools required")
     def test_build_inventory_end_to_end_reports_the_real_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -603,6 +607,8 @@ class InventoryHonestyTests(unittest.TestCase):
             (toolkit / "config" / "npm_global_clis.txt").write_text("# none\n", encoding="utf-8")
             stubs = root / "stubs"
             base_stubs(stubs)
+            from support import mock_defaults
+            mock_defaults(stubs)
             write_stub(stubs, "brew", "exit 0")
             write_stub(stubs, "mas", "exit 1")
             env = shell_env(MAC_LANG="en", HOME=str(root), TMPDIR=str(root), MAC_UPDATE_APP_DIRS=str(apps))

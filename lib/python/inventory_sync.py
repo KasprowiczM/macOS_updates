@@ -665,8 +665,6 @@ def legend_rows(
     norm_installed = {norm_name(n) for n in installed_names if n}
 
     def _is_app_installed(app: str) -> bool:
-        if not norm_installed:
-            return True
         if norm_name(app) in norm_installed:
             return True
         for key, val_list in APP_ALIASES.items():

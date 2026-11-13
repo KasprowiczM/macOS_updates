@@ -10,7 +10,7 @@
 #
 # WHAT IT DOES
 #   1. Writes /etc/pam.d/sudo_local  (macOS 14+; survives OS updates)
-#      or patches /etc/pam.d/sudo    (macOS 13; wiped by OS updates)
+#      macOS 13 shared sudo configuration requires manual administration
 #   2. Optionally wires pam_reattach so Touch ID also works in tmux/screen
 #   3. Never touches /etc/sudoers and never grants passwordless sudo
 #
@@ -27,6 +27,7 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+[ ! -f "$SCRIPT_DIR/i18n/loader.sh" ] || . "$SCRIPT_DIR/i18n/loader.sh"
 
 GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[0;33m'
 RED='\033[0;31m'; MAGENTA='\033[0;35m'; NC='\033[0m'
@@ -88,8 +89,8 @@ if [ "$MACOS_MAJOR" -ge 14 ] 2>/dev/null; then
 else
     TARGET="$PAM_SUDO"
     PERSISTENT=0
-    warn "macOS 13 has no sudo_local; /etc/pam.d/sudo is patched instead."
-    warn "That file is REWRITTEN by every macOS update — re-run this script after upgrades."
+    warn "$L_TOUCHID_SHARED_UNAVAILABLE"
+
 fi
 info "Target PAM file: $TARGET"
 
@@ -147,88 +148,73 @@ if [ "$MODE" = "check" ]; then
     exit 1
 fi
 
-# ── 5. UNINSTALL mode ───────────────────────────────────────
+# Refuse to alter any existing file whose entire content is not ours.
+# The macOS 13 sudo file is shared, so it is never modified automatically.
+if [ "$PERSISTENT" -ne 1 ]; then
+    err "${L_TOUCHID_SHARED_UNAVAILABLE:-Automatic changes to the shared sudo file are unavailable.}"
+    exit 1
+fi
+if [ -L "$TARGET" ] || { [ -e "$TARGET" ] && [ ! -f "$TARGET" ]; }; then
+    err "$L_TOUCHID_FOREIGN_FILE"
+    exit 1
+fi
+if [ -e "$TARGET" ]; then
+    if ! diff -q "$TARGET" <(build_desired) >/dev/null 2>&1; then
+        err "${L_TOUCHID_FOREIGN_FILE:-Existing sudo_local contains foreign or unrecognized content; left unchanged.}"
+        exit 1
+    fi
+fi
+if [ "$MODE" = "install" ] && [ -e "$TARGET" ]; then
+    ok "${L_TOUCHID_ALREADY_CONFIGURED:-Already configured; no changes needed.}"
+    exit 0
+fi
+if [ "$MODE" = "uninstall" ] && [ ! -e "$TARGET" ]; then
+    info "Nothing to remove."
+    exit 0
+fi
+if [ ! -t 0 ] || [ ! -t 1 ] || [ "${MAC_UPDATE_NONINTERACTIVE:-0}" = 1 ]; then
+    err "${L_TOUCHID_TTY_REQUIRED:-A terminal is required for PAM changes; no changes made.}"
+    exit 1
+fi
+if ! command -v sudo >/dev/null 2>&1; then
+    err "${L_TOUCHID_SUDO_UNAVAILABLE:-sudo is unavailable; no changes made.}"
+    exit 1
+fi
+. "$SCRIPT_DIR/lib/platform.sh"
+if ! mac_update_tool_usable python3 || ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1; then
+    err "$L_SETUP_PYTHON_UNAVAILABLE"
+    exit 1
+fi
+python_path="$(command -v python3)"
+# Bind consent to absence or the exact file observed before the prompt. The
+# privileged helper checks it again and creates new files without overwriting.
+preview_token="$(PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from setup_safety import fingerprint
+print(fingerprint(sys.argv[1]))
+' "$TARGET" 2>/dev/null)" || { err "$L_TOUCHID_FOREIGN_FILE"; exit 1; }
 if [ "$MODE" = "uninstall" ]; then
-    if [ "$PERSISTENT" -eq 1 ]; then
-        if [ -f "$TARGET" ]; then
-            step "Removing $TARGET"
-            sudo rm -f "$TARGET" || { err "Failed to remove $TARGET"; exit 1; }
-            ok "Touch ID for sudo disabled."
-        else
-            info "Nothing to remove."
-        fi
-    else
-        err "Automatic uninstall from /etc/pam.d/sudo is not performed (too risky)."
-        info "Edit it manually: sudo visudo is NOT the tool — use: sudo nano $PAM_SUDO"
-        exit 1
-    fi
-    exit 0
-fi
-
-# ── 6. INSTALL ──────────────────────────────────────────────
-if current_state; then
-    if [ -n "$REATTACH_LINE" ] && ! grep -q "pam_reattach" "$TARGET" 2>/dev/null; then
-        info "pam_tid already present; adding pam_reattach for tmux support."
-    else
-        ok "Already configured — nothing to do."
-        echo ""
-        info "Verify with: sudo -k && sudo true"
-        exit 0
-    fi
-fi
-
-echo ""
-step "Writing PAM configuration (sudo password required once)"
-
-if [ "$PERSISTENT" -eq 1 ]; then
-    # sudo_local is ours to own entirely. Back up anything pre-existing.
-    if [ -f "$TARGET" ]; then
-        BACKUP="${TARGET}.backup-$(date +%Y%m%d%H%M%S)"
-        sudo cp -p "$TARGET" "$BACKUP" 2>/dev/null && info "Backup: $BACKUP"
-    fi
-    if ! build_desired | sudo tee "$TARGET" >/dev/null; then
-        err "Failed to write $TARGET"
-        exit 1
-    fi
-    sudo chown root:wheel "$TARGET" 2>/dev/null || true
-    sudo chmod 444 "$TARGET" 2>/dev/null || true
+    info "$(printf "$L_TOUCHID_UNINSTALL_PREVIEW" "$TARGET")"
 else
-    # macOS 13: prepend into /etc/pam.d/sudo, never overwrite it.
-    BACKUP="${TARGET}.backup-$(date +%Y%m%d%H%M%S)"
-    sudo cp -p "$TARGET" "$BACKUP" || { err "Backup failed — aborting."; exit 1; }
-    info "Backup: $BACKUP"
-    TMP_PAM="$(mktemp "${TMPDIR:-/tmp}/mac_update_pam.XXXXXX")" || exit 1
-    build_desired > "$TMP_PAM"
-    grep -v '^# Managed by macOS_updates' "$TARGET" >> "$TMP_PAM"
-    if ! sudo cp "$TMP_PAM" "$TARGET"; then
-        err "Write failed — restoring backup."
-        sudo cp -p "$BACKUP" "$TARGET"
-        rm -f "$TMP_PAM"
-        exit 1
-    fi
-    rm -f "$TMP_PAM"
-    sudo chown root:wheel "$TARGET" 2>/dev/null || true
-    sudo chmod 444 "$TARGET" 2>/dev/null || true
+    info "$(printf "$L_TOUCHID_INSTALL_PREVIEW" "$TARGET")"
+    build_desired
 fi
-
-ok "PAM configuration written."
-echo ""
-info "Result:"
-sed 's/^/      /' "$TARGET"
-echo ""
-
-# ── 7. Verify ───────────────────────────────────────────────
-if current_state; then
-    ok "Touch ID for sudo is now ACTIVE."
-    [ "$PERSISTENT" -eq 1 ] && ok "This survives macOS updates (sudo_local)."
-    echo ""
-    info "Test it in a NEW terminal window:"
-    echo "      sudo -k && sudo true      # should show the Touch ID prompt"
-    echo ""
-    info "Then run the updater without typing a password:"
-    echo "      bash update_all.sh -y"
-    exit 0
+printf '%s [y/N] ' "$L_TOUCHID_CONFIRM"
+IFS= read -r answer || exit 1
+case "$answer" in y|Y|yes|YES) ;; *) info "$L_TOUCHID_NO_CHANGES"; exit 0 ;; esac
+if ! sudo "$python_path" - "$SCRIPT_DIR/lib/python" "$TARGET" "$PAM_SUDO" "$MODE" "$preview_token" "$(build_desired)" <<'PY_SETUP_PAM'
+import sys
+sys.path.insert(0, sys.argv[1])
+from setup_safety import apply_pam
+try:
+    backup = apply_pam(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6] + "\n")
+    print(backup)
+except (OSError, ValueError) as exc:
+    print(str(exc), file=sys.stderr)
+    sys.exit(1)
+PY_SETUP_PAM
+then
+    err "$L_TOUCHID_OPERATION_FAILED"
+    exit 1
 fi
-
-err "Verification failed — pam_tid line not found after write."
-exit 1
+ok "$L_TOUCHID_COMPLETE"

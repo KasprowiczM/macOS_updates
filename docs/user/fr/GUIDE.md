@@ -1,6 +1,12 @@
 # Guide utilisateur (Français)
 
-**Version :** 1.6.0 · **Apple Silicon, macOS 13+**
+**Version :** 1.6.1 · **Apple Silicon, macOS 13+**
+
+## Configuration sûre et sources des applications
+
+`bash setup.sh --inspect` vérifie la disponibilité sans installation, modification du profil shell ni configuration Touch ID. Un outil absent rend sa fonction indisponible. Dans un terminal, `bash setup.sh --install-dependencies` présente les dépendances facultatives et demande avant chaque installation ; `bash setup.sh --configure-shell` présente séparément la modification du profil. Refuser une dépendance ne bloque pas les fonctions indépendantes. Sans Python, installez-le explicitement avant de construire l’inventaire. Un `mas` absent ou ancien est signalé, jamais installé ni mis à niveau automatiquement.
+
+Le rapport normal montre les applications installées. `bash scripts/report_update_coverage.sh --show-supported` affiche les recettes absentes. Ce catalogue informatif n’est pas encore un menu d’installation. Un reçu App Store pour CapCut conserve la voie App Store même sans cask. Sans propriété Homebrew confirmée, une source est proposée sans adoption ni installation. La résolution complète et le choix interactif des sources restent prévus pour les étapes suivantes.
 
 ## Fonctionnement
 

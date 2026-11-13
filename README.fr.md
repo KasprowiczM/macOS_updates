@@ -6,7 +6,7 @@
 
 **Site web :** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Dépôt :** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licence :** [MIT](LICENSE) · **Changements :** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.0** — Orchestrateur de mises à jour en une seule commande, prêt pour la production, pour les **Mac Apple Silicon sous macOS 13–27**. Il coordonne des mises à jour de paquets vérifiées et des déclenchements honnêtes des programmes de mise à jour des applications, pour les **logiciels déjà installés sur ce Mac**. **Multilingue** (7 langues). Surcouche privée facultative via [`dev_sync/`](dev_sync/README.md).
+> **v1.6.1** : Orchestrateur de mises à jour en une seule commande, pour les **Mac Apple Silicon sous macOS 13-27**. Il coordonne des mises à jour de paquets vérifiées et des déclenchements honnêtes des programmes de mise à jour des applications, pour les **logiciels déjà installés sur ce Mac**. **Multilingue** (7 langues). Surcouche privée facultative via [`dev_sync/`](dev_sync/README.md).
 
 | En un coup d'œil | |
 |------------------|--|
@@ -14,11 +14,21 @@
 | Pipeline | 7 étapes (0–6), la mise à jour de macOS vient toujours en dernier |
 | Registre | 47 applications Internet · 11 méthodes de mise à jour (voir [Méthodes de mise à jour](#méthodes-de-mise-à-jour)) |
 | Langues | EN, PL, ES, FR, DE, IT, PT (CLI et documentation) |
-| Tests | 846 tests automatisés (`bash run_tests.sh`) |
+| Tests | 900 tests automatisés (`bash run_tests.sh`) |
+
+Nouveautés de v1.6.1 : rapport local, reconnaissance du reçu CapCut, consentement explicite dans setup et protection renforcée des tests hors ligne. L’étape A n’active pas encore la résolution automatique des sources ni le menu d’installation.
 
 **Nouveautés de la v1.6.0 :** Les exécutions planifiées (launchd) trouvent Homebrew et `mas`, et l'installateur vérifie que la tâche est chargée (ajout de `--minute` et `--once-in`). Les apps ouvertes ne sont jamais fermées ni remplacées, casks Homebrew compris. Chaque question en cours d'exécution expire avec la réponse sûre « non ». `bash update_all.sh --doctor` est un rapport de préparation en lecture seule, et les exécutions réelles ajoutent des contrôles préalables. L'état persistant des flux éditeur remplace les avertissements opaques de « flux obsolète », et HyperFrames, Superset et Open Design sont installés ou vérifiés sans lancement caché. Les versions 1.5.x antérieures sont décrites dans [CHANGELOG.md](CHANGELOG.md).
 
 **Vérité de l'éditeur (depuis v1.5.0) :** la version de chaque application est comparée au flux de son propre éditeur avant toute exécution. Les applications à jour ne sont pas modifiées ; les applications obsolètes sont mises à jour par leur propre programme de mise à jour, ou installées depuis l'éditeur avec vérification de la signature et du Team ID. Seuls les logiciels installés sont mis à jour (`--bootstrap-cli` installe volontairement les CLI manquantes). Les applications supprimées manuellement sont détectées et jamais réinstallées. **Les applications que vous avez ouvertes ne sont jamais fermées : l'outil ne quitte que ce qu'il a lancé lui-même.** Vérifiez l'état des éditeurs en lecture seule avec `bash scripts/check_vendor_feeds.sh`.
+
+## Configuration sûre et sources des applications
+
+`bash setup.sh --inspect` vérifie la disponibilité sans installation, modification du profil shell ni configuration Touch ID. Un outil absent rend sa fonction indisponible. Dans un terminal, `bash setup.sh --install-dependencies` présente les dépendances facultatives et demande avant chaque installation ; `bash setup.sh --configure-shell` présente séparément la modification du profil. Refuser une dépendance ne bloque pas les fonctions indépendantes. Sans Python, installez-le explicitement avant de construire l’inventaire. Un `mas` absent ou ancien est signalé, jamais installé ni mis à niveau automatiquement.
+
+Le rapport normal montre les applications installées. `bash scripts/report_update_coverage.sh --show-supported` affiche les recettes absentes. Ce catalogue informatif n’est pas encore un menu d’installation. Un reçu App Store pour CapCut conserve la voie App Store même sans cask. Sans propriété Homebrew confirmée, une source est proposée sans adoption ni installation. La résolution complète et le choix interactif des sources restent prévus pour les étapes suivantes.
+
+La recherche latest stable figure dans [SOURCE_RESEARCH.md](docs/catalog/SOURCE_RESEARCH.md). Les éditions différentes ne sont pas comparables ; une observation ponctuelle ne prouve pas quel canal est habituellement le plus rapide.
 
 ---
 
@@ -28,7 +38,7 @@
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/KasprowiczM/macOS_updates/main/install.sh)"
 ```
 
-L'installateur clone le dépôt, demande la **langue** (menu en anglais, 7 langues), installe les dépendances, génère **votre** fichier `APPLICATIONS.md` à partir des applications déjà présentes sur ce Mac et indique celles que le projet peut mettre à jour. Il n'importe jamais l'inventaire d'une autre personne et n'installe pas d'applications à votre place.
+L’installateur clone le dépôt, demande la langue, vérifie la disponibilité et construit l’inventaire de ce Mac si Python est disponible. Les dépendances nécessitent un choix séparé dans setup. Touch ID et les profils shell ne sont pas modifiés automatiquement.
 
 Voir [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 
@@ -48,7 +58,7 @@ Voir [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md
 | 5 | **Post-mise à jour/historique** — actualise `APPLICATIONS.md`, ajoute à `UPDATES.md` de façon atomique |
 | 6 | **macOS (final)** — par étiquette `softwareupdate -i <label> -R` (étiquettes nécessitant un redémarrage dans le lot final) ; différé après un échec bloquant dur aux étapes 1–4 ou sans autorisation |
 
-**Important :** Les mises à jour ne touchent que les logiciels déjà installés sur votre Mac. Les applications prises en charge mais absentes sont signalées, pas installées. L'étape finale macOS peut redémarrer le Mac ; elle passe donc en dernier et conserve l'option obligatoire `-R`. L'étape 5 ne sert qu'au rapport : son échec est une erreur mais ne diffère jamais l'étape macOS. Les applications installées inconnues sont listées pour que vous (ou un agent IA) puissiez ajouter des gestionnaires.
+**Important :** Les mises à jour ne touchent que les logiciels déjà installés sur votre Mac. Les applications absentes du catalogue sont affichées seulement avec `--show-supported`. L'étape finale macOS peut redémarrer le Mac ; elle passe donc en dernier et conserve l'option obligatoire `-R`. L'étape 5 ne sert qu'au rapport : son échec est une erreur mais ne diffère jamais l'étape macOS. Les applications installées inconnues sont listées pour que vous (ou un agent IA) puissiez ajouter des gestionnaires.
 
 La couverture est volontairement explicite : **verified direct** signifie que le programme a confirmé le chemin paquet/version ; **triggered-unverified**, qu'une application a été lancée pour laisser son programme de mise à jour agir sans qu'on puisse prouver l'achèvement ; **externally managed**, que l'éditeur ou l'App Store gère le cycle de mise à jour ; **manual** exige une action de l'utilisateur ; **unknown** n'a aucune méthode enregistrée.
 
@@ -215,10 +225,10 @@ vous-même quand vous voulez appliquer les mises à jour de l'App Store et de ma
 |-------|----------------------------|
 | Mac Apple Silicon (arm64) | — |
 | macOS 13 Ventura ou plus récent (testé jusqu'à macOS 27) | — |
-| Xcode Command Line Tools | ✅ `setup.sh` / `install.sh` |
-| Homebrew | ✅ |
+| Xcode Command Line Tools | Installation manuelle |
+| Homebrew | Installation manuelle: https://brew.sh |
 | `mas` (CLI de l'App Store) | ✅ |
-| Python 3 | ✅ via Homebrew s'il manque |
+| Python 3.9+ | Consentement explicite : `setup.sh --install-dependencies` |
 | `rclone` (facultatif) | ✅ s'il est choisi comme fournisseur cloud |
 
 Les Mac Intel et macOS 12 ou antérieur ne sont pas pris en charge ; les scripts s'arrêtent avant toute modification.
@@ -236,7 +246,7 @@ Les Mac Intel et macOS 12 ou antérieur ne sont pas pris en charge ; les scripts
 # Option B — manuel
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
-bash setup.sh
+bash setup.sh --inspect
 bash build_inventory.sh
 bash update_all.sh
 ```

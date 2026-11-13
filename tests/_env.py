@@ -79,7 +79,7 @@ def install_app_state_stubs(bin_dir) -> None:
     the directory name (`Foo Bar.app` -> `com.test.FooBar`). The probe answers from
     environment variables: FAKE_RUNNING_IDS (space-separated ids -> true),
     FAKE_UNKNOWN_IDS (ids whose probe fails -> unknown); everything else -> false.
-    Any other `defaults` query falls through to the real tool."""
+    Other queries fail closed; no real defaults executable is called."""
     from pathlib import Path
 
     d = Path(bin_dir)
@@ -91,7 +91,7 @@ def install_app_state_stubs(bin_dir) -> None:
         '    n="$(basename "$p" .app | tr -d " ")"\n'
         '    echo "com.test.$n"; exit 0 ;;\n'
         "esac\n"
-        'exec /usr/bin/defaults "$@"\n',
+        'exit 1\n',
         encoding="utf-8",
     )
     (d / "osascript").write_text(

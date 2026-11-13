@@ -1,6 +1,12 @@
 # Inicio rápido (Español)
 
-**Se requiere Mac con Apple Silicon** · macOS 13+ · **v1.6.0**
+**Se requiere Mac con Apple Silicon** · macOS 13+ · **v1.6.1**
+
+## Configuración segura y fuentes de aplicaciones
+
+`bash setup.sh --inspect` comprueba la preparación sin instalar dependencias, cambiar perfiles ni configurar Touch ID. Una herramienta ausente deja su función no disponible. En un terminal, `bash setup.sh --install-dependencies` muestra dependencias opcionales y pregunta antes de cada instalación; `bash setup.sh --configure-shell` presenta por separado el cambio de perfil. Rechazar una dependencia no bloquea funciones independientes. Si falta Python, instálalo explícitamente antes de crear el inventario. Un `mas` ausente o antiguo se indica sin instalarlo ni actualizarlo automáticamente.
+
+El informe normal muestra aplicaciones instaladas. `bash scripts/report_update_coverage.sh --show-supported` muestra recetas ausentes del catálogo. Todavía no es un menú de instalación. Un recibo de App Store para CapCut conserva esa fuente incluso sin cask. Sin propiedad Homebrew confirmada se propone elegir fuente, sin adopción ni instalación. La resolución completa y selección interactiva corresponden a etapas posteriores.
 
 ## Instalación en una línea
 
@@ -13,12 +19,11 @@
 ```bash
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
-bash setup.sh
+bash setup.sh --inspect
 bash build_inventory.sh
 bash update_all.sh
 ```
 
-`setup.sh` instala Homebrew, `mas` y Python si faltan, y selecciona su idioma.
 
 ## Propietario (GitHub + capa Proton Drive)
 

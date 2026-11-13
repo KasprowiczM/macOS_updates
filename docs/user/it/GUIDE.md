@@ -1,6 +1,12 @@
 # Guida utente (Italiano)
 
-**Versione:** 1.6.0 · **Apple Silicon, macOS 13+**
+**Versione:** 1.6.1 · **Apple Silicon, macOS 13+**
+
+## Configurazione sicura e fonti delle applicazioni
+
+`bash setup.sh --inspect` verifica la disponibilità senza installare dipendenze, modificare profili o configurare Touch ID. Uno strumento mancante rende indisponibile la funzione dipendente. Nel terminale, `bash setup.sh --install-dependencies` mostra le dipendenze facoltative e chiede prima di ogni installazione; `bash setup.sh --configure-shell` mostra separatamente la modifica del profilo. Rifiutare una dipendenza non blocca funzioni indipendenti. Se Python manca, installarlo esplicitamente prima dell’inventario. `mas` mancante o vecchio viene segnalato senza installazione o aggiornamento automatico.
+
+Il rapporto normale mostra le applicazioni installate. `bash scripts/report_update_coverage.sh --show-supported` mostra le ricette assenti. Non è ancora un menu di installazione. Una ricevuta App Store per CapCut mantiene quella fonte anche senza cask. Senza proprietà Homebrew confermata viene proposta una fonte, senza adozione o installazione. Risoluzione completa e selezione interattiva delle fonti appartengono alle fasi successive.
 
 ## Cosa fa
 

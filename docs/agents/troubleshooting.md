@@ -36,7 +36,7 @@
 | Intel (x86_64) app does not start after an upgrade (Rosetta) | macOS 27 drops Rosetta on upgrade; Intel x86_64 apps won't run without reinstalling Rosetta (`softwareupdate --install-rosetta --agree-to-license`), and Rosetta is completely removed in macOS 28. Migrate to Apple Silicon native build. |
 | macOS step was skipped | Either a blocking hard failure in steps 1–4 (inspect the summary/log, fix it, rerun; macOS runs last to avoid rebooting a half-updated session) or authorization was unavailable (see below). Since v1.5.5 a step 5 reporting failure never skips it. |
 | macOS update step exits after declining restart | Rerun and accept the framework-managed restart (`-R`) or use System Settings; never replace it with a plain reboot. |
-| Touch ID for sudo not working | `bash scripts/setup_touchid_sudo.sh` (per-machine setup; survives OS updates) |
+| Touch ID for sudo not working | `bash scripts/setup_touchid_sudo.sh --check`; optional setup requires a terminal, Python 3.9+, a backup and explicit consent. Foreign PAM files are refused; macOS 13 needs manual administration |
 | Sudo prompt during long update_all run | `MAC_UPDATE_NO_SUDO_KEEPALIVE=0` (default: keep-alive refreshes sudo every 50s) |
 | LaunchAgent scheduling | `bash scripts/install_launchagent.sh --day 1 --hour 9 --minute 30`; to test a scheduled run use `--once-in 5` (fires once, 5 minutes from now; exclusive with `--day/--hour/--minute`); remove with `--uninstall` |
 | `CASK_MISSING` warning | `config/internet_app_methods.txt` has `brew_cask` but app is not in `brew list --cask`; run `brew install --cask --adopt <slug>` or change method to `silent_launch`. If **every** `brew_cask` app reports missing at once, the cask query itself broke — see the row below, not your config |

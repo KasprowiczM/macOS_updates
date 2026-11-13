@@ -25,11 +25,23 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+unit_only=0
+pattern='test*.py'
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --unit-only) unit_only=1 ;;
+        --pattern) shift; [ "$#" -gt 0 ] || { echo "--pattern requires a value" >&2; exit 2; }; pattern="$1" ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+    shift
+done
+
 fail=0
 say()  { echo -e "${CYAN}── $1${NC}"; }
 ok()   { echo -e "  ${GREEN}✅ $1${NC}"; }
 err()  { echo -e "  ${RED}❌ $1${NC}"; fail=1; }
 
+if [ "$unit_only" -eq 0 ]; then
 say "1/4  bash -n on all .sh"
 syntax_fail=0
 for f in *.sh lib/*.sh dev_sync/*.sh i18n/*.sh scripts/*.sh; do
@@ -105,30 +117,94 @@ else
     err "inline python compile failed"
 fi
 
+fi
+
 say "3/4  python3 -m unittest discover tests"
 # Host guard (pattern from macOS_cleanup 240f0b8/6b61e8f): a test that forgets to
 # mock a host-mutating tool must hit a failing stub, never the real one. Tests
 # still prepend their own mock dirs, which win over the guard. stdin is closed
 # so no test can block on, or answer, a real prompt.
+REAL_PYTHON="$(command -v python3)" || exit 1
 GUARD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mac_update_testguard.XXXXXX")" || exit 1
 GUARD_LOG="$GUARD_DIR/blocked.log"
 : > "$GUARD_LOG"
 # Persistent vendor feed state (lib/python/feed_state.py) must never be read
 # from or written to the real ~/.local/state during tests.
 export MAC_UPDATE_FEED_STATE_FILE="$GUARD_DIR/feed_state.json"
-for tool in softwareupdate mas brew msupdate installer sudo launchctl docker killall; do
+export MAC_UPDATE_HOMEBREW_PREFIX="$GUARD_DIR/empty-homebrew"
+for tool in softwareupdate mas brew msupdate installer sudo launchctl docker killall curl wget open osascript defaults hdiutil ditto codesign spctl; do
     cat > "$GUARD_DIR/$tool" <<GUARD_EOF
 #!/bin/sh
-echo "$tool \$*" >> "$GUARD_LOG"
+echo "[\${MAC_UPDATE_TEST_NAME:-unknown}] $tool \$*" >> "\${MAC_UPDATE_TEST_GUARD_LOG:-$GUARD_LOG}"
 echo "run_tests.sh guard: real '$tool' blocked during tests" >&2
 exit 97
 GUARD_EOF
     chmod +x "$GUARD_DIR/$tool"
 done
-if PATH="$GUARD_DIR:$PATH" python3 -c 'import sys, unittest
+cat > "$GUARD_DIR/python3" <<SH_WRAPPER
+#!/bin/sh
+PYTHONPATH="$GUARD_DIR\${PYTHONPATH+:\$PYTHONPATH}"; export PYTHONPATH
+exec "$REAL_PYTHON" "\$@"
+SH_WRAPPER
+chmod +x "$GUARD_DIR/python3"
+export MAC_UPDATE_TEST_GUARD_LOG="$GUARD_LOG"
+# sitecustomize applies to Python children too, without placing product modules
+# on PYTHONPATH. Local server tests may explicitly opt in to loopback sockets.
+cat > "$GUARD_DIR/sitecustomize.py" <<'PY_GUARD'
+import os
+import socket
+import subprocess
+_guard_dir = os.path.dirname(__file__)
+_original_popen = subprocess.Popen
+class _GuardedPopen(_original_popen):
+    def __init__(self, *args, **kwargs):
+        env = dict(os.environ if kwargs.get('env') is None else kwargs['env'])
+        env['PYTHONPATH'] = _guard_dir + (os.pathsep + env['PYTHONPATH'] if env.get('PYTHONPATH') else '')
+        env.setdefault('MAC_UPDATE_TEST_GUARD_LOG', os.environ.get('MAC_UPDATE_TEST_GUARD_LOG', ''))
+        kwargs['env'] = env
+        super().__init__(*args, **kwargs)
+subprocess.Popen = _GuardedPopen
+def _deny():
+    path = os.environ.get('MAC_UPDATE_TEST_GUARD_LOG')
+    if path:
+        with open(path, 'a') as log:
+            log.write('python network blocked\n')
+    raise OSError('network blocked by test guard')
+_original_connect = socket.socket.connect
+_original_connect_ex = socket.socket.connect_ex
+_original_getaddrinfo = socket.getaddrinfo
+def _allowed(address):
+    return (os.environ.get('MAC_UPDATE_TEST_ALLOW_LOOPBACK') == '1'
+            and isinstance(address, tuple) and address[0] in ('127.0.0.1', '::1', 'localhost'))
+def _connect(self, address):
+    if self.family == socket.AF_UNIX or _allowed(address):
+        return _original_connect(self, address)
+    return _deny()
+def _connect_ex(self, address):
+    if self.family == socket.AF_UNIX or _allowed(address):
+        return _original_connect_ex(self, address)
+    return _deny()
+def _getaddrinfo(host, *args, **kwargs):
+    if os.environ.get('MAC_UPDATE_TEST_ALLOW_LOOPBACK') == '1' and host in ('127.0.0.1', '::1', 'localhost', None):
+        return _original_getaddrinfo(host, *args, **kwargs)
+    return _deny()
+socket.getaddrinfo = _getaddrinfo
+socket.socket.connect = _connect
+socket.socket.connect_ex = _connect_ex
+PY_GUARD
+if PATH="$GUARD_DIR:$PATH" PYTHONPATH="$GUARD_DIR" python3 -c 'import sys, unittest
 sys.path[:0] = ["dev_sync", "lib/python"]
-prog = unittest.main(module=None, argv=["unittest", "discover", "-s", "tests"], exit=False)
-sys.exit(0 if prog.result.wasSuccessful() else 1)' </dev/null 2>&1; then
+import os
+original_run = unittest.TestCase.run
+def named_run(self, result=None):
+    os.environ["MAC_UPDATE_TEST_NAME"] = self.id()
+    try: return original_run(self, result)
+    finally: os.environ.pop("MAC_UPDATE_TEST_NAME", None)
+unittest.TestCase.run = named_run
+prog = unittest.main(module=None, argv=["unittest", "discover", "-s", "tests", "-p", sys.argv[1]], exit=False)
+for test, reason in prog.result.skipped:
+    print("SKIPPED: {}: {}".format(test.id(), reason))
+sys.exit(0 if prog.result.wasSuccessful() else 1)' "$pattern" </dev/null 2>&1; then
     ok "test suite passed"
 else
     err "test suite failed"
@@ -139,11 +215,14 @@ if [ -s "$GUARD_LOG" ]; then
 fi
 rm -rf "$GUARD_DIR"
 
+if [ "$unit_only" -eq 0 ]; then
 say "4/4  scripts/scan_secrets.sh"
 if bash scripts/scan_secrets.sh 2>&1; then
     ok "secret scan passed"
 else
     err "secret scan failed"
+fi
+
 fi
 
 echo ""

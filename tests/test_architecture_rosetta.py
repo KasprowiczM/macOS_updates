@@ -23,6 +23,8 @@ class ArchitectureRosettaTests(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp(prefix="macupd_test_arch_")
         self.bin_dir = os.path.join(self.temp_dir, "bin")
         os.makedirs(self.bin_dir, exist_ok=True)
+        from support import mock_defaults
+        mock_defaults(Path(self.bin_dir))
         self.old_path = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{self.bin_dir}:{self.old_path}"
         self.rosetta_dir = os.path.join(self.temp_dir, "rosetta")

@@ -1,6 +1,12 @@
 # Quick Start (English)
 
-**Apple Silicon Mac required** · macOS 13+ · **v1.6.0**
+**Apple Silicon Mac required** · macOS 13+ · **v1.6.1**
+
+## Safe setup and application sources
+
+`bash setup.sh --inspect` checks readiness without installing dependencies, changing shell profiles or configuring Touch ID. Missing tools leave the affected feature unavailable. In a terminal, `bash setup.sh --install-dependencies` previews optional dependencies and asks before each installation; `bash setup.sh --configure-shell` separately previews a shell profile change. Declining a dependency leaves independent features usable. If Python is unavailable, install it explicitly before building inventory. Missing or outdated `mas` is reported during updates and is never installed or upgraded automatically.
+
+The normal update report lists installed applications. Browse supported but absent recipes with `bash scripts/report_update_coverage.sh --show-supported`. This is a reference catalog, not an installation menu. A CapCut App Store receipt retains App Store routing even without a cask. A local app without confirmed Homebrew ownership gets a source recommendation, not adoption or installation. The full source resolver and interactive source selection are planned for later stages.
 
 ## One-line install (recommended)
 
@@ -20,7 +26,7 @@ The installer builds **your** app inventory from what's already installed. It do
 
 ## Language (7 locales)
 
-After clone, `install.sh`, `setup.sh`, and `migration_setup.sh` show an **English** language menu (default: English). Your choice is saved in `.mac_update_prefs` as `MAC_LANG` (`en`, `pl`, `de`, `fr`, `es`, `it`, `pt`). All update scripts (`update_all.sh`, `update_*.sh`), `uninstall.sh`, and the coverage report use the same preference.
+After clone, `install.sh` and `migration_setup.sh` show an **English** language menu (default: English). Your choice is saved in `.mac_update_prefs` as `MAC_LANG` (`en`, `pl`, `de`, `fr`, `es`, `it`, `pt`). All update scripts (`update_all.sh`, `update_*.sh`), `uninstall.sh`, and the coverage report use the same preference.
 
 Set `MAC_UPDATE_LANG=pl` (etc.) before running the one-liner to skip the picker.
 
@@ -29,7 +35,7 @@ Set `MAC_UPDATE_LANG=pl` (etc.) before running the one-liner to skip the picker.
 ```bash
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
-bash setup.sh
+bash setup.sh --inspect
 bash build_inventory.sh
 bash update_all.sh
 ```

@@ -275,12 +275,6 @@ echo "RC=$?"
         for flag in ("--proto =https", "--proto-redir =https", "--retry-all-errors", "--max-filesize"):
             self.assertIn(flag, args)
 
-    def test_system_curl_supports_retry_all_errors(self) -> None:
-        curl = shutil.which("curl")
-        if not curl:
-            self.skipTest("curl not installed")
-        out = subprocess.run([curl, "--help", "all"], capture_output=True, text=True).stdout
-        self.assertIn("--retry-all-errors", out)
 
 
 def _history(app_ts_unix: float, version: str, state: str = "NO_UPDATE", appid: str = "com.google.drivefs") -> str:

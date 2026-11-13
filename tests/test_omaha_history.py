@@ -164,6 +164,7 @@ class OmahaHistoryShellTests(unittest.TestCase):
             Path(tmp, "Comet.app").mkdir()
             res = _bash(COMMON + f"""
                 app_version() {{ echo "153.0.8010.191"; }}
+                app_build_version() {{ echo "$@" >> "{tmp}/build_calls"; return 1; }}
                 MAC_UPDATE_OMAHA_WAIT=1
                 internet_handler_chromium_updater "Comet" "{tmp}/Comet.app" "{updater}" "{tmp}/updater.log" "ai.perplexity.comet"
                 echo "STATUS=$INTERNET_LAST_STATUS"; echo "VERIFIED=$INTERNET_LAST_VERIFIED"
@@ -188,6 +189,7 @@ class OmahaHistoryShellTests(unittest.TestCase):
                 export MAC_UPDATE_GOOGLE_USER_LOG="{tmp}/updater.log"
                 export MAC_UPDATE_GOOGLE_SYS_LOG="/dev/null"
                 app_version() {{ echo "1.119.2.914"; }}
+                app_build_version() {{ echo "$@" >> "{tmp}/build_calls"; return 1; }}
                 google_keystone_check() {{ echo called >> "{calls}"; return 0; }}
                 eval "$(declare -f iu_gemini | sed 's|/Applications/Gemini.app|{tmp}/Gemini.app|g')"
                 iu_gemini

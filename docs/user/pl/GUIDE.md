@@ -1,6 +1,12 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.6.0 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.6.1 · **Apple Silicon, macOS 13+**
+
+## Bezpieczny setup i źródła aplikacji
+
+`bash setup.sh --inspect` sprawdza gotowość bez instalowania zależności, zmiany profilu powłoki i konfiguracji Touch ID. Brak narzędzia oznacza niedostępność zależnej funkcji. W terminalu `bash setup.sh --install-dependencies` pokazuje plan opcjonalnych zależności i pyta przed każdą instalacją; `bash setup.sh --configure-shell` osobno pokazuje zmianę profilu powłoki. Odrzucenie zależności nie blokuje niezależnych funkcji. Jeśli brak Pythona, zainstaluj go świadomie przed budowaniem inventory. Brakujący lub stary `mas` jest zgłaszany podczas aktualizacji, bez automatycznej instalacji lub aktualizacji narzędzia.
+
+Zwykły raport aktualizacji pokazuje lokalne aplikacje. Katalog obsługiwanych, lecz nieobecnych aplikacji otwiera `bash scripts/report_update_coverage.sh --show-supported`. To katalog informacyjny, jeszcze nie menu instalacji. Receipt App Store dla CapCut zachowuje obsługę przez App Store również bez caska. Lokalna aplikacja bez potwierdzonej rejestracji Homebrew otrzymuje propozycję wyboru źródła, bez przejmowania lub instalacji. Pełny resolver i interaktywny wybór źródła należą do kolejnych etapów.
 
 ## Co robi ten zestaw
 

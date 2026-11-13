@@ -657,6 +657,7 @@ fi
 STALE_LIMIT="${MAC_UPDATE_STALE_DAYS:-45}"
 while IFS='|' read -r _s_app _s_meth _s_var; do
     case "$_s_app" in '#'*|'') continue ;; esac
+    internet_app_present "$_s_app" || continue
     _s_meth="$(echo "$_s_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     _s_var="$(echo "$_s_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     if [ "$_s_meth" = "silent_launch" ]; then
@@ -677,16 +678,27 @@ while IFS='|' read -r _s_app _s_meth _s_var; do
 done < "$SCRIPT_DIR/config/internet_app_methods.txt"
 
 # ── Validate brew_cask entries exist in Homebrew ──
-_installed_casks="$(brew_cask_versions 2>/dev/null || true)"
+_cask_query_ok=1
+_installed_casks="$(brew_cask_versions 2>/dev/null)" || _cask_query_ok=0
 while IFS='|' read -r _v_app _v_meth _v_var; do
     case "$_v_app" in '#'*|'') continue ;; esac
     _v_meth="$(echo "$_v_meth" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     _v_var="$(echo "$_v_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     if [ "$_v_meth" = "brew_cask" ]; then
         _v_app_name="$(echo "$_v_app" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        internet_app_present "$_v_app_name" || continue
+        _v_path="$(internet_app_path "$_v_app_name")"
+        if app_store_managed "$_v_path"; then
+            eval "${_v_var}=\"\$L_INTERNET_STATUS_MANAGED_APPSTORE\""
+            continue
+        fi
+        if [ "$_cask_query_ok" -ne 1 ]; then
+            eval "${_v_var}=\"\$L_INTERNET_STATUS_SOURCE_UNAVAILABLE\""
+            continue
+        fi
         _v_cask="$(internet_cask_name_for_app "$_v_app_name")"
         if ! echo "$_installed_casks" | grep -qi "^${_v_cask}[[:space:]]"; then
-            eval "${_v_var}=\"\$L_INTERNET_STATUS_CASK_MISSING\""
+            eval "${_v_var}=\"\$L_INTERNET_STATUS_SOURCE_UNMANAGED\""
         fi
     fi
 done < "$SCRIPT_DIR/config/internet_app_methods.txt"
@@ -810,6 +822,7 @@ fi
 
 while IFS='|' read -r _c_app _c_meth _c_var; do
     case "$_c_app" in '#'*|'') continue ;; esac
+    internet_app_present "$_c_app" || continue
     _c_var="$(echo "$_c_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [ -n "$_c_var" ] || continue
     _v_st=""
@@ -840,7 +853,7 @@ while IFS='|' read -r _c_app _c_meth _c_var; do
             # The vendor feed failed and the app's updater ran without proof.
             _soft_fail_from_codes=1
             ;;
-        error_soft)
+        error_soft|source_unavailable)
             # Includes the GitHub rate-limit status (a parameterised message that
             # the exact-match scan below cannot recognise).
             _soft_fail_from_codes=1
@@ -1003,6 +1016,7 @@ do
         "$L_INTERNET_STATUS_MAU_OPENED"|\
         "$L_INTERNET_STATUS_UNKNOWN_VERSION"|\
         "$L_INTERNET_STATUS_CASK_MISSING"|\
+        "$L_INTERNET_STATUS_SOURCE_UNAVAILABLE"|\
         "$L_INTERNET_STATUS_FEED_UNREACHABLE"|\
         "$L_INTERNET_STATUS_FEED_UNREADABLE"|\
         "$L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH"|\

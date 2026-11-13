@@ -29,14 +29,14 @@ def run_bash(cmd: str, env: dict[str, str] | None = None, timeout: int = 15) -> 
     full_env = dict(os.environ)
     if env:
         full_env.update(env)
-    return subprocess.run(
-        ["bash", "-c", cmd],
-        capture_output=True,
-        text=True,
-        cwd=str(REPO_ROOT),
-        env=full_env,
-        timeout=timeout,
-    )
+    from support import mock_defaults
+    with tempfile.TemporaryDirectory() as tmp:
+        mock_defaults(Path(tmp))
+        full_env["PATH"] = tmp + os.pathsep + full_env.get("PATH", "")
+        return subprocess.run(
+            ["bash", "-c", cmd], capture_output=True, text=True,
+            cwd=str(REPO_ROOT), env=full_env, timeout=timeout,
+        )
 
 
 class MauInterruptionDetectionTests(unittest.TestCase):

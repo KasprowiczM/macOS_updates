@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.0** — Production-ready one-command update orchestrator for **Apple Silicon Macs running macOS 13–27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.6.1** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 | At a glance | |
 |-------------|--|
@@ -14,11 +14,21 @@
 | Pipeline | 7 steps (0–6), macOS system update always last |
 | Registry | 47 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 846 automated tests (`bash run_tests.sh`) |
+| Tests | 900 automated tests (`bash run_tests.sh`) |
+
+New in v1.6.1: local-only app reporting, receipt-aware CapCut status, explicit setup consent and stronger offline test guards. This is stage A; automatic source resolution and the installation menu are not enabled.
 
 **New in v1.6.0:** Scheduled (launchd) runs find Homebrew and `mas`, and the installer verifies that the job is loaded (`--minute` and `--once-in` added). Apps you have open are never closed or replaced, Homebrew casks included. Every mid-run question times out with the safe answer "no". `bash update_all.sh --doctor` is a read-only readiness report, and real runs add pre-flight checks. Persistent vendor-feed state replaces opaque "stale feed" warnings, and HyperFrames, Superset and Open Design are installed or checked without hidden launches. Earlier 1.5.x releases are described in [CHANGELOG.md](CHANGELOG.md).
 
 **Vendor truth (since v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. **Apps you have open are never closed — the toolkit only quits what it launched itself.** Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
+
+## Safe setup and application sources
+
+`bash setup.sh --inspect` checks readiness without installing dependencies, changing shell profiles or configuring Touch ID. Missing tools leave the affected feature unavailable. In a terminal, `bash setup.sh --install-dependencies` previews optional dependencies and asks before each installation; `bash setup.sh --configure-shell` separately previews a shell profile change. Declining a dependency leaves independent features usable. If Python is unavailable, install it explicitly before building inventory. Missing or outdated `mas` is reported during updates and is never installed or upgraded automatically.
+
+The normal update report lists installed applications. Browse supported but absent recipes with `bash scripts/report_update_coverage.sh --show-supported`. This is a reference catalog, not an installation menu. A CapCut App Store receipt retains App Store routing even without a cask. A local app without confirmed Homebrew ownership gets a source recommendation, not adoption or installation. The full source resolver and interactive source selection are planned for later stages.
+
+Latest stable source research is recorded in [SOURCE_RESEARCH.md](docs/catalog/SOURCE_RESEARCH.md). Versions from different editions are not comparable; a current snapshot does not prove which channel is historically fastest.
 
 ---
 
@@ -28,7 +38,7 @@
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/KasprowiczM/macOS_updates/main/install.sh)"
 ```
 
-The installer clones the repo, prompts for **language** (English menu, 7 locales), installs dependencies, builds **your** `APPLICATIONS.md` from apps already on this Mac, and prints which apps the project can update. It never imports another user's inventory or installs apps for you.
+The installer clones the repo, asks for the language, checks readiness and builds this Mac's inventory when Python is available. Dependency installation requires a separate choice in setup. Touch ID and shell profiles are not changed automatically.
 
 See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 
@@ -48,7 +58,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 | 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
 | 6 | **macOS (final)** — per-label `softwareupdate -i <label> -R` (restart-required labels in the final batch); deferred after a blocking hard failure in steps 1–4 or when authorization is unavailable |
 
-**Important:** Updates only touch software already installed on your Mac. Supported-but-missing apps are reported, not installed. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Step 5 is reporting-only: a failure there is an error but never defers the macOS step. Unknown installed apps are listed so you (or an AI agent) can add handlers.
+**Important:** Updates only touch software already installed on your Mac. Absent catalog apps appear only with `--show-supported`. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Step 5 is reporting-only: a failure there is an error but never defers the macOS step. Unknown installed apps are listed so you (or an AI agent) can add handlers.
 
 Coverage is deliberately explicit: **verified direct** means the updater confirmed the package/version path; **triggered-unverified** means an app was launched to let its vendor updater run but completion cannot be proven; **externally managed** means the vendor or App Store owns the update lifecycle; **manual** requires user action; **unknown** has no registered method.
 
@@ -212,10 +222,10 @@ when you want App Store and macOS updates applied.
 |------|----------------|
 | Apple Silicon (arm64) Mac | — |
 | macOS 13 Ventura or later (tested through macOS 27) | — |
-| Xcode Command Line Tools | ✅ `setup.sh` / `install.sh` |
-| Homebrew | ✅ |
-| `mas` (App Store CLI) | ✅ |
-| Python 3 | ✅ via Homebrew if missing |
+| Xcode Command Line Tools | Manual installation |
+| Homebrew | Manual installation: https://brew.sh |
+| `mas` (App Store CLI) | Explicit consent: `setup.sh --install-dependencies` |
+| Python 3.9+ | Explicit consent: `setup.sh --install-dependencies` |
 | `rclone` (optional) | ✅ if chosen as cloud provider |
 
 Intel Macs and macOS 12 or older are not supported; the scripts exit before any change.
@@ -233,7 +243,7 @@ Intel Macs and macOS 12 or older are not supported; the scripts exit before any 
 # Option B — manual
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
-bash setup.sh
+bash setup.sh --inspect
 bash build_inventory.sh
 bash update_all.sh
 ```

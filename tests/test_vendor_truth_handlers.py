@@ -444,14 +444,15 @@ class TestVendorTruthHandlers(unittest.TestCase):
         self.assertIn("VERIFIED=1", proc.stdout)
         self.assertFalse(os.path.exists(open_log), "silent_launch_app called in dry run")
 
-    @unittest.skipUnless(shutil.which("ditto"), "requires ditto (macOS)")
     def test_vendor_direct_rejects_older_bundle_version(self):
         copy_log = os.path.join(self.tmpdir, "copy.log")
         zip_path = os.path.join(self.tmpdir, "dummy.zip")
         # Create a mock zip with Dummy.app
         app_in_zip = os.path.join(self.tmpdir, "extract_src", "Dummy.app")
         os.makedirs(app_in_zip, exist_ok=True)
-        subprocess.run(["ditto", "-c", "-k", os.path.join(self.tmpdir, "extract_src"), zip_path], check=True)
+        import zipfile
+        with zipfile.ZipFile(zip_path, "w") as archive:
+            archive.writestr("Dummy.app/placeholder", "fixture")
 
         script = f"""
         . "{REPO_ROOT}/i18n/lang_en.sh"
@@ -463,6 +464,10 @@ class TestVendorTruthHandlers(unittest.TestCase):
         print_warn() {{ :; }}
         fetch_to_file() {{ cp "{zip_path}" "$2"; }}
         vendor_direct_verify_checksum() {{ return 0; }}
+        ditto() {{
+            echo "$@" >> "{self.tmpdir}/ditto.log"
+            python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' "$3" "$4"
+        }}
         internet_app_bundle_id() {{ echo "com.example.dummy"; }}
         internet_app_is_running() {{ return 1; }}
         app_version() {{
@@ -485,6 +490,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
         proc = self._run_bash(script)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("RC=1", proc.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.tmpdir, "ditto.log")))
         self.assertFalse(os.path.exists(copy_log), "copy_verified_app should not be called when version is older")
 
     def test_vendor_direct_diag_is_logged(self):
@@ -551,6 +557,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
         print_step() {{ echo "$1"; }}
         silent_launch_app() {{ :; }}
         sleep() {{ :; }}
+        vendor_direct_install() {{ echo "$@" >> "{self.tmpdir}/direct.log"; return 1; }}
         internet_app_bundle_id() {{ echo "com.anthropic.test"; }}
         internet_app_is_running() {{ return 1; }}
         app_version() {{ echo "2.0.0"; }}
@@ -564,6 +571,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
         # Format string expects %s %s -> Claude 2.1.0 (not 90)
         self.assertIn("2.1.0", proc.stdout)
         self.assertNotIn("90", proc.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.tmpdir, "direct.log")))
 
     def test_ambiguous_running_probe_never_authorizes_quit(self):
         session = Path(self.tmpdir) / "session"

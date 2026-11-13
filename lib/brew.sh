@@ -337,3 +337,21 @@ for line in doctor_advisories(sys.stdin.read()):
     print(line)
 ' 2>/dev/null
 }
+
+# Installed cask metadata for read-only coverage; keep all brew queries here.
+brew_installed_casks_json() {
+    local tokens token
+    local names=()
+    command -v brew >/dev/null 2>&1 || return 1
+    tokens="$(HOMEBREW_NO_AUTO_UPDATE=1 brew list --cask -1 2>/dev/null)" || return 1
+    if [ -z "$tokens" ]; then
+        printf '{"casks":[]}\n'
+        return 0
+    fi
+    while IFS= read -r token; do
+        case "$token" in ''|*[!a-zA-Z0-9@+._/-]*) return 1 ;; esac
+        case "$token" in -*) return 1 ;; esac
+        names+=("$token")
+    done <<< "$tokens"
+    HOMEBREW_NO_AUTO_UPDATE=1 brew info --cask --json=v2 "${names[@]}"
+}

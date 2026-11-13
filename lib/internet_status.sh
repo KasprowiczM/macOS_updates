@@ -22,6 +22,8 @@ internet_status_code() {
         "$L_INTERNET_STATUS_FEED_UNREACHABLE"|\
         "$L_INTERNET_STATUS_FEED_UNREADABLE"|\
         "$L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH") echo "feed_unreachable"; return 0 ;;
+        "${L_INTERNET_STATUS_SOURCE_UNAVAILABLE:-source_unavailable}") echo "source_unavailable"; return 0 ;;
+        "${L_INTERNET_STATUS_SOURCE_UNMANAGED:-source_unmanaged}") echo "source_unmanaged"; return 0 ;;
         "$L_INTERNET_STATUS_MANAGED_BREW") echo "managed_brew"; return 0 ;;
         "$L_INTERNET_STATUS_MANAGED_APPSTORE") echo "managed_appstore"; return 0 ;;
         "$L_INTERNET_STATUS_MANUAL_UPDATE") echo "manual"; return 0 ;;

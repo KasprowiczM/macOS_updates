@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.6.0**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
+**Version:** see `VERSION` in repo root (currently **1.6.1**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
 
 ## One-line install (new Mac, Apple Silicon)
 
@@ -12,8 +12,8 @@ This will:
 
 1. Clone to `~/Dev_Env/macOS_updates` (override with `MAC_UPDATE_DIR`)
 2. Show the **language picker** (English menu; default English) and save choice to `.mac_update_prefs`
-3. Run `setup.sh` — Xcode CLT, Homebrew, `mas`, Python, permissions (localized UI)
-4. Run `build_inventory.sh` — create `APPLICATIONS.md` from **your** installed apps only
+3. Run `setup.sh --inspect` to report readiness without changing dependencies, profiles or PAM
+4. When Python is available, run `build_inventory.sh` to create `APPLICATIONS.md` from this Mac; otherwise report the unavailable scan
 5. Print `scripts/report_update_coverage.sh` — what the project can and cannot update (localized)
 
 Pre-clone checks (arm64, macOS version, git) are shown in English because i18n files are not available until after the clone.
@@ -31,10 +31,18 @@ The installer **does not**:
 ```bash
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
-bash setup.sh
+bash setup.sh --inspect
 bash build_inventory.sh
 bash update_all.sh --dry-run -y
 ```
+
+## Explicit optional setup
+
+`bash setup.sh --inspect` checks readiness without installing dependencies, changing shell profiles or configuring Touch ID. Missing tools leave the affected feature unavailable. In a terminal, `bash setup.sh --install-dependencies` previews optional dependencies and asks before each installation; `bash setup.sh --configure-shell` separately previews a shell profile change. Declining a dependency leaves independent features usable. If Python is unavailable, install it explicitly before building inventory. Missing or outdated `mas` is reported during updates and is never installed or upgraded automatically.
+
+The normal update report lists installed applications. Browse supported but absent recipes with `bash scripts/report_update_coverage.sh --show-supported`. This is a reference catalog, not an installation menu. A CapCut App Store receipt retains App Store routing even without a cask. A local app without confirmed Homebrew ownership gets a source recommendation, not adoption or installation. The full source resolver and interactive source selection are planned for later stages.
+
+Touch ID configuration remains a separate, explicitly invoked command with its own preview and confirmation, Python 3.9+ and a successful backup. Automatic PAM changes are available only on macOS 14+; macOS 13 requires manual administration. A foreign PAM configuration is never replaced by setup. The source-channel research is [here](catalog/SOURCE_RESEARCH.md).
 
 ## Owner (GitHub + cloud overlay)
 
@@ -53,9 +61,11 @@ bash update_all.sh
 | `MAC_UPDATE_DIR` | `~/Dev_Env/macOS_updates` | Clone location |
 | `MAC_UPDATE_REPO` | GitHub URL | Alternate remote |
 | `MAC_UPDATE_LANG` | (picker after clone) | Skip picker: `en`, `pl`, `de`, `fr`, `es`, `it`, `pt` |
-| `MAC_UPDATE_NONINTERACTIVE` | `0` | `1` = default answers in `setup.sh` |
+| `MAC_UPDATE_NONINTERACTIVE` | `0` | `1` = inspection only; no mutation consent |
 | `MAC_UPDATE_SKIP_INVENTORY` | `0` | `1` = skip inventory build in `install.sh` |
 | `MAC_UPDATE_REF` | (clone default branch) | Tag, branch, or SHA to check out after clone (`main`, an existing release tag, …) |
+
+The installer exits `10` when optional sources or Python are unavailable; it reports what to configure and does not claim full readiness. Homebrew itself is acquired separately from its official site.
 
 ## Verify
 

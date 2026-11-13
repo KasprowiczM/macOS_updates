@@ -925,6 +925,7 @@ def collect_run_items(
                             "behind", "needs_restart", "update_available", "rollout_hold",
                             "updated", "current_verified", "current_vendor", "current_cask_only",
                             "managed_brew", "managed_appstore", "manual", "skipped",
+                            "source_unavailable", "source_unmanaged",
                             "feed_unreachable", "current_cached", "current_feed_regressed"):
                 internet_unexplained_status = True
             app_keys = get_all_alias_keys(app_name)
@@ -934,7 +935,7 @@ def collect_run_items(
             # feed_unreachable: the vendor feed failed and the app's updater was
             # launched without proof — unconfirmed, like "unverified". The two
             # current_* codes from feed state are informational and add no item.
-            if code in ("unverified", "error_soft", "error_hard", "feed_unreachable"):
+            if code in ("unverified", "error_soft", "error_hard", "feed_unreachable", "source_unavailable", "source_unmanaged"):
                 # Name the app, not just the step: "Step: Internet apps" told
                 # the user nothing about WHICH updater went unconfirmed.
                 seen_internet_keys.update(app_keys)

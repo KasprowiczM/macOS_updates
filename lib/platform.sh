@@ -179,6 +179,21 @@ mac_update_clt_status() {
 }
 
 
+# Apple developer-tool shims can launch an installer when CLT is absent.
+# Resolve without running the tool, and query the selected developer directory.
+mac_update_tool_usable() {
+    local tool_path developer_dir
+    tool_path="$(command -v "$1" 2>/dev/null)" || return 1
+    case "$1:$tool_path" in
+        git:/usr/bin/git|python3:/usr/bin/python3)
+            command -v xcode-select >/dev/null 2>&1 || return 1
+            developer_dir="$(xcode-select -p 2>/dev/null)" || return 1
+            [ -x "$developer_dir/usr/bin/$1" ] || return 1
+            ;;
+    esac
+    return 0
+}
+
 # Guarantee Homebrew is on PATH. launchd starts jobs with
 # /usr/bin:/bin:/usr/sbin:/sbin, where `command -v brew` and `mas` fail.
 # Only prepends when the directory exists and is not already present, so a

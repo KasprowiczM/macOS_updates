@@ -102,7 +102,6 @@ class AppcastCrossCheck(unittest.TestCase):
         self.assertIn("vendor_appcast_published_channel", vt[:stale])
         self.assertIn("L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT", vt[:stale])
 
-    @unittest.skipUnless(sys.platform == "darwin" and shutil.which("defaults"), "needs macOS defaults(1) to read Info.plist")
     def test_shell_helper_end_to_end_with_stub_curl(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_p = Path(tmp)
@@ -116,6 +115,8 @@ class AppcastCrossCheck(unittest.TestCase):
                 plistlib.dump({"CFBundleShortVersionString": "9.9.9", "CFBundleVersion": "1"}, fh)
             bindir = tmp_p / "bin"
             bindir.mkdir()
+            from support import mock_defaults
+            mock_defaults(bindir)
             (tmp_p / "appcast.xml").write_text(APPCAST, encoding="utf-8")
             stub = bindir / "curl"
             stub.write_text(f'#!/bin/sh\ncat "{tmp_p}/appcast.xml"\n', encoding="utf-8")
@@ -129,6 +130,7 @@ class AppcastCrossCheck(unittest.TestCase):
             )
             res = run_bash(script, env=env)
             self.assertEqual(res.stdout.split(), ["gradual-rollout", "rc=0", "rc=1", "rc=1"], res.stderr)
+            self.assertTrue((bindir / "defaults.log").exists())
 
 
 class WarningsOnly(unittest.TestCase):

@@ -1,12 +1,12 @@
 # Contributing
 
-Thank you for contributing to **macOS Updates** (v1.6.0, MIT license). Project site: <https://macos-updates.64bit.site>. Security issues: see [SECURITY.md](SECURITY.md) (do not open a public issue).
+Thank you for contributing to **macOS Updates** (v1.6.1, MIT license). Project site: <https://macos-updates.64bit.site>. Security issues: see [SECURITY.md](SECURITY.md) (do not open a public issue).
 
 ## Requirements
 
 - **Apple Silicon (arm64) Mac running macOS 13 to 27** — Intel and older macOS releases are not supported
 - **Bash 3.2+** — macOS default shell; no `declare -A`, `mapfile`, or `readarray` in project scripts
-- **Python 3.11+** for `dev_sync/`, the importable modules under `lib/python/` and inline heredocs in `update_all.sh`
+- **Python 3.9+** for the public setup/update pipeline; use **Python 3.11+** for the optional `dev_sync/` workflow
 
 ## Before you submit
 
