@@ -378,7 +378,7 @@ bash update_all.sh --dry-run -y
 | Publiczny GitHub a prywatna nakładka | [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · [dev_sync/README.md](dev_sync/README.md) |
 | Deweloperzy/agenci | [docs/agents/scripts.md](docs/agents/scripts.md) · [zasady krytyczne](docs/agents/critical_rules.md) · [kody wyjścia](docs/agents/exit_codes.md) · [rozwiązywanie problemów](docs/agents/troubleshooting.md) · [lista akceptacyjna](docs/agents/acceptance_checklist.md) |
 | Kontekst agentów AI | [AGENTS.md](AGENTS.md) (wspólny kontrakt) · [CLAUDE.md](CLAUDE.md) · [GEMINI.md](GEMINI.md) · [CODEX.md](CODEX.md) |
-| Historia wydań | [CHANGELOG.md](CHANGELOG.md) · [indeks zapisów deweloperskich](docs/reviews/README.md) |
+| Historia wydań | [CHANGELOG.md](CHANGELOG.md) |
 | Współtworzenie / bezpieczeństwo | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) |
 
 ---

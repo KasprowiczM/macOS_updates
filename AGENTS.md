@@ -60,7 +60,7 @@ Load only when relevant to your task:
 - @docs/agents/mcp_setup.md — MCP server absolute path requirement, PATH env fix
 - @docs/agents/security.md — secret handling and deny rules
 - docs/agents/maintenance_prompt.md — universal, harness-agnostic prompt for a periodic verify-review-fix session
-- docs/user/INDEX.md — end-user guides (7 languages); docs/reviews/README.md — index of historical review and implementation records (not authoritative, not auto-loaded)
+- docs/user/INDEX.md — end-user guides (7 languages)
 
 ## Subagents
 

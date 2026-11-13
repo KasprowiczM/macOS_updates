@@ -60,7 +60,6 @@ Starting with version 1.5.5, release numbers of `macOS_updates` and the companio
 Documentation hygiene:
 
 - Counts (tests, apps, update methods) must come from commands, not memory: `bash run_tests.sh`, `grep -vcE '^\s*(#|$)' config/internet_apps.txt`.
-- `docs/reviews/` is an index plus an archive of development records; add new records to its [README](docs/reviews/README.md) and move superseded ones to `docs/reviews/archive/` with `git mv`.
 - No absolute home-directory paths, account names, e-mail addresses, hostnames or machine inventory in tracked files.
 
 ## Pull requests

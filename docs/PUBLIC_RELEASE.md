@@ -16,7 +16,7 @@ This repository is designed for **public GitHub** plus an optional **private ove
 | `i18n/` | 7 language packs (English is source of truth) |
 | `templates/APPLICATIONS.md.template` | Reference structure (not a user catalog) |
 | `tests/`, `run_tests.sh`, `.github/workflows/` | CI (unit/static tests + shellcheck + gitleaks) |
-| `docs/` | User and developer documentation; `docs/reviews/` holds the development-record index and archive |
+| `docs/` | User and developer documentation |
 | `README*.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE` (MIT) | Public project documentation and policy |
 | `VERSION` | Package version |
 | `.env.example` | Template only (no secrets) |

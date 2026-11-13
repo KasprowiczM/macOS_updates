@@ -36,20 +36,14 @@ __pycache__/
 # ── Private overlay examples (real files sync via dev_sync) ─────
 /.env.example.local
 
-# ── Proton Drive Private Overlay (Ignored by Git) ───────
-# Development artefacts (reviews, implementation reports, session prompts) now
-# live in docs/reviews/ — see docs/reviews/README.md. The entries below keep the
-# private ones ignored at their new paths; do not re-add them to git.
+# Local agent settings and development captures
 .antigravitycli/
 /docs/DEV_SCRIPTS_README.md
-/docs/reviews/FABLE5_Project_Review_Report.md
-/docs/reviews/IMPLEMENTATION_REPORT_20260609.md
-/docs/reviews/ultra_review_opus5_v*.md
-/docs/reviews/ULTRA_REVIEW_2026-09-06_v144.md
-docs/agents/handoffs/
-docs/agents/handoff.md
-docs/agents/archive/
-/scratch/
+/docs/reviews/
+/docs/agents/handoffs/
+/docs/agents/handoff.md
+/docs/agents/archive/
+/ULTRA_REVIEW*.md
 git_history_archive.md
 
 # Per-repo update/overlay lock

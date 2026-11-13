@@ -376,7 +376,7 @@ bash update_all.sh --dry-run -y
 | GitHub público e camada privada | [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · [dev_sync/README.md](dev_sync/README.md) |
 | Programadores / agentes | [docs/agents/scripts.md](docs/agents/scripts.md) · [regras críticas](docs/agents/critical_rules.md) · [códigos de saída](docs/agents/exit_codes.md) · [resolução de problemas](docs/agents/troubleshooting.md) · [lista de aceitação](docs/agents/acceptance_checklist.md) |
 | Contexto para agentes de IA | [AGENTS.md](AGENTS.md) (contrato partilhado) · [CLAUDE.md](CLAUDE.md) · [GEMINI.md](GEMINI.md) · [CODEX.md](CODEX.md) |
-| Histórico de versões | [CHANGELOG.md](CHANGELOG.md) · [índice dos registos de desenvolvimento](docs/reviews/README.md) |
+| Histórico de versões | [CHANGELOG.md](CHANGELOG.md) |
 | Contribuir / segurança | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) |
 
 ---

@@ -54,7 +54,7 @@ Phase 3 - fix
 Phase 4 - close
 15. Update the documentation that describes current behaviour: CHANGELOG.md ([Unreleased], dated section),
     the affected files under docs/agents/, the acceptance checklist status, README files in all languages
-    when something user-visible changed, and a new dated, sanitized record under docs/reviews/.
+    when something user-visible changed.
     Leave dated historical sections unchanged.
 16. Do not push, open a pull request, merge, tag or delete anything unless the owner asks. When asked to
     merge: require green CI first, then verify that local main equals the remote.

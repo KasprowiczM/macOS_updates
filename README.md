@@ -374,7 +374,7 @@ bash update_all.sh --dry-run -y
 | Public GitHub vs private overlay | [docs/PUBLIC_RELEASE.md](docs/PUBLIC_RELEASE.md) · [dev_sync/README.md](dev_sync/README.md) |
 | Developers / agents | [docs/agents/scripts.md](docs/agents/scripts.md) · [critical rules](docs/agents/critical_rules.md) · [exit codes](docs/agents/exit_codes.md) · [troubleshooting](docs/agents/troubleshooting.md) · [acceptance checklist](docs/agents/acceptance_checklist.md) |
 | AI agent context | [AGENTS.md](AGENTS.md) (shared contract) · [CLAUDE.md](CLAUDE.md) · [GEMINI.md](GEMINI.md) · [CODEX.md](CODEX.md) |
-| Release history | [CHANGELOG.md](CHANGELOG.md) · [development records index](docs/reviews/README.md) |
+| Release history | [CHANGELOG.md](CHANGELOG.md) |
 | Contributing / security | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) |
 
 ---

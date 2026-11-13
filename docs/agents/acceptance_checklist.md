@@ -3,13 +3,13 @@
 ## Current status (v1.6.0, 2026-11-10)
 
 - v1.6.0 (2026-11-10) is a documentation and version release on top of the branch state recorded below; it adds no live evidence beyond the 2026-11-09 and 2026-11-10 records. Release gate: **846 tests pass** (`bash run_tests.sh`). Paths 2, 3, 4, 6 and 12 remain unaccepted.
-- 2026-11-10 run-log follow-up ([record](../reviews/RUN_LOG_FOLLOWUP_2026-11-10.md)): a real launchd-started run (one-shot LaunchAgent, non-interactive, `--skip-system`) completed with exit 0: Homebrew and `mas` were found (path 10), an app was installed direct-only from its verified vendor zip without any launch, a never-launch app was reported as "open the app to update", and a GitHub rate limit was reported as such. Not observed: a prompt timeout and an open-cask deferral (path 12). Paths 2 and 3 remain unaccepted.
-- 2026-11-09 review follow-up ([record](../reviews/RUN_LOG_FOLLOWUP_2026-11-09.md)): one live full run on the follow-up branch (macOS 27.2, exit 0, degraded). Observed: `--doctor`, pre-flight and `caffeinate` (path 13); the Google Drive proof accepted after the system-scope updater wake (path 11); a single master confirmation with no second Homebrew prompt; vendor-feed diagnostics; `brew doctor` advisories in the summary; an ANSI-free log with per-step durations; an open browser left untouched (path 7, Case B). Not observed: a scheduled launchd run (path 10), a prompt timeout and an open-cask deferral (path 12). The fixes made after that run (GitHub rate-limit reporting, the pre-download running check, prompt re-ask, two newly registered apps) are covered by tests only. The macOS update offered in that run was declined by the user, so paths 2 and 3 remain unaccepted.
-- 2026-11-02 run ([follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-11-02.md)): **621 tests pass**. Path 5 success branch observed again (KeePassXC 2.8.0 → 2.8.0-1 rebuild, `.DIGEST` verified); Path 7 Case A observed for a native updater (HyperFrames b637 → b666, toolkit quit the app it launched). Paths 2 and 3 remain unaccepted.
+- 2026-11-10 run-log follow-up (record): a real launchd-started run (one-shot LaunchAgent, non-interactive, `--skip-system`) completed with exit 0: Homebrew and `mas` were found (path 10), an app was installed direct-only from its verified vendor zip without any launch, a never-launch app was reported as "open the app to update", and a GitHub rate limit was reported as such. Not observed: a prompt timeout and an open-cask deferral (path 12). Paths 2 and 3 remain unaccepted.
+- 2026-11-09 review follow-up (record): one live full run on the follow-up branch (macOS 27.2, exit 0, degraded). Observed: `--doctor`, pre-flight and `caffeinate` (path 13); the Google Drive proof accepted after the system-scope updater wake (path 11); a single master confirmation with no second Homebrew prompt; vendor-feed diagnostics; `brew doctor` advisories in the summary; an ANSI-free log with per-step durations; an open browser left untouched (path 7, Case B). Not observed: a scheduled launchd run (path 10), a prompt timeout and an open-cask deferral (path 12). The fixes made after that run (GitHub rate-limit reporting, the pre-download running check, prompt re-ask, two newly registered apps) are covered by tests only. The macOS update offered in that run was declined by the user, so paths 2 and 3 remain unaccepted.
+- 2026-11-02 run (follow-up): **621 tests pass**. Path 5 success branch observed again (KeePassXC 2.8.0 → 2.8.0-1 rebuild, `.DIGEST` verified); Path 7 Case A observed for a native updater (HyperFrames b637 → b666, toolkit quit the app it launched). Paths 2 and 3 remain unaccepted.
 - Release gate: **600 tests pass** (`bash run_tests.sh`, now with the host-tool guard), shell/Python syntax and secret scan pass; the suite also passes under `/usr/bin/python3` 3.9 (2026-10-30 follow-up on macOS 27.2, still v1.5.5).
-- 2026-10-29 run ([follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-30.md)): macOS 27.2 was offered and the user declined the automatic restart. That exposed the declined-restart error now fixed (exit 10, "skipped by user"). Paths 2 and 3 remain unaccepted.
-- 2026-10-25 run ([follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-25.md)): Path 5 success branch again observed (KeePassXC 2.7.12 → 2.8.0). Path 1 exposed a Track 2 false negative (UniFi update pending, GUI found no button, reported as "nothing pending"); the fixed polling/product-page/`not_offered` flow still needs one live interactive run. Paths 2 and 3 remain unaccepted (no macOS update was offered).
-- Newest live evidence: the 2026-10-11 run below ([v1.5.5 follow-up](../reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md)). Paths 1 and 5 (success branch) were observed; the system update/reboot paths 2 and 3 are still **unaccepted** because that run skipped the macOS step (fixed in v1.5.5).
+- 2026-10-29 run (follow-up): macOS 27.2 was offered and the user declined the automatic restart. That exposed the declined-restart error now fixed (exit 10, "skipped by user"). Paths 2 and 3 remain unaccepted.
+- 2026-10-25 run (follow-up): Path 5 success branch again observed (KeePassXC 2.7.12 → 2.8.0). Path 1 exposed a Track 2 false negative (UniFi update pending, GUI found no button, reported as "nothing pending"); the fixed polling/product-page/`not_offered` flow still needs one live interactive run. Paths 2 and 3 remain unaccepted (no macOS update was offered).
+- Newest live evidence: the 2026-10-11 run below (v1.5.5 follow-up). Paths 1 and 5 (success branch) were observed; the system update/reboot paths 2 and 3 are still **unaccepted** because that run skipped the macOS step (fixed in v1.5.5).
 - The two dated sections after it (2026-10-05, v1.5.3/v1.5.4) are historical evidence and are kept unchanged.
 
 
@@ -19,11 +19,11 @@ The user completed a real v1.5.3 Update All run in **108 seconds**: App Store, n
 
 v1.5.4 fixes the presentation of that manufacturer warning and Proton Mail's updater label. This live observation validates the current-software path; it does not validate installing a future GUI update, user-open protection during an actual update, an OS update/reboot, or a fresh isolated installation/overlay restore. Those remain explicit acceptance work.
 
-Current follow-up evidence: [v1.5.4 run-log review](../reviews/RUN_LOG_FOLLOWUP_2026-10-05_v154.md). Historical v1.5.3 review and acceptance dates below remain unchanged.
+Current follow-up evidence: v1.5.4 run-log review. Historical v1.5.3 review and acceptance dates below remain unchanged.
 
 ## Live run observation (2026-10-11)
 
-The user ran an interactive Update All (Polish locale) on the v1.5.4 branch state. The run exposed the stale-command-hash defect fixed in v1.5.5 (see [the follow-up review](../reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md)); the observations below are valid regardless of that defect.
+The user ran an interactive Update All (Polish locale) on the v1.5.4 branch state. The run exposed the stale-command-hash defect fixed in v1.5.5 (see the follow-up review); the observations below are valid regardless of that defect.
 
 - **Path 1 (App Store Track 2) accepted:** UniFi 10.38.1 → 11.0.0 updated through the App Store GUI and verified after Track 2.
 - **Path 5, success branch only:** OpenCode Desktop 1.18.35 → 1.19.0 installed from the verified vendor feed and verified. The Gatekeeper-rejection and post-swap rollback branches were not exercised.
@@ -39,7 +39,7 @@ The user ran an interactive Update All (Polish locale) on the v1.5.4 branch stat
 - Native CLI migration and duplicate cleanup receive targeted live verification; the release review records the observed result. App-copy, no-terminal authorization and warning propagation receive behavioral tests.
 - Pending live acceptance: a future interactive full Update All run for the final v1.5.3 branch, including GUI fallback and authorized system installation. No reboot-capable full run is claimed during release verification.
 
-Current evidence: [v1.5.3 review](../reviews/ULTRA_REVIEW_2026-10-05_v153.md). Historical checked paths below retain their original dates and versions.
+Current evidence: v1.5.3 review. Historical checked paths below retain their original dates and versions.
 
 This checklist covers critical update and safety paths that have passed static, unit, and integration tests (`run_tests.sh`), but await live observation in a real `update_all.sh` run on macOS hardware.
 

@@ -23,7 +23,7 @@ Released here first at the owner's request; the Ascendo parity port to 1.6.0 is 
 
 ### Fixed (2026-11-10 run-log follow-up)
 
-Evidence: [run-log record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-10.md).
+Evidence: run-log record.
 
 - **HyperFrames and Superset did not update from a hidden launch (high).** Both now install direct-only from their verified Apple Silicon zip through `vendor_direct_install` / `copy_verified_app` (allowlisted https host, vendor checksum, exactly one bundle with the installed bundle ID, Team ID match, Gatekeeper, staged swap with rollback); a running app is reported "quit the app" without a download. HyperFrames: `select_hyperframes_latest` returns `arm64.url` + `arm64.sha256` (`static.heygen.ai`); its build label (`HFBuildLabel`, b879 < b891 < b1000) is the version for both the pre-copy check and the post-install verification. Superset (upstream project now "paradev"; the bundle is still `Superset.app`): arm64 zip + sha512 from `latest-mac.yml` on `github.com`. Neither app is launched, not even when the download fails.
 - **Open Design is never launched or quit (high).** Its launcher hands off to a versioned payload, and LaunchServices launches of 0.27.0 exited about a second after start on 2026-11-06 and 2026-11-10; its own updater installs only while the app runs and the user confirms. Behind is now reported as "Open the app to update: 0.27.0 → 0.27.1" (soft `behind`); the version is still read from the launcher's `runtime.json`, and the toolkit never writes the launcher's state.
@@ -39,7 +39,7 @@ Evidence: [run-log record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-10.md).
 
 ### Fixed (2026-11-09 review follow-up)
 
-Evidence: [review record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-09.md).
+Evidence: review record.
 
 - **Scheduled runs could not find Homebrew or `mas` (high).** launchd's default `PATH` lacks `/opt/homebrew/bin`, so scheduled runs reported "Homebrew is not installed". `lib/platform.sh` now runs `mac_update_ensure_homebrew_path` when sourced (the prefix override `MAC_UPDATE_HOMEBREW_PREFIX` is for tests only) and the generated plist sets `EnvironmentVariables.PATH`. Existing installs must re-run `scripts/install_launchagent.sh`; `--check` warns when the plist has no `PATH` key.
 - **LaunchAgent install could report success without loading (high).** The installer now verifies with `launchctl print` that the service is loaded; on failure it prints the launchctl error and exits non-zero. Re-install cleanup and `--uninstall` use `bootout` only (service target, then plist path); `unload -w` is never used because it leaves a persistent disabled override.
@@ -74,7 +74,7 @@ Evidence: [review record](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-09.md).
 
 ### Fixed (2026-11-02 run-log follow-up, macOS 27.2)
 
-Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-02.md).
+Evidence: run-log follow-up.
 
 - **KeePassXC rebuild never installed (high).** 2.8.0 (Qt 6.11.1) crashes on macOS 27.2 when a database is unlocked; upstream's fix is the same-version package `2.8.0-1` (Qt 6.11.2). `dmg_package_revision` + `github_rebuild_asset` detect a newer package revision of the installed version (recorded in `~/.local/state/mac-update/package_revisions.tsv`, override `MAC_UPDATE_PACKAGE_REVISION_FILE`), and every KeePassXC download is checked against the publisher `.DIGEST`.
 - **New apps deleted on the next run (high).** `app_exists` now ignores the `[arm64]` / 🆕 markers prescan writes.
@@ -83,7 +83,7 @@ Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-11-02.md).
 
 ### Fixed (2026-10-30 run-log follow-up, macOS 27.2)
 
-Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-30.md).
+Evidence: run-log follow-up.
 
 - **Managed Node.js moved to an alpha (high).** `detect_latest_node_version` took the head of `nodejs.org/dist/index.json`, which became `v27.0.0-alpha.0.0.0` on 2026-10-29, and `n latest` installed it; npm 12.2.1 then warned on every call. The new `lib/python/node_releases.py` selects the newest stable `vX.Y.Z` (the shell fallback is restricted the same way) and `n` installs that exact version, so the next run returns to stable (v26.13.0 today).
 - **Declined restart failed the whole run (high).** Answering "n" to the automatic-restart prompt printed "will not be installed" followed by "installing with automatic restart", exited `1` and showed step 6 as an error. It now installs the no-restart labels, skips the restart-required ones (never without `-R`), writes `system_skipped_by_user` and exits `10` with a localized message (`L_SYSTEM_RESTART_DECLINED_FMT`, 7 languages).
@@ -101,7 +101,7 @@ Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-30.md).
 
 ### Fixed (2026-10-25 run-log follow-up)
 
-The version stays 1.5.5 until the Ascendo parity port (lockstep policy). Evidence: [run-log follow-up](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-25.md).
+The version stays 1.5.5 until the Ascendo parity port (lockstep policy). Evidence: run-log follow-up.
 
 - **App Store Track 2 false negative (high).** The iTunes lookup reported `UniFi 11.0.1 → 11.0.2`, the AppleScript returned `NO_UPDATES_FOUND`, and the run claimed "no pending iPad app updates" with exit 0. The same happened on 7 runs since 2026-10-05.
   - The AppleScript now polls the Updates page for up to ~30 s instead of a fixed 6 s delay.
@@ -153,7 +153,7 @@ The version stays 1.5.5 until the Ascendo parity port (lockstep policy). Evidenc
 
 ### Live evidence (2026-10-11)
 
-- The same run verified App Store Track 2 (UniFi 10.38.1 → 11.0.0), a verified vendor install (OpenCode Desktop 1.18.35 → 1.19.0) and toolkit-launched native updaters (Claude Desktop 2.31226.1, Warp). The macOS system step was skipped by the bug above, so the system/reboot path remains unaccepted. See [the follow-up review](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-11_v155.md).
+- The same run verified App Store Track 2 (UniFi 10.38.1 → 11.0.0), a verified vendor install (OpenCode Desktop 1.18.35 → 1.19.0) and toolkit-launched native updaters (Claude Desktop 2.31226.1, Warp). The macOS system step was skipped by the bug above, so the system/reboot path remains unaccepted. See the follow-up review.
 
 ### Documentation
 
@@ -174,7 +174,7 @@ The version stays 1.5.5 until the Ascendo parity port (lockstep policy). Evidenc
 ### Verified live evidence
 
 - The user's completed v1.5.3 run took **108 seconds**, with no observed package/app updates, 25 verified internet applications and zero unverified app updaters. App Store, Homebrew, native CLI and system checks completed cleanly; macOS 27.0.1 had no offered update. Proton Drive's older manufacturer feed was the sole warning.
-- This was a current-software verification run, not a benchmark of installing new updates. [Dated follow-up review](docs/reviews/RUN_LOG_FOLLOWUP_2026-10-05_v154.md) records release validation and remaining live acceptance limits.
+- This was a current-software verification run, not a benchmark of installing new updates. Dated follow-up review records release validation and remaining live acceptance limits.
 
 ## [1.5.3] — 2026-10-05
 
@@ -191,7 +191,7 @@ The version stays 1.5.5 until the Ascendo parity port (lockstep policy). Evidenc
 ### Validation
 
 - Full suite: **527 tests pass**, shell/Python syntax, warning-level ShellCheck and secret scan pass. Read-only vendor query and orchestrator dry-run pass; targeted native OpenCode migration and duplicate cleanup were verified live.
-- Regression and release evidence: [v1.5.3 review](docs/reviews/ULTRA_REVIEW_2026-10-05_v153.md). No reboot-capable live Update All run or release tag is part of this release validation.
+- Regression and release evidence: v1.5.3 review. No reboot-capable live Update All run or release tag is part of this release validation.
 
 ## [1.5.2] — 2026-09-28
 
