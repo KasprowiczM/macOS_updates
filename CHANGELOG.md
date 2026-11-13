@@ -6,7 +6,9 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
-## [1.7.0] - 2026-11-13 (local, unpublished)
+## [1.7.0] - 2026-11-14 (main source snapshot, untagged)
+
+The owner authorized merging the completed local checkpoints to main on 2026-11-14. No release tag or new live update acceptance is implied. Earlier implementation reports remain dated records of their local gates.
 
 - Close the A-E source-aware inventory implementation after local checkpoints 1.6.1 through 1.6.5. This final version change adds no execution authority or public installation recipes.
 - Final guarded integration: 1178 collected cases, 1177 passed and one expected private-inventory skip; zero unexpected host-command or network guard hits. Python 3.9 critical checks, warning-level ShellCheck, syntax, module compilation and secret scans pass.
