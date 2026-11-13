@@ -6,6 +6,15 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-11-13 (local, unpublished)
+
+- Add reviewed-source latest-stable advice for 47 registry rows and 48 products, with compatibility, offered/listed distinctions, bounded selected metadata checks and a dated cache. No universal source-speed ranking or automatic migration.
+- Add the optional unselected catalog, requirements preview and separate digest-bound InstallPlan. Automatic yes, EOF and unattended execution grant no new installation permission.
+- Keep all public first-install entries manual or pending review. Official acquisition links require explicit approval; a fresh optional rescan reports observations without treating a browser open as installation success.
+- Add exclusive staged-bundle installation infrastructure, per-action fresh observations, shared target locks and observation-only journal recovery. Automatic public recipes require separate live acceptance.
+- Synchronize seven languages and distinguish historical adapter capabilities from currently authorized execution. No publication, host update, dependency installation or landing change.
+
+
 ## [1.6.4] - 2026-11-13 (local, unpublished)
 
 - Close stage D with 29 new-user fixture profiles and an offline 100-bundle scan budget. Unknown applications remain visible, with review-only proposals and no new execution authority.

@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "name": "vendor_ahead",
+      "versions": [
+        [
+          "vendor",
+          "2.0"
+        ],
+        [
+          "homebrew",
+          "1.0"
+        ]
+      ],
+      "expected": "vendor"
+    },
+    {
+      "name": "brew_ahead",
+      "versions": [
+        [
+          "vendor",
+          "1.0"
+        ],
+        [
+          "homebrew",
+          "2.0"
+        ]
+      ],
+      "expected": "homebrew"
+    },
+    {
+      "name": "payload_tie",
+      "versions": [
+        [
+          "vendor",
+          "2.0"
+        ],
+        [
+          "homebrew",
+          "2.0"
+        ]
+      ],
+      "current": "homebrew",
+      "expected": "homebrew"
+    },
+    {
+      "name": "mas_ahead",
+      "versions": [
+        [
+          "vendor",
+          "1.0"
+        ],
+        [
+          "app_store",
+          "2.0"
+        ]
+      ],
+      "expected": "app_store"
+    },
+    {
+      "name": "mas_later",
+      "versions": [
+        [
+          "vendor",
+          "2.0"
+        ],
+        [
+          "app_store",
+          "1.0"
+        ]
+      ],
+      "expected": "vendor"
+    },
+    {
+      "name": "prerelease_only",
+      "versions": [
+        [
+          "npm",
+          "3.0rc1"
+        ]
+      ],
+      "expected": null
+    },
+    {
+      "name": "no_data",
+      "versions": [],
+      "expected": null
+    },
+    {
+      "name": "incompatible_latest",
+      "versions": [
+        [
+          "vendor",
+          "3.0"
+        ],
+        [
+          "homebrew",
+          "1.0"
+        ]
+      ],
+      "incompatible": [
+        "vendor"
+      ],
+      "expected": "homebrew"
+    },
+    {
+      "name": "staged_rollout",
+      "versions": [
+        [
+          "vendor",
+          "3.0"
+        ],
+        [
+          "homebrew",
+          "1.0"
+        ]
+      ],
+      "staged": [
+        "vendor"
+      ],
+      "expected": "homebrew"
+    },
+    {
+      "name": "incomparable_series",
+      "versions": [
+        [
+          "vendor",
+          "1.107"
+        ],
+        [
+          "homebrew",
+          "2.7"
+        ]
+      ],
+      "policy": "incomparable",
+      "expected": null
+    },
+    {
+      "name": "gui_cli_separate",
+      "versions": [
+        [
+          "vendor",
+          "1.0"
+        ],
+        [
+          "npm",
+          "999"
+        ]
+      ],
+      "cli": [
+        "npm"
+      ],
+      "expected": "vendor"
+    }
+  ]
+}

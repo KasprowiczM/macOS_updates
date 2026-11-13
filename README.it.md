@@ -6,7 +6,7 @@
 
 **Sito web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licenza:** [MIT](LICENSE) · **Modifiche:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.4** : Orchestratore di aggiornamenti con un solo comando, per **Mac Apple Silicon con macOS 13-27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
+> **v1.6.5** : Orchestratore di aggiornamenti con un solo comando, per **Mac Apple Silicon con macOS 13-27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
 
 La fase C attiva inventario JSON locale e piani con permessi specifici. `bash update_all.sh --plan` e `--dry-run` mostrano le stesse decisioni senza scrivere. Una sessione interattiva chiede una volta gli ambiti mostrati; `-y`, EOF e sessioni senza terminale non concedono nuovi permessi. Usa `--preferences` per rivedere o reimpostare le scelte. Gli aggiornamenti conservano fonte e destinazione osservate; conflitti, destinazioni assenti e prove incerte rinviano quel destinatario. `build_inventory.sh --migration --preview` conserva i byte Markdown originali e le note; accetta esplicitamente l’ID mostrato. Gli aggiornamenti generici del produttore restano manuali finché identità e adattatore non sono verificati. Una voce di catalogo non prova installazione né consenso.
 
@@ -16,19 +16,19 @@ La fase C attiva inventario JSON locale e piani con permessi specifici. `bash up
 | Flusso | 7 passaggi (0–6), l'aggiornamento di macOS è sempre l'ultimo |
 | Registro | 47 app da Internet · 11 metodi di aggiornamento (vedi [Metodi di aggiornamento](#metodi-di-aggiornamento)) |
 | Lingue | EN, PL, ES, FR, DE, IT, PT (CLI e documentazione) |
-| Test | 1103 test automatici (`bash run_tests.sh`) |
+| Test | 1178 test automatici (`bash run_tests.sh`) |
 
-Novità della v1.6.1: rapporti locali, riconoscimento ricevuta CapCut, consenso esplicito in setup e isolamento più forte dei test offline. La fase A non abilita ancora la risoluzione automatica delle fonti o il menu di installazione.
+Questa è una versione candidata locale e non pubblicata. Il gestore agisce solo su obiettivi installati con fonte osservata e dopo una nuova approvazione. Gli adattatori generici nativi e dei produttori restano manuali finché non sono disponibili ricette verificate. Il catalogo pubblico facoltativo comprende 48 prodotti e offre link ufficiali verificati per l’acquisizione manuale; non esistono ricette approvate per la prima installazione automatica. L’elenco dei metodi qui sotto descrive capacità, non autorizza l’esecuzione.
 
 **Novità della v1.6.0:** Le esecuzioni pianificate (launchd) trovano Homebrew e `mas`, e l'installer verifica che il job sia caricato (aggiunti `--minute` e `--once-in`). Le app aperte non vengono mai chiuse né sostituite, cask Homebrew inclusi. Ogni domanda durante l'esecuzione scade con la risposta sicura «no». `bash update_all.sh --doctor` è un rapporto di prontezza in sola lettura e le esecuzioni reali aggiungono controlli preliminari. Lo stato persistente dei feed dei produttori sostituisce gli opachi avvisi di «feed obsoleto», e HyperFrames, Superset e Open Design vengono installati o verificati senza avvii nascosti. Le versioni 1.5.x precedenti sono descritte in [CHANGELOG.md](CHANGELOG.md).
 
-**Verità del produttore (dalla v1.5.0):** la versione di ciascuna applicazione viene verificata rispetto al feed del rispettivo produttore prima di qualsiasi azione. Le app aggiornate non vengono toccate; quelle obsolete vengono aggiornate dall'updater della stessa app oppure installate dal produttore con verifica di firma e Team ID. Viene aggiornato solo il software installato (`--bootstrap-cli` installa deliberatamente le CLI mancanti). Le app rimosse manualmente vengono riconosciute e mai reinstallate. **Le app che hai aperto non vengono mai chiuse: lo strumento chiude solo ciò che ha avviato lui stesso.** Controlla lo stato dei produttori in sola lettura con `bash scripts/check_vendor_feeds.sh`.
+I vecchi rapporti sui feed dei produttori sono in sola lettura. Il gestore attuale lascia manuali gli adattatori generici nativi e dei produttori finché non è disponibile una ricetta verificata. La vecchia opzione `--bootstrap-cli` non autorizza una prima installazione. Installa le CLI mancanti separatamente seguendo istruzioni ufficiali verificate. Le app aperte non vengono chiuse. Controlla i feed con `bash scripts/check_vendor_feeds.sh`.
 
 ## Configurazione sicura e fonti delle applicazioni
 
 `bash setup.sh --inspect` verifica la disponibilità senza installare dipendenze, modificare profili o configurare Touch ID. Uno strumento mancante rende indisponibile la funzione dipendente. Nel terminale, `bash setup.sh --install-dependencies` mostra le dipendenze facoltative e chiede prima di ogni installazione; `bash setup.sh --configure-shell` mostra separatamente la modifica del profilo. Rifiutare una dipendenza non blocca funzioni indipendenti. Se Python manca, installarlo esplicitamente prima dell’inventario. `mas` mancante o vecchio viene segnalato senza installazione o aggiornamento automatico.
 
-Il rapporto normale mostra le applicazioni installate. `bash scripts/report_update_coverage.sh --show-supported` mostra le ricette assenti. Non è ancora un menu di installazione. Una ricevuta App Store per CapCut mantiene quella fonte anche senza cask. Senza proprietà Homebrew confermata viene proposta una fonte, senza adozione o installazione. Risoluzione completa e selezione interattiva delle fonti appartengono alle fasi successive.
+Il rapporto normale riguarda le applicazioni installate. `bash scripts/report_update_coverage.sh --show-supported` resta un elenco di riferimento. Il menu facoltativo si apre con `bash setup.sh --catalog` e non seleziona nulla. Dopo l’anteprima e una nuova approvazione, puoi acquisire manualmente un’app tramite un link ufficiale verificato. Cambiare la fonte di un’app esistente richiede una migrazione manuale. Una ricevuta App Store per CapCut conserva quella fonte. Un’app locale senza proprietà Homebrew confermata non viene adottata automaticamente.
 
 La ricerca latest stable è in [SOURCE_RESEARCH.md](docs/catalog/SOURCE_RESEARCH.md). Edizioni diverse non sono confrontabili; una singola osservazione non prova quale canale sia normalmente più veloce.
 
@@ -60,7 +60,7 @@ Vedi [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md
 | 5 | **Post-aggiornamento/cronologia** — aggiorna `APPLICATIONS.md`, aggiunge a `UPDATES.md` in modo atomico |
 | 6 | **macOS (finale)** — per etichetta `softwareupdate -i <label> -R` (etichette che richiedono riavvio nell'ultimo gruppo); rinviato dopo un errore grave bloccante nei passaggi 1–4 o senza autorizzazione |
 
-**Importante:** Gli aggiornamenti riguardano solo il software già installato sul tuo Mac. Le app assenti del catalogo appaiono solo con `--show-supported`. Il passaggio finale di macOS può riavviare il Mac, quindi viene eseguito per ultimo e mantiene l'obbligatorio `-R`. Il passaggio 5 serve solo al report: un suo errore è un errore ma non rinvia mai il passaggio macOS. Le app installate sconosciute vengono elencate in modo che tu (o un agente IA) possa aggiungere gestori.
+**Importante:** Gli aggiornamenti normali agiscono solo sul software installato con fonte osservata e ambito approvato. Il catalogo facoltativo separato può mostrare app assenti, ma non le installa automaticamente. L’acquisizione manuale richiede anteprima e nuova approvazione. Il passaggio finale di macOS può riavviare il Mac, quindi viene eseguito per ultimo e mantiene l’obbligatorio `-R`. Il passaggio 5 serve solo al rapporto. Le app sconosciute sono elencate per la revisione.
 
 La copertura è volutamente esplicita: **verified direct** significa che l'updater ha confermato il percorso pacchetto/versione; **triggered-unverified**, che l'app è stata avviata per lasciar lavorare il suo updater ma il completamento non è dimostrabile; **externally managed**, che il ciclo di aggiornamento è gestito dal produttore o dall'App Store; **manual** richiede un'azione dell'utente; **unknown** non ha un metodo registrato.
 
@@ -70,6 +70,7 @@ bash build_inventory.sh                  # ricostruisce APPLICATIONS.md da quest
 ```
 
 ### Metodi di aggiornamento
+La tabella dei metodi è un riferimento storico alle capacità. Descrive metodi registrati ma non ne autorizza l’esecuzione; il gestore richiede fonte osservata e nuova approvazione.
 
 Il registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) associa 47 app a 11 metodi:
 
@@ -101,7 +102,7 @@ Il registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 | `--dry-run` | Anteprima di ogni passaggio, nessuna modifica, non chiede mai credenziali |
 | `--verify-only` | Verifica le versioni delle app installate rispetto alla cronologia senza modificare nulla |
 | `--json-summary` | Stampa su stdout un oggetto JSON con il risultato al termine |
-| `--bootstrap-cli` | Installa esplicitamente le CLI mancanti (per impostazione predefinita si aggiornano solo quelle installate) |
+| `--bootstrap-cli` | La vecchia opzione CLI non autorizza una prima installazione. Installa le CLI mancanti separatamente seguendo istruzioni ufficiali verificate. |
 | `--non-interactive` | Modalità non interattiva per launchd / cron (implica anche `-y`) |
 | `--notify` | Invia una notifica di macOS al termine |
 | `--treat-appstore-ax-as-warning` | Tratta l'uscita `2` dell'App Store (Accessibilità mancante) come avviso |
@@ -411,3 +412,10 @@ Elenco completo: [docs/agents/troubleshooting.md](docs/agents/troubleshooting.md
 ## Licenza
 
 [MIT](LICENSE) © macOS Updates contributors
+
+
+## Catalogo facoltativo e prima installazione
+
+I nuovi segnali sulle app sono proposte da verificare, non ricette eseguibili. `bash scripts/scan_update_feeds.sh` mostra un riepilogo aggregato. L’esportazione permette di visualizzare e accettare esplicitamente la proposta; è redatta, resta locale e non viene mai caricata. `bash setup.sh --catalog` apre il catalogo senza selezioni. `-y`, le esecuzioni non interattive e EOF non installano nulla. Nel menu, `check <number>` confronta solo le fonti scelte. I risultati indicano l’ultima versione stabile compatibile confermata e la data, con cache di 24 ore. Un dato sconosciuto resta tale. Una scheda pubblica del Mac App Store non dimostra che l’app sia offerta al tuo account.
+
+Il catalogo pubblico conta 47 righe del registro per 48 prodotti e zero ricette approvate per la prima installazione automatica. Dopo l’anteprima e una nuova conferma, puoi scegliere link ufficiali verificati per l’acquisizione manuale. Aprire una pagina non installa l’app. Cambiare la fonte di un’app esistente richiede migrazione manuale. L’InstallPlan separato mostra fonte, destinazione, versione, requisiti e permessi; licenza e costo sconosciuti sono indicati come tali. Ogni ricetta futura richiederà approvazione prima dell’attivazione. Il catalogo non promette l’installazione automatica di tutti i prodotti.

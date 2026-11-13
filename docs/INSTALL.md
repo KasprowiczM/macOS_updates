@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.6.4**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
+**Version:** see `VERSION` in repo root (currently **1.6.5**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
 
 ## One-line install (new Mac, Apple Silicon)
 
@@ -53,6 +53,14 @@ bash migration_setup.sh
 bash dev_sync/dev-sync-import.sh
 bash update_all.sh
 ```
+
+## Optional catalog and source advice
+
+After inspection and inventory collection, run `bash setup.sh --catalog` to browse the public catalog. No item is selected by default. `check <number>` compares the reviewed sources for a chosen product; a newer compatible stable version can produce advice, never an automatic migration. Missing tools or metadata remain explicit limitations.
+
+Selection produces a separate InstallPlan and a fresh confirmation prompt. All current public entries offer manual acquisition or require further review; none has automatic first-install acceptance. Requirements are shown before approval and are not silently installed. Opening an official page does not mean installation succeeded. Return to scan the actual local application before treating it as installed. See [catalog acceptance](catalog/ACCEPTANCE.md).
+
+Existing Markdown inventory requires `bash build_inventory.sh --migration --preview` and explicit acceptance of the displayed proposal ID. Keep the private backup until the new report and preserved notes are checked. `bash update_all.sh --plan` previews existing-app actions without granting new permissions. Review saved decisions with `bash update_all.sh --preferences`.
 
 ## Environment variables
 

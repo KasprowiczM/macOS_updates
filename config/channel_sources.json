@@ -1,0 +1,2468 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-11-13",
+  "scope": "Reviewed public channel metadata only; no install/update authority or offered proof",
+  "registry_rows": [
+    {
+      "row": 1,
+      "name": "Google Chrome",
+      "product_ids": [
+        "google-chrome-gui"
+      ]
+    },
+    {
+      "row": 2,
+      "name": "Firefox Developer Edition",
+      "product_ids": [
+        "firefox-developer-edition-gui"
+      ]
+    },
+    {
+      "row": 3,
+      "name": "Brave Browser",
+      "product_ids": [
+        "brave-browser-gui"
+      ]
+    },
+    {
+      "row": 4,
+      "name": "ChatGPT / Codex",
+      "product_ids": [
+        "chatgpt-gui",
+        "codex-gui"
+      ]
+    },
+    {
+      "row": 5,
+      "name": "Claude",
+      "product_ids": [
+        "claude-gui"
+      ]
+    },
+    {
+      "row": 6,
+      "name": "Comet",
+      "product_ids": [
+        "comet-gui"
+      ]
+    },
+    {
+      "row": 7,
+      "name": "Gemini",
+      "product_ids": [
+        "gemini-gui"
+      ]
+    },
+    {
+      "row": 8,
+      "name": "Perplexity",
+      "product_ids": [
+        "perplexity-gui"
+      ]
+    },
+    {
+      "row": 9,
+      "name": "Antigravity",
+      "product_ids": [
+        "antigravity-gui"
+      ]
+    },
+    {
+      "row": 10,
+      "name": "Antigravity IDE",
+      "product_ids": [
+        "antigravity-ide-gui"
+      ]
+    },
+    {
+      "row": 11,
+      "name": "LM Studio",
+      "product_ids": [
+        "lm-studio-gui"
+      ]
+    },
+    {
+      "row": 12,
+      "name": "OpenCode",
+      "product_ids": [
+        "opencode-gui"
+      ]
+    },
+    {
+      "row": 13,
+      "name": "Cursor",
+      "product_ids": [
+        "cursor-gui"
+      ]
+    },
+    {
+      "row": 14,
+      "name": "Open Design",
+      "product_ids": [
+        "open-design-gui"
+      ]
+    },
+    {
+      "row": 15,
+      "name": "HyperFrames",
+      "product_ids": [
+        "hyperframes-gui"
+      ]
+    },
+    {
+      "row": 16,
+      "name": "Superset",
+      "product_ids": [
+        "superset-gui"
+      ]
+    },
+    {
+      "row": 17,
+      "name": "DeepSeek Harness",
+      "product_ids": [
+        "deepseek-harness-gui"
+      ]
+    },
+    {
+      "row": 18,
+      "name": "Grok Bot",
+      "product_ids": [
+        "grok-bot-gui"
+      ]
+    },
+    {
+      "row": 19,
+      "name": "Obsidian",
+      "product_ids": [
+        "obsidian-gui"
+      ]
+    },
+    {
+      "row": 20,
+      "name": "ProtonVPN",
+      "product_ids": [
+        "protonvpn-gui"
+      ]
+    },
+    {
+      "row": 21,
+      "name": "KeePassXC",
+      "product_ids": [
+        "keepassxc-gui"
+      ]
+    },
+    {
+      "row": 22,
+      "name": "Proton Mail",
+      "product_ids": [
+        "proton-mail-gui"
+      ]
+    },
+    {
+      "row": 23,
+      "name": "zoom.us",
+      "product_ids": [
+        "zoom-us-gui"
+      ]
+    },
+    {
+      "row": 24,
+      "name": "Google Drive",
+      "product_ids": [
+        "google-drive-gui"
+      ]
+    },
+    {
+      "row": 25,
+      "name": "MEGAsync",
+      "product_ids": [
+        "megasync-gui"
+      ]
+    },
+    {
+      "row": 26,
+      "name": "Proton Drive",
+      "product_ids": [
+        "proton-drive-gui"
+      ]
+    },
+    {
+      "row": 27,
+      "name": "Microsoft Excel",
+      "product_ids": [
+        "microsoft-excel-gui"
+      ]
+    },
+    {
+      "row": 28,
+      "name": "Microsoft Word",
+      "product_ids": [
+        "microsoft-word-gui"
+      ]
+    },
+    {
+      "row": 29,
+      "name": "Microsoft Outlook",
+      "product_ids": [
+        "microsoft-outlook-gui"
+      ]
+    },
+    {
+      "row": 30,
+      "name": "Microsoft PowerPoint",
+      "product_ids": [
+        "microsoft-powerpoint-gui"
+      ]
+    },
+    {
+      "row": 31,
+      "name": "Microsoft OneNote",
+      "product_ids": [
+        "microsoft-onenote-gui"
+      ]
+    },
+    {
+      "row": 32,
+      "name": "Microsoft Teams",
+      "product_ids": [
+        "microsoft-teams-gui"
+      ]
+    },
+    {
+      "row": 33,
+      "name": "Visual Studio Code",
+      "product_ids": [
+        "visual-studio-code-gui"
+      ]
+    },
+    {
+      "row": 34,
+      "name": "Warp",
+      "product_ids": [
+        "warp-gui"
+      ]
+    },
+    {
+      "row": 35,
+      "name": "CodeEdit",
+      "product_ids": [
+        "codeedit-gui"
+      ]
+    },
+    {
+      "row": 36,
+      "name": "Docker Desktop",
+      "product_ids": [
+        "docker-desktop-gui"
+      ]
+    },
+    {
+      "row": 37,
+      "name": "AppCleaner",
+      "product_ids": [
+        "appcleaner-gui"
+      ]
+    },
+    {
+      "row": 38,
+      "name": "Spotify",
+      "product_ids": [
+        "spotify-gui"
+      ]
+    },
+    {
+      "row": 39,
+      "name": "CapCut",
+      "product_ids": [
+        "capcut-gui"
+      ]
+    },
+    {
+      "row": 40,
+      "name": "Ledger Live",
+      "product_ids": [
+        "ledger-live-gui"
+      ]
+    },
+    {
+      "row": 41,
+      "name": "Trezor Suite",
+      "product_ids": [
+        "trezor-suite-gui"
+      ]
+    },
+    {
+      "row": 42,
+      "name": "Remote Desktop Manager",
+      "product_ids": [
+        "remote-desktop-manager-gui"
+      ]
+    },
+    {
+      "row": 43,
+      "name": "IPMIView",
+      "product_ids": [
+        "ipmiview-gui"
+      ]
+    },
+    {
+      "row": 44,
+      "name": "Inkscape",
+      "product_ids": [
+        "inkscape-gui"
+      ]
+    },
+    {
+      "row": 45,
+      "name": "UniFi",
+      "product_ids": [
+        "unifi-gui"
+      ]
+    },
+    {
+      "row": 46,
+      "name": "WiFiman",
+      "product_ids": [
+        "wifiman-gui"
+      ]
+    },
+    {
+      "row": 47,
+      "name": "Picsart",
+      "product_ids": [
+        "picsart-gui"
+      ]
+    }
+  ],
+  "products": [
+    {
+      "product_id": "google-chrome-gui",
+      "name": "Google Chrome",
+      "edition": "gui",
+      "research_row": 1,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions?pageSize=1). Stable API: 158.0.8127.37; cask 157.0.8103.79. reviewed/high for channel labels. Catalog newer, but rollout/offered and compatible version unknown. Google updater can own vendor payload from cask only after local ownership review.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions?pageSize=1",
+          "allowed_hosts": [
+            "versionhistory.googleapis.com"
+          ],
+          "parser": "chrome_versions",
+          "stable_policy": "reviewed_endpoint",
+          "architectures": [
+            "arm64"
+          ],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "chrome",
+          "observed_at": "2026-11-13T20:44:07.698569+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/google-chrome.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "google-chrome",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:google-chrome",
+          "observed_at": "2026-11-13T20:43:59.263200+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "firefox-developer-edition-gui",
+      "name": "Firefox Developer Edition",
+      "edition": "gui",
+      "research_row": 2,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://product-details.mozilla.org/1.0/firefox_versions.json). 161.0b3 vs cask 161.0b2. reviewed/high: Developer Edition is beta by design, so there is no eligible stable in this edition. Firefox stable is a separate edition/source migration, never silent substitution.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://product-details.mozilla.org/1.0/firefox_versions.json",
+          "allowed_hosts": [
+            "product-details.mozilla.org"
+          ],
+          "parser": "json_path",
+          "stable_policy": "beta_only",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "firefox",
+          "observed_at": "2026-11-13T20:44:07.784928+00:00",
+          "version_path": [
+            "FIREFOX_DEVEDITION"
+          ]
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/firefox@developer-edition.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "firefox@developer-edition",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:firefox@developer-edition",
+          "observed_at": "2026-11-13T20:43:59.361704+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "brave-browser-gui",
+      "name": "Brave Browser",
+      "edition": "gui",
+      "research_row": 3,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api.github.com/repos/brave/brave-browser/releases/latest). GitHub stable v1.99.57 (prerelease=false), cask 1.99.57.0. reviewed/high for labels, probable release-family tie only. Fourth component and artifact identity need a product-specific rule; no generic zero stripping.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api.github.com/repos/brave/brave-browser/releases/latest",
+          "allowed_hosts": [
+            "api.github.com"
+          ],
+          "parser": "github_release",
+          "stable_policy": "github_flags",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brave",
+          "observed_at": "2026-11-13T20:44:07.862584+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/brave-browser.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "brave-browser",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:brave-browser",
+          "observed_at": "2026-11-13T20:43:59.537927+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "chatgpt-gui",
+      "name": "ChatGPT",
+      "edition": "gui",
+      "research_row": 4,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://persistent.oaistatic.com/codex-app-prod/appcast.xml). SPLIT REQUIRED: see identity table. Feed title Codex, enclosure ChatGPT 26.1111.21308, cask chatgpt 26.1111.21308, separate codex-app 26.623.141536. unknown/conflicting product identity. Do not deduplicate or rank GUI against CLI.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/chatgpt.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "chatgpt",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "brew:chatgpt",
+          "observed_at": "2026-11-13T20:43:59.706331+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "codex-gui",
+      "name": "Codex",
+      "edition": "gui",
+      "research_row": 4,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://persistent.oaistatic.com/codex-app-prod/appcast.xml). SPLIT REQUIRED: see identity table. Feed title Codex, enclosure ChatGPT 26.1111.21308, cask chatgpt 26.1111.21308, separate codex-app 26.623.141536. unknown/conflicting product identity. Do not deduplicate or rank GUI against CLI.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/codex-app.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "codex-app",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "brew:codex-app",
+          "observed_at": "2026-11-13T20:43:59.895633+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "claude-gui",
+      "name": "Claude",
+      "edition": "gui",
+      "research_row": 5,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://downloads.claude.ai/releases/darwin/universal/RELEASES.json). currentRelease 5.11492.2 equals cask release component; cask suffix is hash. reviewed/high metadata, stable channel confirmation pending (feed does not explicitly label stable). Claude Desktop and Claude Code CLI are separate products.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://downloads.claude.ai/releases/darwin/universal/RELEASES.json",
+          "allowed_hosts": [
+            "downloads.claude.ai"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Claude",
+          "observed_at": "2026-11-13T20:44:06.083040+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/claude.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "claude",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:claude",
+          "observed_at": "2026-11-13T20:44:00.078015+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "comet-gui",
+      "name": "Comet",
+      "edition": "gui",
+      "research_row": 6,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://www.perplexity.ai/comet). Official page HTTP403; cask 145.2.7632.4581 points to channel=stable vendor download. reviewed cask metadata only; unknown latest vendor/offered. Chromium updater compatibility needs product identity and native updater ownership. No stale-cask version equals payload assumption for mutable URL.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://www.perplexity.ai/comet",
+          "allowed_hosts": [
+            "www.perplexity.ai"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "comet",
+          "observed_at": "2026-11-13T20:44:15.455406+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/comet.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "comet",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:comet",
+          "observed_at": "2026-11-13T20:44:00.258571+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "gemini-gui",
+      "name": "Gemini",
+      "edition": "gui",
+      "research_row": 7,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://gemini.google/overview/). Official Gemini overview retrieved; no desktop stable feed or matching installer established. unknown product identity. Homebrew gemini is MacPaw Gemini, not Google Gemini. Config keystone is an existing routing claim, not new proof.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://gemini.google/overview/",
+          "allowed_hosts": [
+            "gemini.google"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "gemini",
+          "observed_at": "2026-11-13T20:44:11.787109+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "perplexity-gui",
+      "name": "Perplexity",
+      "edition": "gui",
+      "research_row": 8,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://www.perplexity.ai/download/mac). Vendor endpoint HTTP403. Cask 26.44.0 points to Personal Computer, bundle hint ai.perplexity.macv3. unknown comparison: mobile App Store 26.45.0 cannot be ranked as newer desktop. Mac search gave no verified publisher match.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://www.perplexity.ai/download/mac",
+          "allowed_hosts": [
+            "www.perplexity.ai"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "perplexity",
+          "observed_at": "2026-11-13T20:44:11.734394+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/perplexity.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "perplexity",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "brew:perplexity",
+          "observed_at": "2026-11-13T20:44:00.439014+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "antigravity-gui",
+      "name": "Antigravity",
+      "edition": "gui",
+      "research_row": 9,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml). Vendor default manifest 2.32.0 vs cask 2.31.2,6470801290035200. reviewed metadata; stable eligibility unknown until default manifest is explicitly tied to stable policy. Compound build suffix is not semver prerelease.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml",
+          "allowed_hosts": [
+            "antigravity-hub-auto-updater-974169037036.us-central1.run.app"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Antigravity",
+          "observed_at": "2026-11-13T20:44:06.367947+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/antigravity.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "antigravity",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:antigravity",
+          "observed_at": "2026-11-13T20:44:00.621118+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "antigravity-ide-gui",
+      "name": "Antigravity IDE",
+      "edition": "gui",
+      "research_row": 10,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin-arm64/stable/latest). Stable endpoint name/productVersion 1.107.0, artifact path 2.7.0-4507555968450560; cask 2.7.0,4507555968450560. unknown/incomparable without edition-version mapping; artifact path matches cask release family. Never numerically rank 1.107.0 against 2.7.0.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin-arm64/stable/latest",
+          "allowed_hosts": [
+            "antigravity-ide-auto-updater-974169037036.us-central1.run.app"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "feed:Antigravity IDE",
+          "observed_at": "2026-11-13T20:44:06.577640+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/antigravity-ide.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "antigravity-ide",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "brew:antigravity-ide",
+          "observed_at": "2026-11-13T20:44:00.805780+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "lm-studio-gui",
+      "name": "LM Studio",
+      "edition": "gui",
+      "research_row": 11,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://lmstudio.ai/download). Official download page 0.4.28; cask 0.4.28,2. reviewed matching release family, build 2 vendor page not established. Native GUI and llmster/server CLI need separate identities and versions.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://lmstudio.ai/download",
+          "allowed_hosts": [
+            "lmstudio.ai"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "lmstudio",
+          "observed_at": "2026-11-13T20:44:08.711273+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/lm-studio.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "lm-studio",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:lm-studio",
+          "observed_at": "2026-11-13T20:44:00.994195+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "opencode-gui",
+      "name": "OpenCode",
+      "edition": "gui",
+      "research_row": 12,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api.github.com/repos/anomalyco/opencode/releases/latest). GitHub latest non-prerelease v1.19.5 and updater YAML1.19.5, but cask 2.3.0 points to opencode.ai/files/bin. unknown/conflicting version series, no brew-ahead recommendation without release/edition mapping. npm opencode-ai is CLI, not this GUI.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api.github.com/repos/anomalyco/opencode/releases/latest",
+          "allowed_hosts": [
+            "api.github.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "opencode-release",
+          "observed_at": "2026-11-13T20:45:25.333994+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/opencode-desktop.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "opencode-desktop",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "brew:opencode-desktop",
+          "observed_at": "2026-11-13T20:44:01.195172+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "cursor-gui",
+      "name": "Cursor",
+      "edition": "gui",
+      "research_row": 13,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api2.cursor.sh/updates/api/update/darwin-arm64/cursor/0.0.0/stable). Explicit stable endpoint 3.30.14 vs cask 3.30.8 with different commit. reviewed/high current vendor-ahead evidence. Compatibility and offered rollout still unknown; keep existing install source until separate migration approval. Cursor agent CLI is separate.",
+      "version_comparison_policy": "numeric_before_comma",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api2.cursor.sh/updates/api/update/darwin-arm64/cursor/0.0.0/stable",
+          "allowed_hosts": [
+            "api2.cursor.sh"
+          ],
+          "parser": "json_path",
+          "stable_policy": "reviewed_endpoint",
+          "architectures": [
+            "arm64"
+          ],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Cursor",
+          "observed_at": "2026-11-13T20:44:06.193215+00:00",
+          "version_path": [
+            "name"
+          ]
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/cursor.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "cursor",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:cursor",
+          "observed_at": "2026-11-13T20:44:01.378202+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "open-design-gui",
+      "name": "Open Design",
+      "edition": "gui",
+      "research_row": 14,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://releases.open-design.ai/stable/latest/metadata.json). Explicit stableVersion/channel stable 0.27.1. reviewed/high channel metadata; no comparator source established. Launcher runtime release and bundle version are different. Keep manual open-to-update policy; no app launch in research.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://releases.open-design.ai/stable/latest/metadata.json",
+          "allowed_hosts": [
+            "releases.open-design.ai"
+          ],
+          "parser": "open_design",
+          "stable_policy": "channel_field",
+          "architectures": [
+            "arm64"
+          ],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Open Design",
+          "observed_at": "2026-11-13T20:44:06.846125+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "hyperframes-gui",
+      "name": "HyperFrames",
+      "edition": "gui",
+      "research_row": 15,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://static.heygen.ai/hyperframes-oss/desktop/latest.json). Public latest build b980; arm64 artifact supplied. reviewed build observation, stable eligibility unknown because latest/build label alone is insufficient. Compare numeric b build only within this product, not bundle version.",
+      "version_comparison_policy": "build_b",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://static.heygen.ai/hyperframes-oss/desktop/latest.json",
+          "allowed_hosts": [
+            "static.heygen.ai"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:HyperFrames",
+          "observed_at": "2026-11-13T20:44:06.897959+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "superset-gui",
+      "name": "Superset",
+      "edition": "gui",
+      "research_row": 16,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api.github.com/repos/paradevai/paradev/releases/latest). Paradev Desktop desktop-v2.0.8, GitHub prerelease=false; feed 2.0.8 includes Superset ZIP and Paradev DMG. reviewed/high release status. Rebrand/artifact ownership needs identity review. minimumSystemVersion 22.0.0 is ambiguous (Darwin vs macOS), not permission to infer compatibility.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api.github.com/repos/paradevai/paradev/releases/latest",
+          "allowed_hosts": [
+            "api.github.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "superset-release",
+          "observed_at": "2026-11-13T20:45:25.701877+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "deepseek-harness-gui",
+      "name": "DeepSeek Harness",
+      "edition": "gui",
+      "research_row": 17,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml). nightly-mac.yml returns0.2.2-rc.3. reviewed/high exclusion: no eligible stable established. Native electron-updater may offer nightly, but stable-only policy must decline this candidate.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml",
+          "allowed_hosts": [
+            "download.deepseek.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:DeepSeek Harness",
+          "observed_at": "2026-11-13T20:44:07.145499+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "grok-bot-gui",
+      "name": "Grok Bot",
+      "edition": "gui",
+      "research_row": 18,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api2.cursor.sh/updates/api/update/darwin-arm64/sand/0.0.0/stable). Cursor sand stable endpoint1.0.3, Grok_Bot artifact. reviewed channel observation, vendor ownership/product identity unknown. Do not treat as X Grok mobile, Grok CLI or general Cursor.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api2.cursor.sh/updates/api/update/darwin-arm64/sand/0.0.0/stable",
+          "allowed_hosts": [
+            "api2.cursor.sh"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "feed:Grok Bot",
+          "observed_at": "2026-11-13T20:44:07.323659+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "obsidian-gui",
+      "name": "Obsidian",
+      "edition": "gui",
+      "research_row": 19,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/desktop-releases.json). Official desktop-releases latestVersion1.15.1 matches cask release. reviewed metadata; insider/channel eligibility needs confirmation. asar in-app update and cask full Electron installer are different layers; same app version does not prove same runtime.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/desktop-releases.json",
+          "allowed_hosts": [
+            "raw.githubusercontent.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "obsidian",
+          "observed_at": "2026-11-13T20:44:08.942765+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/obsidian.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "obsidian",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:obsidian",
+          "observed_at": "2026-11-13T20:44:01.555068+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "protonvpn-gui",
+      "name": "ProtonVPN",
+      "edition": "gui",
+      "research_row": 20,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://protonvpn.com/download-macos). Official download page retrieved; earlier /download/macos HTTP404. Cask6.5.2. reviewed manager metadata; latest vendor stable and updater feed unknown. VPN helper/network-extension effects require separate reviewed recipe, not generic bundle swap.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://protonvpn.com/download-macos",
+          "allowed_hosts": [
+            "protonvpn.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "protonvpn-download",
+          "observed_at": "2026-11-13T20:45:26.366859+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/protonvpn.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "protonvpn",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:protonvpn",
+          "observed_at": "2026-11-13T20:44:01.735004+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "keepassxc-gui",
+      "name": "KeePassXC",
+      "edition": "gui",
+      "research_row": 21,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api.github.com/repos/keepassxreboot/keepassxc/releases/latest). Official non-prerelease 2.8.0; cask 2.8.0,2.8.0-1 points to same GitHub release. reviewed/high release-family tie; package revision retained. Native check notification is not proof of self-install capability.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api.github.com/repos/keepassxreboot/keepassxc/releases/latest",
+          "allowed_hosts": [
+            "api.github.com"
+          ],
+          "parser": "github_release",
+          "stable_policy": "github_flags",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "keepassxc",
+          "observed_at": "2026-11-13T20:44:08.317555+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/keepassxc.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "keepassxc",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:keepassxc",
+          "observed_at": "2026-11-13T20:44:01.931722+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "proton-mail-gui",
+      "name": "Proton Mail",
+      "edition": "gui",
+      "research_row": 22,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://proton.me/download/mail/macos/version.json). Explicit Stable 1.16.1 (2026-11-02) equals cask. reviewed/high tie in release label; mutable generic vendor DMG needs artifact/signature checks. Subscription/access requirements not reviewed.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://proton.me/download/mail/macos/version.json",
+          "allowed_hosts": [
+            "proton.me"
+          ],
+          "parser": "proton_releases",
+          "stable_policy": "category_stable",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Proton Mail",
+          "observed_at": "2026-11-13T20:44:06.735502+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/proton-mail.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "proton-mail",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:proton-mail",
+          "observed_at": "2026-11-13T20:44:02.111180+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "zoom-us-gui",
+      "name": "zoom.us",
+      "edition": "gui",
+      "research_row": 23,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061222). Cask7.2.5.90525 and official release notes retrieved. reviewed manager metadata only; native latest stable extraction unknown. PKG/helper effects and account/managed rollout distinguish Zoom Workplace from Zoom for IT admins.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061222",
+          "allowed_hosts": [
+            "support.zoom.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "zoom",
+          "observed_at": "2026-11-13T20:44:09.998484+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/zoom.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "zoom",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:zoom",
+          "observed_at": "2026-11-13T20:44:02.302390+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "google-drive-gui",
+      "name": "Google Drive",
+      "edition": "gui",
+      "research_row": 24,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://support.google.com/a/answer/7577057). Cask134.0.1 points to vendor 5-percent/GoogleDrive.dmg, official release notes retrieved. reviewed manager metadata; staged channel explicitly visible in URL, no global offered claim. Keystone/Google updater ownership needs local confirmation.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://support.google.com/a/answer/7577057",
+          "allowed_hosts": [
+            "support.google.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "google-drive",
+          "observed_at": "2026-11-13T20:44:10.259314+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/google-drive.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "google-drive",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:google-drive",
+          "observed_at": "2026-11-13T20:44:02.472452+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "megasync-gui",
+      "name": "MEGAsync",
+      "edition": "gui",
+      "research_row": 25,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://mega.io/desktop). Cask6.7.0.3 and official desktop page retrieved. reviewed manager metadata; latest native stable feed unknown. Mutable DMG and native updater may share payload without proving simultaneous publication.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://mega.io/desktop",
+          "allowed_hosts": [
+            "mega.io"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "mega",
+          "observed_at": "2026-11-13T20:44:09.677149+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/megasync.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "megasync",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:megasync",
+          "observed_at": "2026-11-13T20:44:02.686801+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "proton-drive-gui",
+      "name": "Proton Drive",
+      "edition": "gui",
+      "research_row": 26,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://proton.me/download/drive/macos/version.json). Explicit Stable 3.1.1 (2026-11-09), cask 3.1.1; reviewed/high release tie. Additional appcast exists and may contain rollout releases; publication does not equal offered update. File-provider and agent effects need reviewed installer contract.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://proton.me/download/drive/macos/version.json",
+          "allowed_hosts": [
+            "proton.me"
+          ],
+          "parser": "proton_releases",
+          "stable_policy": "category_stable",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Proton Drive",
+          "observed_at": "2026-11-13T20:44:06.603173+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/proton-drive.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "proton-drive",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:proton-drive",
+          "observed_at": "2026-11-13T20:44:02.865540+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "microsoft-excel-gui",
+      "name": "Microsoft Excel",
+      "edition": "gui",
+      "research_row": 27,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac). Current-channel official Office 16.115 (26110837) matches cask 16.115.26110837 and Mac App Store16.115 at release granularity only. reviewed/high family tie, MAS build unknown. MAU and MAS are distinct update ownership/license channels.",
+      "version_comparison_policy": "office_release_family",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+          "allowed_hosts": [
+            "learn.microsoft.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "office",
+          "observed_at": "2026-11-13T20:44:11.168091+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/microsoft-excel.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "microsoft-excel",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:microsoft-excel",
+          "observed_at": "2026-11-13T20:44:03.046286+00:00"
+        },
+        {
+          "source_id": "app_store",
+          "updater_id": "app_store",
+          "url": "https://itunes.apple.com/lookup?id=462058435&entity=macSoftware&country=us",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "app_store_mac",
+          "stable_policy": "public_store_listing",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "store_id": 462058435,
+          "bundle_id": "com.microsoft.Excel",
+          "region": "us",
+          "evidence_key": "mas-mac",
+          "observed_at": "2026-11-13T20:45:25.001416+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "microsoft-word-gui",
+      "name": "Microsoft Word",
+      "edition": "gui",
+      "research_row": 28,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac). Official Office 16.115 (26110837), cask 16.115.26110837, MAS16.115. reviewed/high release-family tie, MAS build unknown. Preserve MAS for receipt app; MAU for compatible vendor-owned payload only.",
+      "version_comparison_policy": "office_release_family",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+          "allowed_hosts": [
+            "learn.microsoft.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "office",
+          "observed_at": "2026-11-13T20:44:11.168091+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/microsoft-word.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "microsoft-word",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:microsoft-word",
+          "observed_at": "2026-11-13T20:44:03.233588+00:00"
+        },
+        {
+          "source_id": "app_store",
+          "updater_id": "app_store",
+          "url": "https://itunes.apple.com/lookup?id=462054704&entity=macSoftware&country=us",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "app_store_mac",
+          "stable_policy": "public_store_listing",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "store_id": 462054704,
+          "bundle_id": "com.microsoft.Word",
+          "region": "us",
+          "evidence_key": "mas-office-us",
+          "observed_at": "2026-11-13T20:44:40.512715+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "microsoft-outlook-gui",
+      "name": "Microsoft Outlook",
+      "edition": "gui",
+      "research_row": 29,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac). Official Office 16.115 (26110837), cask 16.115.26110837, MAS16.115. reviewed/high release-family tie, MAS build unknown. Consumer/business licensing and rollout are independent of visible version.",
+      "version_comparison_policy": "office_release_family",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+          "allowed_hosts": [
+            "learn.microsoft.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "office",
+          "observed_at": "2026-11-13T20:44:11.168091+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/microsoft-outlook.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "microsoft-outlook",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:microsoft-outlook",
+          "observed_at": "2026-11-13T20:44:03.420465+00:00"
+        },
+        {
+          "source_id": "app_store",
+          "updater_id": "app_store",
+          "url": "https://itunes.apple.com/lookup?id=985367838&entity=macSoftware&country=us",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "app_store_mac",
+          "stable_policy": "public_store_listing",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "store_id": 985367838,
+          "bundle_id": "com.microsoft.Outlook",
+          "region": "us",
+          "evidence_key": "mas-office-us",
+          "observed_at": "2026-11-13T20:44:40.512715+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "microsoft-powerpoint-gui",
+      "name": "Microsoft PowerPoint",
+      "edition": "gui",
+      "research_row": 30,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac). Official Office 16.115 (26110837), cask 16.115.26110837, MAS16.115. reviewed/high release-family tie, MAS build unknown. Native updater compatibility does not authorize source change.",
+      "version_comparison_policy": "office_release_family",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+          "allowed_hosts": [
+            "learn.microsoft.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "office",
+          "observed_at": "2026-11-13T20:44:11.168091+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/microsoft-powerpoint.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "microsoft-powerpoint",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:microsoft-powerpoint",
+          "observed_at": "2026-11-13T20:44:03.602732+00:00"
+        },
+        {
+          "source_id": "app_store",
+          "updater_id": "app_store",
+          "url": "https://itunes.apple.com/lookup?id=462062816&entity=macSoftware&country=us",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "app_store_mac",
+          "stable_policy": "public_store_listing",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "store_id": 462062816,
+          "bundle_id": "com.microsoft.Powerpoint",
+          "region": "us",
+          "evidence_key": "mas-office-us",
+          "observed_at": "2026-11-13T20:44:40.512715+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "microsoft-onenote-gui",
+      "name": "Microsoft OneNote",
+      "edition": "gui",
+      "research_row": 31,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac). Official Office 16.115 (26110837), cask 16.115.26110837, MAS16.115. reviewed/high release-family tie. Cask URL is Updater.pkg, not evidence of safe first installation.",
+      "version_comparison_policy": "office_release_family",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+          "allowed_hosts": [
+            "learn.microsoft.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "office",
+          "observed_at": "2026-11-13T20:44:11.168091+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/microsoft-onenote.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "microsoft-onenote",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:microsoft-onenote",
+          "observed_at": "2026-11-13T20:44:03.841168+00:00"
+        },
+        {
+          "source_id": "app_store",
+          "updater_id": "app_store",
+          "url": "https://itunes.apple.com/lookup?id=784801555&entity=macSoftware&country=us",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "app_store_mac",
+          "stable_policy": "public_store_listing",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "store_id": 784801555,
+          "bundle_id": "com.microsoft.onenote.mac",
+          "region": "us",
+          "evidence_key": "mas-office-us",
+          "observed_at": "2026-11-13T20:44:40.512715+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "microsoft-teams-gui",
+      "name": "Microsoft Teams",
+      "edition": "gui",
+      "research_row": 32,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://learn.microsoft.com/en-us/officeupdates/teams-app-versioning). Official Mac version table 26289.204.5281.6363 equals cask. reviewed/high release-label tie. Teams self-update/MAU policy, SlimCore and organizational deployment rings are separate; Office 16.x is not Teams version.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://learn.microsoft.com/en-us/officeupdates/teams-app-versioning",
+          "allowed_hosts": [
+            "learn.microsoft.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "teams",
+          "observed_at": "2026-11-13T20:44:11.462543+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/microsoft-teams.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "microsoft-teams",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:microsoft-teams",
+          "observed_at": "2026-11-13T20:44:04.018500+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "visual-studio-code-gui",
+      "name": "Visual Studio Code",
+      "edition": "gui",
+      "research_row": 33,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest). Explicit stable endpoint1.146.0 matches cask. reviewed/high release-label tie. Commit/productVersion separate; VS Code OSS/Insiders and CLI command shipped inside GUI are not alternate numbered editions.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest",
+          "allowed_hosts": [
+            "update.code.visualstudio.com"
+          ],
+          "parser": "json_path",
+          "stable_policy": "reviewed_endpoint",
+          "architectures": [
+            "arm64"
+          ],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "vscode",
+          "observed_at": "2026-11-13T20:44:08.641211+00:00",
+          "version_path": [
+            "productVersion"
+          ]
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/visual-studio-code.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "visual-studio-code",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:visual-studio-code",
+          "observed_at": "2026-11-13T20:44:04.201223+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "warp-gui",
+      "name": "Warp",
+      "edition": "gui",
+      "research_row": 34,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://releases.warp.dev/channel_versions.json). Explicit stablev0.2026.11.11.08.17.stable_01 matches cask after leading v only. reviewed/high tie; beta/dev/preview/canary excluded. Use product-aware date/channel comparator, not generic semver.",
+      "version_comparison_policy": "warp_stable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://releases.warp.dev/channel_versions.json",
+          "allowed_hosts": [
+            "releases.warp.dev"
+          ],
+          "parser": "json_path",
+          "stable_policy": "reviewed_field",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Warp",
+          "observed_at": "2026-11-13T20:44:06.279753+00:00",
+          "version_path": [
+            "stable",
+            "version"
+          ]
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/warp.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "warp",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:warp",
+          "observed_at": "2026-11-13T20:44:04.387197+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "codeedit-gui",
+      "name": "CodeEdit",
+      "edition": "gui",
+      "research_row": 35,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api.github.com/repos/CodeEditApp/CodeEdit/releases/latest). GitHub v0.3.6 prerelease=false matches cask. reviewed/high GitHub release status, but app maturity/release age is separate (published 2025-08-26). Do not promote nightly.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api.github.com/repos/CodeEditApp/CodeEdit/releases/latest",
+          "allowed_hosts": [
+            "api.github.com"
+          ],
+          "parser": "github_release",
+          "stable_policy": "github_flags",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "codeedit",
+          "observed_at": "2026-11-13T20:44:08.641281+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/codeedit.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "codeedit",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:codeedit",
+          "observed_at": "2026-11-13T20:44:04.567241+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "docker-desktop-gui",
+      "name": "Docker Desktop",
+      "edition": "gui",
+      "research_row": 36,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://desktop.docker.com/mac/main/arm64/appcast.xml). Main arm64 appcast4.99.0 build 245822 equals cask 4.99.0,245822. reviewed/high main-release metadata; stable/main policy should be confirmed in recipe. Docker Engine/CLI and Docker Desktop are different deliverables. Privileged components and commercial terms need review.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://desktop.docker.com/mac/main/arm64/appcast.xml",
+          "allowed_hosts": [
+            "desktop.docker.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Docker Desktop",
+          "observed_at": "2026-11-13T20:44:06.795279+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/docker-desktop.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "docker-desktop",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:docker-desktop",
+          "observed_at": "2026-11-13T20:44:04.753211+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "appcleaner-gui",
+      "name": "AppCleaner",
+      "edition": "gui",
+      "research_row": 37,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://freemacsoft.net/appcleaner/). Official stable downloads3.7 for macOS15+ matches cask; older3.6.8 explicitly offered for 10.14 through 15.6,3.6 for 10.13. reviewed/high compatibility evidence. Pick newest compatible, not 3.7 for every supported Mac.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://freemacsoft.net/appcleaner/",
+          "allowed_hosts": [
+            "freemacsoft.net"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "appcleaner",
+          "observed_at": "2026-11-13T20:44:09.156434+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/appcleaner.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "appcleaner",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:appcleaner",
+          "observed_at": "2026-11-13T20:44:04.949929+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "spotify-gui",
+      "name": "Spotify",
+      "edition": "gui",
+      "research_row": 38,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://www.spotify.com/download/mac/). Cask1.3.9.2055 and official Mac download retrieved. reviewed manager metadata; no trustworthy global/latest native stable value extracted. Rollout and mutable download prevent faster-channel conclusion.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://www.spotify.com/download/mac/",
+          "allowed_hosts": [
+            "www.spotify.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "spotify",
+          "observed_at": "2026-11-13T20:44:09.221528+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/spotify.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "spotify",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:spotify",
+          "observed_at": "2026-11-13T20:44:05.120233+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "capcut-gui",
+      "name": "CapCut",
+      "edition": "gui",
+      "research_row": 39,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://www.capcut.com/tools/desktop-video-editor). Cask desktop9.7.1.4778 vs Apple listing20.1.0 bundle com.lemon.lvoverseas. unknown/incomparable edition numbering; macSoftware search also returned mobile-style listing without mt=12. Do not interpret20>9 as MAS ahead; Mac eligibility/desktop store identity unproven.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://www.capcut.com/tools/desktop-video-editor",
+          "allowed_hosts": [
+            "www.capcut.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "capcut",
+          "observed_at": "2026-11-13T20:44:09.260170+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/capcut.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "capcut",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "brew:capcut",
+          "observed_at": "2026-11-13T20:44:05.301179+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "ledger-live-gui",
+      "name": "Ledger Live",
+      "edition": "gui",
+      "research_row": 40,
+      "identity_status": "unknown",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://www.ledger.com/ledger-live). Official page now Ledger Wallet; cask ledger-wallet4.28.0; old ledger-live API404. GitHub latest is live-mobile@4.28.0, explicitly not desktop proof. unknown desktop stable feed/identity migration; wallet integrity requires vendor signature validation.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://www.ledger.com/ledger-live",
+          "allowed_hosts": [
+            "www.ledger.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "ledger",
+          "observed_at": "2026-11-13T20:44:15.507759+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/ledger-wallet.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "ledger-wallet",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": false,
+          "evidence_key": "brew:ledger-wallet",
+          "observed_at": "2026-11-13T20:44:05.476056+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "trezor-suite-gui",
+      "name": "Trezor Suite",
+      "edition": "gui",
+      "research_row": 41,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://api.github.com/repos/trezor/trezor-suite/releases/latest). Official GitHub non-prereleasev26.10.3 equals cask. reviewed/high release tie. Trezor Bridge/firmware/web Suite are separate; signing/integrity and license review still needed before first install.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://api.github.com/repos/trezor/trezor-suite/releases/latest",
+          "allowed_hosts": [
+            "api.github.com"
+          ],
+          "parser": "github_release",
+          "stable_policy": "github_flags",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "trezor",
+          "observed_at": "2026-11-13T20:44:08.942825+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/trezor-suite.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "trezor-suite",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:trezor-suite",
+          "observed_at": "2026-11-13T20:44:05.824355+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "remote-desktop-manager-gui",
+      "name": "Remote Desktop Manager",
+      "edition": "gui",
+      "research_row": 42,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://devolutions.net/productinfo.htm). RDMMacbin stable 2026.3.3.1 equals cask. reviewed/high tie; Windows RDMsetup2026.3.18.0 and RDMMacbinBeta/Lts must not replace Mac stable selector. Editions/license unknown.",
+      "version_comparison_policy": "numeric",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://devolutions.net/productinfo.htm",
+          "allowed_hosts": [
+            "devolutions.net"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "feed:Remote Desktop Manager",
+          "observed_at": "2026-11-13T20:44:07.689480+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/remote-desktop-manager.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "remote-desktop-manager",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:remote-desktop-manager",
+          "observed_at": "2026-11-13T20:44:06.012473+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "ipmiview-gui",
+      "name": "IPMIView",
+      "edition": "gui",
+      "research_row": 43,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://itunes.apple.com/search?term=IPMIView&entity=software&country=us&limit=4). Apple publisher Super Micro Computer, Inc.; com.supermicro.ipmiview1.12.0. reviewed/high US listed identity, offered/Apple Silicon availability unknown. Java desktop IPMIView is separate edition, not a brew/native substitute for iPad app.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://itunes.apple.com/search?term=IPMIView&entity=software&country=us&limit=4",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "mas-search:IPMIView",
+          "observed_at": "2026-11-13T20:44:38.150834+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "inkscape-gui",
+      "name": "Inkscape",
+      "edition": "gui",
+      "research_row": 44,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://inkscape.org/release/). Official release page request timed out; cask 1.4.4 arm64. reviewed manager metadata; global vendor stable/compatible version unknown. Do not infer cask freshness from unavailable vendor.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://inkscape.org/release/",
+          "allowed_hosts": [
+            "inkscape.org"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "inkscape",
+          "observed_at": "2026-11-13T20:44:09.478745+00:00"
+        },
+        {
+          "source_id": "homebrew",
+          "updater_id": "homebrew",
+          "url": "https://formulae.brew.sh/api/cask/inkscape.json",
+          "allowed_hosts": [
+            "formulae.brew.sh"
+          ],
+          "parser": "brew_cask",
+          "token": "inkscape",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "brew:inkscape",
+          "observed_at": "2026-11-13T20:44:06.193357+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "unifi-gui",
+      "name": "UniFi",
+      "edition": "gui",
+      "research_row": 45,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://itunes.apple.com/search?term=UniFi&entity=software&country=us&limit=4). Apple publisher Ubiquiti Inc.; com.ubnt.unifiac11.1.0. reviewed/high listed identity. UniFi Network server/controller, UniFi Endpoint and Protect are separate products; no desktop migration from this iPad app.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://itunes.apple.com/search?term=UniFi&entity=software&country=us&limit=4",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "mas-search:UniFi",
+          "observed_at": "2026-11-13T20:44:38.552212+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "wifiman-gui",
+      "name": "WiFiman",
+      "edition": "gui",
+      "research_row": 46,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://itunes.apple.com/search?term=WiFiman&entity=software&country=us&limit=4). Apple publisher Ubiquiti Inc.; com.ubnt.wifiman1.37.2. reviewed/high listed identity. WiFiman Desktop/Teleport and iPad app are separate deliverables; no version ranking across editions.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://itunes.apple.com/search?term=WiFiman&entity=software&country=us&limit=4",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "mas-search:WiFiman",
+          "observed_at": "2026-11-13T20:44:38.982058+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    },
+    {
+      "product_id": "picsart-gui",
+      "name": "Picsart",
+      "edition": "gui",
+      "research_row": 47,
+      "identity_status": "reviewed_metadata",
+      "research_evidence": "docs/catalog/SOURCE_RESEARCH.md#current-channel-matrix",
+      "research_summary": "[primary](https://itunes.apple.com/search?term=Picsart&entity=software&country=us&limit=4). Apple publisher PicsArt, Inc.; com.picsart.studio30.9.6. reviewed/high listed identity. Web editor/mobile/iPad delivery need identity and Mac-availability evidence before comparison or installation recipe.",
+      "version_comparison_policy": "incomparable",
+      "sources": [
+        {
+          "source_id": "vendor",
+          "updater_id": null,
+          "url": "https://itunes.apple.com/search?term=Picsart&entity=software&country=us&limit=4",
+          "allowed_hosts": [
+            "itunes.apple.com"
+          ],
+          "parser": "unknown",
+          "stable_policy": "unknown",
+          "architectures": [],
+          "minimum_os": null,
+          "identity_reviewed": true,
+          "evidence_key": "mas-search:Picsart",
+          "observed_at": "2026-11-13T20:44:39.449382+00:00"
+        }
+      ],
+      "compatible_updaters": [],
+      "license_review": "unknown",
+      "installation_authority": false
+    }
+  ]
+}

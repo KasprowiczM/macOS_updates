@@ -1,0 +1,15 @@
+# Stage E implementation, 1.6.5
+
+Local source checkpoint dated 2026-11-13, unpublished. Tasks T12-T15 add product-specific stable-channel comparison and an optional catalog with separate installation consent.
+
+The manifest covers 47 registry rows and 48 products. Channel advice separates global stable, compatible stable, public listing and user-offered versions. A tie preserves the existing source; a newer different source proposes manual migration. Missing identities, compatibility or comparable versions remain unknown. No universal native/Homebrew/npm/App Store ranking is used, and no historical speed claim is made without sufficient dated observations.
+
+Only selected or positively matched installed products enter metadata checks. Requests use reviewed HTTPS sources, bounded transfers, at most three concurrent requests, one request per host, a sixty-second invocation budget, a twenty-four-hour cache and rate-limit cooldown. Unknown local feed URLs are not queried automatically.
+
+`bash setup.sh --catalog` starts with no selection. Users can compare selected products with `check <number>`, select a source and inspect a separate InstallPlan. The plan describes requirements, permissions, versions, destinations and unknown license/cost information. It requires fresh terminal approval bound to its digest. EOF, automatic yes, no terminal and cancellation grant no new authority. The ordinary updater rejects InstallPlan files.
+
+All 48 public products currently use manual acquisition or explicit unknown states. There are zero approved automatic first-install recipes. Official links open only after selection and approval; opening a page is never installation success. The implementation includes a guarded staged vendor-bundle adapter tested with synthetic identities, exclusive destination creation, shared resource locks, verification, snapshot capture and observation-only crash recovery. It does not execute generic vendor shells, opaque packages, manager bootstrap or automatic source migration.
+
+One independent security review identified an installation-journal crash window. The journal now records the complete action before the exclusive rename, and startup recovery observes the destination without resuming installation or deleting applications. The final integration gate also checks current inventory matching and the manual acquisition/rescan flow.
+
+Verification: the sealed full integration gate passed 1178 collected cases (1177 passed, one expected private-inventory skip) in 220.231 seconds, with zero unexpected host-command or network guard hits. Bash syntax, Python compilation, tracked secret scanning and warning-level ShellCheck passed. Python 3.9.6 passed 102 selected E, channel, setup and installation cases. Ruff F checks passed for new modules and tests. The final CLI help correction has 28 additional passing guarded tests. See [catalog acceptance](../catalog/ACCEPTANCE.md) for the separate fixture and live-evidence boundary. Real first installations, supported-OS/GUI/account coverage, publication, Ascendo parity and landing synchronization remain unperformed.

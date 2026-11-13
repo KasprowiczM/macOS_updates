@@ -1,6 +1,6 @@
 # macOS Updates — Codex Agent Context
 
-**Version:** 1.6.4 · **Platform:** Apple Silicon (arm64), macOS 13-27
+**Version:** 1.6.5 · **Platform:** Apple Silicon (arm64), macOS 13-27
 
 Codex works on this repo with the same rules as every other agent. The shared contract (quick commands, reference docs, non-negotiable rules) lives in `AGENTS.md`:
 

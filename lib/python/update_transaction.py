@@ -6,7 +6,6 @@ transactions exercise every real rename without touching host applications.
 
 import fcntl
 import ctypes
-import errno
 import sys
 import hashlib
 import json

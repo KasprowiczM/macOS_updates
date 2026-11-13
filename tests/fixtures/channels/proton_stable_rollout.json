@@ -1,0 +1,21 @@
+{
+  "Releases": [
+    {
+      "CategoryName": "EarlyAccess",
+      "Version": "9.0",
+      "MinimumOsVersion": "13"
+    },
+    {
+      "CategoryName": "Stable",
+      "Version": "3.0",
+      "MinimumOsVersion": "15",
+      "RolloutProportion": 0.2
+    },
+    {
+      "CategoryName": "Stable",
+      "Version": "2.0",
+      "MinimumOsVersion": "13",
+      "RolloutProportion": 1
+    }
+  ]
+}

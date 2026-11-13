@@ -10,9 +10,9 @@
 
 **Spec:** [Audyt i specyfikacja docelowa, 2026-11-13](../../implementation/NEW_USER_AUDIT_2026-11-13.md), szczególnie rozdziały 4, 8, 10 i 11. Plan obejmuje 15 zadań w etapach A-E.
 
-**Status:** Etap A i research źródeł wdrożone lokalnie jako 1.6.1. Etap B (T04-T05) zaakceptowany 2026-11-13, wdrożenie obserwacyjne 1.6.2 na bazie `5daf24d`. Bez publikacji, prawdziwych aktualizacji i zmian w landing page. Etap C (T06-T09) wdrożono lokalnie jako 1.6.3; jego pełna bramka przeszła 1101 przypadków, jeden jawnie pominięty. Etap D (T10-T11) ma zieloną bramkę 1103 przypadków, jeden pominięty. Etap E jest w integracji. Linux, live macOS, publikacja i landing pozostają osobno. Po każdym etapie zwiększamy trzeci człon wersji; po ukończeniu całości wersja 1.7.0.
+**Status:** A-E wdrożono lokalnie: 1.6.1, 1.6.2, 1.6.3, 1.6.4 i 1.6.5. Pełna końcowa bramka: 1178 przypadków, jeden jawnie pominięty, zero niezamockowanych komend lub sieci. Końcowe zamknięcie wersji: 1.7.0. Bez publikacji, prawdziwych aktualizacji i zmian w landing page. Linux oraz live acceptance pozostają nieprzeprowadzone.
 
-**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T06-T09 są zamknięte w [etapie C](../../implementation/STAGE_C_1.6.3.md); T10-T11 są zamknięte w [etapie D](../../implementation/STAGE_D_1.6.4.md); T12-T15 są w integracji. **Etap B:** [zapis implementacji 1.6.2](../../implementation/STAGE_B_1.6.2.md).
+**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T06-T09 są zamknięte w [etapie C](../../implementation/STAGE_C_1.6.3.md); T10-T11 są zamknięte w [etapie D](../../implementation/STAGE_D_1.6.4.md); T12-T15 zamknięto w [etapie E](../../implementation/STAGE_E_1.6.5.md). **Etap B:** [zapis implementacji 1.6.2](../../implementation/STAGE_B_1.6.2.md).
 
 ## Global Constraints
 
@@ -301,13 +301,13 @@ Etap D nie włącza żadnego nowego native/direct adaptera. Warunki zgody, podpi
 
 - [x] Zrób pełną macierz każdej pozycji bieżącego rejestru: product/edition, oficjalny vendor/native updater, brew token, MAS ID i npm package tylko gdy to ten sam produkt, stable endpoints, schemat wersji, licencja, minOS/arch i istniejące dowody. Rozdziel połączone produkty takie jak ChatGPT/Codex przed liczeniem pokrycia. Nie wymyślaj brakujących Team ID i store ID; unknown wyłącza automatyczne działanie danej ścieżki.
 - [x] Research wyłącznie z oficjalnych producentów, App Store i repozytoriów managerów. Każdy wiersz ma URL, datę, zakres dowodu i stan reviewed/unknown. Zbadanie źródeł nie jest live-install proof; niedostępne źródło oznacz jako niedostępne.
-- [ ] Fixtures: vendor stable nowszy niż brew, brew i vendor identyczny payload, MAS pierwszy, MAS późniejszy, npm latest wskazuje prerelease, różne GUI/CLI wersje, stable nowa ale minOS za wysokie, staged rollout, region unknown, nieporównywalna numeracja. Rekomendacja nie może promować beta/RC/nightly ani wersji niekompatybilnej.
-- [ ] Porównuj global latest stable, compatible stable i offered version osobno. Stable potwierdzaj regułami źródła (np. prerelease flag, kanał feedu, oficjalne release notes), nie samym słowem latest ani regexem wersji. Wersja widoczna publicznie w MAS to listed, dopóki nie potwierdzono offered dla użytkownika.
-- [ ] Rekomenduj nowszą potwierdzoną kompatybilną stable; przy remisie zachowaj istniejący kanał. Gdy source unavailable/incomparable, nie stwierdzaj, że inny kanał jest szybszy. Dla istniejącej aplikacji zwracaj migration_required, bez wykonania migracji. Preferowany native updater może współistnieć z instalacją brew, jeśli zbadano zgodność ownership i polityki aktualizacji.
-- [ ] Runtime sprawdza tylko lokalne/wybrane aplikacje, nie cały internet. Metadata fetch przez politykę T09, bez uruchamiania app czy package scripts. Cache 24 h z datą; per-request timeout 10 s, max 3 jednoczesne żądania i 1 na host, budżet interaktywnego sprawdzenia 60 s. Niesprawdzone pozycje pozostają pending/unknown. HTTP429 respektuje retry-after, nie blokuje setupu pętlą.
-- [ ] Nieznana aplikacja: najpierw statyczna identyfikacja i match do zaufanej recepty. Automatyczny odczyt dowolnego SUFeedURL nie jest research potwierdzającym zaufanie; brak reviewed source daje propozycję weryfikacji/check-only i unknown rekomendację.
-- [ ] Historia opóźnień lokalna, tylko podczas uruchomionych sprawdzeń; brak nowego harmonogramu i telemetrii. Oddziel published_at od first_observed_at, zapisuj przedziały niepewności. Etykietę „zwykle szybszy” dopuszczaj przy minimum 5 dopasowanych stabilnych wydaniach w okresie co najmniej 30 dni; pokaż sample size i podstawę czasów, nadal bez gwarancji przyszłych wydań. Jeśli brak porównywalnych dat, pokazuj wyłącznie „obecnie oferuje nowszą stable”.
-- [ ] `--pattern 'test_channel_advisor.py'`, schema lint wszystkich recept i kompletność wierszy research; aktualizuj docs z konkretnymi nieustalonymi przypadkami. Commit bez twierdzenia, że każdy app/source jest sprawdzony live.
+- [x] Fixtures: vendor stable nowszy niż brew, brew i vendor identyczny payload, MAS pierwszy, MAS późniejszy, npm latest wskazuje prerelease, różne GUI/CLI wersje, stable nowa ale minOS za wysokie, staged rollout, region unknown, nieporównywalna numeracja. Rekomendacja nie może promować beta/RC/nightly ani wersji niekompatybilnej.
+- [x] Porównuj global latest stable, compatible stable i offered version osobno. Stable potwierdzaj regułami źródła (np. prerelease flag, kanał feedu, oficjalne release notes), nie samym słowem latest ani regexem wersji. Wersja widoczna publicznie w MAS to listed, dopóki nie potwierdzono offered dla użytkownika.
+- [x] Rekomenduj nowszą potwierdzoną kompatybilną stable; przy remisie zachowaj istniejący kanał. Gdy source unavailable/incomparable, nie stwierdzaj, że inny kanał jest szybszy. Dla istniejącej aplikacji zwracaj migration_required, bez wykonania migracji. Preferowany native updater może współistnieć z instalacją brew, jeśli zbadano zgodność ownership i polityki aktualizacji.
+- [x] Runtime sprawdza tylko lokalne/wybrane aplikacje, nie cały internet. Metadata fetch przez politykę T09, bez uruchamiania app czy package scripts. Cache 24 h z datą; per-request timeout 10 s, max 3 jednoczesne żądania i 1 na host, budżet interaktywnego sprawdzenia 60 s. Niesprawdzone pozycje pozostają pending/unknown. HTTP429 respektuje retry-after, nie blokuje setupu pętlą.
+- [x] Nieznana aplikacja: najpierw statyczna identyfikacja i match do zaufanej recepty. Automatyczny odczyt dowolnego SUFeedURL nie jest research potwierdzającym zaufanie; brak reviewed source daje propozycję weryfikacji/check-only i unknown rekomendację.
+- [x] Historia opóźnień lokalna, tylko podczas uruchomionych sprawdzeń; brak nowego harmonogramu i telemetrii. Oddziel published_at od first_observed_at, zapisuj przedziały niepewności. Etykietę „zwykle szybszy” dopuszczaj przy minimum 5 dopasowanych stabilnych wydaniach w okresie co najmniej 30 dni; pokaż sample size i podstawę czasów, nadal bez gwarancji przyszłych wydań. Jeśli brak porównywalnych dat, pokazuj wyłącznie „obecnie oferuje nowszą stable”.
+- [x] `--pattern 'test_channel_advisor.py'`, schema lint wszystkich recept i kompletność wierszy research; aktualizuj docs z konkretnymi nieustalonymi przypadkami. Commit bez twierdzenia, że każdy app/source jest sprawdzony live.
 
 ### T13. Katalog aplikacji, wybór kanału i podgląd instalacji
 
@@ -315,14 +315,14 @@ Etap D nie włącza żadnego nowego native/direct adaptera. Warunki zgody, podpi
 
 **Interfaces:** `build_catalog_view(snapshot: dict, recipes: dict, recommendations: list[dict], filters: dict) -> dict`; `build_install_plan(selections: list[dict], snapshot: dict, recipes: dict, now: str) -> dict`; `validate_install_plan(plan: dict) -> dict`. `setup.sh --catalog` otwiera menu, `setup.sh --install-plan <path>` wymaga konkretnego preview i świeżego potwierdzenia. `install.sh` może zaproponować wejście do menu, nigdy nie wykonuje wyboru automatycznie.
 
-- [ ] Tests: katalog istnieje bez prywatnego inventory autora, wszystkie wybory domyślnie puste, zaznaczenie app nie uruchamia polecenia, cancel/EOF/no-TTY/`-y` nie instaluje. Zwykły build_inventory pozostaje skanem, może tylko wskazać opcję przejścia do setup --catalog.
-- [ ] Menu pokazuje: już zainstalowane i ich kanał; dostępne nowe aplikacje; poziom dowodu; rekomendowany source/updater i latest stable z datą; inne zbadane kanały; ograniczenia/licencję. Nie udawaj, że każda pozycja ma brew/npm/MAS. Kliknięcie źródła z niezgodną edycją/arch nie może dodać selection.
-- [ ] Dla obecnej instalacji nie oferuj domyślnie install. Pokaż aktualizację zachowującą kanał albo osobną propozycję migracji z skutkami. Pierwsze wdrożenie nie wykonuje automatycznych migracji kanału; umożliwia zapoznanie się z instrukcją i ponowny scan po ręcznej zmianie.
-- [ ] Instalowalne automatycznie są tylko recepty z osobno zatwierdzonym install adapterem i fresh-install acceptance. Same update-live-tested mogą być oglądane, z oficjalnym linkiem do instalacji ręcznej. Kontrolowane testy pierwszej instalacji w disposable środowisku są możliwe jako osobna procedura walidacji recepty przed włączeniem jej w publicznym menu.
-- [ ] Preview rozdziela nowe app, już spełnione requirements, wymagane nowe dependencies, opcjonalne dodatki, uprawnienia i ręczne kroki. Pokaż wersję/source/destination, potrzebę admin, koszt/licencję jako unknown gdy niezweryfikowane, rozmiar jako szacunek lub unknown. Nie pokazuj „bezpłatna” bez dowodu. Brak danych o wymaganiach uniemożliwia automatyczne uruchomienie tej pozycji.
-- [ ] Zgoda dotyczy listy i plan_digest. Żadnego domyślnego „zainstaluj wszystko”; użytkownik może jawnie wybrać wiele aplikacji, widząc wspólne zależności. Rewizja recepty, wersji lub dependency graph przed wykonaniem wymaga nowego preview.
-- [ ] Testuj menu w Bash3.2: cyfry, prosty wybór wielu pozycji, back/cancel, bez wymagania zewnętrznego TUI i bez instalowania narzędzi tylko do wyświetlenia menu. Gdy brak Python do pełnego planu, shell pokazuje ograniczony bootstrap preview wymaganej zależności, a reszta czeka na jego świadome wykonanie.
-- [ ] `--pattern 'test_setup_catalog.py'`, `--pattern 'test_install_plan.py'`; testy 7 języków i plan serializacja/odczyt bez sekretów. Commit.
+- [x] Tests: katalog istnieje bez prywatnego inventory autora, wszystkie wybory domyślnie puste, zaznaczenie app nie uruchamia polecenia, cancel/EOF/no-TTY/`-y` nie instaluje. Zwykły build_inventory pozostaje skanem, może tylko wskazać opcję przejścia do setup --catalog.
+- [x] Menu pokazuje: już zainstalowane i ich kanał; dostępne nowe aplikacje; poziom dowodu; rekomendowany source/updater i latest stable z datą; inne zbadane kanały; ograniczenia/licencję. Nie udawaj, że każda pozycja ma brew/npm/MAS. Kliknięcie źródła z niezgodną edycją/arch nie może dodać selection.
+- [x] Dla obecnej instalacji nie oferuj domyślnie install. Pokaż aktualizację zachowującą kanał albo osobną propozycję migracji z skutkami. Pierwsze wdrożenie nie wykonuje automatycznych migracji kanału; umożliwia zapoznanie się z instrukcją i ponowny scan po ręcznej zmianie.
+- [x] Instalowalne automatycznie są tylko recepty z osobno zatwierdzonym install adapterem i fresh-install acceptance. Same update-live-tested mogą być oglądane, z oficjalnym linkiem do instalacji ręcznej. Kontrolowane testy pierwszej instalacji w disposable środowisku są możliwe jako osobna procedura walidacji recepty przed włączeniem jej w publicznym menu.
+- [x] Preview rozdziela nowe app, już spełnione requirements, wymagane nowe dependencies, opcjonalne dodatki, uprawnienia i ręczne kroki. Pokaż wersję/source/destination, potrzebę admin, koszt/licencję jako unknown gdy niezweryfikowane, rozmiar jako szacunek lub unknown. Nie pokazuj „bezpłatna” bez dowodu. Brak danych o wymaganiach uniemożliwia automatyczne uruchomienie tej pozycji.
+- [x] Zgoda dotyczy listy i plan_digest. Żadnego domyślnego „zainstaluj wszystko”; użytkownik może jawnie wybrać wiele aplikacji, widząc wspólne zależności. Rewizja recepty, wersji lub dependency graph przed wykonaniem wymaga nowego preview.
+- [x] Testuj menu w Bash3.2: cyfry, prosty wybór wielu pozycji, back/cancel, bez wymagania zewnętrznego TUI i bez instalowania narzędzi tylko do wyświetlenia menu. Gdy brak Python do pełnego planu, shell pokazuje ograniczony bootstrap preview wymaganej zależności, a reszta czeka na jego świadome wykonanie.
+- [x] `--pattern 'test_setup_catalog.py'`, `--pattern 'test_install_plan.py'`; testy 7 języków i plan serializacja/odczyt bez sekretów. Commit.
 
 Przykładowy widok, bez twierdzenia o rzeczywistych wersjach konkretnego produktu:
 
@@ -345,15 +345,15 @@ Dowody: aktualizacja testowana; pierwsza instalacja producenta wymaga weryfikacj
 
 **Interfaces:** `resolve_requirements(selections: list[dict], environment: dict, recipes: dict) -> dict` zwraca DAG i brakujące warunki; `authorize_install(action: dict, current: dict, consent: dict, now: str) -> dict`; `record_install_result(action: dict, observed: dict, journal: dict) -> dict`. Shell `setup_execute_install_action <plan_path> <action_id>` oraz odrębny `install_verified_app <staged_app> <expected_absent_destination> <action_id>`; nie osłabiaj copy_verified_app/update guard.
 
-- [ ] Failing tests: app pojawia się po preview, destination symlink, source conflict, changed plan, wygasła zgoda, nieznany dependency, cycle, istniejący nowszy dependency, partial failure i cancel. Dozwolone mutacje dokładnie równają się zatwierdzonym akcjom; zero update/adopt/uninstall jako ukrytego fallbacku install.
-- [ ] Requirements rozpoznawaj przed instalacją: wymagany Python/CLT, Homebrew tylko dla wybranego kanału, mas tylko dla funkcji które go potrzebują, Rosetta tylko dla wybranej zgodnej aplikacji i po osobnym świadomym wyborze. Dostępność Intel-only app nie znosi ograniczeń wspieranego macOS. Accessibility, Apple Account, licencje i MDM nie są automatycznie „naprawiane”. PAM/Touch ID pozostaje poza procesem.
-- [ ] Rozwiązuj DAG i wersje do konkretnego planu; już spełnionych requirements nie reinstaluj/downgraduj. Jeśli Homebrew może doinstalować zależności, uwzględnij je w preview. Gdy nie da się określić skutków zewnętrznego instalatora, ręczna ścieżka zamiast obietnicy pełnej kontroli.
-- [ ] Dla brew: reviewed token/tap i konkretny zakres artefaktów, brak --force/--adopt/zap. Rewalidacja po aktualizacji metadanych i tuż przed install; nowa zależność lub artefakt powoduje ponowny plan. Nie instaluj przypadkowego tokena uzyskanego przez dopasowanie nazwy.
-- [ ] Dla pierwszej instalacji vendor bundle: niezależnie reviewed bundle ID/Team ID i source, HTTPS/redirect allowlist, podpis/Gatekeeper/minOS/arch/channel i integralność artefaktu. Checksum z tego samego feedu nie zastępuje tożsamości producenta. Nie wykonuj dowolnego vendor shell ani generycznego pkg; adaptery takiego typu wymagają oddzielnego kontraktu i testów.
-- [ ] App Store v1: manual_acquisition otwiera oficjalną stronę tylko po wyborze. Użytkownik sam loguje się, akceptuje warunki i decyduje o zakupie. Po powrocie ponowny scan potwierdza źródło/tożsamość; samo otwarcie sklepu nie jest installed. Brak mas nie blokuje otwarcia oficjalnej strony.
-- [ ] Instalator i updater współdzielą blokadę zasobów. Nowy app instaluj przez staging do zatwierdzonej pustej ścieżki, bez launch po instalacji. Jeśli destination pojawi się w trakcie, zatrzymaj akcję. Capture podpisu po instalacji i nowy snapshot, dopiero wtedy wynik installed_verified.
-- [ ] Journal rozróżnia nowo utworzone pliki od istniejących. Po porażce usuwa wyłącznie własne niesfinalizowane staging; nie usuwa współdzielonych zależności ani innej aplikacji. Częściowo udane instalacje zostają jawnie wykazane. Resume jest nowym planem z preview, nie efektem zwykłego update_all.
-- [ ] `--pattern 'test_install_execution.py'`, `--pattern 'test_setup_requirements.py'`, pełny gate. Jeden przegląd bezpieczeństwa etapu E przed publicznym włączeniem wykonawcy, bez osobnego review każdego helpera. Commit.
+- [x] Failing tests: app pojawia się po preview, destination symlink, source conflict, changed plan, wygasła zgoda, nieznany dependency, cycle, istniejący nowszy dependency, partial failure i cancel. Dozwolone mutacje dokładnie równają się zatwierdzonym akcjom; zero update/adopt/uninstall jako ukrytego fallbacku install.
+- [x] Requirements rozpoznawaj przed instalacją: wymagany Python/CLT, Homebrew tylko dla wybranego kanału, mas tylko dla funkcji które go potrzebują, Rosetta tylko dla wybranej zgodnej aplikacji i po osobnym świadomym wyborze. Dostępność Intel-only app nie znosi ograniczeń wspieranego macOS. Accessibility, Apple Account, licencje i MDM nie są automatycznie „naprawiane”. PAM/Touch ID pozostaje poza procesem.
+- [x] Rozwiązuj DAG i wersje do konkretnego planu; już spełnionych requirements nie reinstaluj/downgraduj. Jeśli Homebrew może doinstalować zależności, uwzględnij je w preview. Gdy nie da się określić skutków zewnętrznego instalatora, ręczna ścieżka zamiast obietnicy pełnej kontroli.
+- [x] Dla brew: reviewed token/tap i konkretny zakres artefaktów, brak --force/--adopt/zap. Rewalidacja po aktualizacji metadanych i tuż przed install; nowa zależność lub artefakt powoduje ponowny plan. Nie instaluj przypadkowego tokena uzyskanego przez dopasowanie nazwy.
+- [x] Dla pierwszej instalacji vendor bundle: niezależnie reviewed bundle ID/Team ID i source, HTTPS/redirect allowlist, podpis/Gatekeeper/minOS/arch/channel i integralność artefaktu. Checksum z tego samego feedu nie zastępuje tożsamości producenta. Nie wykonuj dowolnego vendor shell ani generycznego pkg; adaptery takiego typu wymagają oddzielnego kontraktu i testów.
+- [x] App Store v1: manual_acquisition otwiera oficjalną stronę tylko po wyborze. Użytkownik sam loguje się, akceptuje warunki i decyduje o zakupie. Po powrocie ponowny scan potwierdza źródło/tożsamość; samo otwarcie sklepu nie jest installed. Brak mas nie blokuje otwarcia oficjalnej strony.
+- [x] Instalator i updater współdzielą blokadę zasobów. Nowy app instaluj przez staging do zatwierdzonej pustej ścieżki, bez launch po instalacji. Jeśli destination pojawi się w trakcie, zatrzymaj akcję. Capture podpisu po instalacji i nowy snapshot, dopiero wtedy wynik installed_verified.
+- [x] Journal rozróżnia nowo utworzone pliki od istniejących. Po porażce usuwa wyłącznie własne niesfinalizowane staging; nie usuwa współdzielonych zależności ani innej aplikacji. Częściowo udane instalacje zostają jawnie wykazane. Resume jest nowym planem z preview, nie efektem zwykłego update_all.
+- [x] `--pattern 'test_install_execution.py'`, `--pattern 'test_setup_requirements.py'`, pełny gate. Jeden przegląd bezpieczeństwa etapu E przed publicznym włączeniem wykonawcy, bez osobnego review każdego helpera. Commit.
 
 ### T15. Akceptacja katalogu i synchronizacja obietnic produktu
 
@@ -361,13 +361,16 @@ Dowody: aktualizacja testowana; pierwsza instalacja producenta wymaga weryfikacj
 
 **Interfaces:** publiczny sanitized catalog manifest z app/source/updater i verification state; audytowany eksport z recept, bez danych maszyn. Liczniki „obsługiwane”, „sprawdzone aktualizacje”, „sprawdzone pierwsze instalacje” mają różne definicje; jedna aplikacja z trzema źródłami nie staje się trzema aplikacjami w liczniku.
 
-- [ ] Matryca nowych testów poniżej; contract tests każdej installable recipe i rekomendacji latest stable. Każda pozycja katalogu ma research row, nawet gdy wynik to unsupported/unknown/manual.
-- [ ] Na fixture: scan nigdy nie instaluje; menu bez wyboru nigdy nie instaluje; update_all nie konsumuje starego InstallPlan; instalator wykonuje wyłącznie zatwierdzone app+deps i aktualizuje lokalne inventory po faktycznej obserwacji.
+- [x] Matryca nowych testów poniżej; contract tests każdej installable recipe i rekomendacji latest stable. Każda pozycja katalogu ma research row, nawet gdy wynik to unsupported/unknown/manual.
+- [x] Na fixture: scan nigdy nie instaluje; menu bez wyboru nigdy nie instaluje; update_all nie konsumuje starego InstallPlan; instalator wykonuje wyłącznie zatwierdzone app+deps i aktualizuje lokalne inventory po faktycznej obserwacji.
 - [ ] Po osobnej zgodzie wykonaj fresh-install acceptance wybranych recept w disposable macOS. Zapisz datę, wersję, kanał, system, wymagania i wynik bez prywatnych danych. Przed rozszerzeniem menu kolejne recepty przechodzą tę samą bramkę, nie dziedziczą oznaczenia autora „działa u mnie”.
-- [ ] Potwierdź recommendator na minimum: vendor ahead, brew ahead/identyczny, MAS ahead, brak danych, incompatible latest i prerelease-only. Uczciwie oddziel bieżącą dostępność od historycznej szybkości; bez źródła dat brak etykiety „najszybszy”.
-- [ ] Copy produktu: „Aktualizacje dotyczą zainstalowanych aplikacji. Opcjonalny katalog pozwala wybrać nowe aplikacje, źródła i zatwierdzić ich instalację wraz z wymaganiami”. Nie obiecywać, że wszystkie 47 pozycji mają sprawdzoną instalację ani że App Store zawsze jest opóźniony.
+- [x] Potwierdź recommendator na minimum: vendor ahead, brew ahead/identyczny, MAS ahead, brak danych, incompatible latest i prerelease-only. Uczciwie oddziel bieżącą dostępność od historycznej szybkości; bez źródła dat brak etykiety „najszybszy”.
+- [x] Copy produktu: „Aktualizacje dotyczą zainstalowanych aplikacji. Opcjonalny katalog pozwala wybrać nowe aplikacje, źródła i zatwierdzić ich instalację wraz z wymaganiami”. Nie obiecywać, że wszystkie 47 pozycji mają sprawdzoną instalację ani że App Store zawsze jest opóźniony.
 - [ ] Landing synchronizuj dopiero z rzeczywistym wdrożeniem i zgodnie z jego równoległymi zmianami; nie nadpisuj cudzej pracy. Fakty w site.ts, EN/PL parity, metadane/LLM zgodne. `npm run build` w landing ma raportować wszystkie EN/PL routes,404 i sitemap. Testy/update counts tylko z bieżącego upstream evidence.
 - [ ] Pełne `bash run_tests.sh`, schema/catalog coverage, rendering/links/privacy docs, osobny landing build. Publikacja obu produktów wyłącznie po akceptacji właściciela i zgodnie z zasadą wersjonowania/parity.
+
+
+Etap E zamyka kod, fixture i dokumentację toolkit. Brak publicznych receptur first-install jest jawną bramką: wszystkie 48 produktów pozostają manual/pending. Pierwsza instalacja brew, opaque pkg, automatyczny bootstrap requirements i migracje źródeł nie są włączone. Wykonawca staged vendor bundle ma testy syntetyczne; nie są one live proof. Pełny runner toolkit, schema/catalog, linki i prywatność są sprawdzone; landing/build i publikacja pozostają poza zakresem.
 
 ## 4. Macierz akceptacyjna
 
@@ -439,18 +442,19 @@ Te opcje nie istniały w bazie audytu; wdrożono je w etapie A dla wersji 1.6.1.
 
 Warunki końcowe:
 
-- [ ] Zero niezamockowanych komend mutujących i zero zewnętrznej sieci w standardowym zestawie testów.
-- [ ] Zero absent apps w normalnym przebiegu aktualizacji i zero false soft failures za brak katalogowego caska.
-- [ ] Każda aktualizacja ma istniejący cel, zgodne źródło, dowody tożsamości, właściwą zgodę i wynik po wykonaniu.
-- [ ] Conflict/partial/unknown nie może wejść do mutacji przez alternatywny entrypoint.
-- [ ] Migracja i rollback zachowują ręczne notatki, źródłowy plik i działające aplikacje.
-- [ ] Nieznane apps są widoczne; brak adaptera jest opisanym ograniczeniem, nie awarią całego run.
-- [ ] Zgodność siedmiu języków, dokumentacja i schema validation przechodzą.
-- [ ] Zapisano konkretne nieprzeprowadzone live scenariusze; żaden nie jest oznaczony jako passed na podstawie mocków.
-- [ ] InstallPlan ma osobną zgodę i guard; zwykły scan/update/-y nie instaluje nowych aplikacji ani zależności.
-- [ ] Każda rekomendacja latest stable ma identyfikację produktu/kanału, kompatybilność, datę i dowody lub jawne unknown.
-- [ ] „Najszybszy kanał” jako trend wymaga historii; brak historii daje wyłącznie obecnie oferowaną wersję.
+- [x] Zero niezamockowanych komend mutujących i zero zewnętrznej sieci w standardowym zestawie testów.
+- [x] Zero absent apps w normalnym przebiegu aktualizacji i zero false soft failures za brak katalogowego caska.
+- [x] Każda aktualizacja ma istniejący cel, zgodne źródło, dowody tożsamości, właściwą zgodę i wynik po wykonaniu.
+- [x] Conflict/partial/unknown nie może wejść do mutacji przez alternatywny entrypoint.
+- [x] Migracja i rollback zachowują ręczne notatki, źródłowy plik i działające aplikacje.
+- [x] Nieznane apps są widoczne; brak adaptera jest opisanym ograniczeniem, nie awarią całego run.
+- [x] Zgodność siedmiu języków, dokumentacja i schema validation przechodzą.
+- [x] Zapisano konkretne nieprzeprowadzone live scenariusze; żaden nie jest oznaczony jako passed na podstawie mocków.
+- [x] InstallPlan ma osobną zgodę i guard; zwykły scan/update/-y nie instaluje nowych aplikacji ani zależności.
+- [x] Każda rekomendacja latest stable ma identyfikację produktu/kanału, kompatybilność, datę i dowody lub jawne unknown.
+- [x] „Najszybszy kanał” jako trend wymaga historii; brak historii daje wyłącznie obecnie oferowaną wersję.
 - [ ] Katalog i landing odróżniają wsparcie w kodzie, live update oraz live fresh install, bez kopiowania inventory autora.
+
 
 ## 6. Samodzielny prompt do przyszłego wdrożenia
 
@@ -460,8 +464,9 @@ Przeczytaj AGENTS.md oraz:
 docs/implementation/NEW_USER_AUDIT_2026-11-13.md
 docs/superpowers/plans/2026-11-13-source-aware-inventory.md
 Przeczytaj zapisy etapów A i B w docs/implementation; sprawdź bieżący HEAD i zachowaj cudze pliki.
-Etap A (T01-T03) i etap B (T04-T05) są wdrożone lokalnie; nie powtarzaj zakończonej pracy.
-Kolejny etap C obejmuje T06-T09, zgodnie z zakresem bieżącego polecenia właściciela.
+Etapy A-E są wdrożone lokalnie; nie powtarzaj zakończonej pracy.
+Przeczytaj docs/implementation/FINAL_1.7.0.md i uzgodnij nowy zakres.
+Otwarte są rzeczywiste testy akceptacyjne receptur, Linux/OS matrix, parity i publikacja; nie wykonuj ich bez właściwej zgody.
 W trybie orkiestra kontynuuj plan bez publikacji, prawdziwych aktualizacji i zmian w landing page.
 Zwiększaj trzeci człon wersji po każdym etapie, a po ukończeniu całości ustaw 1.7.0.
 Każda zmiana zachowania ma failing regression na fixture, potem implementację
@@ -484,4 +489,4 @@ oraz live update wymagają osobnej zgody. Na koniec podaj testy, ograniczenia
 i dokładny zakres rzeczywiście wdrożony, nie utożsamiaj mocków z live proof.
 ```
 
-Właściciel akceptuje zakres i kolejność A-E; każdy rzeczywisty test systemowy oraz publikacja pozostają osobnymi decyzjami. Etapy A i B oraz research T12 zostały wykonane lokalnie. Następna jednostka to etap C; nie aktywować nowego wykonawcy przed zamknięciem jego zabezpieczeń i migracji.
+Właściciel akceptuje zakres i kolejność A-E; każdy rzeczywisty test systemowy oraz publikacja pozostają osobnymi decyzjami. Etapy A-E zostały wykonane lokalnie. Otwarte pozycje checklisty odnoszą się do live acceptance, Linux, parity, landing i publikacji; nie zostały zastąpione twierdzeniami opartymi na mockach.

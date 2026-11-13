@@ -250,6 +250,8 @@ def main(script_dir, argv, mode="coverage"):
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--show-supported", action="store_true")
+    parser.add_argument("--compare-sources", action="store_true")
+    parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--root", action="append")
     if mode == "scaffold":
         parser.add_argument("app_path")
@@ -262,6 +264,20 @@ def main(script_dir, argv, mode="coverage"):
     try:
         snapshot = collect_current_snapshot(script_dir, roots=args.root)
         recipes = load_recipes(os.path.join(script_dir, "config/app_recipes.json"))
+        if args.compare_sources or args.refresh:
+            from channel_probes import compare_selected_channels
+
+            comparison = compare_selected_channels(
+                snapshot,
+                refresh=args.refresh,
+                environment={
+                    "os_version": snapshot.get("os_version"),
+                    "architecture": snapshot.get("architecture"),
+                    "region": os.environ.get("MAC_UPDATE_REGION", "unknown"),
+                },
+            )
+            print(json.dumps(comparison, ensure_ascii=False, indent=2))
+            return 0
         if mode == "scaffold":
             # Exact observed path is the only selector. Names cannot create identity.
             matches = [

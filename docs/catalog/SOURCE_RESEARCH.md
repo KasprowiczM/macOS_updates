@@ -128,3 +128,17 @@ A defensible result should report sample size, covered dates, matched release id
 3. Review license/access terms and exact bundle/Team IDs, signatures, redirects and updater ownership before making any source installable. Review PKG/system-extension/helper effects for Office, Teams, Zoom, VPN, Drive and Docker. No first-install proof exists here.
 4. Probe vendor latest and compatible history where unavailable or unextracted, especially Comet, Spotify, Zoom, MEGA, ProtonVPN and Inkscape. Review official App Store links, platform kind, country and Apple Silicon eligibility for each exact edition.
 5. Implement bounded selected-app probes, fixtures for ahead/tie/MAS-ahead/prerelease/incompatible/rollout/incomparable, and recommendation logic separately under T12. This document alone does not complete the runtime task or activate T13-T15.
+
+## Runtime advisor implementation, 2026-11-13
+
+The selected-product advisor is now implemented separately from the observations above. `config/channel_sources.json` preserves all 47 research rows and identifies 48 GUI products after splitting ChatGPT and Codex. The manifest grants public metadata checks only. Its entries grant no installation, replacement, launch, license or updater-ownership authority. Unknown identity and stable policies remain explicit.
+
+`channel_probes.compare_selected_channels` accepts selected product IDs or matches current inventory through reviewed exact bundle IDs and verified installed cask receipt identities. Names and local SUFeedURL values do not establish a match. Unknown installed products stay unmatched. The coverage command can show those limitations without fetching the whole catalog.
+
+Checks use the shared HTTPS policy with exact source hosts, at most three simultaneous requests and one request per host, ten seconds per source, and a sixty second invocation budget. Successful metadata is cached for 24 hours in private local state with its original observation time. Explicit refresh skips the normal cache but respects Retry-After. No schedule, account session, app launch, package execution or telemetry is involved.
+
+The recommendation keeps global stable, compatible stable, actually offered and the specific recommended release separate. A public App Store result remains listed, even for a verified Mac product. Unknown architecture or minimum OS prevents a compatible recommendation. A staged release can remain the latest compatible observation while an older listed release is the available recommendation. Equal releases preserve the current source. Conflicting source ownership blocks a recommendation. Native updater preference needs an explicit reviewed ownership binding and a matching eligible release observation.
+
+Local history records publication time separately from first observation and its probe interval. Cached reads never become new first observations. At least five matched stable releases over thirty days are required before history is qualified for analysis. This implementation makes no historical speed claim. It does not infer an installable product, an offered update or a universal winner from the preserved research rows.
+
+The guarded fixture suite covers source-ahead and tie cases, MAS ahead and later, prerelease and edition exclusions, incompatible and staged releases, unknown region/compatibility, reviewed identity matching, cache expiry, Retry-After, concurrency and the invocation budget. No live application update or fresh installation was performed by these checks.

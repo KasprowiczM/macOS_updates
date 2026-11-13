@@ -14,7 +14,7 @@ Options:
       --doctor                   Read-only readiness report (no sudo, no run log); exit 0 ok, 10 warnings, 1 problem
       --verify-only              Verify installed app versions against history without mutating
       --json-summary             Emit JSON summary on exit (stdout, after run)
-      --bootstrap-cli            Install missing native CLIs and managed Node/Bun toolchain
+      --bootstrap-cli            Legacy flag; does not authorize missing CLI installation
       --skip-prescan             Skip step 0 (APPLICATIONS.md prescan)
       --skip-system              Skip final macOS system update
       --skip-appstore            Skip App Store updates

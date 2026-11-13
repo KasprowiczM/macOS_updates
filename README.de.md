@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Lizenz:** [MIT](LICENSE) · **Änderungen:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.4** : Ein-Befehl-Orchestrator für Updates auf **Apple-Silicon-Macs mit macOS 13-27**. Er koordiniert verifizierte Paketaktualisierungen und ehrliche Auslöser der app-eigenen Updater für **Software, die bereits auf diesem Mac installiert ist**. **Mehrsprachig** (7 Sprachen). Optionales privates Overlay über [`dev_sync/`](dev_sync/README.md).
+> **v1.6.5** : Ein-Befehl-Orchestrator für Updates auf **Apple-Silicon-Macs mit macOS 13-27**. Er koordiniert verifizierte Paketaktualisierungen und ehrliche Auslöser der app-eigenen Updater für **Software, die bereits auf diesem Mac installiert ist**. **Mehrsprachig** (7 Sprachen). Optionales privates Overlay über [`dev_sync/`](dev_sync/README.md).
 
 | Auf einen Blick | |
 |-----------------|--|
@@ -14,21 +14,21 @@
 | Ablauf | 7 Schritte (0–6), das macOS-Systemupdate kommt immer zuletzt |
 | Registry | 47 Internet-Apps · 11 Update-Methoden (siehe [Update-Methoden](#update-methoden)) |
 | Sprachen | EN, PL, ES, FR, DE, IT, PT (CLI und Dokumentation) |
-| Tests | 1103 automatisierte Tests (`bash run_tests.sh`) |
+| Tests | 1178 automatisierte Tests (`bash run_tests.sh`) |
 
 Phase C aktiviert lokales JSON-Inventar und ausdrücklich genehmigte Aktionen. `bash update_all.sh --plan` und `--dry-run` zeigen denselben Plan ohne Speicherung. Ein interaktiver Lauf fragt einmal nach den angezeigten Umfängen; `-y`, EOF und unbeaufsichtigte Läufe erteilen keine neue Erlaubnis. Mit `--preferences` Entscheidungen prüfen oder zurücksetzen. Updates erhalten beobachtete Quelle und Zielpfad; Konflikte, fehlende Ziele und unsichere Belege stellen nur das betroffene Ziel zurück. `build_inventory.sh --migration --preview` erhält ursprüngliche Markdown-Bytes und Notizen; die angezeigte Vorschlags-ID ausdrücklich bestätigen. Allgemeine Herstellerupdates bleiben bis zur Prüfung von Identität und Adapter manuell. Ein Katalogeintrag belegt weder Installation noch Zustimmung.
 
-Neu in v1.6.1: lokale Anwendungsberichte, CapCut-Belegerkennung, ausdrückliche Setup-Zustimmung und stärkere Offline-Testschutzmaßnahmen. Stufe A aktiviert noch keine automatische Quellenauflösung oder Installationsmenüs.
+Dies ist ein lokaler, unveröffentlichter Kandidat. Der Update-Manager arbeitet nur für installierte Ziele mit beobachteter Quelle und neuer Zustimmung. Allgemeine native und Hersteller-Updater bleiben manuell, bis geprüfte Rezepte vorliegen. Der optionale öffentliche Katalog umfasst 48 Produkte und bietet geprüfte offizielle Links zur manuellen Beschaffung; es gibt null freigegebene automatische Erstinstallationsrezepte. Die folgende Methodenliste beschreibt Fähigkeiten, keine Ausführungsberechtigung.
 
 **Neu in v1.6.0:** Geplante Läufe (launchd) finden Homebrew und `mas`, und der Installer prüft, dass der Job geladen ist (neu: `--minute`, `--once-in`). Geöffnete Apps werden nie geschlossen oder ersetzt, auch Homebrew-Casks nicht. Jede Rückfrage während des Laufs läuft mit der sicheren Antwort „nein“ ab. `bash update_all.sh --doctor` ist ein schreibgeschützter Bereitschaftsbericht, und echte Läufe haben Vorabprüfungen. Ein dauerhafter Feed-Zustand ersetzt unklare „veralteter Feed“-Warnungen, und HyperFrames, Superset und Open Design werden ohne versteckte Starts installiert bzw. geprüft. Frühere 1.5.x-Versionen stehen im [CHANGELOG.md](CHANGELOG.md).
 
-**Herstellerwahrheit (seit v1.5.0):** Die Version jeder Anwendung wird vor jeder Ausführung mit dem Feed des Herstellers abgeglichen. Aktuelle Apps bleiben unberührt; veraltete Apps werden vom eigenen Updater der App aktualisiert oder vom Hersteller mit Signatur- und Team-ID-Prüfung installiert. Es wird nur installierte Software aktualisiert (`--bootstrap-cli` installiert fehlende CLIs bewusst). Manuell entfernte Apps werden erkannt und nie neu installiert. **Apps, die du geöffnet hast, werden nie geschlossen — das Werkzeug beendet nur, was es selbst gestartet hat.** Den Herstellerstatus prüfst du schreibgeschützt mit `bash scripts/check_vendor_feeds.sh`.
+Ältere Hersteller-Feed-Berichte sind schreibgeschützt. Der aktuelle Manager lässt allgemeine native und Hersteller-Updater manuell, bis ein geprüftes Rezept vorliegt. Das alte Flag `--bootstrap-cli` erteilt keine Erlaubnis zur Erstinstallation. Fehlende CLIs separat anhand geprüfter offizieller Anleitungen installieren. Geöffnete Apps werden nicht geschlossen. Feed-Status mit `bash scripts/check_vendor_feeds.sh` prüfen.
 
 ## Sicheres Setup und Anwendungsquellen
 
 `bash setup.sh --inspect` prüft die Bereitschaft ohne Installation, Profiländerung oder Touch-ID-Konfiguration. Fehlende Werkzeuge machen nur die abhängige Funktion unverfügbar. Im Terminal zeigt `bash setup.sh --install-dependencies` optionale Abhängigkeiten und fragt vor jeder Installation; `bash setup.sh --configure-shell` zeigt eine getrennt zu bestätigende Profiländerung. Abgelehnte Abhängigkeiten blockieren unabhängige Funktionen nicht. Ohne Python muss dieses vor dem Inventar ausdrücklich installiert werden. Fehlendes oder veraltetes `mas` wird gemeldet und nicht automatisch installiert oder aktualisiert.
 
-Der normale Bericht zeigt installierte Anwendungen. `bash scripts/report_update_coverage.sh --show-supported` zeigt zusätzlich fehlende Katalogeinträge. Dies ist noch kein Installationsmenü. Ein App-Store-Beleg für CapCut erhält den App-Store-Pfad auch ohne Cask. Ohne bestätigte Homebrew-Zuordnung wird eine Quellenwahl empfohlen, ohne Übernahme oder Installation. Vollständige Quellenauflösung und interaktive Auswahl folgen später.
+Der normale Updatebericht umfasst installierte Apps. `bash scripts/report_update_coverage.sh --show-supported` bleibt eine Referenzliste. Das optionale Auswahlmenü öffnet `bash setup.sh --catalog` und startet ohne Vorauswahl. Nach Vorschau und erneuter Zustimmung kann eine App über einen geprüften offiziellen Link manuell beschafft werden. Ein Quellenwechsel für eine bestehende App erfordert manuelle Migration. Ein App-Store-Beleg für CapCut erhält den App-Store-Pfad. Eine lokale App ohne bestätigte Homebrew-Zuordnung wird nicht automatisch übernommen.
 
 Die Untersuchung zu Latest Stable steht in [SOURCE_RESEARCH.md](docs/catalog/SOURCE_RESEARCH.md). Verschiedene Editionen sind nicht vergleichbar; eine Momentaufnahme beweist keinen dauerhaft schnellsten Kanal.
 
@@ -60,7 +60,7 @@ Siehe [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.m
 | 5 | **Postupdate/Historie** — `APPLICATIONS.md` aktualisieren, `UPDATES.md` atomar ergänzen |
 | 6 | **macOS (final)** — pro Label `softwareupdate -i <label> -R` (Labels mit Neustart im letzten Stapel); wird nach einem blockierenden harten Fehler in den Schritten 1–4 oder ohne Autorisierung verschoben |
 
-**Wichtig:** Updates betreffen nur Software, die bereits auf deinem Mac installiert ist. Fehlende Katalogeinträge erscheinen nur mit `--show-supported`. Der abschließende macOS-Schritt kann den Mac neu starten; er läuft deshalb zuletzt und behält das zwingende `-R`. Schritt 5 dient nur der Berichterstattung: Ein Fehler dort ist ein Fehler, verschiebt den macOS-Schritt aber nie. Unbekannte installierte Apps werden aufgelistet, damit du (oder ein KI-Agent) Handler ergänzen kannst.
+**Wichtig:** Normale Updates betreffen nur installierte Software mit beobachteter Quelle und genehmigtem Aktionsumfang. Der separate optionale Katalog kann fehlende Apps anzeigen, installiert sie aber nicht automatisch. Manuelle Beschaffung erfordert Vorschau und neue Zustimmung. Der abschließende macOS-Schritt kann den Mac neu starten und läuft daher zuletzt mit dem zwingenden `-R`. Schritt 5 dient nur der Berichterstattung. Unbekannte installierte Apps werden zur Prüfung aufgelistet.
 
 Die Abdeckung ist bewusst explizit: **verified direct** heißt, der Updater hat den Paket-/Versionspfad bestätigt; **triggered-unverified**, eine App wurde gestartet, damit ihr Hersteller-Updater arbeiten kann, der Abschluss ist aber nicht belegbar; **externally managed**, der Hersteller oder der App Store steuert den Update-Zyklus; **manual** erfordert eine Aktion des Benutzers; **unknown** hat keine registrierte Methode.
 
@@ -70,6 +70,7 @@ bash build_inventory.sh                  # APPLICATIONS.md von diesem Mac neu au
 ```
 
 ### Update-Methoden
+Die Methodentabelle ist eine ältere Fähigkeitsübersicht. Sie beschreibt registrierte Methoden, erteilt aber keine Ausführungsberechtigung; der Manager benötigt eine beobachtete Quelle und neue Zustimmung.
 
 Die Registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) ordnet 47 Apps 11 Methoden zu:
 
@@ -101,7 +102,7 @@ Die Registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 | `--dry-run` | Jeden Schritt nur anzeigen, nichts ändern, nie nach Zugangsdaten fragen |
 | `--verify-only` | Installierte App-Versionen gegen die Historie prüfen, ohne zu ändern |
 | `--json-summary` | Nach dem Lauf ein JSON-Ergebnisobjekt auf stdout ausgeben |
-| `--bootstrap-cli` | Fehlende CLI-Werkzeuge ausdrücklich installieren (standardmäßig werden nur installierte CLIs aktualisiert) |
+| `--bootstrap-cli` | Das alte Flag CLI erteilt keine Erlaubnis zur Erstinstallation. Fehlende CLIs separat anhand geprüfter offizieller Anleitungen installieren. |
 | `--non-interactive` | Nicht-interaktiver Modus für launchd / cron (impliziert auch `-y`) |
 | `--notify` | Beim Ende eine macOS-Benachrichtigung senden |
 | `--treat-appstore-ax-as-warning` | App-Store-Exit `2` (fehlende Bedienungshilfen) als Warnung behandeln |
@@ -411,3 +412,10 @@ Vollständige Liste: [docs/agents/troubleshooting.md](docs/agents/troubleshootin
 ## Lizenz
 
 [MIT](LICENSE) © macOS Updates contributors
+
+
+## Optionaler Katalog und Erstinstallation
+
+Neue App-Hinweise sind Vorschläge zur Prüfung, keine ausführbaren Rezepte. `bash scripts/scan_update_feeds.sh` gibt eine zusammengefasste Übersicht aus. Ein Proposal-Export ermöglicht Vorschau und ausdrückliche Annahme; er ist bereinigt, bleibt lokal und wird nie hochgeladen. `bash setup.sh --catalog` öffnet den Katalog ohne Vorauswahl. `-y`, nichtinteraktive Läufe und EOF installieren nichts. Im Menü vergleicht `check <number>` nur ausgewählte Quellen. Ergebnisse zeigen die neueste bestätigte kompatible stabile Version samt Datum; der Cache gilt 24 Stunden. Unbekannt bleibt unbekannt. Ein öffentlicher Mac-App-Store-Eintrag beweist nicht, dass die App für Ihr Konto angeboten wird. Kein Kanal ist immer am schnellsten.
+
+Der öffentliche Katalog umfasst 47 Registry-Zeilen für 48 Produkte und null freigegebene automatische Erstinstallationsrezepte. Nach Vorschau und erneuter Bestätigung können Sie geprüfte offizielle Links zur manuellen Beschaffung auswählen. Das Öffnen einer Seite installiert die App nicht. Ein Quellenwechsel für eine bestehende App erfordert manuelle Migration. Der separate InstallPlan zeigt Quelle, Ziel, Version, Voraussetzungen und Berechtigungen; unbekannte Lizenz oder Kosten bleiben als unbekannt markiert. Jedes künftige automatische Rezept braucht vor der Aktivierung eine neue Erstinstallationsfreigabe. Der Katalog verspricht keine automatische Installation aller Produkte.

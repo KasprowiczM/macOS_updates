@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.4** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.6.5** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 | At a glance | |
 |-------------|--|
@@ -14,21 +14,21 @@
 | Pipeline | 7 steps (0–6), macOS system update always last |
 | Registry | 47 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 1103 automated tests (`bash run_tests.sh`) |
+| Tests | 1178 automated tests (`bash run_tests.sh`) |
 
 Stage C activates local JSON inventory and scoped update plans. `bash update_all.sh --plan` and `--dry-run` show the same read-only decisions. A normal interactive run asks once for the displayed scopes; `-y`, EOF and unattended runs grant no new permission. Use `--preferences` to review or reset choices. Updates keep the observed source and exact destination; conflicts, missing targets and uncertain evidence defer that target. `build_inventory.sh --migration --preview` preserves old Markdown bytes and notes; accept the displayed proposal ID explicitly. Generic vendor updates remain manual until a reviewed identity and adapter are available. An old catalog entry is neither proof of installation nor consent.
 
-New in v1.6.1: local-only app reporting, receipt-aware CapCut status, explicit setup consent and stronger offline test guards. This is stage A; automatic source resolution and the installation menu are not enabled.
+This is a local, unpublished candidate. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority.
 
 **New in v1.6.0:** Scheduled (launchd) runs find Homebrew and `mas`, and the installer verifies that the job is loaded (`--minute` and `--once-in` added). Apps you have open are never closed or replaced, Homebrew casks included. Every mid-run question times out with the safe answer "no". `bash update_all.sh --doctor` is a read-only readiness report, and real runs add pre-flight checks. Persistent vendor-feed state replaces opaque "stale feed" warnings, and HyperFrames, Superset and Open Design are installed or checked without hidden launches. Earlier 1.5.x releases are described in [CHANGELOG.md](CHANGELOG.md).
 
-**Vendor truth (since v1.5.0):** each app's version is checked against its vendor's own feed before anything runs. Up-to-date apps are left alone; outdated ones are updated by the app's own updater, or installed from the vendor with signature and Team ID verification. Only software that is installed gets updated (`--bootstrap-cli` installs missing CLIs on purpose). Apps removed manually are detected and never reinstalled. **Apps you have open are never closed — the toolkit only quits what it launched itself.** Check the vendor state read-only with `bash scripts/check_vendor_feeds.sh`.
+Legacy vendor-feed reporting is read-only. The current manager leaves generic native and vendor adapters manual until a reviewed recipe is available. The legacy `--bootstrap-cli` flag grants no first-install permission. Acquire missing CLIs separately through their reviewed official instructions. Open apps are not closed. Check feed state with `bash scripts/check_vendor_feeds.sh`.
 
 ## Safe setup and application sources
 
 `bash setup.sh --inspect` checks readiness without installing dependencies, changing shell profiles or configuring Touch ID. Missing tools leave the affected feature unavailable. In a terminal, `bash setup.sh --install-dependencies` previews optional dependencies and asks before each installation; `bash setup.sh --configure-shell` separately previews a shell profile change. Declining a dependency leaves independent features usable. If Python is unavailable, install it explicitly before building inventory. Missing or outdated `mas` is reported during updates and is never installed or upgraded automatically.
 
-The normal update report lists installed applications. Browse supported but absent recipes with `bash scripts/report_update_coverage.sh --show-supported`. This is a reference catalog, not an installation menu. A CapCut App Store receipt retains App Store routing even without a cask. A local app without confirmed Homebrew ownership gets a source recommendation, not adoption or installation. The full source resolver and interactive source selection are planned for later stages.
+The normal update report covers installed applications. `bash scripts/report_update_coverage.sh --show-supported` remains a reference list. Open the optional selection menu with `bash setup.sh --catalog`; it starts with nothing selected. A selected app can be acquired from a reviewed official link after preview and fresh confirmation. Changing an existing app source requires manual migration. A CapCut App Store receipt retains App Store routing. A local app without confirmed Homebrew ownership is never adopted automatically.
 
 Latest stable source research is recorded in [SOURCE_RESEARCH.md](docs/catalog/SOURCE_RESEARCH.md). Versions from different editions are not comparable; a current snapshot does not prove which channel is historically fastest.
 
@@ -60,7 +60,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 | 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
 | 6 | **macOS (final)** — per-label `softwareupdate -i <label> -R` (restart-required labels in the final batch); deferred after a blocking hard failure in steps 1–4 or when authorization is unavailable |
 
-**Important:** Updates only touch software already installed on your Mac. Absent catalog apps appear only with `--show-supported`. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Step 5 is reporting-only: a failure there is an error but never defers the macOS step. Unknown installed apps are listed so you (or an AI agent) can add handlers.
+**Important:** Normal updates act only on installed software whose source was observed and whose scoped action was approved. The separate optional catalog can show absent apps, but it does not install automatically. Manual acquisition requires preview and fresh confirmation. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Step 5 is reporting-only. Unknown installed apps are listed for review.
 
 Coverage is deliberately explicit: **verified direct** means the updater confirmed the package/version path; **triggered-unverified** means an app was launched to let its vendor updater run but completion cannot be proven; **externally managed** means the vendor or App Store owns the update lifecycle; **manual** requires user action; **unknown** has no registered method.
 
@@ -70,6 +70,7 @@ bash build_inventory.sh                  # rebuild APPLICATIONS.md from this Mac
 ```
 
 ### Update methods
+The method table is a legacy capability reference. It describes registered methods and does not authorize a current action; the scoped manager requires observed source and fresh approval.
 
 The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/internet_app_methods.txt`](config/internet_app_methods.txt)) maps 47 apps to 11 methods:
 
@@ -101,7 +102,7 @@ The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 | `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
 | `--verify-only` | Verify installed app versions against history without mutating |
 | `--json-summary` | Print a JSON result object on stdout after the run |
-| `--bootstrap-cli` | Explicitly install missing CLI tools (by default only installed CLIs are updated) |
+| `--bootstrap-cli` | The legacy CLI flag grants no first-install permission. Acquire missing CLIs separately through their reviewed official instructions. |
 | `--non-interactive` | Non-interactive mode for launchd / cron (also implies `-y`) |
 | `--notify` | Post a macOS notification when the run finishes |
 | `--treat-appstore-ax-as-warning` | Treat App Store exit `2` (missing Accessibility) as a warning |
@@ -409,3 +410,10 @@ Full list: [docs/agents/troubleshooting.md](docs/agents/troubleshooting.md)
 ## License
 
 [MIT](LICENSE) © macOS Updates contributors
+
+
+## Optional catalog and first installation
+
+New app signals are review proposals, not executable recipes. `bash scripts/scan_update_feeds.sh` prints an aggregated summary. Proposal export supports preview and explicit acceptance; it is redacted, stays local, and is never uploaded. `bash setup.sh --catalog` opens the optional catalog with no selection. `-y`, noninteractive runs, and EOF install nothing. In the menu, `check <number>` compares only selected sources. Results show the latest confirmed compatible stable version and date, cached for 24 hours. Unknown stays unknown. A public Mac App Store listing does not prove availability to your account, and no channel is always fastest.
+
+The public catalog has 47 registry rows for 48 separate products and zero approved automatic first-install recipes. After preview and fresh confirmation, you can choose reviewed official links for manual acquisition. Opening a page does not install the app. Changing an existing app's source requires manual migration. The separate InstallPlan shows source, destination, version, requirements, and permissions; unknown license or cost stays labeled unknown. Any future automatic recipe needs fresh-install acceptance before enablement. The catalog does not promise automatic installation for all 48 products.

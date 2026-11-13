@@ -5,6 +5,29 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/lib/platform.sh"
 mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/i18n/loader.sh"
+# New application acquisition is a separate explicit preview and consent flow.
+case "${1:-}" in
+    --catalog|--install-plan)
+        catalog_mode="$1"; shift
+        catalog_plan=""
+        if [ "$catalog_mode" = --install-plan ]; then
+            [ "$#" -gt 0 ] || { echo "${L_INSTALL_PLAN_PATH_REQUIRED:-An install plan path is required.}" >&2; exit 1; }
+            catalog_plan="$1"; shift
+        fi
+        for catalog_arg in "$@"; do
+            case "$catalog_arg" in
+                -y|--yes) export MAC_UPDATE_YES=1 ;;
+                --non-interactive) export MAC_UPDATE_NONINTERACTIVE=1 ;;
+                *) echo "Unknown option: $catalog_arg" >&2; exit 1 ;;
+            esac
+        done
+        . "$SCRIPT_DIR/lib/setup_catalog.sh"
+        if [ "$catalog_mode" = --catalog ]; then setup_catalog_menu
+        else setup_catalog_install_plan "$catalog_plan"; fi
+        exit $?
+        ;;
+esac
+
 install_deps=0
 configure_shell=0
 for arg in "$@"; do
@@ -12,7 +35,7 @@ for arg in "$@"; do
         --inspect) ;;
         --install-dependencies) install_deps=1 ;;
         --configure-shell) configure_shell=1 ;;
-        -h|--help) echo "Usage: bash setup.sh [--inspect] [--install-dependencies] [--configure-shell]"; exit 0 ;;
+        -h|--help) echo "Usage: bash setup.sh [--inspect] [--install-dependencies] [--configure-shell] [--catalog] [--install-plan PATH]"; exit 0 ;;
         *) echo "Unknown option: $arg" >&2; exit 1 ;;
     esac
 done

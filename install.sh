@@ -159,6 +159,7 @@ fi
 echo ""
 echo -e "  ${BOLD}${L_INSTALLER_NEXT_STEPS}${NC}"
 echo "    cd $MAC_UPDATE_DIR"
+echo "    bash setup.sh --catalog             # optional new applications, explicit choices"
 echo "    bash update_all.sh --dry-run -y    # preview"
 echo "    bash update_all.sh -y              # full update"
 echo "    bash run_tests.sh                  # verify"
