@@ -1,0 +1,14 @@
+{
+  "id": "symlink_escape",
+  "apps": [],
+  "symlink_escape": true,
+  "expected_instances": 0,
+  "expected_sources": [],
+  "partial": true,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

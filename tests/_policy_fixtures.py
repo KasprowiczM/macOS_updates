@@ -27,7 +27,7 @@ class PolicyFixture:
         with self.plist.open('wb') as stream: plistlib.dump({'CFBundleIdentifier':'fixture.app','CFBundleName':'Fixture','CFBundleShortVersionString':'1.0.0'},stream)
         for name,body in [('ps','exit 0'),('uname','echo arm64'),('sw_vers','echo 26.0')]: self.shell(name,body)
         (self.bin/'python3').symlink_to(sys.executable)
-        self.environ=patch.dict(os.environ,dict(HOME=str(self.root),MAC_UPDATE_STATE_DIR=str(self.state),MAC_UPDATE_SESSION_DIR=str(self.session),PATH=str(self.bin)+':/usr/bin:/bin',MAC_UPDATE_YES='1',MAC_UPDATE_NONINTERACTIVE='1',MAC_LANG='en',MAC_UPDATE_HOMEBREW_PREFIX=str(self.root/'unused-homebrew')),clear=False)
+        self.environ=patch.dict(os.environ,dict(HOME=str(self.root),MAC_UPDATE_STATE_DIR=str(self.state),MAC_UPDATE_SESSION_DIR=str(self.session),PATH=str(self.bin)+':/usr/bin:/bin',MAC_UPDATE_YES='1',MAC_UPDATE_NONINTERACTIVE='1',MAC_LANG='en',MAC_UPDATE_HOMEBREW_PREFIX=str(self.root/'unused-homebrew'),MAC_UPDATE_APP_DIRS=str(self.root/'Applications'),MAC_UPDATE_BREW_PREFIXES='',MAC_UPDATE_CLI_PREFIXES=''),clear=False)
         self.environ.start();os.environ.pop('MAC_UPDATE_PLAN_PATH',None)
         return self
     def __exit__(self,*args): self.environ.stop();self.temp.cleanup()

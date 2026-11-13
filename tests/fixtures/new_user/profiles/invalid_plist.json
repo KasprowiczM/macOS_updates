@@ -1,0 +1,20 @@
+{
+  "id": "invalid_plist",
+  "apps": [
+    {
+      "name": "Broken Launcher",
+      "bundle": "com.example.broken",
+      "bad_plist": true
+    }
+  ],
+  "expected_sources": [
+    "unknown"
+  ],
+  "partial": true,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

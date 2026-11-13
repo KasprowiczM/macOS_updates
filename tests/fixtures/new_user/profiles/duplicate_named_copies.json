@@ -1,0 +1,25 @@
+{
+  "id": "duplicate_named_copies",
+  "apps": [
+    {
+      "name": "Agent",
+      "bundle": "com.example.agent",
+      "folder": "one"
+    },
+    {
+      "name": "Agent",
+      "bundle": "com.example.agent",
+      "folder": "two"
+    }
+  ],
+  "expected_sources": [
+    "unknown",
+    "unknown"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

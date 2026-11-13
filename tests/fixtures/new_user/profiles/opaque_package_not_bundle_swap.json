@@ -1,0 +1,13 @@
+{
+  "id": "opaque_package_not_bundle_swap",
+  "apps": [],
+  "expected_sources": [],
+  "expected_instances": 0,
+  "opaque_package": true,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

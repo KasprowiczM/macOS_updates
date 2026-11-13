@@ -1,6 +1,6 @@
 # Guía de usuario (Español)
 
-**Versión:** 1.6.3 · **Apple Silicon, macOS 13+**
+**Versión:** 1.6.4 · **Apple Silicon, macOS 13+**
 
 ## Configuración segura y fuentes de aplicaciones
 

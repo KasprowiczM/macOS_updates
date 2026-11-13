@@ -1,0 +1,13 @@
+{
+  "id": "partial_manager_preserves_stale",
+  "apps": [],
+  "expected_sources": [],
+  "expected_instances": 0,
+  "partial_manager": true,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

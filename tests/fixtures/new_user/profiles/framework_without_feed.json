@@ -1,0 +1,20 @@
+{
+  "id": "framework_without_feed",
+  "apps": [
+    {
+      "name": "Framework Agent",
+      "bundle": "com.example.framework",
+      "framework": "sparkle_no_feed"
+    }
+  ],
+  "expected_sources": [
+    "unknown"
+  ],
+  "expected_possible": 1,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

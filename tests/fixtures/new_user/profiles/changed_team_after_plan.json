@@ -1,0 +1,20 @@
+{
+  "id": "changed_team_after_plan",
+  "apps": [
+    {
+      "name": "Changed",
+      "bundle": "com.example.changed",
+      "brew": true
+    }
+  ],
+  "expected_sources": [
+    "homebrew"
+  ],
+  "changed_team": true,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

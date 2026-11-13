@@ -1,0 +1,24 @@
+{
+  "id": "same_version_name_not_identity",
+  "apps": [
+    {
+      "name": "Same",
+      "bundle": "com.example.one"
+    },
+    {
+      "name": "Same",
+      "bundle": "com.example.two",
+      "folder": "two"
+    }
+  ],
+  "expected_sources": [
+    "unknown",
+    "unknown"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

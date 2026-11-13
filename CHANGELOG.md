@@ -6,6 +6,11 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-11-13 (local, unpublished)
+
+- Close stage D with 29 new-user fixture profiles and an offline 100-bundle scan budget. Unknown applications remain visible, with review-only proposals and no new execution authority.
+- Record the fixture acceptance boundary separately from live updates, supported-OS validation and publication.
+
 ## [1.6.3] - 2026-11-13 (local, unpublished)
 
 ### Changed

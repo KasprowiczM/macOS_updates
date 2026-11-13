@@ -1,0 +1,20 @@
+{
+  "id": "new_squirrel",
+  "apps": [
+    {
+      "name": "Squirrel Agent",
+      "bundle": "com.example.squirrel",
+      "framework": "squirrel"
+    }
+  ],
+  "expected_sources": [
+    "unknown"
+  ],
+  "expected_possible": 1,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

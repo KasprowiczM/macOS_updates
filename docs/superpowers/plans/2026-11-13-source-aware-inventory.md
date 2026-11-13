@@ -10,9 +10,9 @@
 
 **Spec:** [Audyt i specyfikacja docelowa, 2026-11-13](../../implementation/NEW_USER_AUDIT_2026-11-13.md), szczególnie rozdziały 4, 8, 10 i 11. Plan obejmuje 15 zadań w etapach A-E.
 
-**Status:** Etap A i research źródeł wdrożone lokalnie jako 1.6.1. Etap B (T04-T05) zaakceptowany 2026-11-13, wdrożenie obserwacyjne 1.6.2 na bazie `5daf24d`. Bez publikacji, prawdziwych aktualizacji i zmian w landing page. Etap C (T06-T09) wdrożono lokalnie jako 1.6.3; jego pełna bramka przeszła 1101 przypadków, jeden jawnie pominięty. D i E są w integracji. Po każdym etapie zwiększamy trzeci człon wersji; po ukończeniu całości wersja 1.7.0.
+**Status:** Etap A i research źródeł wdrożone lokalnie jako 1.6.1. Etap B (T04-T05) zaakceptowany 2026-11-13, wdrożenie obserwacyjne 1.6.2 na bazie `5daf24d`. Bez publikacji, prawdziwych aktualizacji i zmian w landing page. Etap C (T06-T09) wdrożono lokalnie jako 1.6.3; jego pełna bramka przeszła 1101 przypadków, jeden jawnie pominięty. Etap D (T10-T11) ma zieloną bramkę 1103 przypadków, jeden pominięty. Etap E jest w integracji. Linux, live macOS, publikacja i landing pozostają osobno. Po każdym etapie zwiększamy trzeci człon wersji; po ukończeniu całości wersja 1.7.0.
 
-**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T06-T09 są zamknięte w [etapie C](../../implementation/STAGE_C_1.6.3.md); T10-T15 są w integracji. **Etap B:** [zapis implementacji 1.6.2](../../implementation/STAGE_B_1.6.2.md).
+**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T06-T09 są zamknięte w [etapie C](../../implementation/STAGE_C_1.6.3.md); T10-T11 są zamknięte w [etapie D](../../implementation/STAGE_D_1.6.4.md); T12-T15 są w integracji. **Etap B:** [zapis implementacji 1.6.2](../../implementation/STAGE_B_1.6.2.md).
 
 ## Global Constraints
 
@@ -265,14 +265,16 @@ Etap B ukończony lokalnie jako 1.6.2. Dowody i konserwatywne ograniczenia w rap
 
 **Interfaces:** `detect_capabilities(instance: dict, metadata: dict) -> list[dict]`; `propose_recipe(instance: dict, capabilities: list[dict]) -> dict`; `redact_proposal(proposal: dict) -> dict`. Propozycja nigdy nie trafia do wykonywalnego config bez review.
 
-- [ ] Wykorzystaj istniejący detektor Sparkle/Electron/Squirrel/receipt; nie duplikuj parserów. Inventory automatycznie nadaje źródło tylko tam, gdzie istnieje wystarczający dowód; capability może pozostać probable.
-- [ ] Testy dowodzą: nowe app pojawia się raz, bez install/launch/network; maszyna z 50 nieznanymi app nie generuje 50 błędów. Pokazuje „50 wykrytych, 12 z możliwym updaterem, wybierz obsługę”.
-- [ ] Opcjonalne check-only wymaga zatwierdzonego feedu/polityki, ograniczeń HTTP, schema/size/timeouts i zgodności kanału. Brak sprawdzalnego feedu to manual, nie błąd.
-- [ ] Native updater uruchamiany tylko po pierwszej zgodzie, z informacją, że aplikacja może się otworzyć. Samo launch nie daje updated/current_verified; sprawdź wynik albo wyświetl unverified.
-- [ ] Recepty mogą korzystać z read-only danych Homebrew jako propozycji. Nie uruchamiaj `brew install --adopt`, uninstall ani naprawy źródła w tle. Zgodność nazwy lub wersji nie oznacza tożsamości.
-- [ ] Eksport propozycji dopiero po preview. Usuwa path/user/receipt/URL query/tokens; pozostawia publiczne bundle ID, dane adaptera i syntetyczny przykład. Brak automatycznego uploadu/zgłoszenia issue.
-- [ ] Fixture kontraktowy każdej nowej recepty: absent, current, newer, older/feed regression, offline, bad signature, wrong identity, wrong arch/minOS, running, source conflict. Dopiero potem podniesienie capability do reviewed_direct.
-- [ ] `--pattern 'test_app_capabilities.py'`, full gate, docs w 7 językach; commit.
+- [x] Wykorzystaj istniejący detektor Sparkle/Electron/Squirrel/receipt; nie duplikuj parserów. Inventory automatycznie nadaje źródło tylko tam, gdzie istnieje wystarczający dowód; capability może pozostać probable.
+- [x] Testy dowodzą: nowe app pojawia się raz, bez install/launch/network; maszyna z 50 nieznanymi app nie generuje 50 błędów. Pokazuje „50 wykrytych, 12 z możliwym updaterem, wybierz obsługę”.
+- [x] Opcjonalne check-only wymaga zatwierdzonego feedu/polityki, ograniczeń HTTP, schema/size/timeouts i zgodności kanału. Brak sprawdzalnego feedu to manual, nie błąd.
+- [x] Native updater uruchamiany tylko po pierwszej zgodzie, z informacją, że aplikacja może się otworzyć. Samo launch nie daje updated/current_verified; sprawdź wynik albo wyświetl unverified.
+- [x] Recepty mogą korzystać z read-only danych Homebrew jako propozycji. Nie uruchamiaj `brew install --adopt`, uninstall ani naprawy źródła w tle. Zgodność nazwy lub wersji nie oznacza tożsamości.
+- [x] Eksport propozycji dopiero po preview. Usuwa path/user/receipt/URL query/tokens; pozostawia publiczne bundle ID, dane adaptera i syntetyczny przykład. Brak automatycznego uploadu/zgłoszenia issue.
+- [x] Fixture kontraktowy każdej nowej recepty: absent, current, newer, older/feed regression, offline, bad signature, wrong identity, wrong arch/minOS, running, source conflict. Dopiero potem podniesienie capability do reviewed_direct.
+- [x] `--pattern 'test_app_capabilities.py'`, full gate, docs w 7 językach; commit.
+
+Etap D nie włącza żadnego nowego native/direct adaptera. Warunki zgody, podpisu i testu receptury pozostają bramką przyszłej aktywacji; wykrycie frameworka jej nie spełnia.
 
 ### T11. Akceptacja, dokumentacja i ograniczone wydanie
 
@@ -280,15 +282,16 @@ Etap B ukończony lokalnie jako 1.6.2. Dowody i konserwatywne ograniczenia w rap
 
 **Interfaces:** profile fixture opisują snapshot źródeł, oczekiwany plan, dozwolone komendy i efekty. Kontrola listy wykonanych poleceń jest równie ważna jak końcowy tekst.
 
-- [ ] Przejdź macierz poniżej na fixture z deny-by-default mutacjami i siecią; brak poprawności jednego profilu blokuje deklarację wsparcia tego profilu.
+- [x] Przejdź macierz poniżej na fixture z deny-by-default mutacjami i siecią; brak poprawności jednego profilu blokuje deklarację wsparcia tego profilu.
 - [ ] Uruchom pełny runner macOS i przenośną bramkę Linux. Python 3.9 i aktualny dostępny Python: minimum syntaktyka/importy i krytyczne testy. Nie instaluj brakujących interpreterów bez uzgodnienia; wynik nieprzeprowadzony pozostaje nieprzeprowadzony.
-- [ ] Zapisz czasy, liczby pytań, nieoczekiwane komendy i false warnings. Offline static fixture 100 bundle: budżet 5 s bez sztucznych opóźnień; z providerami timeouty per source, brak nieograniczonego czekania.
+- [x] Zapisz czasy, liczby pytań, nieoczekiwane komendy i false warnings. Offline static fixture 100 bundle: budżet 5 s bez sztucznych opóźnień; z providerami timeouty per source, brak nieograniczonego czekania.
 - [ ] Dopiero po zgodzie: ręczne próby na disposable koncie/Macu, najpierw scan/plan, potem wybrane bezpieczne aktualizacje. Zwykły nowy account na hoście nadal widzi systemowe /Applications; nie traktować go jako pustej maszyny.
 - [ ] Próby: najstarszy wspierany macOS, bieżący, co najmniej dwa profile użytkownika; mas signed-out, standard user, niestandardowy AppDir. Nie deklarować wszystkich OS na podstawie jednego hosta.
-- [ ] Test rollback inventory osobno od rollback aplikacji. Odrębnie zatwierdzane prawdziwe instalacje, GUI, privileged pkg i restart systemu. Niczego takiego nie uruchamia automatycznie runner.
-- [ ] Aktualizuj dokumentację w tym samym change; stare audyty i receipts pozostają niezmienione. README opisuje ograniczenie multi-artifact/pkg i źródła niepewne zamiast absolutnej obietnicy.
+- [x] Test rollback inventory osobno od rollback aplikacji. Odrębnie zatwierdzane prawdziwe instalacje, GUI, privileged pkg i restart systemu. Niczego takiego nie uruchamia automatycznie runner.
+- [x] Aktualizuj dokumentację w tym samym change; stare audyty i receipts pozostają niezmienione. README opisuje ograniczenie multi-artifact/pkg i źródła niepewne zamiast absolutnej obietnicy.
 - [ ] Ascendo: ustalić scope parity i wersjonowanie przed release. Landing synchronizować dopiero z zatwierdzonymi faktami wydania; to osobny change z jego build gate, nie część obecnego audytu.
 - [ ] Lokalny final diff i pełne testy, then review. Publikacja/merge dopiero po zgodzie i zielonym CI; po publikacji sprawdzić main, remote, tag i rzeczywisty artefakt clean-install.
+
 
 ### T12. Research kanałów i doradca latest stable
 

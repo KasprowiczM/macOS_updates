@@ -1,0 +1,19 @@
+{
+  "id": "offline_no_sudo_gui",
+  "apps": [
+    {
+      "name": "Offline App",
+      "bundle": "com.example.offline"
+    }
+  ],
+  "mas_status": "error",
+  "expected_sources": [
+    "unknown"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

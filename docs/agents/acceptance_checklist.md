@@ -1,5 +1,9 @@
 # Production Acceptance Checklist — Live Execution Paths (v1.5.x to v1.6.0)
 
+## Local source-aware candidate 1.6.4
+
+Stages C and D activate source-bound plans and review-only adaptation. The 29 synthetic profiles and sealed runner are recorded in [stage C](../implementation/STAGE_C_1.6.3.md) and [stage D](../implementation/STAGE_D_1.6.4.md). Historical live checks below do not automatically certify the new executor or approve a first-install recipe. The Linux container engine was unavailable and was not started. Disposable-Mac, supported-OS and real-update acceptance remain open.
+
 ## Local 1.6.1 stage A
 
 Prepared locally, unpublished. See [implementation and test evidence](../implementation/STAGE_A_1.6.1.md). Fixture tests do not close any live acceptance path below. Full source resolution and the installation menu remain later stages.

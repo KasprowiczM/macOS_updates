@@ -1,0 +1,19 @@
+{
+  "id": "user_app_dir_only",
+  "apps": [
+    {
+      "name": "User Agent",
+      "bundle": "com.example.user",
+      "folder": "UserApplications"
+    }
+  ],
+  "expected_sources": [
+    "unknown"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

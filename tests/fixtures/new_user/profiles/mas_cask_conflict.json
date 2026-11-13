@@ -1,0 +1,20 @@
+{
+  "id": "mas_cask_conflict",
+  "apps": [
+    {
+      "name": "CapCut",
+      "bundle": "com.example.capcut",
+      "receipt": true,
+      "brew": true
+    }
+  ],
+  "expected_sources": [
+    "conflict"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

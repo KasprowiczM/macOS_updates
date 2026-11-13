@@ -1,6 +1,6 @@
 # Schnellstart (Deutsch)
 
-**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.6.3**
+**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.6.4**
 
 ## Sicheres Setup und Anwendungsquellen
 

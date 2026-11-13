@@ -1,0 +1,19 @@
+{
+  "id": "brew_capcut_no_consent",
+  "apps": [
+    {
+      "name": "CapCut",
+      "bundle": "com.example.capcut",
+      "brew": true
+    }
+  ],
+  "expected_sources": [
+    "homebrew"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

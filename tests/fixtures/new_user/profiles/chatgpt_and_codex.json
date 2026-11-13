@@ -1,0 +1,23 @@
+{
+  "id": "chatgpt_and_codex",
+  "apps": [
+    {
+      "name": "ChatGPT",
+      "bundle": "com.openai.chat"
+    },
+    {
+      "name": "Codex",
+      "bundle": "com.openai.codex"
+    }
+  ],
+  "expected_sources": [
+    "unknown",
+    "unknown"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

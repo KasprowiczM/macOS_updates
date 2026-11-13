@@ -1,6 +1,6 @@
 # Benutzerhandbuch (Deutsch)
 
-**Version:** 1.6.3 · **Apple Silicon, macOS 13+**
+**Version:** 1.6.4 · **Apple Silicon, macOS 13+**
 
 ## Sicheres Setup und Anwendungsquellen
 

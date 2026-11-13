@@ -1,0 +1,12 @@
+{
+  "id": "empty_no_managers",
+  "apps": [],
+  "expected_sources": [],
+  "expected_instances": 0,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

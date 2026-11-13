@@ -1,0 +1,20 @@
+{
+  "id": "noninteractive_no_consent",
+  "apps": [
+    {
+      "name": "Store",
+      "bundle": "com.example.store",
+      "receipt": true
+    }
+  ],
+  "expected_sources": [
+    "app_store"
+  ],
+  "noninteractive": true,
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

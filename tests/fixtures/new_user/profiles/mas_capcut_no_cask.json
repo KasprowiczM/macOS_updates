@@ -1,0 +1,19 @@
+{
+  "id": "mas_capcut_no_cask",
+  "apps": [
+    {
+      "name": "CapCut",
+      "bundle": "com.example.capcut",
+      "receipt": true
+    }
+  ],
+  "expected_sources": [
+    "app_store"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}

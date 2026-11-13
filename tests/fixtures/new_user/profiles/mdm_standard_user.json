@@ -1,0 +1,19 @@
+{
+  "id": "mdm_standard_user",
+  "apps": [
+    {
+      "name": "MDM Agent",
+      "bundle": "com.example.mdm",
+      "enterprise": true
+    }
+  ],
+  "expected_sources": [
+    "enterprise_managed"
+  ],
+  "schema_version": 1,
+  "allowed_commands": [],
+  "expected_effects": [],
+  "questions": 0,
+  "expected_unexpected_commands": 0,
+  "expected_false_warnings": 0
+}
