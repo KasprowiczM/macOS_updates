@@ -143,12 +143,12 @@ export MAC_UPDATE_FEED_STATE_FILE="{root}/feed_state.json" MAC_UPDATE_STAGE_WAIT
 . lib/platform.sh; . lib/ui.sh; . lib/version.sh; . lib/proc.sh; . lib/vendor_feeds.sh
 . lib/internet_apps.sh; . lib/internet_registry.sh; . lib/internet_handlers.sh
 . lib/internet_i18n.sh; . lib/internet_status.sh; . i18n/loader.sh
+. lib/internet_app_updates.sh
 print_header() {{ echo "HEADER $1"; }}
 capture_app_path() {{ echo "{bundle}"; }}
 vendor_feed_fetch() {{ cp "{root}/feed" "$3"; }}
 silent_launch_app() {{ echo "$1" >> "{launched}"; return 0; }}
 internet_app_is_running() {{ {"return 0" if running else "return 1"}; }}
-. lib/internet_app_updates.sh
 {status}="$L_INTERNET_STATUS_SKIPPED"
 {handler}
 echo "STATUS=${{{status}}}"
