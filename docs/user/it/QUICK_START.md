@@ -1,6 +1,6 @@
 # Avvio rapido (Italiano)
 
-**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.6.1**
+**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.6.2**
 
 ## Configurazione sicura e fonti delle applicazioni
 
@@ -48,3 +48,5 @@ I file privati (`APPLICATIONS.md`, `UPDATES.md`, `.env`) provengono dall'overlay
 | `bash run_tests.sh` | Verifica dell'installazione |
 
 Vedi [GUIDE.md](GUIDE.md) e [OPERATIONS.md](OPERATIONS.md).
+
+La fase B (1.6.2) aggiunge un inventario osservativo facoltativo: `bash build_inventory.sh --shadow`. Salva identità locali, prove delle fonti e scansioni incomplete in JSON privato, senza modificare `APPLICATIONS.md` o gli aggiornamenti. `--dry-run` evita il salvataggio, `--json` restituisce risultati strutturati e più opzioni `--root PERCORSO` indicano le directory. I conflitti restano osservazioni; scelta delle fonti e controlli di esecuzione appartengono alla fase C.

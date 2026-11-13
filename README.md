@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.1** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.6.2** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 | At a glance | |
 |-------------|--|
@@ -14,7 +14,9 @@
 | Pipeline | 7 steps (0–6), macOS system update always last |
 | Registry | 47 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 900 automated tests (`bash run_tests.sh`) |
+| Tests | 971 automated tests (`bash run_tests.sh`) |
+
+Stage B (1.6.2) adds an opt-in observational inventory: `bash build_inventory.sh --shadow`. It records local app/package identities, source evidence and incomplete scans in private JSON, without changing `APPLICATIONS.md` or update routing. Add `--dry-run` to avoid saving state, `--json` for structured results, or repeat `--root PATH` to specify scan roots. Conflicts remain observations; source choices and execution guards arrive in stage C.
 
 New in v1.6.1: local-only app reporting, receipt-aware CapCut status, explicit setup consent and stronger offline test guards. This is stage A; automatic source resolution and the installation menu are not enabled.
 

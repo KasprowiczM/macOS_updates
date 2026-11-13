@@ -68,3 +68,9 @@ v1.5.4 keeps run-summary format **4** with additive item support: `status="warni
 v1.5.3 verifies vendor versions before GUI work and uses direct-first vendor artifacts for ChatGPT. Known current/stale feeds avoid launches; unknown feeds retain the native fallback. The final settle loop runs only for toolkit-launched applications. App-copy transactions check running state before staging and immediately before replacement; unknown state defers without closing user apps.
 
 The CLI step updates existing native installations before Node/npm and uses `lib/python/cli_duplicates.py` to discover redundant npm packages conservatively. Package removal requires native version validation, supported location, PATH ownership and process checks; failed migration retains the fallback.
+
+## Stage B shadow model (1.6.2)
+
+The opt-in shadow path keeps a schema-1 snapshot with source completeness, independent app instances and manager/prefix packages. It uses `${XDG_STATE_HOME:-$HOME/.local/state}/mac-update/inventory.json` (0700 directory, 0600 file); `MAC_UPDATE_STATE_DIR` provides an explicit local override. Store writes use a lock, expected generation, profile/ancestry checks and an atomic replace. Existing state with unsafe ownership, permissions or symlinks is refused, not overwritten.
+
+`MAC_UPDATE_APP_DIRS`, `MAC_UPDATE_BREW_PREFIXES` and `MAC_UPDATE_CLI_PREFIXES` override bounded source roots for isolated testing or explicit configuration. Shell command names are not identities. Incomplete sources preserve prior observations as stale/unobserved. The resolver has no executor and grants no consent. Current legacy aliases and Markdown routing remain until coordinated activation in stage C; the new resolver does not use those aliases.

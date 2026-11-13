@@ -227,3 +227,5 @@ When running `update_all.sh`, inspect the execution log in `logs/update_all_<YYY
   - The user's open applications are never terminated by the toolkit. Only apps launched by the toolkit are gracefully closed.
 - **Triage on Failure:**
   - If a toolkit-launched app remains running: inspect running processes (`pgrep -fl <App>`) and verify `toolkit_launched.txt` entries.
+
+Stage B source version 1.6.2 adds fixture-tested observational collection and resolution only. No live inventory acceptance, package installation, update, migration or privileged test is marked complete by this work. Physical-Mac acceptance remains open.

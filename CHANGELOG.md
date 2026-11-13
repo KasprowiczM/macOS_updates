@@ -6,6 +6,19 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-13 (local, unpublished)
+
+### Added
+
+- Stage B observational inventory via `build_inventory.sh --shadow`, with separate application instances and manager/prefix package identities, explicit complete/partial/unavailable source results, conservative reconciliation and private atomic JSON storage. `--dry-run` avoids saving state; `--json` returns structured observations.
+- Bounded static Homebrew receipts and npm manifest discovery without evaluating Ruby casks, package scripts or discovered binaries. Cask artifact ownership uses installed staging links rather than display names or assumed application directories.
+- A pure source resolver and strict declarative recipe schema. App Store/Homebrew conflicts, duplicate installations, stale evidence, TestFlight and unknown sources remain explicit. Legacy catalog entries describe capability only; unreviewed identities grant no direct update capability.
+- Fixture tests for collection, source resolution, partial scans, file safety, concurrent snapshot generations and the isolated shadow command. Seven language packs and user instructions describe the opt-in mode.
+
+### Scope
+
+Stage B is T04-T05 of the approved plan. It does not activate a new update executor, migrate Markdown, create user consent, select latest-stable channels or install applications. Stage C will integrate guards, migration and source choices. Version increments after each stage; the final completed plan targets 1.7.0. Nothing was published or updated on a real Mac for this implementation, and landing-page files were not changed.
+
 ## [1.6.1] - 2026-11-13 (local, unpublished)
 
 ### Fixed

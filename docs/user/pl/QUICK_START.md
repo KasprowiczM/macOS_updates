@@ -1,6 +1,6 @@
 # Szybki start (Polski)
 
-**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.6.1**
+**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.6.2**
 
 ## Bezpieczny setup i źródła aplikacji
 
@@ -48,3 +48,5 @@ Pliki prywatne (`APPLICATIONS.md`, `UPDATES.md`, `.env`) pochodzą z nakładki w
 | `bash run_tests.sh` | Weryfikacja instalacji |
 
 Zobacz [GUIDE.md](GUIDE.md) i [OPERATIONS.md](OPERATIONS.md).
+
+Etap B (1.6.2) dodaje opcjonalne inventory obserwacyjne: `bash build_inventory.sh --shadow`. Zapisuje lokalne tożsamości aplikacji i pakietów, dowody źródeł oraz niepełne skany w prywatnym JSON, bez zmiany `APPLICATIONS.md` ani sposobu wykonywania aktualizacji. Opcja `--dry-run` wyłącza zapis, `--json` zwraca wynik strukturalny, a powtarzalne `--root ŚCIEŻKA` wskazuje katalogi skanu. Konflikty pozostają obserwacjami; wybór źródła i guard wykonania należą do etapu C.

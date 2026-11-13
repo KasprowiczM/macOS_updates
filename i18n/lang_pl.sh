@@ -1005,3 +1005,9 @@ L_SETUP_PROFILE_CHANGED="Profil zmienił się lub nie udało się go zapisać; s
 L_TOUCHID_OPERATION_FAILED="Operacja PAM nie powiodła się; przed ponowieniem sprawdź błąd i zachowany backup."
 L_INSTALLER_PARTIAL="macOS Updates v%s jest dostępne w %s; część funkcji wymaga setup."
 L_SETUP_SHELL_UNSUPPORTED="Automatyczna konfiguracja profilu obsługuje bash i zsh; inne powłoki skonfiguruj ręcznie."
+
+# Stage B observational inventory
+L_SHADOW_REPORT='Inventory obserwacyjne: aplikacje / pakiety'
+L_SHADOW_NO_ACTIONS='Tylko obserwacja; sposób wykonywania aktualizacji pozostaje bez zmian.'
+L_SHADOW_PARTIAL='Niektóre źródła są niepełne lub niedostępne; zachowane rekordy nie dowodzą obecności instalacji.'
+L_SHADOW_FAILED='Inventory obserwacyjne nie powiodło się. Sprawdź Python, metadane i uprawnienia prywatnego katalogu stanu.'

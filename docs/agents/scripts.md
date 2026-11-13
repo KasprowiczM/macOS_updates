@@ -231,3 +231,9 @@ Never copy another user's `APPLICATIONS.md` — use `build_inventory.sh` or pres
 ## Production Acceptance
 
 - `docs/agents/acceptance_checklist.md` — Live acceptance paths for v1.5.x covering iPad GUI automation, split system updates, major upgrade guards, orphan casks, vendor direct DMG rollbacks, Chrome staged rollouts, and toolkit-launched application cleanup.
+
+## Stage B shadow inventory (1.6.2)
+
+`build_inventory.sh --shadow` invokes the importable `lib/python/inventory_shadow.py` module directly and never enters `update_all.sh`. New modules: `lib/python/inventory_model.py` (schema), `lib/python/inventory_collect.py` (bounded observations and reconciliation), `lib/python/inventory_providers.py` (static manager metadata and bounded mas query), `lib/python/inventory_store.py` (private JSON and generation checks), `lib/python/app_recipes.py` (strict declarative catalog) and `lib/python/source_resolver.py` (pure decisions). `brew_casks.installed_inventory_source` and `brew_inventory_snapshot_json` expose the shared static Homebrew provider.
+
+`--shadow --dry-run` observes without writing state. `--json` emits machine-readable decisions. Repeated `--root PATH` replaces the default scan roots. No vendor feed, application, npm script, Ruby cask or updater is executed. An explicit `mas list --json` query has a ten-second timeout. Normal build/update entrypoints retain stage A behavior until stage C activation.

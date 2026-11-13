@@ -1,6 +1,6 @@
 # Benutzerhandbuch (Deutsch)
 
-**Version:** 1.6.1 · **Apple Silicon, macOS 13+**
+**Version:** 1.6.2 · **Apple Silicon, macOS 13+**
 
 ## Sicheres Setup und Anwendungsquellen
 
@@ -53,3 +53,5 @@ Status: **verified direct**, **triggered-unverified**, **externally managed**, *
 | `APPLICATIONS.md` fehlt | `build_inventory.sh` oder `dev_sync/dev-sync-import.sh` |
 
 Vollständig: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
+
+Phase B (1.6.2) ergänzt ein optionales Beobachtungsinventar: `bash build_inventory.sh --shadow`. Lokale App- und Paketidentitäten, Quellenbelege und unvollständige Scans werden in privatem JSON gespeichert. `APPLICATIONS.md` und die Update-Ausführung bleiben unverändert. `--dry-run` verhindert das Speichern, `--json` liefert strukturierte Ergebnisse und wiederholtes `--root PFAD` legt Scanverzeichnisse fest. Konflikte bleiben Beobachtungen; Quellenauswahl und Ausführungsschutz folgen in Phase C.

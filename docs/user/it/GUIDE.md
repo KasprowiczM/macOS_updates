@@ -1,6 +1,6 @@
 # Guida utente (Italiano)
 
-**Versione:** 1.6.1 · **Apple Silicon, macOS 13+**
+**Versione:** 1.6.2 · **Apple Silicon, macOS 13+**
 
 ## Configurazione sicura e fonti delle applicazioni
 
@@ -53,3 +53,5 @@ Stati: **verified direct**, **triggered-unverified**, **externally managed**, **
 | `APPLICATIONS.md` mancante | `build_inventory.sh` o `dev_sync/dev-sync-import.sh` |
 
 Completo: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
+
+La fase B (1.6.2) aggiunge un inventario osservativo facoltativo: `bash build_inventory.sh --shadow`. Salva identità locali, prove delle fonti e scansioni incomplete in JSON privato, senza modificare `APPLICATIONS.md` o gli aggiornamenti. `--dry-run` evita il salvataggio, `--json` restituisce risultati strutturati e più opzioni `--root PERCORSO` indicano le directory. I conflitti restano osservazioni; scelta delle fonti e controlli di esecuzione appartengono alla fase C.

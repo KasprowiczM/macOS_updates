@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.6.1**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
+**Version:** see `VERSION` in repo root (currently **1.6.2**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
 
 ## One-line install (new Mac, Apple Silicon)
 
@@ -74,3 +74,5 @@ bash run_tests.sh
 ```
 
 See also [UNINSTALL.md](UNINSTALL.md), [user/en/QUICK_START.md](user/en/QUICK_START.md) and the [documentation index in the README](../README.md#documentation).
+
+Stage B (1.6.2) adds an opt-in observational inventory: `bash build_inventory.sh --shadow`. It records local app/package identities, source evidence and incomplete scans in private JSON, without changing `APPLICATIONS.md` or update routing. Add `--dry-run` to avoid saving state, `--json` for structured results, or repeat `--root PATH` to specify scan roots. Conflicts remain observations; source choices and execution guards arrive in stage C.

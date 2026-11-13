@@ -14,6 +14,17 @@
 # ============================================================
 _BREW_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Read installed local metadata only, including exact cask artifact links.
+# Never evaluates Ruby casks or invokes Homebrew's auto-update machinery.
+brew_inventory_snapshot_json() {
+    [ "$#" -eq 1 ] || return 1
+    PYTHONPATH="$_BREW_SH_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import json, sys
+from brew_casks import installed_inventory_source
+print(json.dumps(installed_inventory_source(sys.argv[1]), ensure_ascii=True))
+' "$1"
+}
+
 # brew_cask_versions
 #   Prints one "<cask-token> <version>" line per installed cask.
 #   Return 0 when the cask inventory is trustworthy (including the

@@ -1,6 +1,6 @@
 # Schnellstart (Deutsch)
 
-**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.6.1**
+**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.6.2**
 
 ## Sicheres Setup und Anwendungsquellen
 
@@ -48,3 +48,5 @@ Private Dateien (`APPLICATIONS.md`, `UPDATES.md`, `.env`) stammen aus Ihrem Clou
 | `bash run_tests.sh` | Installation prüfen |
 
 Siehe [GUIDE.md](GUIDE.md) und [OPERATIONS.md](OPERATIONS.md).
+
+Phase B (1.6.2) ergänzt ein optionales Beobachtungsinventar: `bash build_inventory.sh --shadow`. Lokale App- und Paketidentitäten, Quellenbelege und unvollständige Scans werden in privatem JSON gespeichert. `APPLICATIONS.md` und die Update-Ausführung bleiben unverändert. `--dry-run` verhindert das Speichern, `--json` liefert strukturierte Ergebnisse und wiederholtes `--root PFAD` legt Scanverzeichnisse fest. Konflikte bleiben Beobachtungen; Quellenauswahl und Ausführungsschutz folgen in Phase C.

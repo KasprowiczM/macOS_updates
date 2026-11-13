@@ -10,9 +10,9 @@
 
 **Spec:** [Audyt i specyfikacja docelowa, 2026-11-13](../../implementation/NEW_USER_AUDIT_2026-11-13.md), szczególnie rozdziały 4, 8, 10 i 11. Plan obejmuje 15 zadań w etapach A-E.
 
-**Status:** Etap A i równoległy research źródeł zaakceptowane 2026-11-13. Wdrożenie lokalne na bazie oczyszczonego publicznego HEAD `10dc0e4`, docelowa wersja 1.6.1. Bez publikacji i prób aktualizacji na komputerze użytkownika. Etapy B-E, poza dokumentacją researchu T12, pozostają do wykonania.
+**Status:** Etap A i research źródeł wdrożone lokalnie jako 1.6.1. Etap B (T04-T05) zaakceptowany 2026-11-13, wdrożenie obserwacyjne 1.6.2 na bazie `5daf24d`. Bez publikacji, prawdziwych aktualizacji i zmian w landing page. Etapy C-E, poza dokumentacją researchu T12, pozostają do wykonania. Po każdym etapie zwiększamy trzeci człon wersji; po ukończeniu całości wersja 1.7.0.
 
-**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T12 poza researchem oraz T04-T15 pozostają niewdrożone.
+**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T12 poza researchem oraz T06-T15 pozostają niewdrożone. **Etap B:** [zapis implementacji 1.6.2](../../implementation/STAGE_B_1.6.2.md).
 
 ## Global Constraints
 
@@ -171,18 +171,20 @@ Status A: wdrożone lokalnie z odstępstwami opisanymi w raporcie 1.6.1. Commity
 
 ### T04. Snapshot ze źródłami i pełnymi tożsamościami
 
+Etap B ukończony lokalnie jako 1.6.2. Dowody i konserwatywne ograniczenia w raporcie etapu; aktywacja wykonawcy pozostaje C. Po zamknięciu B właściciel zlecił kontynuację C-E do końca, nadal bez publikacji, live updates i zmian landing.
+
 **Files:** create `lib/python/inventory_model.py`, `lib/python/inventory_collect.py`, `tests/test_inventory_collect.py`, `tests/fixtures/new_user/`; modify `lib/python/inventory.py`, `lib/python/inventory_sync.py`, `lib/brew.sh`.
 
 **Interfaces:** `collect_snapshot(roots: list[str], providers: Providers, previous: dict | None) -> dict`; `validate_snapshot(value: dict) -> dict`. `Providers` zawiera wstrzykiwalne funkcje `read_bundle(path)`, `list_mas()`, `list_brew(prefix)`, `list_cli(prefix)`, każda zwraca SourceResult; nie uruchamia nieznanych binariów.
 
-- [ ] Testy rozdzielają ok-empty, brak narzędzia, timeout, uszkodzony JSON, częściowy skan i permission denied. Receipt bundle musi pozostać nawet przy pustym/nieudanym mas. Package targets mają te same testy presence/freshness/source, także dwa prefixy npm i Node spoza zarządzanego prefixu.
-- [ ] Testy zachowują dwie ścieżki tej samej aplikacji, rozdzielają ChatGPT/Codex, warianty beta, aplikacje o zmienionej nazwie i app bez bundle ID. Nie utożsamiaj nazwy ani bundle ID z jedną instalacją.
-- [ ] Zbieraj static metadata bez launch. Domyślne rooty `/Applications`, `~/Applications`, `/System/Applications`; kontrolowane zagłębienie do 3 poziomów folderów organizacyjnych, zatrzymanie na bundle. Bez wejścia do Contents, innych HOME, podmontowanych DMG i zewnętrznych woluminów. Jawne optional roots, limit rekordów i rozmiaru metadanych.
-- [ ] Lstat/realpath, ochrona przed pętlą symlink, duplikatami i wyjściem poza zatwierdzone rooty. Zachowaj lokalną ścieżkę i flagę symlink; symlink celu aktualizacji wymaga dodatkowej kontroli.
-- [ ] Brew metadata pozyskuj przez wspólną warstwę. Zmapuj cask artifact paths i target rename; uwzględnij prefix/AppDir. Brak metadata oznacza partial, nie potwierdzone ownership.
-- [ ] Scan package/CLI z receipt/manifestów managerów; nie wykonuj `--version` dla dowolnego pliku odnalezionego w PATH. Istniejące znane CLI probes mają whitelist i timeout.
-- [ ] Testy nazw Unicode, znaków sterujących, pipe, uszkodzonego plist, ogromnego pliku, linków i dwóch rootów. Brak ręcznego podpinania folderu „Agent” do wykluczeń.
-- [ ] `--pattern 'test_inventory_collect.py'`; zapis snapshotu w shadow mode 0600/0700, brak zmiany wyboru działań. Commit.
+- [x] Testy rozdzielają ok-empty, brak narzędzia, timeout, uszkodzony JSON, częściowy skan i permission denied. Receipt bundle musi pozostać nawet przy pustym/nieudanym mas. Package targets mają te same testy presence/freshness/source, także dwa prefixy npm i Node spoza zarządzanego prefixu.
+- [x] Testy zachowują dwie ścieżki tej samej aplikacji, rozdzielają ChatGPT/Codex, warianty beta, aplikacje o zmienionej nazwie i app bez bundle ID. Nie utożsamiaj nazwy ani bundle ID z jedną instalacją.
+- [x] Zbieraj static metadata bez launch. Domyślne rooty `/Applications`, `~/Applications`, `/System/Applications`; kontrolowane zagłębienie do 3 poziomów folderów organizacyjnych, zatrzymanie na bundle. Bez wejścia do Contents, innych HOME, podmontowanych DMG i zewnętrznych woluminów. Jawne optional roots, limit rekordów i rozmiaru metadanych.
+- [x] Lstat/realpath, ochrona przed pętlą symlink, duplikatami i wyjściem poza zatwierdzone rooty. Zachowaj lokalną ścieżkę i flagę symlink; symlink celu aktualizacji wymaga dodatkowej kontroli.
+- [x] Brew metadata pozyskuj przez wspólną warstwę. Zmapuj cask artifact paths i target rename; uwzględnij prefix/AppDir. Brak metadata oznacza partial, nie potwierdzone ownership.
+- [x] Scan package/CLI z receipt/manifestów managerów; nie wykonuj `--version` dla dowolnego pliku odnalezionego w PATH. Istniejące znane CLI probes mają whitelist i timeout.
+- [x] Testy nazw Unicode, znaków sterujących, pipe, uszkodzonego plist, ogromnego pliku, linków i dwóch rootów. Brak ręcznego podpinania folderu „Agent” do wykluczeń.
+- [x] `--pattern 'test_inventory_collect.py'`; zapis snapshotu w shadow mode 0600/0700, brak zmiany wyboru działań. Commit.
 
 ### T05. Wspólny resolver pochodzenia i możliwości
 
@@ -190,12 +192,12 @@ Status A: wdrożone lokalnie z odstępstwami opisanymi w raporcie 1.6.1. Commity
 
 **Interfaces:** `resolve_target(target: dict, snapshot: dict, recipes: dict) -> dict` przyjmuje CurrentTarget i zwraca Resolution z TargetRef, zarówno dla aplikacji jak i pakietów. `load_recipes(path: str) -> dict` waliduje schema i odrzuca komendy/nieznane pola. Adapter zgodności odczytuje obecny TXT jako możliwości, bez deklaracji lokalnego ownership.
 
-- [ ] Tabela testów: MAS-only, brew-only, vendor-only, MAS+brew, user/system duplicate, źródło unknown, niezgodny Team ID, cask token różny od bundle name, cask wiele artefaktów, TestFlight, enterprise signal.
-- [ ] MAS-only CapCut wybiera app_store. Stale brew record plus receipt daje conflict i brak prawa do brew/vendor. Sam cask w katalogu publicznym nie jest dowodem brew ownership.
-- [ ] Framework Sparkle/Electron jest capability evidence, nie źródłem ani handlerem z prawem do instalacji. Unknown źródło z SUFeedURL pozostaje unknown/check-only-candidate.
-- [ ] Usuń aliasy łączące różne produkty; renames wiąż tylko z dowodem tożsamości. Apple/system wymaga chronionej lokalizacji, nie nazwy/prefiksu bundle ID.
-- [ ] Recepty zaczynają od istniejących znanych adapterów. Nowa niezbadana aplikacja nie dostaje automatycznie reviewed_direct. Zmiana Team ID lub transfer producenta wymaga review recepty.
-- [ ] `--pattern 'test_source_resolver.py'`, tests registry safety. Commit.
+- [x] Tabela testów: MAS-only, brew-only, vendor-only, MAS+brew, user/system duplicate, źródło unknown, niezgodny Team ID, cask token różny od bundle name, cask wiele artefaktów, TestFlight, enterprise signal.
+- [x] MAS-only CapCut wybiera app_store. Stale brew record plus receipt daje conflict i brak prawa do brew/vendor. Sam cask w katalogu publicznym nie jest dowodem brew ownership.
+- [x] Framework Sparkle/Electron jest capability evidence, nie źródłem ani handlerem z prawem do instalacji. Unknown źródło z SUFeedURL pozostaje unknown/check-only-candidate.
+- [x] Usuń aliasy łączące różne produkty; renames wiąż tylko z dowodem tożsamości. Apple/system wymaga chronionej lokalizacji, nie nazwy/prefiksu bundle ID.
+- [x] Recepty zaczynają od istniejących znanych adapterów. Nowa niezbadana aplikacja nie dostaje automatycznie reviewed_direct. Zmiana Team ID lub transfer producenta wymaga review recepty.
+- [x] `--pattern 'test_source_resolver.py'`, tests registry safety. Commit.
 
 ### T06. Jeden plan działań i guard przed każdą mutacją
 
@@ -450,13 +452,15 @@ Warunki końcowe:
 ## 6. Samodzielny prompt do przyszłego wdrożenia
 
 ```text
-Pracuj w macOS_updates. To jest wdrożenie wyłącznie po akceptacji właściciela.
+Pracuj w aktualnym publicznym checkout projektu macOS_updates. Realizuj etap wskazany przez właściciela.
 Przeczytaj AGENTS.md oraz:
 docs/implementation/NEW_USER_AUDIT_2026-11-13.md
 docs/superpowers/plans/2026-11-13-source-aware-inventory.md
-Sprawdź HEAD względem audytowanego 2378c9b i zachowaj prywatne/nieśledzone pliki.
-W trybie orkiestra realizuj T01-T15 etapami A-E, bez poszerzania zakresu.
-Najpierw napraw izolację testów, bez wykonywania rzeczywistych aktualizacji.
+Przeczytaj zapisy etapów A i B w docs/implementation; sprawdź bieżący HEAD i zachowaj cudze pliki.
+Etap A (T01-T03) i etap B (T04-T05) są wdrożone lokalnie; nie powtarzaj zakończonej pracy.
+Kolejny etap C obejmuje T06-T09, zgodnie z zakresem bieżącego polecenia właściciela.
+W trybie orkiestra kontynuuj plan bez publikacji, prawdziwych aktualizacji i zmian w landing page.
+Zwiększaj trzeci człon wersji po każdym etapie, a po ukończeniu całości ustaw 1.7.0.
 Każda zmiana zachowania ma failing regression na fixture, potem implementację
 i zielony wynik przez guard runner. Nie pomijaj źródła, kompletności skanu ani
 powtórnej kontroli celu przed mutacją. Katalog nie jest inventory ani zgodą.
@@ -477,4 +481,4 @@ oraz live update wymagają osobnej zgody. Na koniec podaj testy, ograniczenia
 i dokładny zakres rzeczywiście wdrożony, nie utożsamiaj mocków z live proof.
 ```
 
-Właściciel akceptuje zakres i kolejność A-E; każdy rzeczywisty test systemowy oraz publikacja pozostają osobnymi decyzjami. Pierwsza rekomendowana jednostka wykonawcza to etap A, z researchem kanałów T12 możliwym równolegle.
+Właściciel akceptuje zakres i kolejność A-E; każdy rzeczywisty test systemowy oraz publikacja pozostają osobnymi decyzjami. Etapy A i B oraz research T12 zostały wykonane lokalnie. Następna jednostka to etap C; nie aktywować nowego wykonawcy przed zamknięciem jego zabezpieczeń i migracji.

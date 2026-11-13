@@ -1,6 +1,6 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.6.1 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.6.2 · **Apple Silicon, macOS 13+**
 
 ## Bezpieczny setup i źródła aplikacji
 
@@ -53,3 +53,5 @@ Pokazuje stany: **verified direct**, **triggered-unverified**, **externally mana
 | Brak `APPLICATIONS.md` | `build_inventory.sh` lub `dev_sync/dev-sync-import.sh` (właściciel) |
 
 Pełna lista: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
+
+Etap B (1.6.2) dodaje opcjonalne inventory obserwacyjne: `bash build_inventory.sh --shadow`. Zapisuje lokalne tożsamości aplikacji i pakietów, dowody źródeł oraz niepełne skany w prywatnym JSON, bez zmiany `APPLICATIONS.md` ani sposobu wykonywania aktualizacji. Opcja `--dry-run` wyłącza zapis, `--json` zwraca wynik strukturalny, a powtarzalne `--root ŚCIEŻKA` wskazuje katalogi skanu. Konflikty pozostają obserwacjami; wybór źródła i guard wykonania należą do etapu C.

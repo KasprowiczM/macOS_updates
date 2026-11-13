@@ -1,6 +1,6 @@
 # Démarrage rapide (Français)
 
-**Mac Apple Silicon requis** · macOS 13+ · **v1.6.1**
+**Mac Apple Silicon requis** · macOS 13+ · **v1.6.2**
 
 ## Configuration sûre et sources des applications
 
@@ -48,3 +48,5 @@ Les fichiers privés (`APPLICATIONS.md`, `UPDATES.md`, `.env`) proviennent de vo
 | `bash run_tests.sh` | Vérifier l'installation |
 
 Voir [GUIDE.md](GUIDE.md) et [OPERATIONS.md](OPERATIONS.md).
+
+L’étape B (1.6.2) ajoute un inventaire observationnel facultatif : `bash build_inventory.sh --shadow`. Les identités locales, preuves de provenance et analyses incomplètes sont enregistrées en JSON privé, sans modifier `APPLICATIONS.md` ni le fonctionnement des mises à jour. `--dry-run` évite l’enregistrement, `--json` produit un résultat structuré et plusieurs options `--root CHEMIN` définissent les répertoires. Les conflits restent des observations ; le choix des sources et le contrôle d’exécution relèvent de l’étape C.

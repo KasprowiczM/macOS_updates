@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Lizenz:** [MIT](LICENSE) · **Änderungen:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.1** : Ein-Befehl-Orchestrator für Updates auf **Apple-Silicon-Macs mit macOS 13-27**. Er koordiniert verifizierte Paketaktualisierungen und ehrliche Auslöser der app-eigenen Updater für **Software, die bereits auf diesem Mac installiert ist**. **Mehrsprachig** (7 Sprachen). Optionales privates Overlay über [`dev_sync/`](dev_sync/README.md).
+> **v1.6.2** : Ein-Befehl-Orchestrator für Updates auf **Apple-Silicon-Macs mit macOS 13-27**. Er koordiniert verifizierte Paketaktualisierungen und ehrliche Auslöser der app-eigenen Updater für **Software, die bereits auf diesem Mac installiert ist**. **Mehrsprachig** (7 Sprachen). Optionales privates Overlay über [`dev_sync/`](dev_sync/README.md).
 
 | Auf einen Blick | |
 |-----------------|--|
@@ -14,7 +14,9 @@
 | Ablauf | 7 Schritte (0–6), das macOS-Systemupdate kommt immer zuletzt |
 | Registry | 47 Internet-Apps · 11 Update-Methoden (siehe [Update-Methoden](#update-methoden)) |
 | Sprachen | EN, PL, ES, FR, DE, IT, PT (CLI und Dokumentation) |
-| Tests | 900 automatisierte Tests (`bash run_tests.sh`) |
+| Tests | 971 automatisierte Tests (`bash run_tests.sh`) |
+
+Phase B (1.6.2) ergänzt ein optionales Beobachtungsinventar: `bash build_inventory.sh --shadow`. Lokale App- und Paketidentitäten, Quellenbelege und unvollständige Scans werden in privatem JSON gespeichert. `APPLICATIONS.md` und die Update-Ausführung bleiben unverändert. `--dry-run` verhindert das Speichern, `--json` liefert strukturierte Ergebnisse und wiederholtes `--root PFAD` legt Scanverzeichnisse fest. Konflikte bleiben Beobachtungen; Quellenauswahl und Ausführungsschutz folgen in Phase C.
 
 Neu in v1.6.1: lokale Anwendungsberichte, CapCut-Belegerkennung, ausdrückliche Setup-Zustimmung und stärkere Offline-Testschutzmaßnahmen. Stufe A aktiviert noch keine automatische Quellenauflösung oder Installationsmenüs.
 

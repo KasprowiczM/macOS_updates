@@ -1,6 +1,6 @@
 # Quick Start (English)
 
-**Apple Silicon Mac required** · macOS 13+ · **v1.6.1**
+**Apple Silicon Mac required** · macOS 13+ · **v1.6.2**
 
 ## Safe setup and application sources
 
@@ -61,3 +61,5 @@ bash update_all.sh
 | `bash uninstall.sh` | Remove toolkit |
 
 See [GUIDE.md](GUIDE.md), [../../INSTALL.md](../../INSTALL.md), [../../UNINSTALL.md](../../UNINSTALL.md).
+
+Stage B (1.6.2) adds an opt-in observational inventory: `bash build_inventory.sh --shadow`. It records local app/package identities, source evidence and incomplete scans in private JSON, without changing `APPLICATIONS.md` or update routing. Add `--dry-run` to avoid saving state, `--json` for structured results, or repeat `--root PATH` to specify scan roots. Conflicts remain observations; source choices and execution guards arrive in stage C.

@@ -1,6 +1,6 @@
 # User Guide (English)
 
-**Version:** 1.6.1 · **Apple Silicon, macOS 13+**
+**Version:** 1.6.2 · **Apple Silicon, macOS 13+**
 
 ## Safe setup and application sources
 
@@ -86,3 +86,5 @@ The registry maps 47 apps to 11 methods (`config/internet_app_methods.txt`; the 
 | Missing `APPLICATIONS.md` | `bash build_inventory.sh` or `dev_sync/dev-sync-import.sh` (owner) |
 
 Full troubleshooting: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
+
+Stage B (1.6.2) adds an opt-in observational inventory: `bash build_inventory.sh --shadow`. It records local app/package identities, source evidence and incomplete scans in private JSON, without changing `APPLICATIONS.md` or update routing. Add `--dry-run` to avoid saving state, `--json` for structured results, or repeat `--root PATH` to specify scan roots. Conflicts remain observations; source choices and execution guards arrive in stage C.

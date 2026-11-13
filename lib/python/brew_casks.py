@@ -13,6 +13,12 @@ import re
 from typing import Callable
 
 
+def installed_inventory_source(prefix: str) -> dict:
+    """Static installed receipts for the shadow model; no brew execution."""
+    from inventory_providers import read_brew_receipts
+    return read_brew_receipts(prefix)
+
+
 def cask_guard_facts(text: str) -> str:
     """'version|installed|A.app;B.app' from `brew info --json=v2 --cask <t>`; '' on any parse error."""
     try:

@@ -1,6 +1,6 @@
 # Guia do utilizador (Português)
 
-**Versão:** 1.6.1 · **Apple Silicon, macOS 13+**
+**Versão:** 1.6.2 · **Apple Silicon, macOS 13+**
 
 ## Configuração segura e fontes das aplicações
 
@@ -53,3 +53,5 @@ Estados: **verified direct**, **triggered-unverified**, **externally managed**, 
 | Falta `APPLICATIONS.md` | `build_inventory.sh` ou `dev_sync/dev-sync-import.sh` |
 
 Completo: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
+
+A etapa B (1.6.2) acrescenta um inventário de observação opcional: `bash build_inventory.sh --shadow`. Guarda identidades locais, provas das fontes e análises incompletas em JSON privado, sem alterar `APPLICATIONS.md` nem a execução das atualizações. `--dry-run` impede a gravação, `--json` devolve resultados estruturados e várias opções `--root CAMINHO` indicam diretórios. Os conflitos são observações; a escolha de fontes e os controlos de execução pertencem à etapa C.

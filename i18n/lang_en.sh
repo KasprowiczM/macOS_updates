@@ -1007,3 +1007,9 @@ L_SETUP_PROFILE_CHANGED="Profile changed or could not be written; inspect it and
 L_TOUCHID_OPERATION_FAILED="PAM operation failed; inspect the error and any retained backup before retrying."
 L_INSTALLER_PARTIAL="macOS Updates v%s is available at %s; some features need setup."
 L_SETUP_SHELL_UNSUPPORTED="Automatic profile configuration supports bash and zsh; configure other shells manually."
+
+# Stage B observational inventory
+L_SHADOW_REPORT='Shadow inventory: applications / packages'
+L_SHADOW_NO_ACTIONS='Observation only; update routing is unchanged.'
+L_SHADOW_PARTIAL='Some sources are incomplete or unavailable; retained records are not proof of current installation.'
+L_SHADOW_FAILED='Shadow inventory failed. Check Python, metadata and private state directory permissions.'

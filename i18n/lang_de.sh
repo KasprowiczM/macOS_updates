@@ -983,3 +983,9 @@ L_SETUP_PROFILE_CHANGED="Profil geändert oder Schreiben fehlgeschlagen; prüfen
 L_TOUCHID_OPERATION_FAILED="PAM-Vorgang fehlgeschlagen; Fehler und erhaltene Sicherung vor erneutem Versuch prüfen."
 L_INSTALLER_PARTIAL="macOS Updates v%s ist unter %s verfügbar; einige Funktionen benötigen Setup."
 L_SETUP_SHELL_UNSUPPORTED="Automatische Profilkonfiguration unterstützt bash und zsh; andere Shells manuell konfigurieren."
+
+# Stage B observational inventory
+L_SHADOW_REPORT='Beobachtungsinventar: Anwendungen / Pakete'
+L_SHADOW_NO_ACTIONS='Nur Beobachtung; die Ausführung der Updates bleibt unverändert.'
+L_SHADOW_PARTIAL='Einige Quellen sind unvollständig oder nicht verfügbar; beibehaltene Einträge belegen keine aktuelle Installation.'
+L_SHADOW_FAILED='Beobachtungsinventar fehlgeschlagen. Python, Metadaten und Berechtigungen des privaten Zustandsverzeichnisses prüfen.'
