@@ -10,9 +10,9 @@
 
 **Spec:** [Audyt i specyfikacja docelowa, 2026-11-13](../../implementation/NEW_USER_AUDIT_2026-11-13.md), szczególnie rozdziały 4, 8, 10 i 11. Plan obejmuje 15 zadań w etapach A-E.
 
-**Status:** Etap A i research źródeł wdrożone lokalnie jako 1.6.1. Etap B (T04-T05) zaakceptowany 2026-11-13, wdrożenie obserwacyjne 1.6.2 na bazie `5daf24d`. Bez publikacji, prawdziwych aktualizacji i zmian w landing page. Etapy C-E, poza dokumentacją researchu T12, pozostają do wykonania. Po każdym etapie zwiększamy trzeci człon wersji; po ukończeniu całości wersja 1.7.0.
+**Status:** Etap A i research źródeł wdrożone lokalnie jako 1.6.1. Etap B (T04-T05) zaakceptowany 2026-11-13, wdrożenie obserwacyjne 1.6.2 na bazie `5daf24d`. Bez publikacji, prawdziwych aktualizacji i zmian w landing page. Etap C (T06-T09) wdrożono lokalnie jako 1.6.3; jego pełna bramka przeszła 1101 przypadków, jeden jawnie pominięty. D i E są w integracji. Po każdym etapie zwiększamy trzeci człon wersji; po ukończeniu całości wersja 1.7.0.
 
-**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T12 poza researchem oraz T06-T15 pozostają niewdrożone. **Etap B:** [zapis implementacji 1.6.2](../../implementation/STAGE_B_1.6.2.md).
+**Wdrożenie etapu A:** [zapis implementacji 1.6.1](../../implementation/STAGE_A_1.6.1.md). Research kanałów: [47 pozycji katalogu](../../catalog/SOURCE_RESEARCH.md). T06-T09 są zamknięte w [etapie C](../../implementation/STAGE_C_1.6.3.md); T10-T15 są w integracji. **Etap B:** [zapis implementacji 1.6.2](../../implementation/STAGE_B_1.6.2.md).
 
 ## Global Constraints
 
@@ -205,14 +205,14 @@ Etap B ukończony lokalnie jako 1.6.2. Dowody i konserwatywne ograniczenia w rap
 
 **Interfaces:** `build_plan(snapshot: dict, resolutions: list[dict], policies: dict, now: str) -> dict`; `authorize_action(action: dict, current: dict, policy: dict, now: str) -> dict`. Bash `mac_update_authorize_action <plan_path> <action_id>` zwraca 0 allowed, 10 deferred, 1 error i zapisuje strukturalny GuardResult do session dir.
 
-- [ ] Dodaj tests komend: absent, stale, unknown, source_conflict, changed identity/path, removed after plan, user-opened app, old plan i policy change zawsze mają zero mutacji.
-- [ ] Wdróż plan read-only pod `update_all.sh --plan`; `--dry-run` korzysta z tych samych decyzji. Dopuszczalne są własne logi/session files, bez zmian inventory/history/preferences i bez pobierania payloadów. Odróżnij check wymagający sieci od offline scan.
-- [ ] Każdy entrypoint uruchomiony bez orchestratora buduje albo wymaga planu; nie może ominąć guard. Nie przekazuj autoryzacji jako samego globalnego `YES=1`.
-- [ ] Brew wykonuj per cask po powtórnym odczycie, nie jednym batch po dawnej kwalifikacji. Uwzględnij wszystkie top-level artifacts; absent/new artifact i opaque pkg są manual/deferred do przeglądu skutków. Wykryty receipt blokuje zewnętrzny kanał.
-- [ ] MAS: tylko ID z lokalnej instalacji i pomiaru outdated; nie `install/get` ani katalogowe ID. Brak App Store ID oznacza manual/check, nie wyszukanie po nazwie i instalację pierwszego trafienia.
-- [ ] Node/native CLI: zachowuj istniejący manager/prefix. Przejście npm do native, usuwanie duplikatów i instalacja zarządzanego Node to osobny plan ze zgodą, nie efekt zwykłej aktualizacji. Znane bootstrap CLI nadal wyłącznie jawnie.
-- [ ] Blokada per użytkownik i canonical target między checkoutami, identyfikacja żywego właściciela, stale recovery. Nie kasować cudzej aktywnej blokady. Test dwóch klonów z tym samym fixture zasobem.
-- [ ] `--pattern 'test_update_plan.py'`, obecne tests run_lock/cli_duplicates/brew/appstore/shared guards; commit. Shadow mode do zakończenia T09.
+- [x] Dodaj tests komend: absent, stale, unknown, source_conflict, changed identity/path, removed after plan, user-opened app, old plan i policy change zawsze mają zero mutacji.
+- [x] Wdróż plan read-only pod `update_all.sh --plan`; `--dry-run` korzysta z tych samych decyzji. Dopuszczalne są własne logi/session files, bez zmian inventory/history/preferences i bez pobierania payloadów. Odróżnij check wymagający sieci od offline scan.
+- [x] Każdy entrypoint uruchomiony bez orchestratora buduje albo wymaga planu; nie może ominąć guard. Nie przekazuj autoryzacji jako samego globalnego `YES=1`.
+- [x] Brew wykonuj per cask po powtórnym odczycie, nie jednym batch po dawnej kwalifikacji. Uwzględnij wszystkie top-level artifacts; absent/new artifact i opaque pkg są manual/deferred do przeglądu skutków. Wykryty receipt blokuje zewnętrzny kanał.
+- [x] MAS: tylko ID z lokalnej instalacji i pomiaru outdated; nie `install/get` ani katalogowe ID. Brak App Store ID oznacza manual/check, nie wyszukanie po nazwie i instalację pierwszego trafienia.
+- [x] Node/native CLI: zachowuj istniejący manager/prefix. Przejście npm do native, usuwanie duplikatów i instalacja zarządzanego Node to osobny plan ze zgodą, nie efekt zwykłej aktualizacji. Znane bootstrap CLI nadal wyłącznie jawnie.
+- [x] Blokada per użytkownik i canonical target między checkoutami, identyfikacja żywego właściciela, stale recovery. Nie kasować cudzej aktywnej blokady. Test dwóch klonów z tym samym fixture zasobem.
+- [x] `--pattern 'test_update_plan.py'`, obecne tests run_lock/cli_duplicates/brew/appstore/shared guards; commit. Shadow mode do zakończenia T09.
 
 ### T07. Odwracalna migracja inventory i notatek
 
@@ -220,15 +220,15 @@ Etap B ukończony lokalnie jako 1.6.2. Dowody i konserwatywne ograniczenia w rap
 
 **Interfaces:** `reconcile_inventory(previous: dict | None, snapshot: dict) -> dict`; `prepare_migration(markdown: str, snapshot: dict) -> dict`; `commit_migration(proposal: dict, state_dir: str, report_path: str) -> dict`; `render_inventory(inventory: dict, notes: dict, locale: str) -> str`.
 
-- [ ] Tests poprawny empty usuwa bieżące membership; unknown/partial zachowuje stale, bez prawa do update. Zastąp istniejący test `test_inventory_sync.py:122-140` odrębnymi testami obu znaczeń.
-- [ ] Świeży użytkownik startuje z pustego lokalnego snapshotu. Stary Markdown nie ustala obecności; notes są zachowane. Grupa 1 również generowana z obserwacji. Obce lub nieznane pochodzenie dostaje review migration, bez odziedziczenia zgód.
-- [ ] Migracja tworzy backup oryginalnych bajtów z SHA-256, proposal, mapowanie zachowanych notatek i listę orphan notes, bez ich kasowania. Ogranicz ilość danych w podsumowaniu, bez autoeksportu.
-- [ ] Store zapisuje hash ostatniego wygenerowanego Markdown. Zmiana ręczna przed przygotowaniem migracji, między prepare i commit albo przy późniejszym renderowaniu blokuje nadpisanie. Zachowaj zmodyfikowane bajty, przygotuj import notatek z podglądem; dopiero jego akceptacja pozwala renderować nowy raport. Bezpieczny unattended pozostawia plik i zgłasza konflikt, nie traci notatek. Test compare-and-swap sprawdza ponownie hash tuż przed replace.
-- [ ] Przed commit sprawdź schema, uprawnienia, wolne miejsce i kompletność minimum lokalnego skanu; zapisz journal. Zapis JSON i raportu jest wieloplikowy, więc użyj generation ID i recoverable commit marker; nie udawaj atomowości całego zestawu przez jeden rename.
-- [ ] `build_inventory.sh --rebuild` oznacza ponowne zebranie obserwacji, zachowuje notatki i jawne wybory pasujące do tożsamości. Zwykły rebuild nie importuje prywatnych plików z innej maszyny.
-- [ ] W razie awarii rollback przywraca bajty poprzedniego raportu, poprzedni generation i polityki. Nie zmienia aplikacji. Idempotentny rerun kończy albo wycofuje rozpoczętą migrację.
-- [ ] Test fault injection po każdym zapisie: pełny dysk, brak permissions, SIGTERM/niekompletny journal, corrupt JSON, nieobsługiwany schema major, ręczne dopiski i dwie równoległe migracje. Unknown schema oznacza odmowę nadpisania.
-- [ ] `--pattern 'test_inventory_migration.py'`, idempotencja drugiego skanu i rollback round-trip. Jeden niezależny przegląd migracji przed aktywacją. Commit.
+- [x] Tests poprawny empty usuwa bieżące membership; unknown/partial zachowuje stale, bez prawa do update. Zastąp istniejący test `test_inventory_sync.py:122-140` odrębnymi testami obu znaczeń.
+- [x] Świeży użytkownik startuje z pustego lokalnego snapshotu. Stary Markdown nie ustala obecności; notes są zachowane. Grupa 1 również generowana z obserwacji. Obce lub nieznane pochodzenie dostaje review migration, bez odziedziczenia zgód.
+- [x] Migracja tworzy backup oryginalnych bajtów z SHA-256, proposal, mapowanie zachowanych notatek i listę orphan notes, bez ich kasowania. Ogranicz ilość danych w podsumowaniu, bez autoeksportu.
+- [x] Store zapisuje hash ostatniego wygenerowanego Markdown. Zmiana ręczna przed przygotowaniem migracji, między prepare i commit albo przy późniejszym renderowaniu blokuje nadpisanie. Zachowaj zmodyfikowane bajty, przygotuj import notatek z podglądem; dopiero jego akceptacja pozwala renderować nowy raport. Bezpieczny unattended pozostawia plik i zgłasza konflikt, nie traci notatek. Test compare-and-swap sprawdza ponownie hash tuż przed replace.
+- [x] Przed commit sprawdź schema, uprawnienia, wolne miejsce i kompletność minimum lokalnego skanu; zapisz journal. Zapis JSON i raportu jest wieloplikowy, więc użyj generation ID i recoverable commit marker; nie udawaj atomowości całego zestawu przez jeden rename.
+- [x] `build_inventory.sh --rebuild` oznacza ponowne zebranie obserwacji, zachowuje notatki i jawne wybory pasujące do tożsamości. Zwykły rebuild nie importuje prywatnych plików z innej maszyny.
+- [x] W razie awarii rollback przywraca bajty poprzedniego raportu, poprzedni generation i polityki. Nie zmienia aplikacji. Idempotentny rerun kończy albo wycofuje rozpoczętą migrację.
+- [x] Test fault injection po każdym zapisie: pełny dysk, brak permissions, SIGTERM/niekompletny journal, corrupt JSON, nieobsługiwany schema major, ręczne dopiski i dwie równoległe migracje. Unknown schema oznacza odmowę nadpisania.
+- [x] `--pattern 'test_inventory_migration.py'`, idempotencja drugiego skanu i rollback round-trip. Jeden niezależny przegląd migracji przed aktywacją. Commit.
 
 ### T08. Zapamiętywane decyzje i uczciwe wyniki
 
@@ -236,13 +236,13 @@ Etap B ukończony lokalnie jako 1.6.2. Dowody i konserwatywne ograniczenia w rap
 
 **Interfaces:** `get_decision(target: dict, resolution: dict, policies: dict, now: str) -> dict | None`; `record_decision(decision: dict, policies: dict) -> dict`; `decision_is_valid(decision: dict, target: dict, resolution: dict, now: str) -> bool`. Target to CurrentTarget dla aplikacji albo pakietu; lookup polityk używa TargetRef.
 
-- [ ] Test wyboru preserve-source, 7-dniowego defer, ignore, expiry i unieważnienia po zmianie źródła/tożsamości. Testy dowodzą, że preserve_source nie autoryzuje update, manager_update nie autoryzuje direct_update ani native_launch, a brak decyzji w `-y` daje defer także dla formula/npm/Node. Zmiana wersji sama nie wymusza nowego pytania.
-- [ ] Pytanie tylko o rzeczywistą niejednoznaczność/skutek. Dla MAS-only CapCut brak pytania o brew; dla MAS+stale cask czytelny konflikt z domyślnym odroczeniem i opcją zachowania MAS bez usuwania caska.
-- [ ] `-y`, EOF, timeout i noninteractive nie wybierają migracji ani pierwszego launch. Decyzje do podjęcia pokaż raz w końcowym zestawieniu; pozostałe aplikacje kontynuują.
-- [ ] Wyniki: `manual_by_policy`, `ignored_by_policy`, `deferred_by_user`, `source_conflict`, `source_unavailable`, `scan_partial`, `removed_since_scan`, `current_verified`, `update_unverified`, `update_failed`, `recovery_required`. Mapuj na istniejące summary v4 addytywnie.
-- [ ] Oczekiwane manual/ignore nie zwiększa chronic warning streak. Awaria uzgodnionego działania i aktywny konflikt nadal widoczne. Stale cache nigdy nie zamienia się w świeże verified.
-- [ ] Jeden resolver dla terminala, coverage, Markdown i JSON; usunąć niezależne klasyfikacje i logikę opartą na tekstach tłumaczeń.
-- [ ] `--pattern 'test_user_policy.py'` i obecne summary/status/feed_state tests; commit.
+- [x] Test wyboru preserve-source, 7-dniowego defer, ignore, expiry i unieważnienia po zmianie źródła/tożsamości. Testy dowodzą, że preserve_source nie autoryzuje update, manager_update nie autoryzuje direct_update ani native_launch, a brak decyzji w `-y` daje defer także dla formula/npm/Node. Zmiana wersji sama nie wymusza nowego pytania.
+- [x] Pytanie tylko o rzeczywistą niejednoznaczność/skutek. Dla MAS-only CapCut brak pytania o brew; dla MAS+stale cask czytelny konflikt z domyślnym odroczeniem i opcją zachowania MAS bez usuwania caska.
+- [x] `-y`, EOF, timeout i noninteractive nie wybierają migracji ani pierwszego launch. Decyzje do podjęcia pokaż raz w końcowym zestawieniu; pozostałe aplikacje kontynuują.
+- [x] Wyniki: `manual_by_policy`, `ignored_by_policy`, `deferred_by_user`, `source_conflict`, `source_unavailable`, `scan_partial`, `removed_since_scan`, `current_verified`, `update_unverified`, `update_failed`, `recovery_required`. Mapuj na istniejące summary v4 addytywnie.
+- [x] Oczekiwane manual/ignore nie zwiększa chronic warning streak. Awaria uzgodnionego działania i aktywny konflikt nadal widoczne. Stale cache nigdy nie zamienia się w świeże verified.
+- [x] Jeden resolver dla terminala, coverage, Markdown i JSON; usunąć niezależne klasyfikacje i logikę opartą na tekstach tłumaczeń.
+- [x] `--pattern 'test_user_policy.py'` i obecne summary/status/feed_state tests; commit.
 
 ### T09. Domknij pobieranie i transakcję wymiany
 
@@ -250,14 +250,14 @@ Etap B ukończony lokalnie jako 1.6.2. Dowody i konserwatywne ograniczenia w rap
 
 **Interfaces:** `validate_download_url(url: str, allowed_hosts: list[str]) -> str`; `validate_redirect_chain(urls: list[str], allowed_hosts: list[str]) -> bool`; `prepare_transaction(action: dict, current: dict) -> dict`; `recover_transaction(journal: dict, observed: dict) -> dict`. Shell `copy_verified_app <staged_app> <absolute_existing_dest> <action_id>`; migracja wszystkich callerów, bez fallbacku do domyślnej /Applications.
 
-- [ ] Tests URL userinfo, port, Unicode/IDNA, host suffix tricks, HTTPS downgrade, cross-host redirect, localhost/private IP, IPv6, DNS rebinding policy i signed URL. Userinfo odrzucać; port domyślnie 443. Dla bezpośredniej instalacji wyłącznie reviewed hosty i jawne CDN.
-- [ ] Waliduj każdy redirect przed kolejnym pobraniem; samo końcowe `effective_url` wykrywa problem za późno. Nie poszerzaj allowlist automatycznie. Dla sieci firmowej/proxy nie wyłączaj TLS; kontrolowane odroczenie.
-- [ ] Wymagaj pierwotnego celu i identity fingerprint przed staging oraz bezpośrednio przed swap. Brak celu daje removed_since_scan. Cel z niezgodnym receipt/source/team albo działający/unknown-state jest odroczony.
-- [ ] Dest może być w zatwierdzonym ~/Applications albo /Applications, staging i backup na tym samym woluminie. Bez rozszerzania uprawnień ani przenoszenia aplikacji.
-- [ ] Journal: prepared, backed_up, swapped, verified, rolled_back/recovery_required. SIGKILL/power loss obsługiwane przy kolejnym uruchomieniu przez odczyt journal i obserwację obu bundle; zachowaj jedyną dobrą kopię, nie usuwaj backupu przy niepewności.
-- [ ] Zachowaj signature, Team ID, bundle ID, minOS/arch/channel, kontrolę wersji i rollback. Generic Sparkle direct jest wyłączony, jeśli nie potrafimy zweryfikować wymaganego podpisu EdDSA lub reguł update; użyj reviewed recipe/native path.
-- [ ] Tests wyłącznie na fixture root, stuby native tools, fault injection na każdym etapie; żadnych prawdziwych /Applications zapisów. Dodatkowo test obecny cel znika podczas download i test user otwiera app w trakcie staging.
-- [ ] `--pattern 'test_download_policy.py'`, `--pattern 'test_update_transaction.py'`, pełny gate. Jeden przegląd bezpieczeństwa połączony z migracją T07; aktywuj model B/C dopiero po jego uwagach. Commit.
+- [x] Tests URL userinfo, port, Unicode/IDNA, host suffix tricks, HTTPS downgrade, cross-host redirect, localhost/private IP, IPv6, DNS rebinding policy i signed URL. Userinfo odrzucać; port domyślnie 443. Dla bezpośredniej instalacji wyłącznie reviewed hosty i jawne CDN.
+- [x] Waliduj każdy redirect przed kolejnym pobraniem; samo końcowe `effective_url` wykrywa problem za późno. Nie poszerzaj allowlist automatycznie. Dla sieci firmowej/proxy nie wyłączaj TLS; kontrolowane odroczenie.
+- [x] Wymagaj pierwotnego celu i identity fingerprint przed staging oraz bezpośrednio przed swap. Brak celu daje removed_since_scan. Cel z niezgodnym receipt/source/team albo działający/unknown-state jest odroczony.
+- [x] Dest może być w zatwierdzonym ~/Applications albo /Applications, staging i backup na tym samym woluminie. Bez rozszerzania uprawnień ani przenoszenia aplikacji.
+- [x] Journal: prepared, backed_up, swapped, verified, rolled_back/recovery_required. SIGKILL/power loss obsługiwane przy kolejnym uruchomieniu przez odczyt journal i obserwację obu bundle; zachowaj jedyną dobrą kopię, nie usuwaj backupu przy niepewności.
+- [x] Zachowaj signature, Team ID, bundle ID, minOS/arch/channel, kontrolę wersji i rollback. Generic Sparkle direct jest wyłączony, jeśli nie potrafimy zweryfikować wymaganego podpisu EdDSA lub reguł update; użyj reviewed recipe/native path.
+- [x] Tests wyłącznie na fixture root, stuby native tools, fault injection na każdym etapie; żadnych prawdziwych /Applications zapisów. Dodatkowo test obecny cel znika podczas download i test user otwiera app w trakcie staging.
+- [x] `--pattern 'test_download_policy.py'`, `--pattern 'test_update_transaction.py'`, pełny gate. Jeden przegląd bezpieczeństwa połączony z migracją T07; aktywuj model B/C dopiero po jego uwagach. Commit.
 
 ### T10. Bezpieczna autoadaptacja nowych aplikacji
 

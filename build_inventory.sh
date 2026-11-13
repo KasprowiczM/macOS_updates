@@ -9,6 +9,9 @@
 # Usage:
 #   bash build_inventory.sh
 #   bash build_inventory.sh --dry-run
+#   bash build_inventory.sh --rebuild
+#   bash build_inventory.sh --migration --preview
+#   bash build_inventory.sh --migration --accept PROPOSAL_ID
 #   bash build_inventory.sh --shadow [--dry-run] [--json] [--root PATH ...]
 # ============================================================
 set -o pipefail
@@ -31,18 +34,14 @@ PYEOF_SHADOW
     exit $?
 fi
 
-if [ "${1:-}" = "--dry-run" ]; then
-    export MAC_UPDATE_DRY_RUN=1
-fi
-
-export MAC_UPDATE_SKIP_SYSTEM=1
-export MAC_UPDATE_SKIP_APPSTORE=1
-export MAC_UPDATE_SKIP_NPM=1
-export MAC_UPDATE_SKIP_BREW=1
-export MAC_UPDATE_SKIP_INTERNET=1
-export MAC_UPDATE_SKIP_POSTUPDATE=0
-export MAC_UPDATE_SKIP_DOCTOR=1
-export MAC_UPDATE_INVENTORY_ONLY=1
-export MAC_UPDATE_YES=1
-
-exec bash "$SCRIPT_DIR/update_all.sh" "$@"
+. "$SCRIPT_DIR/i18n/loader.sh"
+export L_INVENTORY_NO_AUTO_MIGRATION L_INVENTORY_DRY_RUN L_INVENTORY_SAVED
+export L_INVENTORY_MIGRATION_PREVIEW L_INVENTORY_MIGRATION_ACCEPT L_INVENTORY_CONFLICT
+mac_update_tool_usable python3 || exit 10
+python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' || exit 10
+PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$SCRIPT_DIR" "$@" <<'PYEOF_INVENTORY'
+import sys
+from inventory_migration import builder_main
+sys.exit(builder_main(sys.argv[1], sys.argv[2:]))
+PYEOF_INVENTORY
+exit $?

@@ -543,49 +543,24 @@ class InventoryHonestyTests(unittest.TestCase):
         return subprocess.run([sys.executable, "-c", code, *args], capture_output=True, text=True, env=env, timeout=120)
 
     def test_inventory_only_writes_real_counts_and_new_app_hints(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            script_dir, session, apps, env = self.setup_workspace(root)
-            prescan = session / "prescan.py"
-            prescan.write_text(self.heredoc("prescan"), encoding="utf-8")
-            proc = subprocess.run([sys.executable, str(prescan), str(script_dir), str(session)],
-                                  capture_output=True, text=True, env=env, timeout=120)
-            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-            # F4: the console line carries the suggested update method.
-            self.assertRegex(proc.stdout, r"→ Newbie.* — suggested update method: sparkle \(feed updates\.example\.com\)")
-            self.assertRegex(proc.stdout, r"→ Electro.* — suggested update method: electron-updater \(generic dl\.example\.org\)")
-            md = (script_dir / "APPLICATIONS.md").read_text(encoding="utf-8")
-            row = next(line for line in md.splitlines() if line.startswith("| Newbie"))
-            self.assertIn("🆕 do skategoryzowania", row, "column 2 keeps the marker the removed-app check relies on")
-            self.assertIn("sparkle (feed updates.example.com)", row)
-            self.assertEqual(len([c for c in row.split("|") if c.strip()]), 3, "still a 3-column row")
-            self.assertEqual(
-                json.loads((session / "inventory_apps.json").read_text(encoding="utf-8"))["added"],
-                ["app:Electro", "app:Newbie"])
-
-            # Step 5 snapshot: Zed 1.0 -> 1.1, Calc 1.0 -> 2.0 and the two new rows (their marker must survive).
-            (session / "installed_apps_after.txt").write_text("Calc|2.0\nNewbie|3.1\nZed|1.1\nElectro|?\n", encoding="utf-8")
-            postupdate = session / "postupdate.py"
-            postupdate.write_text(self.heredoc("postupdate"), encoding="utf-8")
-            proc = subprocess.run([sys.executable, str(postupdate), str(script_dir), str(session), "a", "b", "c", "d", "e"],
-                                  capture_output=True, text=True, env=env, timeout=120)
-            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-            self.assertIn("zmieniono 2 wersji", proc.stdout)
-            counts = json.loads((session / "run_counts.json").read_text(encoding="utf-8"))
-            # The bug: this file was never written in inventory-only mode, so the summary said 0.
-            self.assertEqual(counts["inventory_version_fields_changed"], 2)
-            self.assertEqual(counts["inventory_entries_added"], 2)
-            self.assertEqual(counts["inventory_entries_removed"], 0)
-            self.assertEqual((session / "inventory_counts.txt").read_text(encoding="utf-8").split(), ["2", "2", "0"])
-            final_md = (script_dir / "APPLICATIONS.md").read_text(encoding="utf-8")
-            self.assertIn("| Newbie | 🆕 do skategoryzowania |", final_md, "a new row is not a changed version field")
+        from plan_orchestration import inventory_counts
+        def item(key, version, freshness='fresh'):
+            return dict(instance_id=key, short_version=version, presence='present', freshness=freshness)
+        before = {'instances': [item('zed','1'), item('calc','1')]}
+        after = {'instances': [item('zed','2'), item('calc','2'), item('newbie','3'), item('electro',None)]}
+        counts = inventory_counts(before, after)
+        self.assertEqual(counts['inventory_version_fields_changed'], 2)
+        self.assertEqual(counts['inventory_entries_added'], 2)
+        self.assertEqual(counts['inventory_entries_removed'], 0)
+        self.assertEqual(counts['observed_package_changes'], 0)
+        after['instances'][0]['freshness'] = 'stale'
+        self.assertEqual(inventory_counts(before, after)['inventory_version_fields_changed'], 1)
 
     def test_postupdate_writes_counts_before_the_inventory_only_exit(self) -> None:
-        text = read("update_all.sh")
-        exit_at = text.index("if os.environ.get('MAC_UPDATE_INVENTORY_ONLY') == '1':\n    _write_run_counts()")
-        self.assertLess(text.index("def _write_run_counts():"), exit_at)
-        # The counts block no longer lives after the early exit.
-        self.assertNotIn('_counts_path = os.path.join(session_dir, "run_counts.json")', text)
+        text = read("lib/python/plan_orchestration.py")
+        self.assertIn("inventory_counts(previous, snapshot)", text)
+        self.assertIn("run_counts.json", text)
+        self.assertNotIn("UPDATES.md", text)
 
     def test_banner_and_closing_line_are_inventory_specific_and_localized(self) -> None:
         text = read("update_all.sh")
@@ -602,27 +577,32 @@ class InventoryHonestyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             script_dir, _, apps, _ = self.setup_workspace(root)
-            toolkit = make_toolkit_copy(root / "run")  # fresh copy with the shell side
-            (toolkit / "APPLICATIONS.md").write_text((script_dir / "APPLICATIONS.md").read_text(encoding="utf-8"), encoding="utf-8")
-            (toolkit / "config" / "npm_global_clis.txt").write_text("# none\n", encoding="utf-8")
+            toolkit = make_toolkit_copy(root / "run")
+            legacy = (script_dir / "APPLICATIONS.md").read_bytes()
+            (toolkit / "APPLICATIONS.md").write_bytes(legacy)
             stubs = root / "stubs"
             base_stubs(stubs)
-            from support import mock_defaults
-            mock_defaults(stubs)
-            write_stub(stubs, "brew", "exit 0")
             write_stub(stubs, "mas", "exit 1")
-            env = shell_env(MAC_LANG="en", HOME=str(root), TMPDIR=str(root), MAC_UPDATE_APP_DIRS=str(apps))
+            prefix = root / 'prefix'
+            prefix.mkdir()
+            env = shell_env(MAC_LANG="en", HOME=str(root), TMPDIR=str(root), MAC_UPDATE_APP_DIRS=str(apps),
+                            MAC_UPDATE_STATE_DIR=str(root/'state'), MAC_UPDATE_BREW_PREFIXES=str(prefix),
+                            MAC_UPDATE_CLI_PREFIXES=str(prefix))
             env["PATH"] = f"{stubs}:{env['PATH']}"
-            proc = subprocess.run(["bash", str(toolkit / "build_inventory.sh")], capture_output=True, text=True,
-                                  env=env, stdin=subprocess.DEVNULL, timeout=180)
-            out = proc.stdout
-            self.assertEqual(proc.returncode, 0, out + proc.stderr)
-            self.assertIn("INVENTORY REFRESHED", out)
-            self.assertNotIn("ALL UPDATES COMPLETE", out)
-            self.assertRegex(out, r"Inventory refreshed: [1-9]\d* version field\(s\) changed, 2 new entries added, 0 removed")
-            self.assertRegex(out, r"Inventory version fields changed: [1-9]")
-            self.assertIn("Inventory entries added: 2, removed: 0", out)
-            self.assertNotIn("Inventory version fields changed: 0", out)
+            def run():
+                return subprocess.run(["bash", str(toolkit / "build_inventory.sh")], capture_output=True,
+                                      text=True, env=env, stdin=subprocess.DEVNULL, timeout=30)
+            refused = run()
+            self.assertEqual(refused.returncode, 10, refused.stdout + refused.stderr)
+            self.assertEqual((toolkit / 'APPLICATIONS.md').read_bytes(), legacy)
+            (toolkit / 'APPLICATIONS.md').unlink()  # A separate fresh-user scenario with complete local metadata.
+            (apps / 'Electro.app/Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier': 'fixture.electro', 'CFBundleName': 'Electro'}))
+            fresh = run()
+            self.assertEqual(fresh.returncode, 0, fresh.stdout + fresh.stderr)
+            self.assertIn('Local inventory saved', fresh.stdout)
+            inventory = json.loads((root/'state/inventory.json').read_text())
+            self.assertEqual(len(inventory['instances']), 3)
+            self.assertFalse((toolkit/'UPDATES.md').exists())
 
 
 class CopyToolkitHelperTests(unittest.TestCase):

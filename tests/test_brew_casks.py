@@ -195,74 +195,22 @@ class BrewCasksIntegrationTests(unittest.TestCase):
         brew.chmod(0o755)
 
     def test_update_brew_skips_orphan_cask(self) -> None:
-        # present-cask has its app installed, orphan-cask does not
-        (self.fake_apps / "Present.app").mkdir()
-
-        # Log calls to a file
-        log_file = self.tmp / "brew_calls.log"
-
-        brew_script = f"""
-echo "$@" >> "{log_file}"
-case "$1" in
-    update) exit 0 ;;
-    list)
-        if [ "$2" = "--cask" ]; then
-            echo "present-cask"
-            echo "orphan-cask"
-            exit 0
-        fi
-        ;;
-    outdated)
-        if [ "$2" = "--formula" ]; then exit 0; fi
-        if [ "$2" = "--cask" ]; then
-            echo "present-cask (1.0) < 1.1"
-            echo "orphan-cask (2.0) < 2.1"
-            exit 0
-        fi
-        ;;
-    info)
-        # return json for casks
-        cat <<'EOF'
-{{"casks":[
-    {{"token":"present-cask","version":"1.1","installed":"1.0","artifacts":[{{"app":["Present.app"]}}]}},
-    {{"token":"orphan-cask","version":"2.1","installed":"2.0","artifacts":[{{"app":["Orphan.app"]}}]}}
-]}}
-EOF
-        exit 0
-        ;;
-    upgrade)
-        exit 0
-        ;;
-esac
-exit 0
-"""
-        self._make_brew_stub(brew_script)
-
-        env = os.environ.copy()
-        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
-        env["MAC_UPDATE_SESSION_DIR"] = str(self.session_dir)
-        env["MAC_UPDATE_YES"] = "1"
-        env["HOME"] = str(self.tmp)
-
-        proc = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_brew.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        self.assertNotEqual(proc.returncode, 1, msg=proc.stdout + proc.stderr)
-
-        calls = log_file.read_text(encoding="utf-8") if log_file.is_file() else ""
-        # Find upgrade --cask calls
-        upgrade_lines = [l for l in calls.splitlines() if "upgrade --cask" in l]
-        self.assertTrue(len(upgrade_lines) > 0, msg=f"No upgrade --cask found in: {calls}")
-        for l in upgrade_lines:
-            self.assertNotIn("orphan-cask", l)
-
-        # brew_orphan_casks.txt should record orphan-cask
-        orphan_file = self.session_dir / "brew_orphan_casks.txt"
-        self.assertTrue(orphan_file.is_file())
-        self.assertIn("orphan-cask", orphan_file.read_text(encoding="utf-8"))
+        from tests._policy_fixtures import PolicyFixture
+        for orphan in (False,True):
+            with self.subTest(orphan=orphan), PolicyFixture() as fixture:
+                fixture.cask(orphan=orphan)
+                result=fixture.run('update_brew.sh')
+                upgrades=[c for c in fixture.calls() if c[0]=='upgrade']
+                if orphan:
+                    self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+                    self.assertEqual(upgrades,[])
+                    self.assertFalse(fixture.app.exists())
+                    self.assertFalse(fixture.results()[-1]['verified'])
+                else:
+                    self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                    self.assertEqual(upgrades,[['upgrade','--cask','--appdir='+str(fixture.app.parent),'fixture']])
+                    self.assertEqual(fixture.results()[-1]['status'],'current_verified')
+                self.assertFalse(any(c[0]=='uninstall' for c in fixture.calls()))
 
     def test_greedy_limited_to_designated_casks(self) -> None:
         log_file = self.tmp / "brew_outdated_calls.log"
@@ -296,141 +244,33 @@ brew_outdated_casks "greedy-app"
         self.assertIn("outdated --cask --greedy-auto-updates greedy-app", calls)
 
     def test_no_sudo_defers_pkg_casks(self) -> None:
-        (self.fake_apps / "PkgApp.app").mkdir()
-        log_file = self.tmp / "brew_upgrade_calls.log"
-
-        brew_script = f"""
-echo "$@" >> "{self.tmp / 'calls.log'}"
-case "$1" in
-    update) exit 0 ;;
-    list)
-        if [ "$2" = "--cask" ]; then
-            echo "pkg-cask"
-            exit 0
-        fi
-        ;;
-    outdated)
-        if [ "$2" = "--cask" ]; then
-            echo "pkg-cask (1.0) < 1.1"
-            exit 0
-        fi
-        exit 0
-        ;;
-    info)
-        cat <<'EOF'
-{{"casks":[
-    {{"token":"pkg-cask","version":"1.1","installed":"1.0","artifacts":[{{"app":["PkgApp.app"]}},{{"pkg":["installer.pkg"]}}]}}
-]}}
-EOF
-        exit 0
-        ;;
-    upgrade)
-        echo "$@" >> "{log_file}"
-        exit 0
-        ;;
-esac
-exit 0
-"""
-        self._make_brew_stub(brew_script)
-
-        env = os.environ.copy()
-        env["PATH"] = f"{self.bin_dir}:{env.get('PATH', '')}"
-        env["MAC_UPDATE_SESSION_DIR"] = str(self.session_dir)
-        env["MAC_UPDATE_NO_SUDO"] = "1"
-        env["MAC_UPDATE_YES"] = "1"
-        env["HOME"] = str(self.tmp)
-
-        proc = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_brew.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(proc.returncode, 10, msg=f"Expected exit 10 (soft fail), got {proc.returncode}. Output:\n{proc.stdout}\n{proc.stderr}")
-
-        # verify pkg-cask was deferred
-        sudo_file = self.session_dir / "brew_needs_interactive.txt"
-        self.assertTrue(sudo_file.is_file())
-        self.assertIn("pkg-cask", sudo_file.read_text(encoding="utf-8"))
-
-        if log_file.is_file():
-            self.assertNotIn("pkg-cask", log_file.read_text(encoding="utf-8"))
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.cask(extra_artifacts=[{'pkg':['installer.pkg']}])
+            result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+            self.assertFalse(any(c[0]=='upgrade' for c in fixture.calls()))
+            guards=[json.loads(line) for line in (fixture.session/'guard_results.jsonl').read_text().splitlines()]
+            self.assertTrue(guards)
+            self.assertTrue(all(not guard['allowed'] for guard in guards))
+            self.assertEqual(fixture.results()[-1]['status'],'scan_partial')
 
     def test_update_brew_downgrade_guard_blocks_upgrade(self) -> None:
-        log_file = self.session_dir / "brew_calls.log"
-        brew_script = f"""#!/usr/bin/env bash
-case "$1" in
-    outdated)
-        echo "foo (2.0) < 1.0"
-        exit 0
-        ;;
-    info)
-        cat <<'EOF'
-{{"casks":[
-    {{"token":"foo","version":"1.0","installed":"2.0","artifacts":[{{"app":["Foo.app"]}}]}}
-]}}
-EOF
-        exit 0
-        ;;
-    upgrade)
-        echo "$@" >> "{log_file}"
-        exit 0
-        ;;
-esac
-exit 0
-"""
-        self._make_brew_stub(brew_script)
-        env = shell_env(
-            PATH=f"{self.bin_dir}:{os.environ.get('PATH', '')}",
-            MAC_UPDATE_SESSION_DIR=str(self.session_dir),
-            MAC_UPDATE_YES="1",
-            MAC_UPDATE_LANG="en",
-            HOME=str(self.tmp),
-        )
-        proc = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_brew.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        self.assertIn("downgrade", proc.stdout.lower() + proc.stderr.lower())
-        if log_file.is_file():
-            self.assertNotIn("upgrade --cask foo", log_file.read_text(encoding="utf-8"))
-
-        # Case 2: installed < version -> upgrade --cask bar is in log
-        if log_file.is_file():
-            log_file.unlink()
-        brew_script_up = f"""#!/usr/bin/env bash
-case "$1" in
-    outdated)
-        echo "bar (1.0) < 2.0"
-        exit 0
-        ;;
-    info)
-        cat <<'EOF'
-{{"casks":[
-    {{"token":"bar","version":"2.0","installed":"1.0","artifacts":[{{"app":["Bar.app"]}}]}}
-]}}
-EOF
-        exit 0
-        ;;
-    upgrade)
-        echo "$@" >> "{log_file}"
-        exit 0
-        ;;
-esac
-exit 0
-"""
-        self._make_brew_stub(brew_script_up)
-        (self.tmp / "Applications" / "Bar.app").mkdir(parents=True, exist_ok=True)
-        proc2 = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_brew.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        self.assertTrue(log_file.is_file())
-        self.assertIn("upgrade --cask bar", log_file.read_text(encoding="utf-8"))
+        from tests._policy_fixtures import PolicyFixture
+        for latest,allowed in [('0.5.0',False),('2.0.0',True)]:
+            with self.subTest(latest=latest), PolicyFixture() as fixture:
+                fixture.cask(latest=latest)
+                result=fixture.run('update_brew.sh')
+                upgrades=[c for c in fixture.calls() if c[0]=='upgrade']
+                self.assertEqual(bool(upgrades),allowed,result.stdout+result.stderr)
+                self.assertEqual(result.returncode,0 if allowed else 10)
+                outcome=fixture.results()[-1]
+                if allowed:
+                    self.assertEqual(outcome['after'],'2.0.0')
+                    self.assertTrue(outcome['verified'])
+                else:
+                    self.assertEqual(outcome['reason_code'],'downgrade_or_version_unknown')
+                    self.assertFalse(outcome['verified'])
 
     def test_brew_outdated_casks_rc1_empty_stderr_success(self) -> None:
         brew_script = """#!/usr/bin/env bash
@@ -560,74 +400,18 @@ brew_outdated_formulae "x"
         self.assertIn("Error: Formula 'x' is unavailable", proc.stderr)
 
     def test_update_brew_upgrades_greedy_cask_on_rc1_empty_stderr(self) -> None:
-        (self.tmp / "Applications" / "Brave Browser.app").mkdir(parents=True, exist_ok=True)
-        log_file = self.session_dir / "brew_upgrade_calls.log"
+        # Eligibility now comes from the exact installed receipt and info row;
+        # a broad outdated exit code cannot remove a concrete approved action.
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.cask()
+            result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual([c for c in fixture.calls() if c[0]=='upgrade'],[['upgrade','--cask','--appdir='+str(fixture.app.parent),'fixture']])
+            self.assertTrue(any(c[0]=='info' for c in fixture.calls()))
+            self.assertFalse(any(c[0]=='outdated' for c in fixture.calls()))
+            self.assertTrue(fixture.results()[-1]['verified'])
 
-        brew_script = f"""#!/usr/bin/env bash
-case "$1" in
-    update)
-        exit 0
-        ;;
-    list)
-        if [ "$2" = "--cask" ]; then
-            echo "brave-browser"
-            exit 0
-        fi
-        ;;
-    outdated)
-        if [ "$2" = "--formula" ]; then
-            exit 0
-        fi
-        if [ "$2" = "--cask" ]; then
-            for arg in "$@"; do
-                if [ "$arg" = "--greedy-auto-updates" ]; then
-                    echo "brave-browser (1.0) < 2.0"
-                    exit 1
-                fi
-            done
-            exit 0
-        fi
-        ;;
-    info)
-        cat <<'EOF'
-{{"casks":[
-    {{"token":"brave-browser","version":"2.0","installed":"1.0","artifacts":[{{"app":["Brave Browser.app"]}}]}}
-]}}
-EOF
-        exit 0
-        ;;
-    upgrade)
-        echo "$@" >> "{log_file}"
-        exit 0
-        ;;
-esac
-exit 0
-"""
-        self._make_brew_stub(brew_script)
-        env = shell_env(
-            PATH=f"{self.bin_dir}:{os.environ.get('PATH', '')}",
-            MAC_UPDATE_SESSION_DIR=str(self.session_dir),
-            MAC_UPDATE_YES="1",
-            MAC_UPDATE_LANG="en",
-            HOME=str(self.tmp),
-        )
-        proc = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_brew.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        self.assertTrue(log_file.is_file(), msg=f"Upgrade log file not found. stdout: {proc.stdout}\nstderr: {proc.stderr}")
-        calls = log_file.read_text(encoding="utf-8")
-        self.assertIn("upgrade --cask brave-browser", calls)
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-
-
-class QuitBundleIdTests(unittest.TestCase):
     def test_quit_and_signal_ids(self) -> None:
         from brew_casks import cask_quit_ids_facts, quit_bundle_ids
         cask = {"artifacts": [

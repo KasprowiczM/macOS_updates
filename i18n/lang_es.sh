@@ -1014,3 +1014,18 @@ L_SHADOW_REPORT='Inventario de observación: aplicaciones / paquetes'
 L_SHADOW_NO_ACTIONS='Solo observación; la ejecución de actualizaciones no cambia.'
 L_SHADOW_PARTIAL='Algunas fuentes están incompletas o no disponibles; los registros conservados no prueban una instalación actual.'
 L_SHADOW_FAILED='Falló el inventario de observación. Compruebe Python, los metadatos y los permisos del directorio privado de estado.'
+
+# Local inventory and explicit scoped consent
+L_PLAN_TITLE="Plan de actualización local"
+L_PLAN_NO_CONSENT="No se concedieron permisos nuevos. Las decisiones pendientes se aplazan."
+L_PLAN_CHOICES="Elegir: a1,a3 permitir el alcance mostrado; d2 aplazar 7 días; i4 ignorar; m5 manual; r6 restablecer. Vacío cancela."
+L_PLAN_INVALID="Selección no válida. Permisos sin cambios."
+L_PLAN_FAILED="Plan no disponible. Ninguna acción de aplicaciones autorizada."
+L_INVENTORY_NO_AUTO_MIGRATION="La aceptación automática no migra el inventario. Revise y acepte la propuesta expresamente."
+L_INVENTORY_DRY_RUN="Solo vista previa del inventario. Ningún archivo cambiado."
+L_INVENTORY_SAVED="Inventario local guardado. Notas y decisiones coincidentes conservadas."
+L_INVENTORY_MIGRATION_PREVIEW="Vista previa de migración lista. Los bytes originales y el texto antiguo se conservan como notas. No se heredan permisos."
+L_INVENTORY_MIGRATION_ACCEPT="Aceptar esta vista previa: bash build_inventory.sh --migration --accept PROPOSAL_ID"
+L_INVENTORY_CONFLICT="Inventario sin cambios. Revise notas con build_inventory.sh --migration --preview; se requiere un escaneo local completo."
+L_PLAN_NO_CHOICES="No se requieren decisiones nuevas. Revise las guardadas con --preferences."
+L_PLAN_POLICY_COUNTS="Manual: %s; ignorados: %s; aplazados: %s. Revisar con --preferences."

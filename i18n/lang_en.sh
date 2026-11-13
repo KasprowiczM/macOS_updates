@@ -1013,3 +1013,18 @@ L_SHADOW_REPORT='Shadow inventory: applications / packages'
 L_SHADOW_NO_ACTIONS='Observation only; update routing is unchanged.'
 L_SHADOW_PARTIAL='Some sources are incomplete or unavailable; retained records are not proof of current installation.'
 L_SHADOW_FAILED='Shadow inventory failed. Check Python, metadata and private state directory permissions.'
+
+# Local inventory and explicit scoped consent
+L_PLAN_TITLE="Local update plan"
+L_PLAN_NO_CONSENT="No new permission granted. Pending choices remain deferred."
+L_PLAN_CHOICES="Choose entries: a1,a3 allow the shown scope; d2 defer 7 days; i4 ignore; m5 manual; r6 reset. Empty cancels."
+L_PLAN_INVALID="Invalid selection. No permissions changed."
+L_PLAN_FAILED="Plan unavailable. No app actions authorized."
+L_INVENTORY_NO_AUTO_MIGRATION="Automatic acceptance cannot migrate inventory. Review and accept the proposal explicitly."
+L_INVENTORY_DRY_RUN="Inventory preview only. No files changed."
+L_INVENTORY_SAVED="Local inventory saved. Notes and matching choices retained."
+L_INVENTORY_MIGRATION_PREVIEW="Migration preview ready. Original bytes and legacy text are retained as notes. No update permission is inferred."
+L_INVENTORY_MIGRATION_ACCEPT="To accept this preview: bash build_inventory.sh --migration --accept PROPOSAL_ID"
+L_INVENTORY_CONFLICT="Inventory unchanged. Run build_inventory.sh --migration --preview to review notes; a complete local scan is required."
+L_PLAN_NO_CHOICES="No new decisions required. Use --preferences to review saved choices."
+L_PLAN_POLICY_COUNTS="Manual: %s; ignored: %s; deferred: %s. Review with --preferences."

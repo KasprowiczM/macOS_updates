@@ -54,7 +54,10 @@ def run_shadow(script_dir, roots=None, dry_run=False, env=None):
         os.path.join(script_dir, "config/internet_app_methods.txt")
     )
     resolutions = resolve_snapshot(snapshot, recipes)
-    if not dry_run:
+    # Once the multi-file report generation is active, shadow remains read-only.
+    # Snapshot-only writes would desynchronize report/notes/generation metadata.
+    save_allowed = not dry_run and not os.path.lexists(os.path.join(state_dir, 'generation.json'))
+    if save_allowed:
         snapshot = save_snapshot(
             state_dir, snapshot, previous["generation"] if previous else 0
         )
@@ -63,7 +66,7 @@ def run_shadow(script_dir, roots=None, dry_run=False, env=None):
     )
     report = dict(
         mode="shadow",
-        saved=not dry_run,
+        saved=save_allowed,
         generation=snapshot["generation"],
         snapshot_id=snapshot["snapshot_id"],
         instances=len(snapshot["instances"]),

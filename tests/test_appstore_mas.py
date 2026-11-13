@@ -13,191 +13,34 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AppStoreMasGateTests(unittest.TestCase):
-    def setUp(self):
-        self.temp_dir = tempfile.mkdtemp(prefix="macupd_test_mas_")
-        self.bin_dir = os.path.join(self.temp_dir, "bin")
-        os.makedirs(self.bin_dir, exist_ok=True)
-        self._create_mock_bin("uname", 'echo "arm64"')
-        self._create_mock_bin("sw_vers", 'echo "26.0"')
-        self.old_path = os.environ.get("PATH", "")
-        os.environ["PATH"] = f"{self.bin_dir}:{self.old_path}"
-        self.old_app_dirs = os.environ.get("MAC_UPDATE_APP_DIRS")
-        self.apps_dir = os.path.join(self.temp_dir, "Applications")
-        os.makedirs(self.apps_dir)
-        os.environ["MAC_UPDATE_APP_DIRS"] = self.apps_dir
-
-    def tearDown(self):
-        os.environ["PATH"] = self.old_path
-        if self.old_app_dirs is None:
-            os.environ.pop("MAC_UPDATE_APP_DIRS", None)
-        else:
-            os.environ["MAC_UPDATE_APP_DIRS"] = self.old_app_dirs
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-    def _create_mock_bin(self, name: str, script_body: str) -> str:
-        bin_path = os.path.join(self.bin_dir, name)
-        with open(bin_path, "w", encoding="utf-8") as f:
-            f.write(f"#!/bin/sh\n{script_body}\n")
-        os.chmod(bin_path, os.stat(bin_path).st_mode | stat.S_IXUSR)
-        return bin_path
-
     def test_mas5_does_not_call_account_and_no_macos26_warning(self):
-        log_file = os.path.join(self.temp_dir, "mas_invocations.log")
-        # Mock mas 7.0.0 where account fails with Unexpected argument
-        mas_script = f"""
-echo "$@" >> "{log_file}"
-case "$1" in
-    version)
-        echo "7.0.0"
-        exit 0
-        ;;
-    account)
-        echo "Error: Unexpected argument 'account'" >&2
-        exit 1
-        ;;
-    list)
-        echo "497799835 Xcode (27.0)"
-        exit 0
-        ;;
-    outdated)
-        exit 0
-        ;;
-    *)
-        exit 0
-        ;;
-esac
-"""
-        self._create_mock_bin("mas", mas_script)
-        # Mock brew
-        self._create_mock_bin("brew", 'echo "Homebrew 7.0.2"; exit 0')
-        # Mock osascript
-        self._create_mock_bin("osascript", 'exit 0')
-
-        sdir = Path(self.temp_dir) / "session"
-        sdir.mkdir(parents=True, exist_ok=True)
-
-        env = dict(os.environ)
-        env["MAC_UPDATE_SESSION_DIR"] = str(sdir)
-        env["MAC_UPDATE_NONINTERACTIVE"] = "1"
-        env["MAC_UPDATE_YES"] = "1"
-        env["MAC_LANG"] = "pl"
-
-        res = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_appstore.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-
-        self.assertEqual(res.returncode, 0, f"Script failed: {res.stderr}")
-        # Output should NOT contain macOS 26
-        self.assertNotIn("macOS 26", res.stdout)
-        self.assertNotIn("macOS 26", res.stderr)
-
-        # Invocations log must NOT contain account
-        if os.path.exists(log_file):
-            invocations = Path(log_file).read_text(encoding="utf-8").splitlines()
-            account_calls = [inv for inv in invocations if inv.startswith("account")]
-            self.assertEqual(account_calls, [], "mas account should not be called for mas >= 5")
-
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.mas(outdated='')
+            result=fixture.run('update_appstore.sh')
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertTrue(any(c[0]=='list' for c in fixture.calls()))
+            self.assertFalse(any(c[0]=='account' for c in fixture.calls()))
+            self.assertNotIn('macOS 26',result.stdout+result.stderr)
+            self.assertEqual(fixture.results()[-1]['status'],'current_verified')
     def test_unparseable_native_queue_never_runs_bare_upgrade(self):
-        log_file = Path(self.temp_dir) / "calls.log"
-        self._create_mock_bin("mas", f'''
-echo "mas $@" >> "{log_file}"
-case "$1" in
-version) echo 7.0.0;;
-list) echo '497799835 Xcode (27.0)';;
-outdated) echo 'unexpected vendor diagnostic';;
-esac
-exit 0
-''')
-        self._create_mock_bin("brew", "exit 0")
-        self._create_mock_bin("osascript", "exit 0")
-        self._create_mock_bin("sudo", '''
-if [ "$1" = "-v" ]; then exit 0; fi
-if [ "$1" = "-n" ]; then shift; fi
-exec "$@"
-''')
-        self._create_mock_bin("sleep", "exit 0")
-        session = Path(self.temp_dir) / "session"
-        session.mkdir()
-        env = dict(os.environ, MAC_UPDATE_SESSION_DIR=str(session),
-                   MAC_UPDATE_NONINTERACTIVE="1", MAC_UPDATE_YES="1")
-        env.pop("MAC_UPDATE_NO_SUDO", None)
-        res = subprocess.run(["bash", str(REPO_ROOT / "update_appstore.sh")],
-                             env=env, capture_output=True, text=True)
-        self.assertEqual(res.returncode, 10, res.stdout + res.stderr)
-        self.assertNotIn("mas upgrade", log_file.read_text())
-        self.assertIn("no valid numeric IDs", res.stdout)
-
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.mas(outdated='unexpected vendor diagnostic')
+            result=fixture.run('update_appstore.sh')
+            self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+            self.assertFalse(any(c[0]=='upgrade' for c in fixture.calls()))
+            self.assertFalse(fixture.results()[-1]['verified'])
     def test_appstore_user_session_retry_diagnostics_and_soft_fail(self):
-        log_file = os.path.join(self.temp_dir, "mas_invocations.log")
-        mas_script = f"""
-echo "$@" >> "{log_file}"
-case "$1" in
-    version)
-        echo "7.0.0"
-        exit 0
-        ;;
-    list)
-        echo "6446904124 Whisper Transcription (15.1.1)"
-        exit 0
-        ;;
-    outdated)
-        echo "6446904124 Whisper Transcription (15.1.1 -> 15.2.1)"
-        exit 0
-        ;;
-    upgrade)
-        echo "upgrade called with: $@"
-        exit 0
-        ;;
-    *)
-        exit 0
-        ;;
-esac
-"""
-        self._create_mock_bin("mas", mas_script)
-        self._create_mock_bin("brew", 'echo "Homebrew 7.0.2"; exit 0')
-        self._create_mock_bin("osascript", 'exit 0')
-        sudo_script = """
-if [ "$1" = "-v" ]; then
-    exit 0
-fi
-if [ "$1" = "-n" ]; then
-    shift
-fi
-"$@"
-"""
-        self._create_mock_bin("sudo", sudo_script)
-
-        sdir = Path(self.temp_dir) / "session"
-        sdir.mkdir(parents=True, exist_ok=True)
-
-        env = dict(os.environ)
-        env["MAC_UPDATE_SESSION_DIR"] = str(sdir)
-        env["MAC_UPDATE_NONINTERACTIVE"] = "1"
-        env["MAC_UPDATE_YES"] = "1"
-        env["MAC_LANG"] = "en"
-
-        res = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_appstore.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-
-        self.assertEqual(res.returncode, 10, f"Expected soft exit (10), got {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
-        self.assertIn("6446904124", res.stdout)
-        self.assertIn("Whisper Transcription", res.stdout)
-        # Verify retry is recorded in appstore_diag.txt
-        diag_file = sdir / "appstore_diag.txt"
-        self.assertTrue(diag_file.exists(), "appstore_diag.txt was not created")
-        diag_content = diag_file.read_text(encoding="utf-8")
-        self.assertIn("TRACK 1 user-session retry", diag_content)
-        self.assertIn("Whisper Transcription", diag_content)
-        # Verify manual update hint in output
-        self.assertIn("manual", res.stdout.lower())
-
-
-if __name__ == "__main__":
-    unittest.main()
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.mas(mutates=False,sudo_mutates=False)
+            result=fixture.run('update_appstore.sh')
+            self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+            upgrades=[c for c in fixture.calls() if c[0]=='upgrade']
+            self.assertEqual(upgrades,[['upgrade','123'],['upgrade','123']])
+            outcome=fixture.results()[-1]
+            self.assertEqual(outcome['name'],'Fixture')
+            self.assertEqual(outcome['status'],'update_unverified')
+            self.assertFalse(outcome['verified'])
+            self.assertIn('TRACK 1 user-session retry',(fixture.session/'appstore_diag.txt').read_text())

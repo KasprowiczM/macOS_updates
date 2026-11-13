@@ -74,6 +74,26 @@
 | `config/vendor_launch_policy.txt` | Apps the toolkit never launches: `direct-only` (HyperFrames, Superset: verified vendor artifact only, no launch fallback) and `never-launch` (Open Design: verify only, "open the app to update") |
 | `config/cask_oracles.txt` | Read-only Homebrew Cask version oracle mappings for verifying unverified apps |
 | `tests/_env.py` | Helper for test subprocess environments that strips PYTHONPATH so child shell processes do not inherit it |
+| `lib/update_policy.sh` | Shared scoped-plan authorization for standalone app update entrypoints |
+| `lib/python/user_policy.py` | Identity-bound source preferences, scoped consent, defer expiry and reset |
+| `lib/python/update_plan.py` | Typed action plans, source/identity effects and per-mutation authorization |
+| `lib/python/policy_runtime.py` | Reobservation, shared target locks, manager dispatch and measured outcomes |
+| `lib/python/plan_orchestration.py` | Read-only preview, explicit batch choices and transactional inventory refresh |
+| `lib/python/inventory_migration.py` | Byte-preserving migration preview, CAS commit journal and restart recovery |
+| `lib/python/inventory_render.py` | Local snapshot view and separately fenced preserved notes in seven languages |
+| `lib/python/download_policy.py` | Per-hop HTTPS and public-address validation, DNS pinning and reviewed artifact host allowlists |
+| `lib/python/update_transaction.py` | Same-volume bundle staging and backup, identity checks and conservative startup recovery |
+| `lib/python/app_capabilities.py` | Static updater signals and review-only redacted recipe proposals |
+| `lib/python/coverage_report.py` | Common-resolver coverage, capability scans and explicit proposal exports |
+| `lib/python/channel_advisor.py` | Compatible stable recommendations and conservative local delay evidence |
+| `lib/python/channel_probes.py` | Selected product metadata probes, strict public manifest, bounded cache/history |
+| `lib/python/setup_catalog.py` | Optional public catalog with separate update and first-install evidence |
+| `lib/python/install_plan.py` | Explicit InstallPlan selections, requirement DAG and digest-bound preview |
+| `lib/python/install_execution.py` | Separate first-install authorization and absent-destination execution |
+| `lib/setup_catalog.sh` | Optional catalog entry and explicit menu choices |
+| `lib/setup_install.sh` | Approved first-install adapter boundary, separate from existing-app updates |
+
+
 
 **Private files** (`.gitignore`d): `APPLICATIONS.md`, `UPDATES.md`, `.env`, `.dev_sync_config.json`
 

@@ -48,6 +48,13 @@ NC='\033[0m'
 # Katalog z skryptami
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Every standalone execution uses the same scoped plan and live guard.
+. "$SCRIPT_DIR/lib/platform.sh"
+. "$SCRIPT_DIR/lib/update_policy.sh"
+mac_update_policy_run_adapter app_store
+exit $?
+
+
 . "$SCRIPT_DIR/lib/platform.sh"
 mac_update_require_supported_platform || exit 1
 

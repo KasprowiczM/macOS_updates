@@ -1011,3 +1011,18 @@ L_SHADOW_REPORT='Inventory obserwacyjne: aplikacje / pakiety'
 L_SHADOW_NO_ACTIONS='Tylko obserwacja; sposób wykonywania aktualizacji pozostaje bez zmian.'
 L_SHADOW_PARTIAL='Niektóre źródła są niepełne lub niedostępne; zachowane rekordy nie dowodzą obecności instalacji.'
 L_SHADOW_FAILED='Inventory obserwacyjne nie powiodło się. Sprawdź Python, metadane i uprawnienia prywatnego katalogu stanu.'
+
+# Local inventory and explicit scoped consent
+L_PLAN_TITLE="Plan aktualizacji lokalnych instalacji"
+L_PLAN_NO_CONSENT="Nie udzielono nowych zgód. Nierozstrzygnięte działania pozostają odroczone."
+L_PLAN_CHOICES="Wybierz pozycje: a1,a3 zgoda na pokazany zakres; d2 odrocz 7 dni; i4 ignoruj; m5 ręcznie; r6 usuń wybór. Pusta odpowiedź anuluje."
+L_PLAN_INVALID="Nieprawidłowy wybór. Nie zmieniono zgód."
+L_PLAN_FAILED="Plan niedostępny. Nie zatwierdzono działań na aplikacjach."
+L_INVENTORY_NO_AUTO_MIGRATION="Automatyczna akceptacja nie migruje inwentarza. Przejrzyj i jawnie zatwierdź propozycję."
+L_INVENTORY_DRY_RUN="Tylko podgląd inwentarza. Nie zmieniono plików."
+L_INVENTORY_SAVED="Zapisano lokalny inwentarz. Zachowano notatki i pasujące wybory."
+L_INVENTORY_MIGRATION_PREVIEW="Podgląd migracji gotowy. Oryginalne bajty i dawny tekst zostają w notatkach. Nie odziedziczono zgód na aktualizacje."
+L_INVENTORY_MIGRATION_ACCEPT="Aby zaakceptować podgląd: bash build_inventory.sh --migration --accept PROPOSAL_ID"
+L_INVENTORY_CONFLICT="Inwentarz bez zmian. Sprawdź notatki przez build_inventory.sh --migration --preview; wymagany kompletny skan lokalny."
+L_PLAN_NO_CHOICES="Brak nowych decyzji. Użyj --preferences, aby przejrzeć zapisane wybory."
+L_PLAN_POLICY_COUNTS="Ręcznie: %s; ignorowane: %s; odroczone: %s. Przejrzyj przez --preferences."

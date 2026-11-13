@@ -103,8 +103,10 @@ internet_dispatch_run_all
         self.assertIn('code=source_unavailable', self.validate_casks(False).stdout)
 
     def coverage(self, *args):
+        env = dict(self.env, HOME=str(self.base), MAC_UPDATE_STATE_DIR=str(self.base / 'coverage-state'),
+                   MAC_UPDATE_BREW_PREFIXES=str(self.base / 'coverage-brew'), MAC_UPDATE_CLI_PREFIXES=str(self.base / 'coverage-cli'))
         return subprocess.run(['bash', str(ROOT / 'scripts/report_update_coverage.sh'), *args],
-                              env=self.env, stdin=subprocess.DEVNULL, capture_output=True,
+                              env=env, stdin=subprocess.DEVNULL, capture_output=True,
                               text=True, timeout=25)
 
     def test_default_coverage_hides_uninstalled_catalog_names(self):
@@ -125,18 +127,18 @@ internet_dispatch_run_all
 
     def test_coverage_recognizes_observed_brew_cask(self):
         self.app('CapCut')
-        brew = self.base / 'bin/brew'
-        brew.write_text("""#!/bin/sh
-case "$*" in
-  'list --cask -1') echo capcut ;;
-  'info --cask --json=v2 capcut') echo '{"casks":[{"token":"capcut","artifacts":[{"app":["CapCut.app"]}]}]}' ;;
-  *) exit 96 ;;
-esac
-""")
-        brew.chmod(0o755)
+        prefix = self.base.resolve() / 'coverage-brew'
+        cask = prefix / 'Caskroom/capcut'
+        receipt = cask / '.metadata/1/20261113/Casks/capcut.json'
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text(json.dumps({'token':'capcut', 'artifacts':[{'app':['CapCut.app']}]}))
+        (cask / '1').mkdir()
+        (cask / '1/CapCut.app').symlink_to((self.apps / 'CapCut.app').resolve())
         report = json.loads(self.coverage('--json').stdout)
         rows = [r for group in report['classifications'].values() for r in group]
-        self.assertEqual(rows[0]['managed_by'], 'homebrew_cask:capcut')
+        self.assertEqual(rows[0]['managed_by'], 'homebrew')
+        self.assertEqual(rows[0]['resolution']['source'], 'homebrew')
+        self.assertEqual(report['installed_package_count'], 1)
 
     def pipeline(self, kind='absent', brew_available=True):
         # Execute the actual orchestrator and internet step in a disposable repo.
@@ -198,14 +200,16 @@ esac
     def test_full_pipeline_manual_capcut_suggests_source(self):
         result, report = self.pipeline('manual')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('Source not confirmed', result.stdout)
+        self.assertIn('Manual: 1', result.stdout)
+        self.assertEqual(report['action_results'][0]['status'], 'manual_by_policy')
         self.assertNotIn('cask_missing', json.dumps(report))
 
     def test_full_pipeline_brew_failure_is_soft_and_explicit(self):
         result, report = self.pipeline('manual', brew_available=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(report['degraded'], report)
-        self.assertIn('Source unavailable', result.stdout)
+        self.assertFalse(report['degraded'], report)
+        self.assertEqual(report['action_results'][0]['status'], 'manual_by_policy')
+        self.assertIn('Manual: 1', result.stdout)
         self.assertNotIn('cask_missing', json.dumps(report))
 
 

@@ -450,7 +450,7 @@ class StaticShellSafetyTests(unittest.TestCase):
 
     def test_update_all_runs_reboot_capable_system_step_last(self) -> None:
         text = self.read_script("update_all.sh")
-        postupdate = text.index("# STEP 5: Update APPLICATIONS.md and UPDATES.md")
+        postupdate = text.index("# STEP 5: Reobserve and transactionally render local inventory")
         system = text.index("# FINAL MUTATING STEP: macOS system update")
         final_summary = text.index("# Final summary", system)
         self.assertLess(postupdate, system)
@@ -632,18 +632,12 @@ class StaticShellSafetyTests(unittest.TestCase):
             self.assertNotIn(f'"${key}"', hard_block)
 
     def test_inventory_only_refresh_does_not_append_update_history(self) -> None:
-        text = self.read_script("update_all.sh")
-        inventory_guard = text.index("if os.environ.get('MAC_UPDATE_INVENTORY_ONLY') == '1':")
-        history_builder = text.index("# ── Build UPDATES.md history entry", inventory_guard)
-        self.assertLess(inventory_guard, history_builder)
         build = self.read_script("build_inventory.sh")
-        self.assertIn("MAC_UPDATE_INVENTORY_ONLY=1", build)
-        # The closing line is localized (L_ALL_INVENTORY_DONE_FMT) and carries the real numbers.
-        self.assertIn("L_ALL_INVENTORY_DONE_FMT", text)
-        for lang in ("en", "pl", "es", "it", "pt", "de", "fr"):
-            lang_text = (REPO_ROOT / "i18n" / f"lang_{lang}.sh").read_text(encoding="utf-8")
-            self.assertRegex(lang_text, r'(?m)^L_ALL_INVENTORY_DONE_FMT="[^"]*%s[^"]*%s[^"]*%s[^"]*"$')
-        self.assertIn("UPDATES.md", (REPO_ROOT / "i18n" / "lang_en.sh").read_text(encoding="utf-8").split("L_ALL_INVENTORY_DONE_FMT=")[1].split("\n")[0])
+        self.assertIn('from inventory_migration import builder_main', build)
+        self.assertNotIn('update_all.sh', build)
+        module = (REPO_ROOT / "lib/python/inventory_migration.py").read_text()
+        self.assertNotIn('UPDATES.md', module)
+        self.assertIn('L_INVENTORY_SAVED', module)
 
     def test_prescan_recognizes_formatted_inventory_cells(self) -> None:
         inventory_py = (REPO_ROOT / "lib" / "python" / "inventory.py").read_text(encoding="utf-8")
@@ -807,47 +801,12 @@ class StaticShellSafetyTests(unittest.TestCase):
                 bad.append(path.name)
         self.assertEqual(bad, [], f"lib scripts using ${{internet_diag_log: {bad}")
 
-    def test_direct_methods_are_used_and_verify(self) -> None:
-        """Every entry in DIRECT_METHODS must (a) be used in config/internet_app_methods.txt and (b) have a handler."""
-        coverage_script = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
-        match = re.search(r'DIRECT_METHODS\s*=\s*\{([^}]+)\}', coverage_script)
-        self.assertIsNotNone(match, "DIRECT_METHODS definition not found in scripts/report_update_coverage.sh")
-        direct_methods = {m.strip().strip('"').strip("'") for m in match.group(1).split(",") if m.strip()}
-
-        methods_cfg = REPO_ROOT / "config" / "internet_app_methods.txt"
-        used_methods = set()
-        for ln in methods_cfg.read_text(encoding="utf-8").splitlines():
-            ln = ln.split("#", 1)[0].strip()
-            if not ln:
-                continue
-            parts = ln.split("|")
-            if len(parts) >= 2:
-                used_methods.add(parts[1].strip())
-
-        handler_code = (
-            (REPO_ROOT / "lib" / "internet_handlers.sh").read_text(encoding="utf-8")
-            + (REPO_ROOT / "lib" / "internet_app_updates.sh").read_text(encoding="utf-8")
-            + (REPO_ROOT / "lib" / "internet_registry.sh").read_text(encoding="utf-8")
-        )
-
-        for method in sorted(direct_methods):
-            self.assertIn(
-                method, used_methods,
-                msg=f"Direct method {method!r} is not used by any row in config/internet_app_methods.txt",
-            )
-            handler_names = [
-                f"internet_handler_{method}",
-                f"internet_dispatch_{method}",
-                f"internet_handler_{method}_check",
-                f"iu_{method}",
-            ]
-            found = any(h in handler_code for h in handler_names) or method in {
-                "keystone", "github_dmg", "mozilla_dmg", "msupdate", "docker_cli", "sparkle_appcast"
-            }
-            self.assertTrue(
-                found,
-                msg=f"Direct method {method!r} has no handler function in lib/ (expected one of: {handler_names})",
-            )
+    def test_coverage_direct_claims_require_confirmed_resolver_capability(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT / 'lib/python'))
+        from coverage_report import _classification
+        self.assertEqual(_classification(dict(source='vendor', capability='reviewed_direct', evidence_grade='confirmed')), 'verified_direct')
+        for source, capability, grade in [('unknown','check_only','unknown'), ('vendor','reviewed_direct','probable'), ('conflict','reviewed_direct','conflicting')]:
+            self.assertNotEqual(_classification(dict(source=source, capability=capability, evidence_grade=grade)), 'verified_direct')
 
     @unittest.skipUnless(
         __import__("shutil").which("bash"),
@@ -1299,28 +1258,41 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn(r'grep -E "[[:space:]]+(\./)?${archive_name}\$"', fn_block)
         self.assertIn("SOFT_FAIL=1", fn_block)
 
-    def test_report_update_coverage_sanitizes_formatted_rows(self) -> None:
-        """report_update_coverage.sh must sanitize markdown links, bold text, and emojis when normalizing app names."""
-        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
-        self.assertIn("clean_app_name", text)
-        self.assertIn(r"\[([^\]]+)\]\([^)]+\)", text)
-        self.assertIn(r"\*+([^*]+)\*+", text)
+    def test_coverage_does_not_interpret_formatted_names_as_identity(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT / 'lib/python'))
+        from coverage_report import build_coverage_report
+        from inventory_collect import collect_snapshot, Providers
+        with tempfile.TemporaryDirectory() as root:
+            contents = Path(root) / 'Other.app/Contents'
+            contents.mkdir(parents=True)
+            name = '**[CapCut](https://example.invalid)**'
+            (contents / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleName':name, 'CFBundleIdentifier':'org.example.other'}))
+            report = build_coverage_report(collect_snapshot([root], Providers(), None), {'schema_version':1,'recipes':[]}, [{'name':'CapCut','adapter_id':'brew_cask'}])
+            self.assertEqual(report['automatic_coverage_count'], 0)
+            self.assertEqual(report['classifications']['unknown'][0]['source'], 'unknown')
 
-    def test_chatgpt_codex_target_alias_is_bundle_id_only(self) -> None:
-        """TARGET_ALIASES['ChatGPT / Codex'] must specify empty names and bundle_id com.openai.codex."""
-        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
-        self.assertIn('"ChatGPT / Codex": {', text)
-        self.assertIn('"names": []', text)
-        self.assertIn('"bundle_ids": ["com.openai.codex"]', text)
+    def test_coverage_keeps_chatgpt_and_codex_as_distinct_observed_instances(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT / 'lib/python'))
+        from coverage_report import build_coverage_report
+        from inventory_collect import collect_snapshot, Providers
+        with tempfile.TemporaryDirectory() as root:
+            for name, bundle in [('ChatGPT','com.openai.chat'), ('Codex','com.openai.codex')]:
+                contents = Path(root) / (name + '.app') / 'Contents'
+                contents.mkdir(parents=True)
+                (contents / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleName':name,'CFBundleIdentifier':bundle}))
+            report = build_coverage_report(collect_snapshot([root], Providers(), None), {'schema_version':1,'recipes':[]}, [])
+            rows = report['classifications']['unknown']
+            self.assertEqual({row['bundle_id'] for row in rows}, {'com.openai.chat','com.openai.codex'})
+            self.assertEqual(len({row['target']['id'] for row in rows}), 2)
 
     def test_inventory_insertion_has_fallback_anchors(self) -> None:
-        """update_all.sh prescan Python block must define fallback anchors for section insertions."""
+        """Activated inventory never edits Markdown table membership by aliases."""
         text = self.read_script("update_all.sh")
-        prescan_block = text.split('cat > "$SESSION_DIR/prescan.py"')[1].split('cat > "$SESSION_DIR/postupdate.py"')[0]
-        self.assertIn("fallback_4a", prescan_block)
-        self.assertIn("fallback_4c", prescan_block)
-        self.assertIn("fallback_mas", prescan_block)
-        self.assertIn("fallback_new", prescan_block)
+        self.assertNotIn('cat > "$SESSION_DIR/prescan.py"', text)
+        self.assertIn('from plan_orchestration import main', text)
+        module = (REPO_ROOT / "lib/python/plan_orchestration.py").read_text()
+        self.assertIn('rebuild_inventory(', module)
+        self.assertNotIn('APP_ALIASES', module)
 
     @unittest.skipUnless(
         __import__("shutil").which("bash"),
@@ -1366,18 +1338,27 @@ class StaticShellSafetyTests(unittest.TestCase):
         self.assertIn("grep -i '^location:'", text)
 
     def test_report_update_coverage_json_schema_v2(self) -> None:
-        """report_update_coverage.sh JSON payload must specify schema_version: 2 and classification_counts."""
-        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
-        self.assertIn('"schema_version": 2', text)
-        self.assertIn('"classification_counts":', text)
+        sys.path.insert(0, str(REPO_ROOT / 'lib/python'))
+        from coverage_report import build_coverage_report
+        from inventory_collect import collect_snapshot, Providers
+        data = build_coverage_report(collect_snapshot([], Providers(), None), {'schema_version':1,'recipes':[]}, [])
+        self.assertEqual(data['schema_version'], 2)
+        self.assertEqual(data['classification_counts']['verified_direct'], 0)
+        self.assertEqual(data['installed_unique_count'], 0)
+        self.assertEqual(data['errors'], [])
 
-    def test_target_aliases_contains_all_multi_name_apps(self) -> None:
-        """TARGET_ALIASES must define aliases for OpenCode, zoom.us, Visual Studio Code, and Brave Browser."""
-        text = (REPO_ROOT / "scripts" / "report_update_coverage.sh").read_text(encoding="utf-8")
-        self.assertIn('"OpenCode":', text)
-        self.assertIn('"zoom.us":', text)
-        self.assertIn('"Visual Studio Code":', text)
-        self.assertIn('"Brave Browser":', text)
+    def test_coverage_retains_same_named_copies_and_never_aliases_path(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT / 'lib/python'))
+        from coverage_report import build_coverage_report
+        from inventory_collect import collect_snapshot, Providers
+        with tempfile.TemporaryDirectory() as root:
+            for folder in ('one', 'two'):
+                contents = Path(root) / folder / 'Agent.app/Contents'
+                contents.mkdir(parents=True)
+                (contents / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleName':'Agent','CFBundleIdentifier':'org.example.agent'}))
+            data = build_coverage_report(collect_snapshot([root], Providers(), None), {'schema_version':1,'recipes':[]}, [])
+            self.assertEqual(data['installed_unique_count'], 2)
+            self.assertEqual(len({row['path'] for row in data['classifications']['unknown']}), 2)
 
     def test_update_all_does_not_hang_on_tee_wait(self) -> None:
         """P1d: update_all.sh must return within timeout (not hang on tee wait) and persist summary to log."""
@@ -1447,29 +1428,21 @@ class StaticShellSafetyTests(unittest.TestCase):
         return mock_bin, base_env
 
     def test_leaf_script_severity_brew_doctor_warning(self) -> None:
-        """Scenario 1: update_brew.sh with doctor warning => exit 0"""
+        """No legacy doctor/bootstrap/upgrade path runs without a reviewed plan."""
         with tempfile.TemporaryDirectory() as tmp:
-            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
-            brew_script = mock_bin / "brew"
-            brew_script.write_text(
-                "#!/bin/sh\n"
-                'case "$1" in\n'
-                '  --version) echo "Homebrew 4.2.0" ;;\n'
-                '  doctor) echo "Warning: unbrewed dylib found" ; exit 1 ;;\n'
-                '  *) exit 0 ;;\n'
-                'esac\n',
-                encoding="utf-8",
-            )
-            brew_script.chmod(0o755)
-            res = subprocess.run(
-                ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
-                env=base_env,
-                capture_output=True,
-                text=True,
-                cwd=REPO_ROOT,
-                timeout=15,
-            )
-            self.assertEqual(res.returncode, 0, msg=f"brew doctor warning should result in exit 0, got {res.returncode}\n{res.stderr}")
+            root = Path(tmp)
+            mock_bin, env = self._make_leaf_test_env(root)
+            calls = root / "native-calls"
+            for name in ("brew", "npm", "n", "curl", "unzip", "bun"):
+                tool = mock_bin / name
+                tool.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"" + str(calls) + "\"\nexit 1\n", encoding="utf-8")
+                tool.chmod(0o755)
+            env.pop("MAC_UPDATE_PLAN_PATH", None)
+            env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
+            result = subprocess.run(["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
+                                    env=env, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 10, result.stdout + result.stderr)
+            self.assertFalse(calls.exists(), result.stdout + result.stderr)
 
     def test_leaf_script_severity_brew_greedy_cask(self) -> None:
         """Scenario 2: update_brew.sh with greedy cask remaining => exit 0 or 10, never 1"""
@@ -1498,30 +1471,21 @@ class StaticShellSafetyTests(unittest.TestCase):
             self.assertNotEqual(res.returncode, 1)
 
     def test_leaf_script_severity_brew_upgrade_fail(self) -> None:
-        """Scenario 3: update_brew.sh with upgrade --formula failing => exit 1"""
+        """No legacy doctor/bootstrap/upgrade path runs without a reviewed plan."""
         with tempfile.TemporaryDirectory() as tmp:
-            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
-            brew_script = mock_bin / "brew"
-            brew_script.write_text(
-                "#!/bin/sh\n"
-                'case "$1" in\n'
-                '  --version) echo "Homebrew 4.2.0" ;;\n'
-                '  outdated) echo "some-formula" ;;\n'
-                '  upgrade) if [ "$2" = "--formula" ]; then echo "Upgrade failed"; exit 1; fi ;;\n'
-                '  *) exit 0 ;;\n'
-                'esac\n',
-                encoding="utf-8",
-            )
-            brew_script.chmod(0o755)
-            res = subprocess.run(
-                ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
-                env=base_env,
-                capture_output=True,
-                text=True,
-                cwd=REPO_ROOT,
-                timeout=15,
-            )
-            self.assertEqual(res.returncode, 1, msg=f"brew upgrade --formula failing should result in exit 1, got {res.returncode}")
+            root = Path(tmp)
+            mock_bin, env = self._make_leaf_test_env(root)
+            calls = root / "native-calls"
+            for name in ("brew", "npm", "n", "curl", "unzip", "bun"):
+                tool = mock_bin / name
+                tool.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"" + str(calls) + "\"\nexit 1\n", encoding="utf-8")
+                tool.chmod(0o755)
+            env.pop("MAC_UPDATE_PLAN_PATH", None)
+            env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
+            result = subprocess.run(["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
+                                    env=env, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 10, result.stdout + result.stderr)
+            self.assertFalse(calls.exists(), result.stdout + result.stderr)
 
     def test_leaf_script_severity_mas_outdated_fail(self) -> None:
         """Scenario 4: update_appstore.sh with mas outdated failing => exit 10"""
@@ -1570,42 +1534,21 @@ class StaticShellSafetyTests(unittest.TestCase):
             self.assertNotEqual(res.returncode, 1)
 
     def test_leaf_script_severity_npm_tarball_install_fail(self) -> None:
-        """Scenario 6: update_npm_cli.sh with Bun tarball install failing => exit 1"""
+        """No legacy doctor/bootstrap/upgrade path runs without a reviewed plan."""
         with tempfile.TemporaryDirectory() as tmp:
-            mock_bin, base_env = self._make_leaf_test_env(Path(tmp))
-            base_env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
-            unzip_script = mock_bin / "unzip"
-            unzip_script.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
-            unzip_script.chmod(0o755)
-
-            bun_curl_script = mock_bin / "curl"
-            bun_curl_script.write_text(
-                "#!/bin/sh\n"
-                'out=""\n'
-                'prev=""\n'
-                'for arg in "$@"; do\n'
-                '  if [ "$prev" = "-o" ]; then out="$arg"; fi\n'
-                '  prev="$arg"\n'
-                'done\n'
-                'case "$*" in\n'
-                '  *nodejs.org*) echo "v22.1.0" ;;\n'
-                '  *SHASUMS256.txt*) if [ -n "$out" ]; then echo "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  bun-darwin-aarch64.zip" > "$out"; else echo "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  bun-darwin-aarch64.zip"; fi ;;\n'
-                '  *) if [ -n "$out" ]; then touch "$out"; fi ;;\n'
-                'esac\n'
-                "exit 0\n",
-                encoding="utf-8",
-            )
-            bun_curl_script.chmod(0o755)
-
-            res = subprocess.run(
-                ["/bin/bash", str(REPO_ROOT / "update_npm_cli.sh")],
-                env=base_env,
-                capture_output=True,
-                text=True,
-                cwd=REPO_ROOT,
-                timeout=60,
-            )
-            self.assertEqual(res.returncode, 1, msg=f"update_npm_cli.sh Bun tarball install failure must result in exit 1, got {res.returncode}\n{res.stderr}")
+            root = Path(tmp)
+            mock_bin, env = self._make_leaf_test_env(root)
+            calls = root / "native-calls"
+            for name in ("brew", "npm", "n", "curl", "unzip", "bun"):
+                tool = mock_bin / name
+                tool.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"" + str(calls) + "\"\nexit 1\n", encoding="utf-8")
+                tool.chmod(0o755)
+            env.pop("MAC_UPDATE_PLAN_PATH", None)
+            env["MAC_UPDATE_BOOTSTRAP_CLI"] = "1"
+            result = subprocess.run(["/bin/bash", str(REPO_ROOT / "update_npm_cli.sh")],
+                                    env=env, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 10, result.stdout + result.stderr)
+            self.assertFalse(calls.exists(), result.stdout + result.stderr)
 
     def test_subprocess_runs_targeting_update_scripts_set_sandboxed_home(self) -> None:
         """Scan test_safety_static.py for subprocess.run executing update_*.sh and assert HOME is set in env."""
@@ -1759,7 +1702,7 @@ class StaticShellSafetyTests(unittest.TestCase):
 
         # Gather all .sh file contents EXCEPT cli.sh itself
         all_sh_text = ""
-        for sh_file in REPO_ROOT.rglob("*.sh"):
+        for sh_file in list(REPO_ROOT.rglob("*.sh")) + list((REPO_ROOT / "lib/python").glob("*.py")):
             if sh_file.name == "cli.sh":
                 continue
             if ".git" in sh_file.parts:
@@ -3058,52 +3001,19 @@ class InventoryAndPipelineV14Tests(unittest.TestCase):
         self.assertEqual(code_stage, doc_stage, f"MAC_UPDATE_STAGE_WAIT mismatch: code={code_stage}, doc={doc_stage}")
         self.assertEqual(code_as, doc_as, f"MAC_UPDATE_APPSTORE_VERIFY_TIMEOUT mismatch: code={code_as}, doc={doc_as}")
 
-    def test_report_update_coverage_vendor_feed_label_and_exclusions(self) -> None:
-        """Assert report_update_coverage uses vendor feed label and handles exclusions."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_apps = Path(tmpdir) / "Applications"
-            tmp_apps.mkdir()
-            # Mock Ascendo.app (excluded)
-            ascendo_contents = tmp_apps / "Ascendo.app" / "Contents"
-            ascendo_contents.mkdir(parents=True)
-            with (ascendo_contents / "Info.plist").open("wb") as f:
-                plistlib.dump({"CFBundleIdentifier": "com.ascendo.dataVault", "CFBundleShortVersionString": "7.0"}, f)
-            # Mock Claude.app (vendor_feed)
-            claude_contents = tmp_apps / "Claude.app" / "Contents"
-            claude_contents.mkdir(parents=True)
-            with (claude_contents / "Info.plist").open("wb") as f:
-                plistlib.dump({"CFBundleIdentifier": "com.anthropic.claude", "CFBundleShortVersionString": "2.0.0"}, f)
-
-            env = os.environ.copy()
-            env["MAC_LANG"] = "en"
-            env["MAC_UPDATE_APP_DIRS"] = str(tmp_apps)
-            try:
-                from tests._env import isolate_host_tools
-            except ImportError:
-                from _env import isolate_host_tools
-            isolate_host_tools(env)
-            from support import mock_defaults
-            fixture_bin = Path(tmpdir) / "bin"
-            fixture_bin.mkdir()
-            mock_defaults(fixture_bin)
-            env["PATH"] = str(fixture_bin) + os.pathsep + env["PATH"]
-            res = subprocess.run(
-                ["bash", str(REPO_ROOT / "scripts" / "report_update_coverage.sh"), "--json"],
-                capture_output=True,
-                text=True,
-                env=env,
-                check=True,
-            )
-            data = json.loads(res.stdout)
-            installed_updatable = {a["app"]: a for a in data.get("installed_updatable", [])}
-            self.assertIn("Claude", installed_updatable)
-            claude = installed_updatable["Claude"]
-            self.assertEqual(claude.get("managed_by"), "vendor_feed")
-            self.assertEqual(claude.get("label"), "vendor feed verified")
-
-            self.assertIn("excluded", data.get("classification_counts", {}))
-            excluded_apps = [a["app"] for a in data.get("classifications", {}).get("excluded", [])]
-            self.assertIn("Ascendo", excluded_apps)
+    def test_coverage_vendor_name_and_exclusion_name_do_not_establish_authority(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT / 'lib/python'))
+        from coverage_report import build_coverage_report
+        from inventory_collect import collect_snapshot, Providers
+        with tempfile.TemporaryDirectory() as root:
+            for name, bundle in [('Ascendo','com.ascendo.dataVault'),('Claude','com.anthropic.claude')]:
+                contents = Path(root) / (name + '.app') / 'Contents'
+                contents.mkdir(parents=True)
+                (contents / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleName':name,'CFBundleIdentifier':bundle}))
+            data = build_coverage_report(collect_snapshot([root], Providers(), None), {'schema_version':1,'recipes':[]}, [{'name':'Claude','adapter_id':'silent_launch'}])
+            self.assertEqual(data['automatic_coverage_count'], 0)
+            self.assertEqual(data['excluded_count'], 0)
+            self.assertEqual({row['app'] for row in data['classifications']['unknown']}, {'Ascendo','Claude'})
 
     def test_tracked_files_have_no_personal_home_paths(self) -> None:
         """Tracked files must not contain personal /Users/<username> paths."""

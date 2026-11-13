@@ -119,8 +119,12 @@ class NewSectionInsertTests(unittest.TestCase):
 
     def test_prescan_dedups_on_table_rows_not_free_text(self) -> None:
         text = read("update_all.sh")
-        self.assertIn("unhandled_dedup = [a for a in unhandled if not row_exists(content, a)]", text)
+        self.assertNotIn("unhandled_dedup", text)
         self.assertNotIn("pattern_nowe", text)
+        self.assertIn("from plan_orchestration import main", text)
+        module = read("lib/python/plan_orchestration.py")
+        self.assertIn("collect_local_snapshot(script_dir)", module)
+        self.assertNotIn("row_exists", module)
 
 
 class NativeUpdaterVersionTests(unittest.TestCase):

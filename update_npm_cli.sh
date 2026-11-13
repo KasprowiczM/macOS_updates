@@ -26,6 +26,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 MANIFEST_PATH="${MANIFEST_PATH:-$SCRIPT_DIR/config/npm_global_clis.txt}"
 BUN_VERSION_PATH="$SCRIPT_DIR/config/bun_version.txt"
 
@@ -1297,6 +1298,11 @@ PYEOF_BREW_OPENCODE
 }
 
 print_header "🧰 Native CLI & npm"
+# Every standalone execution uses the same scoped plan and live guard.
+. "$SCRIPT_DIR/lib/update_policy.sh"
+mac_update_policy_run_adapter npm
+exit $?
+
 
 if [ ! -f "$MANIFEST_PATH" ]; then
     print_error "Brak manifestu CLI: $MANIFEST_PATH"

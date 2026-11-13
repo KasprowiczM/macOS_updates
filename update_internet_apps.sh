@@ -69,6 +69,11 @@ mac_update_require_supported_platform || exit 1
 # ── i18n: load language strings ──────────────────────────────
 . "$SCRIPT_DIR/i18n/loader.sh"
 
+# Active execution uses the same scoped plan as standalone manager adapters.
+. "$SCRIPT_DIR/lib/update_policy.sh"
+mac_update_policy_run_adapter vendor
+exit $?
+
 print_header() { ui_print_header "$1"; }
 
 
@@ -255,105 +260,52 @@ replacement_app_is_idle() {
 
 copy_verified_app() {
     INTERNET_COPY_DEFERRED=0
+    local app_path="${1:-}" dest="${2:-}" action_id="${3:-}" rc=0
+    # A filename, missing target or implicit /Applications fallback is never
+    # authority to install an app. Dry runs preserve this target binding.
+    case "$dest" in /*) ;; *) INTERNET_COPY_DEFERRED=1; return 2 ;; esac
+    [ -n "$action_id" ] && [ -n "${MAC_UPDATE_PLAN_PATH:-}" ] || { INTERNET_COPY_DEFERRED=1; return 2; }
     if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
-        print_warn "[DRY-RUN] skip copy: $2"
+        print_warn "[DRY-RUN] skip copy: $dest"
         return 0
     fi
-    local app_path="$1"
-    local app_label="$2"
-    local dest="/Applications/$app_label"
-    local staging_root staging backup_root backup rejected
-    local had_existing=0
-
-    # Only handlers that own a toolkit launch may request a graceful quit.
-    # This common transaction never closes an application from the user's session.
-    if ! replacement_app_is_idle "$dest"; then
+    PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$app_path" "$dest" "$action_id" "$MAC_UPDATE_PLAN_PATH" <<'PY_TRANSACTION'
+import os, sys
+from inventory_store import default_root, _root
+from update_transaction import execute_transaction, observe_bundle, TransactionDeferred
+from policy_runtime import load_plan, reobserve_action, guard_action, TargetLock
+try:
+    plan=load_plan(sys.argv[4])
+    matches=[a for a in plan['actions'] if a.get('action_id')==sys.argv[3]]
+    if len(matches)!=1: raise TransactionDeferred('action_missing')
+    action=matches[0]
+    if action.get('target_path')!=sys.argv[2] or action.get('action_scope')!='direct_update':
+        raise TransactionDeferred('action_target_mismatch')
+    root=_root(default_root(),True)
+    journals=os.path.join(root,'transactions')
+    if os.path.lexists(journals):
+        import stat
+        st=os.lstat(journals)
+        if not stat.S_ISDIR(st.st_mode) or st.st_uid!=os.getuid() or stat.S_IMODE(st.st_mode)!=0o700:
+            raise TransactionDeferred('unsafe_transactions')
+    else: os.mkdir(journals,0o700)
+    with TargetLock(sys.argv[2]):
+        execute_transaction(action,sys.argv[1],journals,
+            lambda: reobserve_action(action),
+            lambda: guard_action(sys.argv[4],sys.argv[3]).get('allowed') is True,
+            observe_bundle)
+except TransactionDeferred:
+    sys.exit(10)
+except Exception:
+    # Never include source URL, private inventory or exception arguments.
+    sys.exit(1)
+PY_TRANSACTION
+    rc=$?
+    if [ "$rc" -eq 10 ]; then
         INTERNET_COPY_DEFERRED=1
-        print_warn "$(internet_msg "$L_INTERNET_COPY_DEFERRED_RUNNING_FMT" "$app_label")"
         return 2
     fi
-
-    if ! verify_app_signature "$app_path"; then
-        print_warn "$(internet_msg "$L_INTERNET_GATEKEEPER_REJECTED" "$app_label")"
-        return 1
-    fi
-
-    # mktemp prevents collisions with concurrent/stale runs. The staging and
-    # backup roots live beside the destination so every mv stays on one volume.
-    staging_root="$(mktemp -d "/Applications/.macupd_staging.XXXXXX")" || return 1
-    backup_root="$(mktemp -d "/Applications/.macupd_backup.XXXXXX")" || {
-        rm -rf "$staging_root" 2>/dev/null || true
-        return 1
-    }
-    staging="$staging_root/$app_label"
-    backup="$backup_root/$app_label"
-    if ! ditto "$app_path" "$staging" 2>/dev/null; then
-        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        return 1
-    fi
-    if ! verify_app_signature "$staging"; then
-        print_warn "Staged signature check failed for $app_label"
-        internet_diag_log "ERROR: staged spctl failed for $staging"
-        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        return 1
-    fi
-    if [ -e "$dest" ] || [ -L "$dest" ]; then
-        if ! verify_replacement_identity "$staging" "$dest" "$app_label"; then
-            rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-            return 1
-        fi
-        had_existing=1
-    fi
-
-    # Recheck immediately before the swap: the user may have opened it while
-    # the payload was copied and verified. An ambiguous probe also defers.
-    if ! replacement_app_is_idle "$dest"; then
-        INTERNET_COPY_DEFERRED=1
-        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        print_warn "$(internet_msg "$L_INTERNET_COPY_DEFERRED_ACTIVE_FMT" "$app_label")"
-        return 2
-    fi
-
-    if [ "$had_existing" -eq 1 ] && ! mv "$dest" "$backup" 2>/dev/null; then
-        internet_diag_log "ERROR: could not move existing $dest to rollback backup $backup"
-        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        return 1
-    fi
-    if ! mv "$staging" "$dest" 2>/dev/null; then
-        if [ "$had_existing" -eq 1 ] && ! mv "$backup" "$dest" 2>/dev/null; then
-            internet_diag_log "CRITICAL: install failed and rollback is at $backup"
-            print_error "CRITICAL: Install failed for $app_label and automatic rollback failed! Retained backup is at $backup. Restore with: mv \"$backup\" \"$dest\""
-            rm -rf "$staging_root" 2>/dev/null || true
-            return 1
-        fi
-        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        return 1
-    fi
-
-    # A post-swap Gatekeeper failure restores the known previous bundle.
-    if ! verify_app_signature "$dest"; then
-        print_warn "Post-install signature check failed for $app_label"
-        internet_diag_log "ERROR: post-install spctl failed for $dest; rolling back"
-        rejected="$staging_root/$app_label.rejected"
-        if ! mv "$dest" "$rejected" 2>/dev/null; then
-            internet_diag_log "WARN: could not preserve rejected app; removing it before rollback"
-            if ! rm -rf "$dest" 2>/dev/null; then
-                internet_diag_log "CRITICAL: could not remove rejected app; rollback remains at $backup"
-                print_error "CRITICAL: Could not remove rejected app $dest; retained backup is at $backup. Restore with: mv \"$backup\" \"$dest\""
-                return 1
-            fi
-        fi
-        if [ "$had_existing" -eq 1 ] && ! mv "$backup" "$dest" 2>/dev/null; then
-            internet_diag_log "CRITICAL: rejected app is at $rejected; rollback remains at $backup"
-            print_error "CRITICAL: Rejected app is at $rejected; automatic rollback failed! Retained backup is at $backup. Restore with: mv \"$backup\" \"$dest\""
-            return 1
-        fi
-        rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-        return 1
-    fi
-
-    rm -rf "$staging_root" "$backup_root" 2>/dev/null || true
-    return 0
+    return "$rc"
 }
 
 . "$SCRIPT_DIR/lib/proc.sh"

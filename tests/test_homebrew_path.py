@@ -58,30 +58,20 @@ class HomebrewPathTests(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), MINIMAL_PATH)
 
     def test_update_brew_finds_stub_brew_under_launchd_path(self) -> None:
-        # The platform guard (arm64 + macOS 13+) runs before the PATH helper; stub the
-        # probes so the test exercises the helper on any host (Linux CI is x86_64).
-        for name, out in (("uname", "arm64"), ("sw_vers", "26.0")):
-            stub = self.bindir / name
-            stub.write_text(f"#!/bin/sh\necho {out}\n", encoding="utf-8")
-            stub.chmod(0o755)
-        env = {
-            "HOME": str(self.root),
-            "USER": "tester",
-            "PATH": MINIMAL_PATH,
-            "MAC_UPDATE_HOMEBREW_PREFIX": str(self.root / "brewprefix"),
-            "MAC_UPDATE_DRY_RUN": "1",
-            "MAC_UPDATE_NONINTERACTIVE": "1",
-            "MAC_UPDATE_YES": "1",
-            "MAC_UPDATE_NO_SUDO": "1",
-            "MAC_LANG": "en",
-        }
-        r = subprocess.run(
-            ["/bin/bash", str(REPO_ROOT / "update_brew.sh")],
-            env=env, capture_output=True, text=True, timeout=120, cwd=str(self.root),
-        )
-        out = r.stdout + r.stderr
-        self.assertNotIn("Homebrew is not installed", out)
-        self.assertIn("stub-brew", out)
+        from tests._policy_fixtures import PolicyFixture
+        import os
+        import sys
+        with PolicyFixture() as fixture:
+            fixture.cask()
+            prefix_bin=fixture.prefix/'bin'
+            (prefix_bin/'python3').symlink_to(sys.executable)
+            (prefix_bin/'ps').write_text('#!/bin/sh\nexit 0\n');(prefix_bin/'ps').chmod(0o755)
+            os.environ['PATH']=MINIMAL_PATH
+            os.environ['MAC_UPDATE_HOMEBREW_PREFIX']=str(fixture.prefix)
+            result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual([c for c in fixture.calls() if c[0]=='upgrade'],[['upgrade','--cask','--appdir='+str(fixture.app.parent),'fixture']])
+            self.assertTrue(fixture.results()[-1]['verified'])
 
     def test_every_orchestrator_sources_platform_before_first_brew_lookup(self) -> None:
         names = [

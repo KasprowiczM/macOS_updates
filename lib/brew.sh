@@ -366,3 +366,13 @@ brew_installed_casks_json() {
     done <<< "$tokens"
     HOMEBREW_NO_AUTO_UPDATE=1 brew info --cask --json=v2 "${names[@]}"
 }
+
+# Scoped stage C query. Do not refresh metadata or mutate the installed set.
+mac_update_brew_policy_info() {
+    [ "$#" -eq 3 ] || return 1
+    local prefix="$1" kind="$2" token="$3"
+    case "$kind" in formula|cask) ;; *) return 1 ;; esac
+    case "$token" in ''|*[!a-zA-Z0-9@+_.-]*) return 1 ;; esac
+    HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 \
+        "$prefix/bin/brew" info --json=v2 "--$kind" "$token"
+}

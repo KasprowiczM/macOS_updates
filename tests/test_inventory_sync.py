@@ -119,27 +119,34 @@ class InventorySyncTests(unittest.TestCase):
         self.assertNotIn("gemini-cli", d4_text)
         self.assertNotIn("qwen-code", d4_text)
 
-    def test_guard_never_wipes_whole_group(self) -> None:
-        # Pass empty sets for groups that have rows in sample_md
-        flaky_facts = {
-            "mas": {},  # empty query
-            "formulae": set(),  # empty query
-            "casks_nonorphan": set(),  # empty query
-            "clis": [],  # empty query
-            "ipad": [],
-            "installed_app_names": set(),
-        }
-        new_md, report = inventory_sync.sync_all(self.sample_md, flaky_facts, self.methods_rows)
-        self.assertIn("GRUPA 2", report["skipped_groups"])
-        self.assertIn("Homebrew Formulae", report["skipped_groups"])
-        self.assertIn("Homebrew Casks", report["skipped_groups"])
-        self.assertIn("Native CLI", report["skipped_groups"])
+    def test_unknown_scan_preserves_stale_membership_and_notes(self) -> None:
+        from inventory_collect import Providers, collect_snapshot, source_result
+        from inventory_render import render_inventory
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            prefix = os.path.realpath(root)
+            item = dict(manager='homebrew', source_identity='formula:tool', installed_receipt=prefix + '/receipt', evidence=[])
+            first = collect_snapshot([], Providers(list_brew=lambda p: source_result('ok', [item]), brew_prefixes=[prefix]), None)
+            second = collect_snapshot([], Providers(list_brew=lambda p: source_result('partial'), brew_prefixes=[prefix]), first)
+            self.assertEqual(second['packages'][0]['presence'], 'unobserved')
+            self.assertEqual(second['packages'][0]['freshness'], 'stale')
+            notes = dict(schema_version=1, mapped=[], orphans=[dict(text='Keep my note')])
+            self.assertIn('formula:tool', render_inventory(second, notes))
+            self.assertIn('Keep my note', render_inventory(second, notes))
 
-        # Tables should NOT have been wiped
-        self.assertIn("Amphetamine", new_md)
-        self.assertIn("mas", new_md)
-        self.assertIn("appcleaner", new_md)
-        self.assertIn("bun", new_md)
+    def test_valid_empty_scan_prunes_membership_and_preserves_notes(self) -> None:
+        from inventory_collect import Providers, collect_snapshot, source_result
+        from inventory_render import render_inventory
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            prefix = os.path.realpath(root)
+            item = dict(manager='homebrew', source_identity='formula:tool', installed_receipt=prefix + '/receipt', evidence=[])
+            first = collect_snapshot([], Providers(list_brew=lambda p: source_result('ok', [item]), brew_prefixes=[prefix]), None)
+            second = collect_snapshot([], Providers(list_brew=lambda p: source_result('ok', []), brew_prefixes=[prefix]), first)
+            self.assertEqual(second['packages'][0]['presence'], 'absent')
+            notes = dict(schema_version=1, mapped=[], orphans=[dict(text='Keep my note')])
+            self.assertNotIn('formula:tool', render_inventory(second, notes))
+            self.assertIn('Keep my note', render_inventory(second, notes))
 
     def test_summary_counts_match_tables(self) -> None:
         updated_summary_md = inventory_sync.recompute_summary(self.sample_md)

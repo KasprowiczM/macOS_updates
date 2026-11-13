@@ -227,12 +227,14 @@ class TestVendorTruthHandlers(unittest.TestCase):
     def test_vendor_direct_refuses_non_applications_path(self):
         script = f"""
         . "{REPO_ROOT}/lib/vendor_direct.sh"
+        MAC_UPDATE_ACTION_ID=fixture-action
+        MAC_UPDATE_PLAN_PATH="{self.tmpdir}/fixture-plan.json"
         vendor_direct_install "/Users/fake/Test.app" "https://example.com/app.zip" "zip" "-" "-" "example.com"
         echo "RC=$?"
         """
         proc = self._run_bash(script)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("RC=1", proc.stdout)
+        self.assertIn("RC=4", proc.stdout)
 
     def test_vendor_direct_dry_run_returns_2(self):
         script = f"""
@@ -445,6 +447,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
         self.assertFalse(os.path.exists(open_log), "silent_launch_app called in dry run")
 
     def test_vendor_direct_rejects_older_bundle_version(self):
+        os.makedirs(os.path.join(self.tmpdir, "Applications", "Dummy.app"), exist_ok=True)
         copy_log = os.path.join(self.tmpdir, "copy.log")
         zip_path = os.path.join(self.tmpdir, "dummy.zip")
         # Create a mock zip with Dummy.app
@@ -459,17 +462,22 @@ class TestVendorTruthHandlers(unittest.TestCase):
         . "{REPO_ROOT}/lib/version.sh"
         . "{REPO_ROOT}/lib/internet_i18n.sh"
         . "{REPO_ROOT}/lib/vendor_direct.sh"
+        HOME="{self.tmpdir}"
+        MAC_UPDATE_ACTION_ID=fixture-action
+        MAC_UPDATE_PLAN_PATH="{self.tmpdir}/fixture-plan.json"
+        mac_update_authorize_action() {{ return 0; }}
+
 
         print_info() {{ :; }}
         print_warn() {{ :; }}
-        fetch_to_file() {{ cp "{zip_path}" "$2"; }}
+        fetch_reviewed_artifact() {{ cp "{zip_path}" "$2"; }}
         vendor_direct_verify_checksum() {{ return 0; }}
         ditto() {{
             echo "$@" >> "{self.tmpdir}/ditto.log"
             python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' "$3" "$4"
         }}
         internet_app_bundle_id() {{ echo "com.example.dummy"; }}
-        internet_app_is_running() {{ return 1; }}
+        internet_app_running_state() {{ echo false; }}
         app_version() {{
             case "$1" in
                 */Dummy.app)
@@ -484,7 +492,7 @@ class TestVendorTruthHandlers(unittest.TestCase):
         }}
         copy_verified_app() {{ echo "$@" >> "{copy_log}"; return 0; }}
 
-        vendor_direct_install "/Applications/Dummy.app" "https://example.com/dummy.zip" "zip" "-" "-" "example.com" "2.0"
+        vendor_direct_install "{self.tmpdir}/Applications/Dummy.app" "https://example.com/dummy.zip" "zip" "-" "-" "example.com" "2.0"
         echo "RC=$?"
         """
         proc = self._run_bash(script)
@@ -494,16 +502,22 @@ class TestVendorTruthHandlers(unittest.TestCase):
         self.assertFalse(os.path.exists(copy_log), "copy_verified_app should not be called when version is older")
 
     def test_vendor_direct_diag_is_logged(self):
+        os.makedirs(os.path.join(self.tmpdir, "Applications", "Dummy.app"), exist_ok=True)
         diag_log = os.path.join(self.tmpdir, "diag.log")
         script = f"""
         . "{REPO_ROOT}/i18n/lang_en.sh"
         . "{REPO_ROOT}/lib/vendor_direct.sh"
+        HOME="{self.tmpdir}"
+        MAC_UPDATE_ACTION_ID=fixture-action
+        MAC_UPDATE_PLAN_PATH="{self.tmpdir}/fixture-plan.json"
+        mac_update_authorize_action() {{ return 0; }}
+
 
         print_info() {{ :; }}
         print_warn() {{ :; }}
         internet_diag_log() {{ echo "$@" >> "{diag_log}"; }}
 
-        vendor_direct_install "/Applications/Dummy.app" "https://bad.com/d.zip" "zip" "-" "-" "good.com" "2.0"
+        vendor_direct_install "{self.tmpdir}/Applications/Dummy.app" "https://bad.com/d.zip" "zip" "-" "-" "good.com" "2.0"
         echo "RC=$?"
         """
         proc = self._run_bash(script)
@@ -511,37 +525,37 @@ class TestVendorTruthHandlers(unittest.TestCase):
         self.assertIn("RC=1", proc.stdout)
         self.assertTrue(os.path.exists(diag_log), "diag log was not created")
         content = Path(diag_log).read_text(encoding="utf-8")
-        self.assertIn("not allowed", content)
+        self.assertIn("host rejected", content)
 
-    def test_fetch_refuses_http_redirect(self):
-        curl_log = os.path.join(self.tmpdir, "curl_args.log")
+    def test_fetch_uses_bounded_public_metadata_transport(self):
+        transport_log = os.path.join(self.tmpdir, "transport.log")
         dest = os.path.join(self.tmpdir, "out.bin")
         script = f"""
         . "{REPO_ROOT}/lib/fetch.sh"
-        curl() {{
-            echo "$@" > "{curl_log}"
-            local out=""
-            while [ $# -gt 0 ]; do
-                if [ "$1" = "-o" ]; then
-                    out="$2"
-                    shift 2
-                else
-                    shift
-                fi
-            done
-            if [ -n "$out" ]; then
-                echo "downloaded" > "$out"
-            fi
-            return 0
+        python3() {{
+            command python3 -c '
+import json, sys
+import download_policy
+log_path=sys.argv[-1]
+def fixture(url,dest,allowed_hosts,**bounds):
+    with open(log_path,"w") as log:
+        json.dump([url,dest,allowed_hosts,bounds],log)
+    with open(dest,"wb") as output: output.write(b"fixture")
+download_policy.download=fixture
+code=sys.stdin.read()
+sys.argv=["-"]+sys.argv[1:-1]
+exec(compile(code,"fetch_fixture","exec"))
+' "${{@:2}}" "{transport_log}"
         }}
         fetch_to_file "https://example.com/file" "{dest}" 60 1000
         """
         proc = self._run_bash(script)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertTrue(os.path.exists(curl_log), "curl was not called")
-        content = Path(curl_log).read_text(encoding="utf-8")
-        self.assertIn("--proto-redir =https", content)
-        self.assertIn("--max-filesize 1000", content)
+        import json
+        record=json.loads(Path(transport_log).read_text())
+        self.assertEqual(record[2], None)
+        self.assertEqual(record[3], dict(timeout=60,max_bytes=1000))
+        self.assertEqual(Path(dest).read_bytes(), b"fixture")
 
     def test_launch_cycle_message_shows_remote_version(self):
         script = f"""

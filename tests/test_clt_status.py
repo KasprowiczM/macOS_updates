@@ -81,33 +81,17 @@ class CltStatusTests(unittest.TestCase):
         self.assertEqual(status, "ok")
 
     def test_brew_preflight_reports_orphan_clt(self):
-        session_dir = os.path.join(self.temp_dir, "session")
-        os.makedirs(session_dir, exist_ok=True)
-
-        self._create_mock_bin("brew", 'echo "Homebrew 7.0.2"')
-        self._create_mock_bin("sw_vers", 'echo "27.0"')
-        self._create_mock_bin("pkgutil", 'echo "No receipt found" >&2; exit 1')
-
-        clt_dir = os.path.join(self.temp_dir, "CommandLineTools")
-        os.makedirs(clt_dir, exist_ok=True)
-
-        env = dict(os.environ)
-        env["MAC_UPDATE_SESSION_DIR"] = session_dir
-        env["MAC_UPDATE_CLT_DIR"] = clt_dir
-        env["MAC_UPDATE_NONINTERACTIVE"] = "1"
-        env["MAC_UPDATE_YES"] = "1"
-        env["MAC_LANG"] = "en"
-        env["MAC_UPDATE_DRY_RUN"] = "1"
-
-        res = subprocess.run(
-            ["bash", str(REPO_ROOT / "update_brew.sh")],
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(res.returncode, 0, f"update_brew failed: {res.stderr}")
-        self.assertIn("Command Line Tools (orphan)", res.stdout)
-        self.assertIn("sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install", res.stdout)
+        # CLT diagnosis remains read-only and independently callable. A leaf
+        # without a plan does not proceed to toolchain recovery or updates.
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.cask()
+            os.environ.pop('MAC_UPDATE_PLAN_PATH',None)
+            fixture.shell('pkgutil','echo queried > "'+str(fixture.root/'pkgutil-called')+'"; exit 1')
+            result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+            self.assertEqual(fixture.calls(),[])
+            self.assertFalse((fixture.root/'pkgutil-called').exists())
 
     def test_brew_doctor_collapses_multiple_clt_warnings(self):
         doctor_mock_input = """Please note that these warnings are just used to help the Homebrew maintainers

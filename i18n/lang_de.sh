@@ -989,3 +989,18 @@ L_SHADOW_REPORT='Beobachtungsinventar: Anwendungen / Pakete'
 L_SHADOW_NO_ACTIONS='Nur Beobachtung; die Ausführung der Updates bleibt unverändert.'
 L_SHADOW_PARTIAL='Einige Quellen sind unvollständig oder nicht verfügbar; beibehaltene Einträge belegen keine aktuelle Installation.'
 L_SHADOW_FAILED='Beobachtungsinventar fehlgeschlagen. Python, Metadaten und Berechtigungen des privaten Zustandsverzeichnisses prüfen.'
+
+# Local inventory and explicit scoped consent
+L_PLAN_TITLE="Lokaler Aktualisierungsplan"
+L_PLAN_NO_CONSENT="Keine neue Erlaubnis erteilt. Offene Entscheidungen bleiben zurückgestellt."
+L_PLAN_CHOICES="Einträge wählen: a1,a3 gezeigten Umfang erlauben; d2 7 Tage warten; i4 ignorieren; m5 manuell; r6 zurücksetzen. Leer bricht ab."
+L_PLAN_INVALID="Ungültige Auswahl. Berechtigungen unverändert."
+L_PLAN_FAILED="Plan nicht verfügbar. Keine App-Aktionen genehmigt."
+L_INVENTORY_NO_AUTO_MIGRATION="Automatische Bestätigung migriert kein Inventar. Vorschlag prüfen und ausdrücklich bestätigen."
+L_INVENTORY_DRY_RUN="Nur Inventarvorschau. Keine Dateien geändert."
+L_INVENTORY_SAVED="Lokales Inventar gespeichert. Notizen und passende Entscheidungen erhalten."
+L_INVENTORY_MIGRATION_PREVIEW="Migrationsvorschau bereit. Originalbytes und alter Text bleiben als Notizen erhalten. Keine Update-Erlaubnis übernommen."
+L_INVENTORY_MIGRATION_ACCEPT="Vorschau bestätigen: bash build_inventory.sh --migration --accept PROPOSAL_ID"
+L_INVENTORY_CONFLICT="Inventar unverändert. Notizen mit build_inventory.sh --migration --preview prüfen; vollständiger lokaler Scan erforderlich."
+L_PLAN_NO_CHOICES="Keine neuen Entscheidungen nötig. Gespeicherte Auswahl mit --preferences prüfen."
+L_PLAN_POLICY_COUNTS="Manuell: %s; ignoriert: %s; zurückgestellt: %s. Mit --preferences prüfen."

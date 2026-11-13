@@ -70,3 +70,7 @@ With `MAC_UPDATE_DRY_RUN=1` or `bash update_all.sh --dry-run`, leaf scripts prin
 Since v1.5.3, the system leaf honors `MAC_UPDATE_NO_SUDO=1`. With no terminal or in noninteractive mode and no cached authorization, it exits `10` before installation. Authorized installs use `sudo -n` so timestamp expiry fails explicitly instead of prompting. The orchestrator records a soft system deferral as degraded; a deliberate user cancellation remains `skipped_by_user`.
 
 For unattended runs, use `--skip-system` (`bash update_all.sh --skip-system`) and apply macOS system updates interactively later. Existing cached authorization does not replace Apple Silicon volume-owner credentials.
+
+## Typed per-target results
+
+Summary format 4 adds `action_results` and per-item `action_status`. Manual and ignored outcomes are neutral; source conflicts, unavailable observations and unverified updates remain visible. A failed mutation is hard and can defer the final system step; a reporting conflict or declined action is soft. `current_verified` requires fresh observed identity, source and version; an installer exit code alone is insufficient.

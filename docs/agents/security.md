@@ -51,3 +51,7 @@ Private files are `.gitignore`d and managed by `dev_sync`:
 ## MCP Server Policy
 
 Only enable MCP servers that this repo actively uses. Disabled servers (Gmail, Google Calendar, Google Drive, memory) are listed in `.claude/settings.json → disabledMcpServers`. Do not re-enable without explicit user decision.
+
+## Local plan and transaction trust
+
+Decisions and receipts stay in private user state. An authorization token is a local UI record, not protection against a malicious process running as that same user. Every action rechecks its profile, base generation, policy revision, age, source, related identities, running state and effects. Downloads enforce exact reviewed artifact hosts, TLS, public-address pinning and a deadline across headers and body. Recovery preserves uncertain copies; it never uses an absent target as permission to download and reinstall.

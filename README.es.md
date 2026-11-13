@@ -6,9 +6,9 @@
 
 **Sitio web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repositorio:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licencia:** [MIT](LICENSE) · **Cambios:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.2** : Orquestador de actualizaciones en un solo comando, para **Macs con Apple Silicon y macOS 13-27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
+> **v1.6.3** : Orquestador de actualizaciones en un solo comando, para **Macs con Apple Silicon y macOS 13-27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
 
-La etapa B (1.6.2) añade un inventario de observación opcional: `bash build_inventory.sh --shadow`. Guarda identidades locales, evidencias de origen y escaneos incompletos en JSON privado, sin cambiar `APPLICATIONS.md` ni la ejecución de actualizaciones. `--dry-run` evita guardar, `--json` devuelve resultados estructurados y `--root RUTA` permite indicar varios directorios. Los conflictos son observaciones; la selección de fuentes y la protección de ejecución corresponden a la etapa C.
+La etapa C activa inventario JSON local y planes con permisos específicos. `bash update_all.sh --plan` y `--dry-run` muestran las mismas decisiones sin guardar. Un proceso interactivo pregunta una vez por los alcances mostrados; `-y`, EOF y ejecución desatendida no conceden permisos nuevos. Use `--preferences` para revisar o restablecer decisiones. Las actualizaciones conservan origen y destino observados; conflictos, destinos ausentes o evidencia incierta aplazan ese destino. `build_inventory.sh --migration --preview` conserva bytes originales de Markdown y notas; acepte expresamente el ID mostrado. Las actualizaciones genéricas del proveedor siguen siendo manuales hasta verificar identidad y adaptador. Una entrada de catálogo no demuestra instalación ni consentimiento.
 
 | De un vistazo | |
 |---------------|--|
@@ -16,7 +16,7 @@ La etapa B (1.6.2) añade un inventario de observación opcional: `bash build_in
 | Flujo | 7 pasos (0–6); la actualización de macOS va siempre al final |
 | Registro | 47 apps de Internet · 11 métodos de actualización (véase [Métodos de actualización](#métodos-de-actualización)) |
 | Idiomas | EN, PL, ES, FR, DE, IT, PT (CLI y documentación) |
-| Pruebas | 971 pruebas automáticas (`bash run_tests.sh`) |
+| Pruebas | 1101 pruebas automáticas (`bash run_tests.sh`) |
 
 Novedades de v1.6.1: informes locales, reconocimiento del recibo de CapCut, consentimiento explícito en setup y mayor aislamiento de pruebas sin red. La etapa A aún no activa la resolución automática de fuentes ni el menú de instalación.
 

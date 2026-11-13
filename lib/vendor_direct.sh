@@ -148,17 +148,14 @@ internet_app_quit_gracefully() {
 }
 
 vendor_direct_host_allowed() {
-    local url="$1" host="$2"
-    [ -n "$url" ] && [ -n "$host" ] || return 1
-    case "$url" in
-        https://*) ;;
-        *) return 1 ;;
-    esac
-    local url_host
-    url_host="${url#https://}"
-    url_host="${url_host%%/*}"
-    url_host="${url_host%%:*}"
-    [ "$url_host" = "$host" ]
+    PYTHONPATH="$_VENDOR_DIRECT_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" <<'PY_HOST'
+import sys
+from download_policy import validate_download_url
+try:
+    validate_download_url(sys.argv[1],[sys.argv[2]])
+except ValueError:
+    sys.exit(1)
+PY_HOST
 }
 
 vendor_direct_verify_checksum() {
@@ -206,30 +203,31 @@ vendor_direct_install() {
 
     # 1. DRY RUN / VERIFY ONLY
     if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
-        print_info "[DRY-RUN] vendor_direct_install $installed_app_path from $url" 2>/dev/null || true
+        print_info "[DRY-RUN] vendor_direct_install $installed_app_path" 2>/dev/null || true
         return 2
     fi
 
-    # 2. Installed path must start with /Applications/
+    # The plan binds the canonical existing destination and direct-update scope.
+    [ -n "${MAC_UPDATE_ACTION_ID:-}" ] && [ -n "${MAC_UPDATE_PLAN_PATH:-}" ] || return 4
     case "$installed_app_path" in
-        /Applications/*) ;;
-        *)
-            _vd_diag "ERROR: vendor_direct_install requires /Applications path: $installed_app_path"
-            return 1
-            ;;
+        /Applications/*|"$HOME"/Applications/*) ;;
+        *) return 4 ;;
     esac
+    [ -d "$installed_app_path" ] && [ ! -L "$installed_app_path" ] || return 4
+    command -v mac_update_authorize_action >/dev/null 2>&1 || return 4
+    mac_update_authorize_action "$MAC_UPDATE_PLAN_PATH" "$MAC_UPDATE_ACTION_ID" >/dev/null || return 4
 
     # 3. Host allowlist
     if ! vendor_direct_host_allowed "$url" "$host"; then
-        print_warn "$(printf "${L_INTERNET_VENDOR_HOST_REJECTED_FMT:-Host %s rejected for URL %s}" "$host" "$url")" 2>/dev/null || true
-        _vd_diag "ERROR: vendor direct host $host not allowed for $url"
+        print_warn "Vendor download host rejected" 2>/dev/null || true
+        _vd_diag "ERROR: vendor direct host rejected"
         return 1
     fi
 
     # 4. App must not be running
     local bid
     bid="$(internet_app_bundle_id "$installed_app_path")"
-    if [ -n "$bid" ] && internet_app_is_running "$bid"; then
+    if [ "$(internet_app_running_state "$bid")" != "false" ]; then
         _vd_diag "ERROR: app $bid is currently running"
         return 4
     fi
@@ -244,8 +242,8 @@ vendor_direct_install() {
     local tmp_root="${INTERNET_TEMP_ROOT:-${TMPDIR:-/tmp}}"
     local dl_file
     dl_file="$(mktemp "$tmp_root/vd.XXXXXX.${ext}")" || return 1
-    if ! fetch_to_file "$url" "$dl_file" 1800 4294967296; then
-        _vd_diag "ERROR: fetch_to_file failed for $url"
+    if ! fetch_reviewed_artifact "$url" "$dl_file" 1800 4294967296 "$MAC_UPDATE_ACTION_ID" "$artifact"; then
+        _vd_diag "ERROR: reviewed artifact fetch deferred"
         rm -f "$dl_file"
         return 1
     fi
@@ -356,7 +354,7 @@ EOF
     local dest_label
     dest_label="$(basename "$installed_app_path")"
     local copy_rc=0
-    copy_verified_app "$found" "$dest_label" || copy_rc=$?
+    copy_verified_app "$found" "$installed_app_path" "$MAC_UPDATE_ACTION_ID" || copy_rc=$?
     if [ "$copy_rc" -ne 0 ]; then
         _vd_diag "ERROR: copy_verified_app failed for $found -> $dest_label (code $copy_rc)"
         rm -rf "$extract_dir"

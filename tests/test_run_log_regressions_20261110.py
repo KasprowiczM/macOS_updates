@@ -298,7 +298,7 @@ class VendorDirectBuildLabelTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def install(self, installed_label: str, candidate_label: str, expected: str) -> tuple[str, bool]:
-        installed = make_bundle(self.tmp / "installed", "HyperFrames", hf_info(installed_label))
+        installed = make_bundle(self.tmp / "Applications", "HyperFrames", hf_info(installed_label))
         src = make_bundle(self.tmp / "src", "HyperFrames", hf_info(candidate_label))
         zpath = self.tmp / "hf.zip"
         with zipfile.ZipFile(zpath, "w") as zf:
@@ -313,6 +313,10 @@ class VendorDirectBuildLabelTests(unittest.TestCase):
         . "{REPO_ROOT}/lib/internet_i18n.sh"
         . "{REPO_ROOT}/lib/vendor_direct.sh"
         print_info() {{ :; }}; print_warn() {{ :; }}
+        HOME="{self.tmp}"
+        MAC_UPDATE_ACTION_ID=fixture-action
+        MAC_UPDATE_PLAN_PATH="{self.tmp}/fixture-plan.json"
+        mac_update_authorize_action() {{ return 0; }}
         eval "real_$(declare -f app_version)"
         app_version() {{
             case "$1" in
@@ -320,12 +324,12 @@ class VendorDirectBuildLabelTests(unittest.TestCase):
                 *) real_app_version "$1" ;;
             esac
         }}
-        fetch_to_file() {{ cp "{zpath}" "$2"; }}
+        fetch_reviewed_artifact() {{ cp "{zpath}" "$2"; }}
         ditto() {{ [ "$1" = -x ] && python3 -I -c 'import sys,zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' "$3" "$4"; }}
         internet_app_bundle_id() {{ echo dev.hyperframes.desktop; }}
-        internet_app_is_running() {{ return 1; }}
+        internet_app_running_state() {{ echo false; }}
         copy_verified_app() {{ real_app_version "$1" > "{copy_log}"; return 0; }}
-        vendor_direct_install "/Applications/HyperFrames.app" "https://static.heygen.ai/x-arm64.zip" zip sha256hex "{sha}" static.heygen.ai "{expected}"
+        vendor_direct_install "{installed}" "https://static.heygen.ai/x-arm64.zip" zip sha256hex "{sha}" static.heygen.ai "{expected}"
         echo "RC=$?"
         """
         out = run_bash(script)

@@ -201,69 +201,37 @@ exit 0
 
 class CaskRunningDeferralTests(_BrewHarness):
     def test_running_unknown_idle_and_no_target(self) -> None:
-        for app in ("Run", "Unk", "Idle"):
-            (self.apps / f"{app}.app").mkdir()
-        self.brew({"run-cask": "Run.app", "unk-cask": "Unk.app",
-                   "idle-cask": "Idle.app", "font-cask": None})
-        res = self.run_brew(MAC_UPDATE_YES="1",
-                            FAKE_RUNNING_IDS="com.test.Run", FAKE_UNKNOWN_IDS="com.test.Unk")
-        out = res.stdout + res.stderr
-        up = self.upgraded()
-        self.assertIn("idle-cask", up, out)       # not running -> upgraded
-        self.assertIn("font-cask", up, out)       # no app target -> untouched by the check
-        self.assertNotIn("run-cask", up)          # open -> deferred
-        self.assertNotIn("unk-cask", up)          # unknown -> deferred
-        deferred = (self.session / "brew_deferred_running.txt").read_text().split()
-        self.assertEqual(sorted(deferred), ["run-cask|Run.app", "unk-cask|Unk.app"])
-        self.assertIn("quit the app so it can be updated", out)
-        self.assertIn("run-cask", out)
-        self.assertEqual(res.returncode, 10, out)  # soft, never hard
-        # The final verification does not report the deferred casks again.
-        self.assertEqual((self.session / "pending_brew_casks").read_text().strip(), "4")  # 2 still outdated + 2 deferred
-        self.assertNotIn("Formulae still outdated", out)
+        from tests._policy_fixtures import PolicyFixture
+        for state in ('running','unknown','idle','opaque'):
+            with self.subTest(state=state), PolicyFixture() as fixture:
+                fixture.cask(extra_artifacts=[{'font':['F.ttf']}] if state=='opaque' else None)
+                fixture.shell('ps','echo "'+str(fixture.app)+'/Contents/MacOS/Fixture"' if state=='running' else 'exit 1' if state=='unknown' else 'exit 0')
+                result=fixture.run('update_brew.sh')
+                upgrades=[c for c in fixture.calls() if c[0]=='upgrade']
+                self.assertEqual(bool(upgrades),state=='idle',result.stdout+result.stderr)
+                self.assertEqual(result.returncode,0 if state=='idle' else 10)
+                self.assertEqual(fixture.results()[-1]['verified'],state=='idle')
 
     def test_pkg_cask_with_quit_ids(self) -> None:
-        def pkg(bid):
-            return ('[{"pkg":["x.pkg"]},{"uninstall":[{"quit":["%s"],'
-                    '"pkgutil":"com.x"}]}]' % bid)
-        self.brew({"pkg-run": pkg("com.test.PkgRun"),
-                   "pkg-unk": pkg("com.test.PkgUnk"),
-                   "pkg-idle": pkg("com.test.PkgIdle"),
-                   "pkg-sig": '[{"pkg":["x.pkg"]},{"uninstall":[{"signal":[["TERM","com.test.PkgSig"]]}]}]',
-                   "pkg-none": '[{"pkg":["x.pkg"]},{"uninstall":[{"pkgutil":"com.x"}]}]'})
-        res = self.run_brew(MAC_UPDATE_YES="1",
-                            FAKE_RUNNING_IDS="com.test.PkgRun com.test.PkgSig",
-                            FAKE_UNKNOWN_IDS="com.test.PkgUnk")
-        out = res.stdout + res.stderr
-        up = self.upgraded()
-        self.assertIn("pkg-idle", up, out)
-        self.assertIn("pkg-none", up, out)
-        for tok in ("pkg-run", "pkg-unk", "pkg-sig"):
-            self.assertNotIn(tok, up, out)
-        deferred = (self.session / "brew_deferred_running.txt").read_text().split()
-        self.assertEqual(sorted(deferred), ["pkg-run|com.test.PkgRun",
-                                            "pkg-sig|com.test.PkgSig",
-                                            "pkg-unk|com.test.PkgUnk"])
-        self.assertEqual(res.returncode, 10, out)
+        from tests._policy_fixtures import PolicyFixture
+        for quit_id in ('fixture.running','fixture.unknown','fixture.idle'):
+            with self.subTest(quit_id=quit_id), PolicyFixture() as fixture:
+                fixture.cask(extra_artifacts=[{'pkg':['x.pkg']},{'uninstall':[{'quit':[quit_id],'pkgutil':'fixture.pkg'}]}])
+                result=fixture.run('update_brew.sh')
+                self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+                self.assertFalse(any(c[0]=='upgrade' for c in fixture.calls()))
+                self.assertFalse(fixture.results()[-1]['verified'])
 
     def test_unreadable_cask_json_defers_no_target_cask(self) -> None:
-        self.brew({"font-cask": None})
-        # `brew info` yields nothing at all for this cask.
-        _script(self.bin / "brew", f'''
-echo "$@" >> "{self.log}"
-case "$1" in
-  update) exit 0 ;;
-  list) [ "$2" = "--cask" ] && echo font-cask; exit 0 ;;
-  outdated) [ "$2" = "--cask" ] && echo "font-cask (1.0) < 2.0"; exit 0 ;;
-  info) exit 1 ;;
-  doctor) exit 0 ;;
-esac
-exit 0
-''')
-        res = self.run_brew(MAC_UPDATE_YES="1")
-        self.assertNotIn("font-cask", self.upgraded(), res.stdout + res.stderr)
-        deferred = (self.session / "brew_deferred_running.txt").read_text().split()
-        self.assertEqual(deferred, ["font-cask|UNREADABLE"])
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.cask()
+            fixture.python(fixture.prefix/'bin/brew','import json,sys\n'+fixture._log_source()+"print('{invalid')\n")
+            result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+            self.assertTrue(any(c[0]=='info' for c in fixture.calls()))
+            self.assertFalse(any(c[0]=='upgrade' for c in fixture.calls()))
+            self.assertFalse(fixture.results()[-1]['verified'])
 
     def test_deferred_casks_reach_run_summary(self) -> None:
         from run_summary import collect_run_items
@@ -278,73 +246,66 @@ exit 0
         self.assertEqual(by_id["brew_casks"]["details"], "1 updates pending")
 
     def test_only_running_cask_is_deferred_softly(self) -> None:
-        (self.apps / "Run.app").mkdir()
-        self.brew({"run-cask": "Run.app"})
-        res = self.run_brew(MAC_UPDATE_YES="1", FAKE_RUNNING_IDS="com.test.Run")
-        self.assertEqual(self.upgraded(), "")
-        self.assertEqual(res.returncode, 10, res.stdout + res.stderr)
-        self.assertNotIn("All casks updated", res.stdout)
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.cask();fixture.shell('ps','echo "'+str(fixture.app)+'/Contents/MacOS/Fixture"')
+            result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+            self.assertFalse(any(c[0]=='upgrade' for c in fixture.calls()))
+            self.assertEqual(fixture.results()[-1]['reason_code'],'target_running')
 
     def test_not_running_is_upgraded(self) -> None:
-        (self.apps / "Idle.app").mkdir()
-        self.brew({"idle-cask": "Idle.app"})
-        res = self.run_brew(MAC_UPDATE_YES="1")
-        self.assertIn("idle-cask", self.upgraded())
-        self.assertFalse((self.session / "brew_deferred_running.txt").exists())
-        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        from tests._policy_fixtures import PolicyFixture
+        with PolicyFixture() as fixture:
+            fixture.cask();result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertEqual([c for c in fixture.calls() if c[0]=='upgrade'],[['upgrade','--cask','--appdir='+str(fixture.app.parent),'fixture']])
+            self.assertTrue(fixture.results()[-1]['verified'])
 
 
 class BrewPromptTests(_BrewHarness):
     def test_parent_confirmed_skips_the_question(self) -> None:
-        (self.apps / "Idle.app").mkdir()
-        self.brew({"idle-cask": "Idle.app"})
-        # Standalone: the typed "n" cancels and nothing is upgraded.
-        res = self.run_brew(stdin="n\n")
-        self.assertEqual(self.upgraded(), "")
-        self.assertIn("Do you want to update all packages", res.stdout)
-        self.log.unlink(missing_ok=True)
-        # Parent already confirmed: no question, upgrade proceeds.
-        res = self.run_brew(stdin="n\n", MAC_UPDATE_PARENT_CONFIRMED="1")
-        self.assertNotIn("Do you want to update all packages", res.stdout)
-        self.assertIn("idle-cask", self.upgraded(), res.stdout + res.stderr)
+        from tests._policy_fixtures import PolicyFixture
+        for has_plan in (False,True):
+            with self.subTest(has_plan=has_plan), PolicyFixture() as fixture:
+                fixture.cask();os.environ['MAC_UPDATE_PARENT_CONFIRMED']='1'
+                if not has_plan: os.environ.pop('MAC_UPDATE_PLAN_PATH',None)
+                result=fixture.run('update_brew.sh')
+                upgrades=[c for c in fixture.calls() if c[0]=='upgrade']
+                self.assertEqual(bool(upgrades),has_plan,result.stdout+result.stderr)
+                self.assertEqual(result.returncode,0 if has_plan else 10)
 
     def test_standalone_timeout_skips_upgrades_softly(self) -> None:
-        (self.apps / "Idle.app").mkdir()
-        self.brew({"idle-cask": "Idle.app"})
-        env = isolate_host_tools(shell_env(
-            PATH=f"{self.bin}:{os.environ.get('PATH', '')}",
-            MAC_UPDATE_SESSION_DIR=str(self.session), MAC_LANG="en",
-            HOME=str(self.tmp), MAC_UPDATE_PROMPT_TIMEOUT="10"))
-        res = subprocess.run(
-            ["/bin/bash", "-c", f'sleep 14 | bash "{REPO_ROOT}/update_brew.sh"'],
-            env=env, capture_output=True, text=True, timeout=90)
-        out = res.stdout + res.stderr
-        self.assertEqual(res.returncode, 10, out)
-        self.assertIn("No answer within 10s", out)
-        self.assertIn("upgrades skipped", out)
-        self.assertEqual(self.upgraded(), "")
+        from tests._policy_fixtures import PolicyFixture
+        import time
+        with PolicyFixture() as fixture:
+            fixture.cask();os.environ.pop('MAC_UPDATE_PLAN_PATH',None)
+            os.environ['MAC_UPDATE_PROMPT_TIMEOUT']='10'
+            start=time.monotonic();result=fixture.run('update_brew.sh')
+            self.assertEqual(result.returncode,10,result.stdout+result.stderr)
+            self.assertLess(time.monotonic()-start,5,'missing authority must not wait for a leaf prompt')
+            self.assertEqual(fixture.calls(),[])
 
 
 class DoctorVerdictTests(_BrewHarness):
     def test_advisories_written_and_no_good_condition_line(self) -> None:
-        self.brew({}, doctor=DOCTOR_SAMPLE)
-        res = self.run_brew(MAC_UPDATE_YES="1")
-        out = res.stdout + res.stderr
-        self.assertNotIn("Homebrew is in good condition", out)
-        self.assertIn("2 health advisories", out)
-        self.assertIn("Security advisory from brew doctor", out)
-        self.assertIn("brew doctor", out)
-        lines = (self.session / "advisories.txt").read_text().splitlines()
-        self.assertEqual(len(lines), 2)
-        self.assertEqual([l.split("|")[1] for l in lines], ["info", "security"])
-        self.assertTrue(all(l.startswith("brew_doctor|") for l in lines))
-        self.assertEqual(res.returncode, 0, out)  # advisories never soft-fail the step
+        # Health inspection is a separate read-only flow. Test the real shared
+        # parser and persisted advisory contract without granting update scope.
+        advisory_file=self.session/'advisories.txt'
+        result=subprocess.run(['/bin/bash','-c','. "$1/lib/brew.sh"; brew_doctor_advisories > "$2"','doctor',str(REPO_ROOT),str(advisory_file)],input=DOCTOR_SAMPLE,capture_output=True,text=True,env=shell_env())
+        self.assertEqual(result.returncode,0,result.stderr)
+        lines=advisory_file.read_text().splitlines()
+        self.assertEqual(len(lines),2)
+        self.assertEqual([line.split('|')[1] for line in lines],['info','security'])
+        from run_summary import read_advisories
+        advisories=read_advisories(self.session)
+        self.assertEqual(len(advisories),2)
 
     def test_clean_doctor_still_reports_good_condition(self) -> None:
-        self.brew({}, doctor="Your system is ready to brew.\n")
-        res = self.run_brew(MAC_UPDATE_YES="1")
-        self.assertIn("Homebrew is in good condition", res.stdout)
-        self.assertFalse((self.session / "advisories.txt").exists())
+        result=subprocess.run(['/bin/bash','-c','. "$1/lib/brew.sh"; brew_doctor_advisories','doctor',str(REPO_ROOT)],input='Your system is ready to brew.\n',capture_output=True,text=True,env=shell_env())
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout,'')
+        self.assertFalse((self.session/'advisories.txt').exists())
 
 
 class SystemPromptTests(unittest.TestCase):
@@ -419,12 +380,15 @@ exit 0''')
         return res, (log.read_text() if log.exists() else "")
 
     def test_standalone_prompt_cancels_but_parent_confirmed_skips_it(self) -> None:
-        res, calls = self._run("n\n")
-        self.assertIn("Do you want to run both updates", res.stdout)
-        self.assertNotIn("mas upgrade", calls)
-        res, calls = self._run("n\n", MAC_UPDATE_PARENT_CONFIRMED="1")
-        self.assertNotIn("Do you want to run both updates", res.stdout)
-        self.assertIn("mas upgrade", calls, res.stdout + res.stderr)
+        from tests._policy_fixtures import PolicyFixture
+        for has_plan in (False,True):
+            with self.subTest(has_plan=has_plan), PolicyFixture() as fixture:
+                fixture.mas();os.environ['MAC_UPDATE_PARENT_CONFIRMED']='1'
+                if not has_plan: os.environ.pop('MAC_UPDATE_PLAN_PATH',None)
+                result=fixture.run('update_appstore.sh')
+                self.assertEqual(result.returncode,0 if has_plan else 10,result.stdout+result.stderr)
+                self.assertEqual(any(c[0]=='upgrade' for c in fixture.calls()),has_plan)
+                self.assertFalse(any(c[0] in ('install','get','search') for c in fixture.calls()))
 
 
 class StaticContractTests(unittest.TestCase):

@@ -159,3 +159,16 @@ class ShadowTests(unittest.TestCase):
         resolved = json.loads(result.stdout)["resolutions"][0]
         self.assertEqual(resolved["source"], "conflict")
         self.assertEqual(resolved["capability"], "inventory_only")
+
+    def test_active_generation_shadow_is_observation_only(self):
+        self.app()
+        built = subprocess.run(['bash', str(self.repo / 'build_inventory.sh')], env=self.env,
+                               stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15)
+        self.assertEqual(built.returncode, 0, built.stderr + built.stdout)
+        before = (self.state / 'inventory.json').read_bytes()
+        report_before = (self.repo / 'APPLICATIONS.md').read_bytes()
+        result = self.run_shadow('--json')
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertFalse(json.loads(result.stdout)['saved'])
+        self.assertEqual((self.state / 'inventory.json').read_bytes(), before)
+        self.assertEqual((self.repo / 'APPLICATIONS.md').read_bytes(), report_before)

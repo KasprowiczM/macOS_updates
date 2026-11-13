@@ -74,7 +74,7 @@ class XcodeLicenseGateTests(unittest.TestCase):
         self.assertEqual(res.returncode, 1)
 
     def test_update_brew_preflight_fails_soft_when_license_unaccepted(self) -> None:
-        """When xcodebuild returns 69, update_brew.sh exits 10, writes unknown + reason, no brew update."""
+        """Missing action authority precedes license/recovery; helper license checks remain read-only."""
         log_file = self.work_dir / "calls.log"
 
         # Mock platform checks
@@ -124,18 +124,11 @@ class XcodeLicenseGateTests(unittest.TestCase):
 
         self.assertEqual(res.returncode, 10, f"Expected rc 10, got {res.returncode}. Output:\n{res.stdout}\n{res.stderr}")
 
-        # Check pending files
-        pbf = (self.session_dir / "pending_brew_formulae").read_text().strip()
-        pbc = (self.session_dir / "pending_brew_casks").read_text().strip()
-        reason = (self.session_dir / "pending_brew_reason").read_text().strip()
-        self.assertEqual(pbf, "unknown")
-        self.assertEqual(pbc, "unknown")
-        self.assertEqual(reason, "xcode_license")
-
-        # brew update must NOT have been called
-        calls = log_file.read_text() if log_file.exists() else ""
-        self.assertNotIn("brew update", calls)
-        self.assertNotIn("xcodebuild -license accept", calls)
+        self.assertIn('reviewed action plan',res.stdout)
+        self.assertFalse((self.session_dir/'pending_brew_formulae').exists())
+        self.assertFalse((self.session_dir/'pending_brew_casks').exists())
+        self.assertFalse((self.session_dir/'pending_brew_reason').exists())
+        self.assertFalse(log_file.exists(),'no license acceptance, toolchain recovery or brew command without plan')
 
     def test_run_summary_details_with_xcode_license(self) -> None:
         """collect_run_items includes Xcode license not accepted details."""

@@ -379,6 +379,54 @@ def read_deferred_running(session_dir: str | Path) -> list[tuple[str, str]]:
     return out
 
 
+def read_action_results(session_dir):
+    """Read bounded, local typed evidence; malformed lines cannot assert success."""
+    if not session_dir:
+        return []
+    path = Path(session_dir) / 'action-results.jsonl'
+    try:
+        if path.is_symlink() or path.stat().st_size > 16 * 1024 * 1024:
+            return []
+        raw = path.read_text(encoding='utf-8')
+    except OSError:
+        return []
+    results = {}
+    for line in raw.splitlines()[:20000]:
+        try:
+            value = json.loads(line)
+            if not isinstance(value, dict) or not isinstance(value.get('target'), dict):
+                continue
+            ref = value['target']
+            if ref.get('kind') not in ('app', 'package') or not isinstance(ref.get('id'), str):
+                continue
+            results[(ref['kind'], ref['id'])] = value
+        except (ValueError, TypeError):
+            continue
+    return list(results.values())
+
+
+def action_result_items(results):
+    items = []
+    for result in results:
+        state = result.get('status')
+        status = 'unconfirmed'
+        if state in ('manual_by_policy', 'ignored_by_policy', 'deferred_by_user'):
+            status = 'skipped'
+        elif state in ('update_failed', 'recovery_required', 'source_conflict'):
+            status = 'pending'
+        elif state == 'current_verified' and result.get('verified') is True:
+            status = 'updated' if (result.get('reason_code') == 'updated_verified' and
+                                  is_valid_version(result.get('before')) and
+                                  is_valid_version(result.get('after')) and
+                                  result['before'] != result['after']) else 'current'
+        items.append(dict(name=result.get('name') or result['target']['id'], source='action_plan',
+                          status=status, action_status=state, target=result['target'],
+                          before=result.get('before'), after=result.get('after'),
+                          details=result.get('reason_code', ''), old_version=result.get('before'),
+                          new_version=result.get('after'), verified=result.get('verified') is True))
+    return items
+
+
 def collect_run_items(
     session_dir: str | Path,
     step_results: dict[str, str] | None = None,
@@ -386,6 +434,9 @@ def collect_run_items(
 ) -> list[dict[str, Any]]:
     """Collect unified per-item records across all update subsystems."""
     sdir = Path(session_dir)
+    action_results = read_action_results(sdir)
+    if action_results:
+        return action_result_items(action_results)
     items: list[dict[str, Any]] = []
     seen_updated_apps: set[str] = set()
 
@@ -1163,6 +1214,14 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     else:
         lines.append(f"   • {none_str}")
 
+    policy_counts = [sum(item.get('action_status') == status for item in items)
+                     for status in ('manual_by_policy', 'ignored_by_policy', 'deferred_by_user')]
+    if any(policy_counts):
+        template = os.environ.get('L_PLAN_POLICY_COUNTS', 'Manual: %s; ignored: %s; deferred: %s. Review with --preferences.')
+        try:
+            lines += ['', template % tuple(policy_counts)]
+        except (TypeError, ValueError):
+            pass
     advisories = [a for a in (summary.get("advisories") or []) if isinstance(a, dict)]
     if advisories:
         # Security advisories first, marked distinctly; order is otherwise stable.
@@ -1389,6 +1448,7 @@ def build_run_summary(
         "flags": flags or {},
         "items": items if items is not None else [],
         "advisories": list(advisories) if advisories else [],
+        "action_results": read_action_results(session_dir),
     }
     if session_dir:
         summary["session_dir"] = session_dir

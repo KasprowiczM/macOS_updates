@@ -140,6 +140,12 @@ def save_snapshot(root, snapshot, expected_generation):
                 if time.monotonic() >= deadline:
                     raise StoreError("state lock timeout")
                 time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+        for guard in ('generation.json', '.migration-journal.json'):
+            try:
+                os.stat(guard, dir_fd=directory, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            raise StoreError('report transaction required')
         current = _load(root, directory)
         generation = current["generation"] if current else 0
         if generation != expected_generation or snapshot["generation"] != generation:
@@ -188,3 +194,42 @@ def save_snapshot(root, snapshot, expected_generation):
     finally:
         os.close(lock)
         os.close(directory)
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def locked_state(root):
+    """Share the snapshot writer lock with multi-file report transactions."""
+    root = _root(root, True)
+    directory = os.open(root, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0))
+    lock = None
+    try:
+        opened = os.fstat(directory)
+        if (not stat.S_ISDIR(opened.st_mode) or opened.st_uid != os.getuid()
+                or stat.S_IMODE(opened.st_mode) != 0o700):
+            raise StoreError('unsafe opened state directory')
+        lock = _open_regular('.inventory.lock', os.O_RDWR | os.O_CREAT, dir_fd=directory)
+        deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise StoreError('state lock timeout')
+                time.sleep(0.01)
+        yield root
+    except OSError as exc:
+        raise StoreError('state transaction failed') from exc
+    finally:
+        if lock is not None:
+            os.close(lock)
+        os.close(directory)
+
+
+def reconcile_inventory(previous, snapshot):
+    """Compatibility export for the pure typed observation reconciler."""
+    from inventory_collect import reconcile_inventory as reconcile
+    return reconcile(previous, snapshot)

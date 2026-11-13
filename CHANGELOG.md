@@ -6,6 +6,21 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-13 (local, unpublished)
+
+### Changed
+
+- Activate local JSON inventory, source-bound action plans, explicit first consent and per-target guards for every app update entrypoint. `--plan` and `--dry-run` are observational; `-y` grants no new permission.
+- Replace Markdown-based membership edits with byte-preserving migration previews, private backups, generation checks and recoverable commits. Manual edits are never silently overwritten.
+- Use per-user target locks across checkouts. Reobserve identities and sources before mutation and after execution; preserve exact cask destinations and defer opaque dependencies, npm scripts or new global commands.
+- Validate every HTTPS redirect and public DNS address, pin connections, bound transfers by an absolute deadline and retain recoverable same-volume bundle backups.
+- Add common-resolver coverage and review-only capability proposals, prepared in parallel with stage D. Unreviewed vendor/native paths remain manual; reviewed direct recipes are currently empty.
+- Preserve summary format 4 with typed action results. Normal manual/ignored items do not become chronic failures. First-install plans are rejected by the updater.
+
+### Scope
+
+Local source checkpoint only. No publication, real updates, disposable-Mac acceptance or landing changes. Advanced manager effects and generic vendor replacement require reviewed adapters.
+
 ## [1.6.2] - 2026-11-13 (local, unpublished)
 
 ### Added

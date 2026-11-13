@@ -107,6 +107,11 @@ def read_bundle_static(path):
             evidence.append({"kind": "framework", "name": "sparkle"})
         if safe_marker(electron):
             evidence.append({"kind": "framework", "name": "electron_updater"})
+        squirrel = os.path.join(path, 'Contents', 'Frameworks', 'Squirrel.framework')
+        if safe_marker(squirrel, True):
+            evidence.append({'kind': 'framework', 'name': 'squirrel'})
+        if isinstance(info.get('KSUpdateURL'), str) and info['KSUpdateURL']:
+            evidence.append({'kind': 'framework', 'name': 'keystone'})
         protected = "/System/Applications"
         if _inside(os.path.abspath(path), protected) and _inside(
             real, os.path.realpath(protected)
@@ -205,6 +210,31 @@ def _package_key(record):
     )
 
 
+
+def _receipt_lineage(record):
+    """Verified Homebrew receipt family, excluding version/timestamp segments."""
+    manager, prefix = record.get('manager'), record.get('prefix')
+    identity, receipt = record.get('source_identity'), record.get('installed_receipt')
+    if manager != 'homebrew' or not all(isinstance(x, str) for x in (prefix, identity, receipt)):
+        return None
+    category, separator, token = identity.partition(':')
+    if not separator or category not in ('formula', 'cask') or not token or '/' in token or token in ('.', '..'):
+        return None
+    if os.path.normpath(receipt) != receipt or not _inside(receipt, prefix):
+        return None
+    parts = os.path.relpath(receipt, prefix).split(os.sep)
+    if category == 'formula':
+        valid = len(parts) == 4 and parts[:2] == ['Cellar', token] and parts[-1] == 'INSTALL_RECEIPT.json'
+    else:
+        valid = (len(parts) == 7 and parts[:3] == ['Caskroom', token, '.metadata']
+                 and parts[-2:] == ['Casks', token + '.json'])
+    if not valid or not any(e.get('kind') == 'homebrew' and e.get('prefix') == prefix
+                            and e.get('token') == token and e.get('installed_receipt') == receipt
+                            for e in record.get('evidence', []) if isinstance(e, dict)):
+        return None
+    return manager, prefix, identity, record.get('channel', 'unknown')
+
+
 def collect_snapshot(roots, providers, previous):
     if previous is not None:
         from inventory_model import validate_snapshot
@@ -215,6 +245,11 @@ def collect_snapshot(roots, providers, previous):
     old_apps = {x["path"]: x for x in (previous or {}).get("instances", [])}
     old_packages = {_package_key(x): x for x in (previous or {}).get("packages", [])}
     seen_apps, seen_packages = set(), set()
+    old_lineages = {}
+    for previous_package in old_packages.values():
+        lineage = _receipt_lineage(previous_package)
+        if lineage is not None:
+            old_lineages.setdefault(lineage, []).append(previous_package)
     for raw in roots:
         root = os.path.realpath(os.path.expanduser(raw))
         source = source_result("ok", covered_roots=[root])
@@ -422,6 +457,11 @@ def collect_snapshot(roots, providers, previous):
             prefix = os.path.realpath(os.path.expanduser(raw))
             source = _call(fn, prefix)
             sources[kind + ":" + prefix] = source
+            current_lineages = {}
+            for item in source['items']:
+                lineage = _receipt_lineage(dict(item, prefix=prefix))
+                if lineage is not None:
+                    current_lineages[lineage] = current_lineages.get(lineage, 0) + 1
             for item in source["items"]:
                 if not isinstance(item, dict):
                     source.update(
@@ -469,6 +509,14 @@ def collect_snapshot(roots, providers, previous):
                     if receipt is not None or file_identity is not None
                     else {}
                 )
+                lineage = _receipt_lineage(dict(item, prefix=prefix))
+                candidates = old_lineages.get(lineage, []) if lineage is not None else []
+                if (not old and source['status'] == 'ok' and source['complete']
+                        and len(candidates) == 1 and current_lineages.get(lineage) == 1
+                        and candidates[0].get('freshness') == 'fresh'
+                        and candidates[0].get('presence') == 'present'):
+                    old = candidates[0]
+                    seen_packages.add(_package_key(old))
                 if identity is None:
                     source.update(
                         status="partial", complete=False, reason_code="invalid_item"
@@ -664,3 +712,65 @@ def collect_snapshot(roots, providers, previous):
         instances=instances,
         packages=packages,
     )
+
+
+def reconcile_inventory(previous, snapshot):
+    """Pure reconciliation for externally collected, typed local observations.
+
+    Records from unknown coverage remain stale. Only a complete source covering
+    the original root/prefix establishes absence. Display names never match IDs.
+    """
+    from inventory_model import validate_snapshot
+    validate_snapshot(snapshot)
+    result = copy.deepcopy(snapshot)
+    if previous is None:
+        return result
+    validate_snapshot(previous)
+    if (result['profile_id'] != previous['profile_id'] or result['generation'] != previous['generation']
+            or result['previous_snapshot_id'] != previous['snapshot_id']):
+        raise ValueError('profile or ancestry mismatch')
+    sources = result['sources']
+    old_apps = {x['path']: x for x in previous['instances']}
+    paths = {x['path'] for x in result['instances']}
+    for app in result['instances']:
+        old = old_apps.get(app['path'])
+        if old and old.get('bundle_id') and all(old.get(k) == app.get(k) for k in ('bundle_id', 'team_id', 'real_path', 'channel')):
+            app['instance_id'] = old['instance_id']
+    for path, old in old_apps.items():
+        if path in paths:
+            continue
+        complete = any(key.startswith('filesystem:') and source['status'] == 'ok' and source['complete']
+                       and any(_inside(path, covered) for covered in source['covered_roots'])
+                       for key, source in sources.items())
+        result['instances'].append(dict(copy.deepcopy(old), presence='absent' if complete else 'unobserved',
+                                        freshness='fresh' if complete else 'stale'))
+    def unique(records, key):
+        groups = {}
+        for record in records:
+            value = key(record)
+            if value is not None:
+                groups.setdefault(value, []).append(record)
+        return groups
+    old_exact = unique(previous['packages'], _package_key)
+    old_lineage = unique(previous['packages'], _receipt_lineage)
+    current_lineage = unique(result['packages'], _receipt_lineage)
+    used = set()
+    for package in result['packages']:
+        candidates = old_exact.get(_package_key(package), []) if (package.get('installed_receipt') or _file_identity(package['evidence'])) else []
+        if len(candidates) != 1:
+            lineage = _receipt_lineage(package)
+            candidates = old_lineage.get(lineage, []) if lineage is not None and len(current_lineage.get(lineage, [])) == 1 else []
+            if package['freshness'] != 'fresh' or package['presence'] != 'present':
+                candidates = []
+        if len(candidates) == 1:
+            package['package_id'] = candidates[0]['package_id']
+        used.add(package['package_id'])
+    for old in previous['packages']:
+        if old['package_id'] in used:
+            continue
+        kind = 'brew' if old['manager'] in ('homebrew', 'brew', 'brew_formula', 'brew_cask') else 'cli'
+        source = sources.get(kind + ':' + old['prefix'])
+        complete = bool(old.get('installed_receipt') is not None and source and source['status'] == 'ok' and source['complete'])
+        result['packages'].append(dict(copy.deepcopy(old), presence='absent' if complete else 'unobserved',
+                                       freshness='fresh' if complete else 'stale'))
+    return validate_snapshot(result)

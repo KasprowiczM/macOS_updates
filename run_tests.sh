@@ -168,7 +168,7 @@ def _deny():
     path = os.environ.get('MAC_UPDATE_TEST_GUARD_LOG')
     if path:
         with open(path, 'a') as log:
-            log.write('python network blocked\n')
+            log.write("[" + os.environ.get("MAC_UPDATE_TEST_NAME", "unknown") + "] python network blocked\n")
     raise OSError('network blocked by test guard')
 _original_connect = socket.socket.connect
 _original_connect_ex = socket.socket.connect_ex
@@ -198,6 +198,17 @@ import os
 original_run = unittest.TestCase.run
 def named_run(self, result=None):
     os.environ["MAC_UPDATE_TEST_NAME"] = self.id()
+    # Static inventory providers bypass command stubs by design. Give every
+    # test private empty roots as well; fixtures can explicitly override them.
+    import tempfile
+    root = tempfile.mkdtemp(prefix="inventory-fixture-", dir=os.path.dirname(os.environ["MAC_UPDATE_TEST_GUARD_LOG"]))
+    apps = os.path.join(root, "Applications")
+    prefix = os.path.join(root, "prefix")
+    os.makedirs(apps)
+    os.makedirs(os.path.join(prefix, "Cellar"))
+    os.makedirs(os.path.join(prefix, "Caskroom"))
+    os.environ.update(MAC_UPDATE_APP_DIRS=apps, MAC_UPDATE_BREW_PREFIXES=prefix,
+                      MAC_UPDATE_CLI_PREFIXES=prefix, MAC_UPDATE_STATE_DIR=os.path.join(root, "state"))
     try: return original_run(self, result)
     finally: os.environ.pop("MAC_UPDATE_TEST_NAME", None)
 unittest.TestCase.run = named_run

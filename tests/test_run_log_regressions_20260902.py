@@ -337,9 +337,9 @@ class RunSummaryCountsTests(unittest.TestCase):
     """"counts": {} in 26 consecutive summaries was a caller that never passed it."""
 
     def test_postupdate_writes_run_counts(self) -> None:
-        text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
-        self.assertIn('"run_counts.json"', text)
-        self.assertIn('"inventory_version_fields_changed": updated_count', text)
+        text = (REPO_ROOT / "lib/python/plan_orchestration.py").read_text(encoding="utf-8")
+        self.assertIn("run_counts.json", text)
+        self.assertIn("inventory_version_fields_changed", text)
         self.assertIn("observed_package_changes", text)
 
     def test_summary_passes_counts(self) -> None:

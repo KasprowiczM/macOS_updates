@@ -6,9 +6,9 @@
 
 **Sito web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licenza:** [MIT](LICENSE) · **Modifiche:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.6.2** : Orchestratore di aggiornamenti con un solo comando, per **Mac Apple Silicon con macOS 13-27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
+> **v1.6.3** : Orchestratore di aggiornamenti con un solo comando, per **Mac Apple Silicon con macOS 13-27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
 
-La fase B (1.6.2) aggiunge un inventario osservativo facoltativo: `bash build_inventory.sh --shadow`. Salva identità locali, prove delle fonti e scansioni incomplete in JSON privato, senza modificare `APPLICATIONS.md` o gli aggiornamenti. `--dry-run` evita il salvataggio, `--json` restituisce risultati strutturati e più opzioni `--root PERCORSO` indicano le directory. I conflitti restano osservazioni; scelta delle fonti e controlli di esecuzione appartengono alla fase C.
+La fase C attiva inventario JSON locale e piani con permessi specifici. `bash update_all.sh --plan` e `--dry-run` mostrano le stesse decisioni senza scrivere. Una sessione interattiva chiede una volta gli ambiti mostrati; `-y`, EOF e sessioni senza terminale non concedono nuovi permessi. Usa `--preferences` per rivedere o reimpostare le scelte. Gli aggiornamenti conservano fonte e destinazione osservate; conflitti, destinazioni assenti e prove incerte rinviano quel destinatario. `build_inventory.sh --migration --preview` conserva i byte Markdown originali e le note; accetta esplicitamente l’ID mostrato. Gli aggiornamenti generici del produttore restano manuali finché identità e adattatore non sono verificati. Una voce di catalogo non prova installazione né consenso.
 
 | In breve | |
 |----------|--|
@@ -16,7 +16,7 @@ La fase B (1.6.2) aggiunge un inventario osservativo facoltativo: `bash build_in
 | Flusso | 7 passaggi (0–6), l'aggiornamento di macOS è sempre l'ultimo |
 | Registro | 47 app da Internet · 11 metodi di aggiornamento (vedi [Metodi di aggiornamento](#metodi-di-aggiornamento)) |
 | Lingue | EN, PL, ES, FR, DE, IT, PT (CLI e documentazione) |
-| Test | 971 test automatici (`bash run_tests.sh`) |
+| Test | 1101 test automatici (`bash run_tests.sh`) |
 
 Novità della v1.6.1: rapporti locali, riconoscimento ricevuta CapCut, consenso esplicito in setup e isolamento più forte dei test offline. La fase A non abilita ancora la risoluzione automatica delle fonti o il menu di installazione.
 

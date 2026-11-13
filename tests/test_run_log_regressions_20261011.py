@@ -111,20 +111,10 @@ class PostupdateNonBlockingTests(unittest.TestCase):
 
     def test_postupdate_failure_branch_is_not_blocking(self) -> None:
         text = read("update_all.sh")
-        match = re.search(
-            r"(    # Step 5 is a reporting step.*?    OVERALL_EXIT=1\n)", text, re.DOTALL
-        )
-        self.assertIsNotNone(match, "step 5 failure branch not found")
-        branch = match.group(1)
-        self.assertNotIn("BLOCKING_EXIT=1", branch)
-        script = (
-            'L_STATUS_ERROR="ERR"; BLOCKING_EXIT=0; OVERALL_EXIT=0\n'
-            f"{branch}\n"
-            'echo "blocking=$BLOCKING_EXIT overall=$OVERALL_EXIT code=$STATUS_CODE_MD result=$RESULT_MD"\n'
-        )
-        proc = run_bash(script)
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertEqual(proc.stdout.strip(), "blocking=0 overall=1 code=error result=ERR")
+        step = text.split("# STEP 5: Reobserve and transactionally render local inventory", 1)[1].split("# FINAL MUTATING STEP", 1)[0]
+        self.assertNotIn("BLOCKING_EXIT=1", step)
+        self.assertIn('DEGRADED=1', step)
+        self.assertIn('STATUS_CODE_MD="warn"', step)
 
     def test_blocking_matrix_documents_step5_as_non_blocking(self) -> None:
         text = read("update_all.sh")

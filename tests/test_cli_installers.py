@@ -61,19 +61,10 @@ class PerVendorArgsTests(unittest.TestCase):
 class DownloadAndVerifyTests(unittest.TestCase):
     def test_curl_failure_is_not_success(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            bindir = Path(tmp) / "bin"
-            bindir.mkdir()
-            curl = bindir / "curl"
-            curl.write_text("#!/bin/sh\necho curl-failed >&2\nexit 22\n", encoding="utf-8")
-            curl.chmod(0o755)
-            dest = Path(tmp) / "installer.sh"
-            env = {"PATH": f"{bindir}:{os.environ.get('PATH', '')}"}
-            out = _run(
-                f'download_installer_script "https://example.test/install.sh" "{dest}"',
-                env=env,
-            )
+            dest = Path(tmp) / 'installer.sh'
+            out = _run(f'fetch_to_file() {{ return 22; }}; download_installer_script "https://example.test/install.sh" "{dest}"')
             self.assertNotEqual(out.returncode, 0)
-            self.assertFalse(dest.exists() and dest.stat().st_size > 0)
+            self.assertFalse(dest.exists())
 
     def test_http_url_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -85,20 +76,17 @@ class DownloadAndVerifyTests(unittest.TestCase):
             self.assertFalse(dest.exists())
 
     def test_empty_download_is_not_success(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            bindir = Path(tmp) / "bin"
-            bindir.mkdir()
-            curl = bindir / "curl"
-            curl.write_text("#!/bin/sh\n# succeed and write nothing\nexit 0\n", encoding="utf-8")
-            curl.chmod(0o755)
-            dest = Path(tmp) / "installer.sh"
-            dest.write_text("", encoding="utf-8")
-            env = {"PATH": f"{bindir}:{os.environ.get('PATH', '')}"}
-            out = _run(
-                f'download_installer_script "https://example.test/install.sh" "{dest}"',
-                env=env,
-            )
-            self.assertNotEqual(out.returncode, 0)
+        import sys
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        sys.path.insert(0, str(REPO_ROOT / 'lib/python'))
+        from download_policy import download
+        response = SimpleNamespace(status=200, getheader=lambda key: None, read1=lambda size: b'', close=lambda: None)
+        with tempfile.TemporaryDirectory() as tmp, patch('download_policy.resolve_public_addresses', return_value=['93.184.216.34']):
+            dest = Path(tmp) / 'installer.sh'
+            with self.assertRaisesRegex(ValueError, 'download_empty'):
+                download('https://example.test/install.sh', str(dest), ['example.test'], request=lambda *args: response)
+            self.assertFalse(dest.exists())
 
     def test_exit_zero_without_working_binary_is_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -265,51 +253,19 @@ class OnlyInstalledAndSelfUpdateTests(unittest.TestCase):
             self.assertIn("update", logged)
 
     def test_bootstrap_flag_installs_missing_cli(self) -> None:
+        # Exercise the real entrypoint, not the retired internal helper. The
+        # bootstrap flag is not a replacement for a fresh install-plan consent.
         with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            home = tmp_path / "home"
-            home.mkdir()
-            mock_bin = tmp_path / "bin"
-            mock_bin.mkdir()
-            local_bin = home / ".local" / "bin"
-
-            installer = tmp_path / "fake_installer.sh"
-            installer.write_text(
-                f'#!/bin/sh\n'
-                f'mkdir -p "{local_bin}"\n'
-                f'cat <<\'EOF\' > "{local_bin}/codex"\n'
-                f'#!/bin/sh\n'
-                f'echo "codex-cli 0.155.0"\n'
-                f'exit 0\n'
-                f'EOF\n'
-                f'chmod 755 "{local_bin}/codex"\n'
-                f'exit 0\n',
-                encoding="utf-8",
-            )
-
-            curl = mock_bin / "curl"
-            curl.write_text(
-                f'#!/bin/sh\n'
-                f'out=""\n'
-                f'prev=""\n'
-                f'for arg in "$@"; do\n'
-                f'  if [ "$prev" = "-o" ]; then out="$arg"; fi\n'
-                f'  prev="$arg"\n'
-                f'done\n'
-                f'if [ -n "$out" ]; then cp "{installer}" "$out"; fi\n'
-                f'exit 0\n',
-                encoding="utf-8",
-            )
-            curl.chmod(0o755)
-
-            env = {
-                "HOME": str(home),
-                "PATH": f"{mock_bin}:{os.environ.get('PATH', '')}",
-                "MAC_UPDATE_BOOTSTRAP_CLI": "1",
-            }
-            res = _run_npm_cli('install_native_cli "codex-cli" "codex"', env=env)
-            self.assertEqual(res.returncode, 0, res.stderr)
-            self.assertTrue((local_bin / "codex").exists())
+            root = Path(tmp)
+            mocks = root/'bin'; mocks.mkdir()
+            for name, body in [('uname','echo arm64'),('sw_vers','echo 14.0'),('curl','echo reached > "$HOME/network-called"; exit 96')]:
+                path = mocks/name;path.write_text('#!/bin/sh\n'+body+'\n');path.chmod(0o755)
+            env = dict(os.environ, HOME=str(root), PATH=str(mocks)+':'+os.environ['PATH'], MAC_UPDATE_BOOTSTRAP_CLI='1', MAC_UPDATE_YES='1')
+            env.pop('MAC_UPDATE_PLAN_PATH', None)
+            res = subprocess.run(['bash', str(REPO_ROOT/'update_npm_cli.sh')], env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20)
+            self.assertEqual(res.returncode, 10, res.stdout+res.stderr)
+            self.assertFalse((root/'.local/bin/codex').exists())
+            self.assertFalse((root/'network-called').exists())
 
     def test_npm_package_skipped_when_absent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -608,7 +564,7 @@ class PruneVendorCliVersionsTests(unittest.TestCase):
             self.assertFalse(v2.exists(), "v2 must be pruned")
 
     def test_native_clis_update_when_node_is_absent(self) -> None:
-        """When managed Node is absent (NODE_READY=0), native CLIs like claude still update."""
+        """A missing Node runtime never triggers native bootstrap without a plan."""
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             home = tmp_path / "home"
@@ -658,8 +614,10 @@ class PruneVendorCliVersionsTests(unittest.TestCase):
                 env=env,
                 timeout=20,
             )
-            self.assertTrue(claude_log.exists(), f"claude was not called. Output: {res.stdout}\nStderr: {res.stderr}")
-            self.assertIn("update", claude_log.read_text(encoding="utf-8"))
+            self.assertEqual(res.returncode, 10, res.stdout + res.stderr)
+            self.assertFalse(claude_log.exists(), 'no concrete plan means no native launch/update')
+            self.assertTrue(claude.exists())
+            self.assertFalse((home / '.local/share/mac-update/node').exists())
             self.assertFalse(npm_log.exists(), "npm should not be called when Node is absent")
 
 

@@ -48,12 +48,12 @@ class PendingMeasurementTests(unittest.TestCase):
 
 class InventoryCountHonestyTests(unittest.TestCase):
     def test_table_edits_are_not_named_installs(self) -> None:
-        text = (REPO_ROOT / "update_all.sh").read_text(encoding="utf-8")
-        self.assertIn('"inventory_version_fields_changed": updated_count', text)
-        self.assertIn("observed_package_changes", text)
-        self.assertIn("L_POSTUPDATE_INVENTORY_FIELDS_CHANGED", text)
-        self.assertIn("L_POSTUPDATE_OBSERVED_PACKAGE_CHANGES", text)
-        self.assertNotIn("L_POSTUPDATE_TOTAL_VERSION_CHANGES", text)
+        from plan_orchestration import inventory_counts
+        before = {'instances': [{'instance_id':'x','presence':'present','freshness':'fresh','short_version':'1'}]}
+        after = {'instances': [{'instance_id':'x','presence':'present','freshness':'fresh','short_version':'2'}]}
+        counts = inventory_counts(before, after)
+        self.assertEqual(counts['inventory_version_fields_changed'], 1)
+        self.assertEqual(counts['observed_package_changes'], 0)
 
     def test_summary_keeps_unknown_pending_and_format_version(self) -> None:
         summary = build_run_summary(

@@ -17,7 +17,9 @@ def is_ok(status: Any) -> bool:
 
 def is_skipped(status: Any) -> bool:
     """A skipped step carries no evidence either way: it is neutral in a streak."""
-    return isinstance(status, dict) and status.get("code") == "skipped"
+    return isinstance(status, dict) and status.get("code") in (
+        "skipped", "manual_by_policy", "ignored_by_policy", "deferred_by_user"
+    )
 
 
 def is_eligible_run(summary: dict[str, Any]) -> bool:

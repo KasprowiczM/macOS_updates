@@ -8,7 +8,9 @@ Usage: bash update_all.sh [OPTIONS]
 Options:
   -y, --yes                      Skip confirmation prompt
   -h, --help                     Show this help
-      --dry-run                  Preview steps without mutating the system
+      --plan                     Show the local JSON action plan without writes
+      --preferences              Review or reset saved per-app choices
+      --dry-run                  Show the same local plan without writes
       --doctor                   Read-only readiness report (no sudo, no run log); exit 0 ok, 10 warnings, 1 problem
       --verify-only              Verify installed app versions against history without mutating
       --json-summary             Emit JSON summary on exit (stdout, after run)
@@ -48,6 +50,8 @@ mac_update_parse_cli() {
         case "$1" in
             -y|--yes) export MAC_UPDATE_YES=1 ;;
             -h|--help) mac_update_cli_usage; exit 0 ;;
+            --plan) export MAC_UPDATE_PLAN_ONLY=1 ;;
+            --preferences) export MAC_UPDATE_PREFERENCES=1 ;;
             --dry-run) export MAC_UPDATE_DRY_RUN=1 ;;
             --doctor) export MAC_UPDATE_DOCTOR=1 ;;
             --verify-only) export MAC_UPDATE_VERIFY_ONLY=1 ;;

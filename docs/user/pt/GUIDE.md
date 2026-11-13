@@ -1,6 +1,6 @@
 # Guia do utilizador (Português)
 
-**Versão:** 1.6.2 · **Apple Silicon, macOS 13+**
+**Versão:** 1.6.3 · **Apple Silicon, macOS 13+**
 
 ## Configuração segura e fontes das aplicações
 
@@ -54,4 +54,4 @@ Estados: **verified direct**, **triggered-unverified**, **externally managed**, 
 
 Completo: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
 
-A etapa B (1.6.2) acrescenta um inventário de observação opcional: `bash build_inventory.sh --shadow`. Guarda identidades locais, provas das fontes e análises incompletas em JSON privado, sem alterar `APPLICATIONS.md` nem a execução das atualizações. `--dry-run` impede a gravação, `--json` devolve resultados estruturados e várias opções `--root CAMINHO` indicam diretórios. Os conflitos são observações; a escolha de fontes e os controlos de execução pertencem à etapa C.
+A etapa C ativa inventário JSON local e planos com permissões específicas. `bash update_all.sh --plan` e `--dry-run` mostram as mesmas decisões sem gravar. Uma execução interativa pergunta uma vez pelos âmbitos mostrados; `-y`, EOF e execução sem terminal não concedem novas permissões. Use `--preferences` para rever ou repor escolhas. As atualizações preservam origem e destino observados; conflitos, destinos ausentes e provas incertas adiam esse destino. `build_inventory.sh --migration --preview` preserva bytes Markdown originais e notas; aceite explicitamente o ID mostrado. Atualizações genéricas do fabricante permanecem manuais até verificar identidade e adaptador. Uma entrada no catálogo não comprova instalação nem consentimento.

@@ -255,7 +255,7 @@ iu_firefox_developer_edition() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_APPLE_SILICON" "Firefox Developer Edition" "$LATEST_FF")"
             FF_URL="https://download.mozilla.org/?product=firefox-devedition-latest&os=osx&lang=pl"
             TEMP_DMG="$(make_temp_dmg Firefox_DevEd)"
-            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$FF_URL"; then
+            if fetch_reviewed_artifact "$FF_URL" "$TEMP_DMG" 180 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
                 FF_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$FF_MOUNT" ]; then
                     if [ -d "$FF_MOUNT/Firefox Developer Edition.app" ]; then
@@ -263,7 +263,7 @@ iu_firefox_developer_edition() {
                         if [ "$(internet_version_relation "$FF_SOURCE_VER" "$VER")" != "newer" ]; then
                             print_warn "Refusing non-newer Firefox payload: $FF_SOURCE_VER (installed: $VER)"
                             STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
-                        elif copy_verified_app "$FF_MOUNT/Firefox Developer Edition.app" "Firefox Developer Edition.app"; then
+                        elif copy_verified_app "$FF_MOUNT/Firefox Developer Edition.app" "/Applications/Firefox Developer Edition.app" "${MAC_UPDATE_ACTION_ID:-}"; then
                             NEW_VER=$(firefox_dev_version)
                             FF_VER_DISPLAY="$NEW_VER (kanał $LATEST_FF)"
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
@@ -539,7 +539,7 @@ iu_keepassxc() {
             print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$KPX_TARGET_LABEL ($KPX_ARCH)")"
             KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/${KPX_ASSET}"
             TEMP_DMG="$(make_temp_dmg KeePassXC)"
-            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$KPX_URL" \
+            if fetch_reviewed_artifact "$KPX_URL" "$TEMP_DMG" 180 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg \
                 && keepassxc_digest_ok "$TEMP_DMG" "$KPX_URL" "$KPX_ASSET"; then
                 KPX_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$KPX_MOUNT" ]; then
@@ -554,7 +554,7 @@ iu_keepassxc() {
                         if [ "$KPX_ACCEPT" -ne 1 ]; then
                             print_warn "Refusing non-newer KeePassXC payload: $KPX_SOURCE_VER (installed: $VER)"
                             STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
-                        elif copy_verified_app "$KPX_MOUNT/KeePassXC.app" "KeePassXC.app"; then
+                        elif copy_verified_app "$KPX_MOUNT/KeePassXC.app" "/Applications/KeePassXC.app" "${MAC_UPDATE_ACTION_ID:-}"; then
                             print_ok "$(internet_msg "$L_INTERNET_APP_COPIED" "KeePassXC")"
                             NEW_VER=$(app_version "/Applications/KeePassXC.app")
                             KPX_REVISION="${KPX_ASSET#KeePassXC-"$KPX_SOURCE_VER"-}"
@@ -2067,7 +2067,7 @@ iu_visual_studio_code() {
                 rm -rf "$TEMP_DIR" 2>/dev/null || true
                 mkdir -p "$TEMP_DIR"
 
-                if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_ZIP" "$VSCODE_URL"; then
+                if fetch_reviewed_artifact "$VSCODE_URL" "$TEMP_ZIP" 300 4294967296 "${MAC_UPDATE_ACTION_ID:-}" zip; then
                     if [ -n "$VSCODE_SHA256" ]; then
                         if ! echo "$VSCODE_SHA256  $TEMP_ZIP" | shasum -a 256 -c >/dev/null 2>&1; then
                             print_warn "$(printf "$L_INTERNET_VSCODE_CHECKSUM_MISMATCH" "$TEMP_ZIP")"
@@ -2084,7 +2084,7 @@ iu_visual_studio_code() {
                             if [ "$(internet_version_relation "$VSCODE_SOURCE_VER" "$VER")" != "newer" ]; then
                                 print_warn "Refusing non-newer VS Code payload: $VSCODE_SOURCE_VER (installed: $VER)"
                                 STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
-                            elif copy_verified_app "$TEMP_DIR/Visual Studio Code.app" "Visual Studio Code.app"; then
+                            elif copy_verified_app "$TEMP_DIR/Visual Studio Code.app" "/Applications/Visual Studio Code.app" "${MAC_UPDATE_ACTION_ID:-}"; then
                                 NEW_VER=$(app_version "/Applications/Visual Studio Code.app")
                                 print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Visual Studio Code" "$NEW_VER")"
                                 STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
@@ -2153,7 +2153,7 @@ iu_codeedit() {
             # TODO(H5): Publisher digest is unverified for CodeEdit download
             CE_URL="https://github.com/CodeEditApp/CodeEdit/releases/download/${LATEST_CE_TAG}/CodeEdit.dmg"
             TEMP_DMG="$(make_temp_dmg CodeEdit)"
-            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 180 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$CE_URL"; then
+            if fetch_reviewed_artifact "$CE_URL" "$TEMP_DMG" 180 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
                 CE_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$CE_MOUNT" ]; then
                     if [ -d "$CE_MOUNT/CodeEdit.app" ]; then
@@ -2161,7 +2161,7 @@ iu_codeedit() {
                         if [ "$(internet_version_relation "$CE_SOURCE_VER" "$VER")" != "newer" ]; then
                             print_warn "Refusing non-newer CodeEdit payload: $CE_SOURCE_VER (installed: $VER)"
                             STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
-                        elif copy_verified_app "$CE_MOUNT/CodeEdit.app" "CodeEdit.app"; then
+                        elif copy_verified_app "$CE_MOUNT/CodeEdit.app" "/Applications/CodeEdit.app" "${MAC_UPDATE_ACTION_ID:-}"; then
                             NEW_VER=$(app_version "/Applications/CodeEdit.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "CodeEdit" "$NEW_VER")"
                             STATUS_CODEEDIT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
@@ -2501,7 +2501,7 @@ for url, digest in entries:
             fi
             LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
             TEMP_DMG="$(make_temp_dmg LedgerWallet)"
-            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$LEDGER_URL"; then
+            if fetch_reviewed_artifact "$LEDGER_URL" "$TEMP_DMG" 300 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
                 if [ -n "$LEDGER_SHA512" ]; then
                     ACTUAL_SHA512=$(shasum -a 512 "$TEMP_DMG" | awk '{print $1}')
                     if ! python3 -c "
@@ -2537,7 +2537,7 @@ sys.exit(0 if exp_hex and exp_hex == act else 1)
                         if [ "$(internet_version_relation "$LEDGER_SOURCE_VER" "$VER")" != "newer" ]; then
                             print_warn "Refusing non-newer Ledger payload: $LEDGER_SOURCE_VER (installed: $VER)"
                             STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
-                        elif copy_verified_app "$LEDGER_MOUNT/$SRC_APP" "$LEDGER_NAME.app"; then
+                        elif copy_verified_app "$LEDGER_MOUNT/$SRC_APP" "/Applications/$LEDGER_NAME.app" "${MAC_UPDATE_ACTION_ID:-}"; then
                             NEW_VER=$(app_version "/Applications/$LEDGER_NAME.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "$LEDGER_NAME" "$NEW_VER")"
                             STATUS_LEDGER="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
@@ -2620,7 +2620,7 @@ except Exception:
             # TODO(H5): Publisher digest is unverified for Trezor Suite download
             TS_URL="https://github.com/trezor/trezor-suite/releases/download/${LATEST_TS_TAG}/Trezor-Suite-${LATEST_TS}-mac-arm64.dmg"
             TEMP_DMG="$(make_temp_dmg TrezorSuite)"
-            if curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 300 --retry 3 --retry-delay 2 -o "$TEMP_DMG" "$TS_URL"; then
+            if fetch_reviewed_artifact "$TS_URL" "$TEMP_DMG" 300 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
                 TS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
                 if [ -n "$TS_MOUNT" ]; then
                     if [ -d "$TS_MOUNT/Trezor Suite.app" ]; then
@@ -2628,7 +2628,7 @@ except Exception:
                         if [ "$(internet_version_relation "$TS_SOURCE_VER" "$VER")" != "newer" ]; then
                             print_warn "Refusing non-newer Trezor Suite payload: $TS_SOURCE_VER (installed: $VER)"
                             STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
-                        elif copy_verified_app "$TS_MOUNT/Trezor Suite.app" "Trezor Suite.app"; then
+                        elif copy_verified_app "$TS_MOUNT/Trezor Suite.app" "/Applications/Trezor Suite.app" "${MAC_UPDATE_ACTION_ID:-}"; then
                             NEW_VER=$(app_version "/Applications/Trezor Suite.app")
                             print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Trezor Suite" "$NEW_VER")"
                             STATUS_TREZOR="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"

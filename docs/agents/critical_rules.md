@@ -317,3 +317,7 @@ For GUI updates, known current/stale feeds do not launch apps. Proton minimum OS
 - Casks whose `.app` bundles have been deleted manually from `/Applications` or `~/Applications` are classified as orphan casks.
 - Orphan casks are skipped during `brew upgrade --cask` (protecting against ghost reinstallations) and recorded in `$MAC_UPDATE_SESSION_DIR/brew_orphan_casks.txt`.
 - In interactive mode, the user is prompted to clean up the stale Homebrew record via `brew uninstall --cask --force <token>`.
+
+## Scoped action boundary
+
+The active app update path uses `lib/update_policy.sh` and `lib/python/policy_runtime.py`. `YES`, parent confirmation and an old Markdown row are never authorization. Reobserve the existing target and all related cask apps after checks and directly before mutation; verify identity/source as well as version after execution. Missing or changed targets defer. Never call a legacy broad handler as a fallback from a rejected plan. Never interpret an InstallPlan as an update plan.

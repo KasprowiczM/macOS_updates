@@ -492,3 +492,41 @@ class CollectorTests(unittest.TestCase):
             snap = collect_snapshot([root], Providers(), None)
             self.assertIsNone(snap["instances"][0]["name"])
             self.assertEqual(snap["instances"][0]["freshness"], "stale")
+
+class PackageVersionIdentityTests(unittest.TestCase):
+    def test_verified_versioned_receipt_keeps_uuid_but_ambiguous_replacement_does_not(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = os.path.realpath(root)
+            def record(version, token='tool'):
+                receipt = root + '/Cellar/' + token + '/' + version + '/INSTALL_RECEIPT.json'
+                return dict(manager='homebrew', name='same display name', source_identity='formula:' + token,
+                            version=version, installed_receipt=receipt, channel='stable',
+                            evidence=[dict(kind='homebrew', prefix=root, token=token, installed_receipt=receipt)])
+            items = [record('1')]
+            p = Providers(list_brew=lambda prefix: source_result('ok', items), brew_prefixes=[root])
+            first = collect_snapshot([], p, None)
+            items[:] = [record('2')]
+            second = collect_snapshot([], p, first)
+            self.assertEqual(len(second['packages']), 1)
+            self.assertEqual(first['packages'][0]['package_id'], second['packages'][0]['package_id'])
+            items[:] = [record('3'), record('4')]
+            ambiguous = collect_snapshot([], p, second)
+            self.assertNotIn(second['packages'][0]['package_id'], [x['package_id'] for x in ambiguous['packages'] if x['presence'] == 'present'])
+            items[:] = [record('2', 'other')]
+            other = collect_snapshot([], p, second)
+            self.assertNotEqual(second['packages'][0]['package_id'], other['packages'][0]['package_id'])
+
+    def test_pure_reconcile_distinguishes_empty_and_unknown(self):
+        from inventory_collect import reconcile_inventory
+        with tempfile.TemporaryDirectory() as root:
+            root = os.path.realpath(root)
+            receipt = root + '/Cellar/tool/1/INSTALL_RECEIPT.json'
+            item = dict(manager='homebrew', source_identity='formula:tool', installed_receipt=receipt,
+                        evidence=[dict(kind='homebrew', prefix=root, token='tool', installed_receipt=receipt)])
+            first = collect_snapshot([], Providers(list_brew=lambda p: source_result('ok', [item]), brew_prefixes=[root]), None)
+            for status, presence in [('partial', 'unobserved'), ('ok', 'absent')]:
+                fresh = collect_snapshot([], Providers(list_brew=lambda p: source_result(status), brew_prefixes=[root]), None)
+                fresh.update(profile_id=first['profile_id'], generation=first['generation'], previous_snapshot_id=first['snapshot_id'])
+                reconciled = reconcile_inventory(first, fresh)
+                self.assertEqual(reconciled['packages'][0]['presence'], presence)
+                self.assertEqual(reconciled['packages'][0]['package_id'], first['packages'][0]['package_id'])

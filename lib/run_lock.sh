@@ -43,3 +43,12 @@ mac_update_lock_release() {
         rm -f "$lock"
     fi
 }
+
+# Canonical per-user target locks span checkouts and live for the command.
+# The kernel releases them after a crash; another live owner is never removed.
+mac_update_target_lock_run() {
+    local lock_lib_dir
+    lock_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    . "$lock_lib_dir/update_policy.sh"
+    mac_update_target_lock_run "$@"
+}
