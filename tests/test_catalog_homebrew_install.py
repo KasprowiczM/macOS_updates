@@ -31,6 +31,7 @@ class CatalogHomebrewTests(unittest.TestCase):
             manager.validate_cask('keepassxc-gui', self.metadata, '2.8.1')
 
     def test_partial_or_present_inventory_cannot_authorize_install(self):
+        from unittest.mock import patch
         snapshot = {'sources': {'filesystem:/Applications': {'status':'ok', 'complete':True}}, 'instances':[], 'packages':[]}
         self.assertTrue(manager.snapshot_proves_absence(snapshot, 'keepassxc-gui', '/Applications/KeePassXC.app'))
         for modified in (dict(snapshot, sources={'filesystem:/Applications': {'status':'partial', 'complete':False}}),
@@ -38,7 +39,10 @@ class CatalogHomebrewTests(unittest.TestCase):
                                                  'homebrew': {'status':'partial', 'complete':False}}),
                          dict(snapshot, packages=None),
                          dict(snapshot, instances=[{'presence':'present','product_id':'keepassxc-gui'}])):
-            self.assertFalse(manager.snapshot_proves_absence(modified, 'keepassxc-gui', '/Applications/KeePassXC.app'))
+            # This fixture describes an existing root with an incomplete scan.
+            # Its safety must not depend on /Applications existing on the host.
+            with patch.object(manager.os, 'lstat', return_value=object()):
+                self.assertFalse(manager.snapshot_proves_absence(modified, 'keepassxc-gui', '/Applications/KeePassXC.app'))
 
 
 class ManagerDelegationExecutionTests(unittest.TestCase):
@@ -60,8 +64,10 @@ class ManagerDelegationExecutionTests(unittest.TestCase):
         snapshot={'sources':{'filesystem:/Applications':{'status':'ok','complete':True}},
                   'instances':[], 'packages':[], 'environment':{'homebrew':{'satisfied':True}}}
         from unittest.mock import patch
-        with patch.object(manager, 'preview_cask', return_value=manager.validate_manager_cask('keepassxc-gui', metadata.metadata, '2.8.0')):
+        with patch.object(manager, 'trusted_brew', return_value=MOCK_BREW), \
+             patch.object(manager, 'preview_cask', return_value=manager.validate_manager_cask('keepassxc-gui', metadata.metadata, '2.8.0')):
             plan=build_install_plan([dict(product_id='keepassxc-gui', edition='gui', source_id='homebrew')],snapshot,recipes,utc_now())
+        self.assertEqual(plan['actions'][0]['kind'], 'install')
         consent=make_install_consent(plan,[plan['actions'][0]['action_id']],utc_now())
         return plan,consent,recipes,snapshot,metadata.metadata
 
