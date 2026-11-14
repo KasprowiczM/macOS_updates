@@ -1,6 +1,6 @@
 # Démarrage rapide (Français)
 
-**Mac Apple Silicon requis** · macOS 13+ · **v1.7.6**
+**Mac Apple Silicon requis** · macOS 13+ · **v1.7.7**
 
 ## Configuration sûre et sources des applications
 

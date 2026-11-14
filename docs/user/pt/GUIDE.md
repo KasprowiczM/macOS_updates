@@ -1,12 +1,12 @@
 # Guia do utilizador (Português)
 
-**Versão:** 1.7.6 · **Apple Silicon, macOS 13+**
+**Versão:** 1.7.7 · **Apple Silicon, macOS 13+**
 
 ## Configuração segura e fontes das aplicações
 
 `bash setup.sh --inspect` verifica a prontidão sem instalar dependências, alterar perfis ou configurar Touch ID. Uma ferramenta ausente deixa a função dependente indisponível. Num terminal, `bash setup.sh --install-dependencies` apresenta dependências opcionais e pergunta antes de cada instalação; `bash setup.sh --configure-shell` apresenta separadamente a alteração do perfil. Recusar uma dependência não bloqueia funções independentes. Sem Python, instale-o explicitamente antes de criar o inventário. `mas` ausente ou antigo é comunicado sem instalação ou atualização automática.
 
-Este é um checkpoint local do código, não publicado nem etiquetado. O gestor atua apenas sobre alvos instalados com origem observada e após nova aprovação. Os adaptadores genéricos nativos e dos fornecedores permanecem manuais até existirem receitas revistas. O catálogo público opcional abrange 48 produtos e oferece ligações oficiais revistas para obtenção manual; não há receitas aprovadas de primeira instalação automática. A lista de métodos abaixo descreve capacidades, não autoriza a execução. O relatório normal abrange aplicações instaladas. `bash scripts/report_update_coverage.sh --show-supported` continua a ser uma lista de referência. O menu opcional abre com `bash setup.sh --catalog` e não seleciona nada inicialmente. Após pré-visualização e nova aprovação, pode obter manualmente uma aplicação através de uma ligação oficial revista. Alterar a origem de uma aplicação existente exige migração manual. Um recibo App Store do CapCut mantém essa origem. Uma aplicação local sem propriedade Homebrew confirmada nunca é adotada automaticamente.
+Este guia descreve o macOS Updates 1.7.7. O gestor atua apenas sobre alvos instalados com origem observada e após nova aprovação. Os adaptadores genéricos nativos e dos fornecedores permanecem manuais até existirem receitas revistas. O catálogo público opcional abrange 48 produtos e oferece ligações oficiais revistas para obtenção manual; não há receitas aprovadas de primeira instalação automática. A lista de métodos abaixo descreve capacidades, não autoriza a execução. O relatório normal abrange aplicações instaladas. `bash scripts/report_update_coverage.sh --show-supported` continua a ser uma lista de referência. O menu opcional abre com `bash setup.sh --catalog` e não seleciona nada inicialmente. Após pré-visualização e nova aprovação, pode obter manualmente uma aplicação através de uma ligação oficial revista. Alterar a origem de uma aplicação existente exige migração manual. Um recibo App Store do CapCut mantém essa origem. Uma aplicação local sem propriedade Homebrew confirmada nunca é adotada automaticamente.
 
 ## O que faz
 
@@ -39,8 +39,10 @@ bash scripts/report_update_coverage.sh
 
 1. Instalar a app no Mac.
 2. `bash build_inventory.sh`
-3. `bash scripts/scaffold_internet_app.sh "Nome" silent_launch`
-4. `bash run_tests.sh`
+3. `bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json`
+4. Reveja a proposta JSON sem execução; uma implementação posterior requer revisão e `bash run_tests.sh`.
+
+Substitua o exemplo pelo caminho exato da aplicação instalada. O comando apresenta uma proposta com dados privados removidos para análise, sem execução. A exportação opcional exige repetir o comando com `--export --accept PREVIEW_ID` após rever o identificador apresentado. Ativar atualizações requer uma implementação revista e provas de aceitação separadas.
 
 ## Resolução de problemas
 
@@ -64,4 +66,6 @@ O catálogo público tem 47 linhas de registo para 48 produtos e zero receitas a
 
 ## Estado local das atualizações por receita
 
-Este é um checkpoint local do código, não publicado nem etiquetado. O catálogo público inclui 48 produtos em 47 linhas de registo e zero receitas automáticas aprovadas para fornecedores, motor nativo ou primeira instalação. O gestor suporta operações delimitadas em alvos instalados após consentimento; atualizações de fornecedores sem receita aceite permanecem manuais. Os 48 dossiers e fixtures sintéticas não comprovam aceitação ao vivo. A aquisição direta de ZIP, a instalação explícita e o motor nativo estão implementados; a aceitação ao vivo T6 e a ativação T7 continuam pendentes. Não existe caminho force, adopt, migração ou bootstrap de dependências. As aplicações existentes do utilizador estão protegidas. As recomendações são estáveis por produto, sem classificação universal do canal mais rápido. Uma análise incompleta é um aviso, mas alvos inseguros são bloqueados; consulte o JSON. Os metadados Cask do host não são reparados. O scheduler permite no máximo duas mutações independentes entre checkouts cooperantes do mesmo utilizador do sistema; a execução pública permanece serial até à aceitação de efeitos independentes. A atualização do sistema obtém por último o bloqueio global exclusivo. Um reinício pendente ou helper desconhecido pode bloquear mutações até existir nova prova revista de reconciliação. Ainda não há timeout automático nem reconciliação no arranque. Consulte o [recibo central de implementação](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). As aplicações abertas estão protegidas. DeepSeek Harness fica excluído até estar estável.
+Este guia descreve o macOS Updates 1.7.7. O catálogo público inclui 48 produtos em 47 linhas de registo e zero receitas automáticas aprovadas para fornecedores, motor nativo ou primeira instalação. O gestor suporta operações delimitadas em alvos instalados após consentimento; atualizações de fornecedores sem receita aceite permanecem manuais. Os 48 dossiers e fixtures sintéticas não comprovam aceitação ao vivo. A aquisição direta de ZIP, a instalação explícita e o motor nativo estão implementados; a aceitação ao vivo T6 e a ativação T7 continuam pendentes. Não existe caminho force, adopt, migração ou bootstrap de dependências. As aplicações existentes do utilizador estão protegidas. As recomendações são estáveis por produto, sem classificação universal do canal mais rápido. Uma análise incompleta é um aviso, mas alvos inseguros são bloqueados; consulte o JSON. Os metadados Cask do host não são reparados. O scheduler permite no máximo duas mutações independentes entre checkouts cooperantes do mesmo utilizador do sistema; a execução pública permanece serial até à aceitação de efeitos independentes. A atualização do sistema obtém por último o bloqueio global exclusivo. Um reinício pendente ou helper desconhecido pode bloquear mutações até existir nova prova revista de reconciliação. Ainda não há timeout automático nem reconciliação no arranque. Consulte o [recibo central de implementação](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). As aplicações abertas estão protegidas. DeepSeek Harness fica excluído até estar estável.
+
+`--dry-run` mostra uma pré-visualização legível de até 25 alvos. `--dry-run --json-summary` ou `--plan` fornece o plano JSON completo. A pré-visualização não concede autorização nem executa atualizações.

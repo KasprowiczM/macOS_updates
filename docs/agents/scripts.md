@@ -32,7 +32,7 @@
 | `scripts/install_launchagent.sh` | Install and manage weekly launchd update schedule; sets `EnvironmentVariables.PATH`, verifies the service is loaded with `launchctl print`, `--check` warns about plists without the `PATH` key; options `--day N`, `--hour N`, `--minute N` (0-59), `--once-in N` (one-shot test run 1-1440 minutes from now, exclusive with the weekly options), `--check`, `--uninstall`; `--day/--hour/--minute` set the weekly time, `--once-in N` installs a one-shot test run N minutes from now |
 | `scripts/audit_cask_candidates.sh` | Audit installed internet apps against Homebrew Cask availability |
 | `scripts/scan_update_feeds.sh` | Scan installed apps for Sparkle, Electron, and Keystone update frameworks |
-| `scripts/scaffold_internet_app.sh` | Generate config entries and handler boilerplate for new internet apps |
+| `scripts/scaffold_internet_app.sh` | Preview a redacted, non-executable proposal for one exact observed app path; optional export requires its accepted preview ID |
 | `scripts/report_chronic_warnings.sh` | Print trailing non-OK step streaks from historical run summaries (`lib/python/chronic_warnings.py`) |
 | `scripts/scan_secrets.sh` | Lightweight secret scan used by CI and pre-push (gitleaks when installed) |
 | `scripts/pre-commit.sh` | Fast staged-file checks (`bash -n`, `py_compile`); the full suite stays the integration gate |
@@ -84,6 +84,7 @@
 | `lib/python/download_policy.py` | Per-hop HTTPS and public-address validation, DNS pinning and reviewed artifact host allowlists |
 | `lib/python/update_transaction.py` | Same-volume bundle staging and backup, identity checks and conservative startup recovery |
 | `lib/python/artifact_acquisition.py` | Hash-bound HTTPS ZIP acquisition with bounded extraction, path/symlink checks and signed bundle observation |
+| `lib/python/recipe_readiness.py` | Pure readiness reports, comparable timing summaries and untrusted feedback validation; no execution authority |
 | `lib/python/recipe_acceptance.py` | Separate exact-candidate live evidence predicates for update, first install and lifecycle |
 | `lib/python/recipe_adapters.py` | Closed recipe dispatch into direct transactions or supervised native drivers; no JSON commands |
 | `lib/python/native_update_session.py` | Owned-process lifecycle, readiness versus completion, durable helper sessions and observed reconciliation |
@@ -244,14 +245,12 @@ Never copy another user's `APPLICATIONS.md` — use `build_inventory.sh` or pres
 
 ## Adding a New Internet App
 
-1. Add app name to `config/internet_apps.txt` (canonical list)
-2. Add method row to `config/internet_app_methods.txt` (`AppName|method|STATUS_VAR`)
-3. Run `bash scripts/scaffold_internet_app.sh "App Name" silent_launch` for boilerplate
-4. Implement `iu_<slug>()` in `lib/internet_app_updates.sh`
-5. Append `iu_<slug>` to `config/internet_dispatch_order.txt` (execution order)
-6. Add `STATUS_*` init, summary `printf`, and failure-scan entry in `update_internet_apps.sh`
-7. Add `L_INTERNET_*` keys to all 7 `i18n/lang_*.sh` files (English first)
-8. `bash run_tests.sh` — handler + dispatch + registry parity tests must pass
+1. Observe the app installed by the user with `bash build_inventory.sh`; preserve its source and exact path.
+2. Preview `bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json`, replacing the example with that exact observed path.
+3. Review the returned proposal and preview ID. Optional export repeats the command with `--export --accept PREVIEW_ID`; output stays redacted and non-executable.
+4. Establish identity, source/channel, immutable candidate, complete effects and the product-specific adapter contract. Public metadata and framework hints do not grant execution authority; update, first-install and lifecycle acceptance remain separate.
+5. For reviewed handler implementation, keep `config/internet_apps.txt`, `config/internet_app_methods.txt`, `lib/internet_app_updates.sh`, `config/internet_dispatch_order.txt`, status reporting and all seven `i18n/lang_*.sh` files consistent. Adding a registry method requires a real handler.
+6. Run `bash run_tests.sh` for handler, dispatch, registry and acceptance parity. Live product acceptance and recipe activation require their separate gates.
 
 `lib/internet_apps.sh` and `migration_setup.sh` phase 14 read the config automatically.
 

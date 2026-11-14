@@ -1082,3 +1082,13 @@ L_CATALOG_STABLE="Estable"
 L_CATALOG_BETA="Beta"
 L_CATALOG_NATIVE="Actualizador nativo"
 L_INSTALL_PLAN_PATH_REQUIRED="Se requiere la ruta del plan de instalación."
+
+# Read-only terminal plan preview
+L_PLAN_PREVIEW_ONLY="Solo vista previa. Sin actualizaciones, inicios de aplicaciones ni cambios de archivos."
+L_PLAN_PREVIEW_COUNT_FMT="Objetivos locales: %s"
+L_PLAN_PREVIEW_MANUAL="Revisión manual"
+L_PLAN_PREVIEW_SKIPPED="Omitido por la política"
+L_PLAN_PREVIEW_PENDING="Se requiere una decisión o evidencia"
+L_PLAN_PREVIEW_ELIGIBLE="Alcance permitido; no se ejecutó ninguna actualización"
+L_PLAN_PREVIEW_MORE_FMT="%s objetivos más en JSON."
+L_PLAN_PREVIEW_JSON_HINT="Plan completo: --dry-run --json-summary (o --plan)."

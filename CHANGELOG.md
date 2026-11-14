@@ -6,6 +6,12 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.7.7] - 2026-11-14
+
+- Show a bounded, readable plain dry-run preview instead of a large escaped JSON line. Keep full JSON for `--plan` and `--dry-run --json-summary`.
+- Handle Unicode output and a closed output pipe without a shutdown traceback; preserve read-only preview and consent boundaries.
+- Publish the preceding recipe execution and durable scheduling checkpoints. No production recipe or native driver is activated by this publication.
+
 ## [1.7.6] - 2026-11-14 (local checkpoint T5b)
 
 - Complete two-slot durable scheduling, per-action receipts, cancellation and shared recovery barriers; protect standalone and final system updates with an authenticated exclusive lease.

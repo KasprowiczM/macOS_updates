@@ -1,6 +1,6 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.7.6 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.7.7 · **Apple Silicon, macOS 13+**
 
 ## Bezpieczny setup i źródła aplikacji
 
@@ -38,8 +38,10 @@ bash scripts/report_update_coverage.sh
 
 1. Zainstaluj aplikację na Macu.
 2. `bash build_inventory.sh`
-3. `bash scripts/scaffold_internet_app.sh "Nazwa" silent_launch`
-4. `bash run_tests.sh`
+3. `bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json`
+4. Przejrzyj niewykonywalną propozycję JSON; późniejsza implementacja wymaga przeglądu i `bash run_tests.sh`.
+
+Zastąp przykład dokładną ścieżką zainstalowanej aplikacji. Polecenie pokazuje zredagowaną, niewykonywalną propozycję do przeglądu. Opcjonalny eksport wymaga ponowienia go z `--export --accept PREVIEW_ID` po sprawdzeniu wyświetlonego identyfikatora podglądu. Włączenie aktualizacji wymaga przeglądu implementacji i osobnych dowodów akceptacji.
 
 ## Rozwiązywanie problemów
 
@@ -63,4 +65,6 @@ Katalog publiczny obejmuje 47 wierszy rejestru i 48 osobnych produktów, a liczb
 
 ## Lokalny status receptur aktualizacji
 
-To lokalny checkpoint źródła, nieopublikowany i nieotagowany. Publiczny katalog obejmuje 48 produktów w 47 wierszach rejestru i ma zero zatwierdzonych automatycznych receptur producentów, natywnych i pierwszej instalacji. Menedżer obsługuje zakresowe działania na zainstalowanych celach po zgodzie; niezaakceptowane aktualizacje producentów pozostają ręczne. 48 dossier i syntetyczne fixtures nie oznaczają akceptacji na żywo. Bezpośrednie pobieranie ZIP, jawna instalacja i silnik natywny są zaimplementowane; testy na osobnym Macu w T6 i aktywacja T7 pozostają do wykonania. Brak ścieżki force, adopt, migracji i bootstrapu zależności. Istniejące aplikacje użytkownika są chronione. Rekomendacje dotyczą najnowszej wersji stable konkretnego produktu. Żaden kanał nie jest zawsze najszybszy. Niepełny skan dostawcy jest ostrzeżeniem, ale niebezpieczne cele są blokowane; sprawdź źródła w JSON. Metadane Cask hosta nie są naprawiane. Scheduler dopuszcza najwyżej dwie niezależne mutacje w checkoutach tego samego użytkownika systemu; publiczne wykonanie pozostaje sekwencyjne do akceptacji niezależnych efektów. Aktualizacja systemu pobiera wyłączną blokadę globalną na końcu. Oczekujący restart lub nieznany helper może blokować mutacje do nowego, sprawdzonego dowodu uzgodnienia. Blokada nie wygasa po czasie. Automatyczne uzgadnianie stanu przy starcie nie jest jeszcze dostępne. Zobacz [centralny zapis implementacji](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Otwarte aplikacje pozostają chronione. DeepSeek Harness jest wykluczony do czasu stabilności.
+Przewodnik dotyczy macOS Updates 1.7.7. Publiczny katalog obejmuje 48 produktów w 47 wierszach rejestru i ma zero zatwierdzonych automatycznych receptur producentów, natywnych i pierwszej instalacji. Menedżer obsługuje zakresowe działania na zainstalowanych celach po zgodzie; niezaakceptowane aktualizacje producentów pozostają ręczne. 48 dossier i syntetyczne fixtures nie oznaczają akceptacji na żywo. Bezpośrednie pobieranie ZIP, jawna instalacja i silnik natywny są zaimplementowane; testy na osobnym Macu w T6 i aktywacja T7 pozostają do wykonania. Brak ścieżki force, adopt, migracji i bootstrapu zależności. Istniejące aplikacje użytkownika są chronione. Rekomendacje dotyczą najnowszej wersji stable konkretnego produktu. Żaden kanał nie jest zawsze najszybszy. Niepełny skan dostawcy jest ostrzeżeniem, ale niebezpieczne cele są blokowane; sprawdź źródła w JSON. Metadane Cask hosta nie są naprawiane. Scheduler dopuszcza najwyżej dwie niezależne mutacje w checkoutach tego samego użytkownika systemu; publiczne wykonanie pozostaje sekwencyjne do akceptacji niezależnych efektów. Aktualizacja systemu pobiera wyłączną blokadę globalną na końcu. Oczekujący restart lub nieznany helper może blokować mutacje do nowego, sprawdzonego dowodu uzgodnienia. Blokada nie wygasa po czasie. Automatyczne uzgadnianie stanu przy starcie nie jest jeszcze dostępne. Zobacz [centralny zapis implementacji](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Otwarte aplikacje pozostają chronione. DeepSeek Harness jest wykluczony do czasu stabilności.
+
+Zwykły `--dry-run` pokazuje czytelny podgląd maksymalnie 25 celów. Pełny plan JSON jest dostępny przez `--dry-run --json-summary` lub `--plan`. Podgląd nie nadaje zgody i nie wykonuje aktualizacji.

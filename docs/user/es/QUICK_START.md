@@ -1,6 +1,6 @@
 # Inicio rápido (Español)
 
-**Se requiere Mac con Apple Silicon** · macOS 13+ · **v1.7.6**
+**Se requiere Mac con Apple Silicon** · macOS 13+ · **v1.7.7**
 
 ## Configuración segura y fuentes de aplicaciones
 

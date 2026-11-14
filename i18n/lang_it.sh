@@ -1082,3 +1082,13 @@ L_CATALOG_STABLE="Stabile"
 L_CATALOG_BETA="Beta"
 L_CATALOG_NATIVE="Aggiornatore nativo"
 L_INSTALL_PLAN_PATH_REQUIRED="È necessario indicare il percorso del piano di installazione."
+
+# Read-only terminal plan preview
+L_PLAN_PREVIEW_ONLY="Solo anteprima. Nessun aggiornamento, avvio di app o modifica ai file."
+L_PLAN_PREVIEW_COUNT_FMT="Destinazioni locali: %s"
+L_PLAN_PREVIEW_MANUAL="Verifica manuale"
+L_PLAN_PREVIEW_SKIPPED="Ignorato secondo le regole"
+L_PLAN_PREVIEW_PENDING="Decisione o prove richieste"
+L_PLAN_PREVIEW_ELIGIBLE="Ambito consentito; nessun aggiornamento eseguito"
+L_PLAN_PREVIEW_MORE_FMT="Altre %s destinazioni nel JSON."
+L_PLAN_PREVIEW_JSON_HINT="Piano completo: --dry-run --json-summary (o --plan)."

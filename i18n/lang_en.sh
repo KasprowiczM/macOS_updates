@@ -1081,3 +1081,13 @@ L_CATALOG_STABLE="Stable"
 L_CATALOG_BETA="Beta"
 L_CATALOG_NATIVE="Native updater"
 L_INSTALL_PLAN_PATH_REQUIRED="An install plan path is required."
+
+# Read-only terminal plan preview
+L_PLAN_PREVIEW_ONLY="Preview only. No updates, app launches or files changed."
+L_PLAN_PREVIEW_COUNT_FMT="Local targets: %s"
+L_PLAN_PREVIEW_MANUAL="Manual review"
+L_PLAN_PREVIEW_SKIPPED="Skipped by policy"
+L_PLAN_PREVIEW_PENDING="Decision or evidence required"
+L_PLAN_PREVIEW_ELIGIBLE="Eligible scope; no update executed"
+L_PLAN_PREVIEW_MORE_FMT="%s more targets in JSON."
+L_PLAN_PREVIEW_JSON_HINT="Full plan: --dry-run --json-summary (or --plan)."
