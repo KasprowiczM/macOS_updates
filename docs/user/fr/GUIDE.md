@@ -1,12 +1,20 @@
 # Guide utilisateur (Français)
 
-**Version :** 1.7.7 · **Apple Silicon, macOS 13+**
+**Version :** 1.8.0 · **Apple Silicon, macOS 13+**
+
+## Interface terminal
+
+Dans un terminal interactif, `bash update_all.sh` ouvre le tableau de bord et affiche l’assistant jusqu’à sa fin. `bash setup.sh` ouvre l’assistant et `bash build_inventory.sh` la vue inventaire. L’assistant reste accessible depuis la navigation. Sa fin et les réglages d’affichage sont enregistrés sans autoriser de mise à jour. `--cli` choisit l’interface texte existante et `--tui` demande explicitement le tableau de bord. Les options comme `--dry-run` restent en CLI ; ne combinez pas `--tui` avec d’autres options. `--tui` exige un terminal utilisable et Python. Les appels non interactifs ou sans TTY restent en CLI.
+
+Choisissez les groupes avant un lancement. La navigation est à gauche, les actions et la sortie au centre, les détails à droite si la place le permet. Une seule tâche est supervisée à la fois ; les confirmations existantes restent nécessaires. Les réglages couvrent langue, thème, ASCII et taille automatique. `?` ouvre l’aide, Ctrl+P la palette et `c` copie la commande, la sortie ou le résumé sélectionné. Ctrl+V colle uniquement dans la fenêtre de réponse ; Entrée envoie. La saisie est masquée si le processus désactive l’écho.
+
+Il faut au moins 80 colonnes et 24 lignes. Par défaut, le programme demande au moins 140 colonnes et 38 lignes aux terminaux compatibles, puis demande la taille initiale à la sortie. Le terminal peut ignorer ces demandes. La taille automatique est désactivable.
 
 ## Configuration sûre et sources des applications
 
 `bash setup.sh --inspect` vérifie la disponibilité sans installation, modification du profil shell ni configuration Touch ID. Un outil absent rend sa fonction indisponible. Dans un terminal, `bash setup.sh --install-dependencies` présente les dépendances facultatives et demande avant chaque installation ; `bash setup.sh --configure-shell` présente séparément la modification du profil. Refuser une dépendance ne bloque pas les fonctions indépendantes. Sans Python, installez-le explicitement avant de construire l’inventaire. Un `mas` absent ou ancien est signalé, jamais installé ni mis à niveau automatiquement.
 
-Ce guide décrit macOS Updates 1.7.7. Le gestionnaire agit uniquement sur les cibles installées dont la source est observée et après une nouvelle autorisation. Les adaptateurs génériques natifs et éditeur restent manuels en attendant des recettes vérifiées. Le catalogue public facultatif couvre 48 produits et propose des liens officiels vérifiés pour une acquisition manuelle ; aucune recette de première installation automatique n’est approuvée. La liste des méthodes ci-dessous décrit des capacités, pas une autorisation d’exécution. Le rapport normal porte sur les applications installées. `bash scripts/report_update_coverage.sh --show-supported` reste une liste de référence. Le menu facultatif s’ouvre avec `bash setup.sh --catalog`, sans sélection initiale. Après aperçu et nouvelle autorisation, une app peut être acquise manuellement via un lien officiel vérifié. Changer la source d’une app existante exige une migration manuelle. Un reçu App Store pour CapCut conserve cette source. Une app locale sans propriété Homebrew confirmée n’est jamais adoptée automatiquement.
+Ce guide décrit macOS Updates 1.8.0. Le gestionnaire agit uniquement sur les cibles installées dont la source est observée et après une nouvelle autorisation. Les adaptateurs génériques natifs et éditeur restent manuels en attendant des recettes vérifiées. Le catalogue public facultatif couvre 48 produits et propose des liens officiels vérifiés pour une acquisition manuelle ; aucune recette de première installation automatique n’est approuvée. La liste des méthodes ci-dessous décrit des capacités, pas une autorisation d’exécution. Le rapport normal porte sur les applications installées. `bash scripts/report_update_coverage.sh --show-supported` reste une liste de référence. Le menu facultatif s’ouvre avec `bash setup.sh --catalog`, sans sélection initiale. Après aperçu et nouvelle autorisation, une app peut être acquise manuellement via un lien officiel vérifié. Changer la source d’une app existante exige une migration manuelle. Un reçu App Store pour CapCut conserve cette source. Une app locale sans propriété Homebrew confirmée n’est jamais adoptée automatiquement.
 
 ## Fonctionnement
 
@@ -38,7 +46,7 @@ bash scripts/report_update_coverage.sh
 ## Ajouter une app Internet
 
 1. Installer l'app sur le Mac.
-2. `bash build_inventory.sh`
+2. `bash build_inventory.sh --cli`
 3. `bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json`
 4. Examinez la proposition JSON non exécutable ; toute implémentation ultérieure exige une revue et `bash run_tests.sh`.
 
@@ -49,7 +57,7 @@ Remplacez l’exemple par le chemin exact de l’application installée. La comm
 | Problème | Solution |
 |----------|----------|
 | Mac Intel | Non pris en charge |
-| Mauvais catalogue | `bash build_inventory.sh` |
+| Mauvais catalogue | `bash build_inventory.sh --cli` |
 | App non mise à jour | `bash scripts/report_update_coverage.sh` |
 | `APPLICATIONS.md` manquant | `build_inventory.sh` ou `dev_sync/dev-sync-import.sh` |
 
@@ -66,6 +74,8 @@ Le catalogue public compte 47 lignes de registre pour 48 produits et zéro recet
 
 ## État local des mises à jour par recette
 
-Ce guide décrit macOS Updates 1.7.7. Le catalogue public comprend 48 produits répartis sur 47 lignes de registre et zéro recette automatique approuvée pour les éditeurs, le moteur natif ou la première installation. Le gestionnaire prend en charge les opérations ciblées sur les cibles installées après consentement ; les mises à jour éditeur sans recette acceptée restent manuelles. Les 48 dossiers et fixtures synthétiques ne prouvent pas une acceptation réelle. L’acquisition directe de ZIP, l’installation explicite et le moteur natif sont implémentés ; l’acceptation réelle T6 et l’activation T7 restent en attente. Aucun chemin force, adopt, migration ou bootstrap des dépendances n’existe. Les apps utilisateur existantes sont protégées. Les recommandations sont stables par produit, sans classement universel du canal le plus rapide. Un scan fournisseur incomplet est un avis, mais les cibles dangereuses sont bloquées ; consultez le JSON. Les métadonnées Cask de l’hôte ne sont pas réparées. Le planificateur autorise au plus deux mutations indépendantes entre checkouts coopérants du même utilisateur système ; l’exécution publique reste séquentielle jusqu’à l’acceptation des effets indépendants. La mise à jour système prend en dernier le verrou global exclusif. Un redémarrage en attente ou un helper inconnu peut bloquer les mutations jusqu’à une nouvelle preuve de réconciliation vérifiée. Aucun délai automatique ni réconciliation au démarrage n’existe encore. Voir le [reçu central d’implémentation](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Les apps ouvertes restent protégées. DeepSeek Harness est exclu jusqu’à stabilité.
+Ce guide décrit macOS Updates 1.8.0. Le catalogue public comprend 48 produits répartis sur 47 lignes de registre et zéro recette automatique approuvée pour les éditeurs, le moteur natif ou la première installation. Le gestionnaire prend en charge les opérations ciblées sur les cibles installées après consentement ; les mises à jour éditeur sans recette acceptée restent manuelles. Les 48 dossiers et fixtures synthétiques ne prouvent pas une acceptation réelle. L’acquisition directe de ZIP, l’installation explicite et le moteur natif sont implémentés ; l’acceptation réelle T6 et l’activation T7 restent en attente. Aucun chemin force, adopt, migration ou bootstrap des dépendances n’existe. Les apps utilisateur existantes sont protégées. Les recommandations sont stables par produit, sans classement universel du canal le plus rapide. Un scan fournisseur incomplet est un avis, mais les cibles dangereuses sont bloquées ; consultez le JSON. Les métadonnées Cask de l’hôte ne sont pas réparées. Le planificateur autorise au plus deux mutations indépendantes entre checkouts coopérants du même utilisateur système ; l’exécution publique reste séquentielle jusqu’à l’acceptation des effets indépendants. La mise à jour système prend en dernier le verrou global exclusif. Un redémarrage en attente ou un helper inconnu peut bloquer les mutations jusqu’à une nouvelle preuve de réconciliation vérifiée. Aucun délai automatique ni réconciliation au démarrage n’existe encore. Voir le [reçu central d’implémentation](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Les apps ouvertes restent protégées. DeepSeek Harness est exclu jusqu’à stabilité.
 
-`--dry-run` affiche un aperçu lisible de 25 cibles maximum. `--dry-run --json-summary` ou `--plan` fournit le plan JSON complet. Cet aperçu ne donne aucune autorisation et ne lance aucune mise à jour.
+`--dry-run` affiche un aperçu lisible de 10 cibles maximum. `--dry-run --json-summary` ou `--plan` fournit le plan JSON complet. Cet aperçu ne donne aucune autorisation et ne lance aucune mise à jour.
+
+L’écran d’autorisation affiche dix éléments admissibles par page. Saisissez des numéros comme `1,3` pour autoriser uniquement leurs actions affichées ; `n` et `p` changent de page. Entrée ou `q` poursuit sans nouvelle autorisation. Le délai de 120 secondes est expliqué ; son expiration ne donne aucun accord. Les éléments bloqués sont résumés séparément. Utilisez `--preferences` pour les choix manuels, ignorés ou reportés. Le journal commence avant cette revue.

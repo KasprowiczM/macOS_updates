@@ -217,7 +217,7 @@ class RealRunTests(unittest.TestCase):
 class SudoKeepAliveCapTests(unittest.TestCase):
     def block(self) -> str:
         text = read("update_all.sh")
-        return text[text.index("# SUDO ACQUISITION"):text.index("# Tee everything from this point")]
+        return text[text.index("# SUDO ACQUISITION"):text.index("# Track wyników")]
 
     def clamp(self, value: str | None) -> str:
         text = read("update_all.sh")
@@ -258,7 +258,7 @@ class SudoKeepAliveCapTests(unittest.TestCase):
 
     def test_parent_confirmation_is_exported_after_the_confirm_block(self) -> None:
         text = read("update_all.sh")
-        confirm = text.index('read -r -p "  $L_CONFIRM_UPDATE [T/n]: " CONFIRM')
+        confirm = text.index('read -r -p "  $L_ALL_CONFIRM_PLAN [T/n]: " CONFIRM')
         export = text.index("export MAC_UPDATE_PARENT_CONFIRMED=1")
         cancel = text.index('print_info "$L_UPDATE_CANCELED"')
         self.assertLess(confirm, cancel)

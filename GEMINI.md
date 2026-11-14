@@ -1,4 +1,4 @@
-# macOS Updates (v1.7.7)
+# macOS Updates (v1.8.0)
 
 Gemini CLI / Antigravity entry point. The shared project contract (quick commands, reference docs, non-negotiable rules) lives in `AGENTS.md`:
 

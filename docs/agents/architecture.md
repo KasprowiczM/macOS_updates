@@ -80,3 +80,11 @@ The opt-in shadow path keeps a schema-1 snapshot with source completeness, indep
 The default inventory builder now uses the shared collector and transactional JSON/Markdown store. Shadow mode is observational once the active generation marker exists. Markdown preserves notes but never controls membership or permission. All app leaf entrypoints require the same immutable action plan; legacy broad dispatch is unreachable. The plan binds its saved base generation, local target identity, source, scope and effects for at most 15 minutes. Version changes alone preserve consent. Recovery runs before collection, and a pending uncertain recovery prevents new consent.
 
 Coverage, Markdown, JSON and the terminal consume the common resolver. Unknown app capabilities are proposals, never executable recipes. Manager execution is deliberately narrow: undeclared dependencies, opaque cask installers, npm lifecycle scripts and global binary changes remain manual. Casks retain their observed app directory. First installation belongs to a separate InstallPlan.
+
+## Terminal workspace
+
+Bare interactive entry points route through `lib/tui.sh` to `terminal_app.py`. Explicit CLI flags and non-TTY invocations retain the text workflow; `--cli` forces it. A missing routing module stops the entry point without discarding arguments. Python usability is checked before importing curses to avoid activating an unavailable developer-tools shim.
+
+`tui_backend.py` validates private display settings, maps fixed actions to argv and supervises one controlling PTY. The original scripts retain target selection, scope approval, locks, receipts and recovery authority. The first-use wizard stores completion only when finished; UI settings contain no grants. `tui_i18n.py` supplies seven complete interface catalogs.
+
+Output is bounded and sanitized. The answer editor preserves wrapped question context and sends input only on explicit submission; secret mode remains masked after echo is disabled. Phase markers are observations, not proof that applications were updated. A rendering failure restores curses state and `tui_recovery.py` continues interaction with the same existing worker. It does not restart the operation or clear leases. Window resizing is optional and best effort, with an original-size restoration request on exit.

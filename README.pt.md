@@ -6,7 +6,7 @@
 
 **Site:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repositório:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licença:** [MIT](LICENSE) · **Alterações:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.7.7** : Orquestrador de atualizações com um só comando, para **Macs com Apple Silicon e macOS 13-27**. Coordena atualizações de pacotes verificadas e acionamentos honestos dos atualizadores das aplicações para o **software já instalado neste Mac**. **Multilingue** (7 idiomas). Camada privada opcional através de [`dev_sync/`](dev_sync/README.md).
+> **v1.8.0** : Orquestrador de atualizações com um só comando, para **Macs com Apple Silicon e macOS 13-27**. Coordena atualizações de pacotes verificadas e acionamentos honestos dos atualizadores das aplicações para o **software já instalado neste Mac**. **Multilingue** (7 idiomas). Camada privada opcional através de [`dev_sync/`](dev_sync/README.md).
 
 A etapa C ativa inventário JSON local e planos com permissões específicas. `bash update_all.sh --plan` e `--dry-run` mostram as mesmas decisões sem gravar. Uma execução interativa pergunta uma vez pelos âmbitos mostrados; `-y`, EOF e execução sem terminal não concedem novas permissões. Use `--preferences` para rever ou repor escolhas. As atualizações preservam origem e destino observados; conflitos, destinos ausentes e provas incertas adiam esse destino. `build_inventory.sh --migration --preview` preserva bytes Markdown originais e notas; aceite explicitamente o ID mostrado. Atualizações genéricas do fabricante permanecem manuais até verificar identidade e adaptador. Uma entrada no catálogo não comprova instalação nem consentimento.
 
@@ -16,13 +16,21 @@ A etapa C ativa inventário JSON local e planos com permissões específicas. `b
 | Fluxo | 7 passos (0–6); a atualização do macOS vem sempre em último |
 | Registo | 47 aplicações da Internet · 11 métodos de atualização (ver [Métodos de atualização](#métodos-de-atualização)) |
 | Idiomas | EN, PL, ES, FR, DE, IT, PT (CLI e documentação) |
-| Testes | 1350 testes automáticos (`bash run_tests.sh`) |
+| Testes | 1441 testes automáticos (`bash run_tests.sh`) |
 
-Esta documentação descreve o macOS Updates 1.7.7. Não foi criada uma etiqueta de lançamento separada. O gestor atua apenas sobre alvos instalados com origem observada e após nova aprovação. Os adaptadores genéricos nativos e dos fornecedores permanecem manuais até existirem receitas revistas. O catálogo público opcional abrange 48 produtos e oferece ligações oficiais revistas para obtenção manual; não há receitas aprovadas de primeira instalação automática. A lista de métodos abaixo descreve capacidades, não autoriza a execução.
+Esta documentação descreve o macOS Updates 1.8.0. Não foi criada uma etiqueta de lançamento separada. O gestor atua apenas sobre alvos instalados com origem observada e após nova aprovação. Os adaptadores genéricos nativos e dos fornecedores permanecem manuais até existirem receitas revistas. O catálogo público opcional abrange 48 produtos e oferece ligações oficiais revistas para obtenção manual; não há receitas aprovadas de primeira instalação automática. A lista de métodos abaixo descreve capacidades, não autoriza a execução.
 
 **Novidades da v1.6.0:** As execuções agendadas (launchd) encontram o Homebrew e o `mas`, e o instalador verifica que a tarefa está carregada (acrescentados `--minute` e `--once-in`). As aplicações abertas nunca são fechadas nem substituídas, incluindo os casks do Homebrew. Cada pergunta durante a execução expira com a resposta segura «não». `bash update_all.sh --doctor` é um relatório de prontidão só de leitura e as execuções reais acrescentam verificações prévias. O estado persistente dos feeds dos fabricantes substitui os avisos opacos de «feed desatualizado», e o HyperFrames, o Superset e o Open Design são instalados ou verificados sem arranques ocultos. As versões 1.5.x anteriores estão descritas no [CHANGELOG.md](CHANGELOG.md).
 
 Os relatórios antigos dos feeds dos fornecedores são apenas de leitura. O gestor atual mantém manuais os adaptadores genéricos nativos e dos fornecedores até existir uma receita revista. A opção antiga `--bootstrap-cli` não autoriza uma primeira instalação. Instale as CLI em falta separadamente com instruções oficiais verificadas. As aplicações abertas não são fechadas. Consulte os feeds com `bash scripts/check_vendor_feeds.sh`.
+
+## Interface de terminal
+
+Num terminal interativo, `bash update_all.sh` abre o painel e apresenta o assistente até à sua conclusão. `bash setup.sh` abre o assistente e `bash build_inventory.sh` o inventário. Pode reabrir o assistente na navegação. A conclusão e as definições visuais são guardadas sem autorizar atualizações. `--cli` escolhe a interface de texto anterior e `--tui` pede explicitamente o painel. Opções como `--dry-run` continuam na CLI; não combine `--tui` com outras opções. `--tui` exige terminal funcional e Python. Chamadas não interativas ou sem TTY continuam na CLI.
+
+Escolha os grupos antes de iniciar. A navegação fica à esquerda, ações e saída no centro e detalhes à direita quando há espaço. Apenas uma tarefa é supervisionada de cada vez; as confirmações existentes mantêm-se. As definições incluem idioma, tema, ASCII e tamanho automático. `?` abre a ajuda, Ctrl+P a paleta e `c` copia o comando, saída ou resumo em foco. Ctrl+V cola apenas na janela de resposta; Enter envia. A entrada é ocultada quando o processo desativa o eco.
+
+São necessárias pelo menos 80 colunas e 24 linhas. Por defeito, são pedidas pelo menos 140 colunas e 38 linhas em terminais compatíveis e o tamanho original ao sair; o terminal pode ignorar os pedidos. O tamanho automático pode ser desativado.
 
 ## Configuração segura e fontes das aplicações
 
@@ -249,7 +257,7 @@ Macs Intel e macOS 12 ou anterior não são suportados; os scripts terminam ante
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
 bash setup.sh --inspect
-bash build_inventory.sh
+bash build_inventory.sh --cli
 bash update_all.sh
 ```
 
@@ -328,7 +336,7 @@ Referência completa dos scripts: [docs/agents/scripts.md](docs/agents/scripts.m
 ## Adicionar suporte a uma nova aplicação
 
 1. Instale a aplicação você mesmo (o atualizador nunca a instala por si).
-2. Execute `bash build_inventory.sh` para a acrescentar a `APPLICATIONS.md`.
+2. Execute `bash build_inventory.sh --cli` para a acrescentar a `APPLICATIONS.md`.
 3. Para rever o suporte, siga [docs/user/pt/GUIDE.md](docs/user/pt/GUIDE.md) ou consulte um agente de IA:
 
 ```bash
@@ -361,7 +369,7 @@ Os wrappers `dev-sync-*.sh` na raiz chamam os mesmos scripts de `dev_sync/`.
 
 ## Testes
 
-A bateria cobre a sintaxe do bash, a compilação do Python, os contratos estáticos de segurança, as guardas de documentação e os testes unitários (591 testes automáticos).
+A bateria cobre a sintaxe do bash, a compilação do Python, os contratos estáticos de segurança, as guardas de documentação e os testes unitários (1441 testes automáticos).
 Os pull requests executam o ShellCheck no Ubuntu, testes Python portáteis e a análise de segredos.
 A suite completa `run_tests.sh` num runner macOS só corre com `workflow_dispatch` ou uma etiqueta `v*`, não a cada push.
 
@@ -422,4 +430,6 @@ Os novos sinais de aplicações são propostas para revisão, não receitas exec
 
 O catálogo público tem 47 linhas de registo para 48 produtos e zero receitas aprovadas de primeira instalação automática. Após pré-visualização e nova confirmação, pode escolher ligações oficiais revistas para obtenção manual. Abrir uma página não instala a aplicação. Alterar a origem de uma aplicação existente exige migração manual. O InstallPlan separado mostra origem, destino, versão, requisitos e permissões; licença e custo desconhecidos são assim indicados. Qualquer receita automática futura precisa de nova aprovação de primeira instalação antes de ser ativada. O catálogo não promete instalar automaticamente todos os produtos.
 
-`--dry-run` mostra uma pré-visualização legível de até 25 alvos. `--dry-run --json-summary` ou `--plan` fornece o plano JSON completo. A pré-visualização não concede autorização nem executa atualizações.
+`--dry-run` mostra uma pré-visualização legível de até 10 alvos. `--dry-run --json-summary` ou `--plan` fornece o plano JSON completo. A pré-visualização não concede autorização nem executa atualizações.
+
+A tela de permissões mostra dez itens elegíveis por página. Digite números como `1,3` para autorizar somente as ações exibidas; `n` e `p` mudam de página. Enter ou `q` continua sem novas permissões. O limite de 120 segundos é explicado; o fim do prazo não concede permissão. Itens bloqueados têm um resumo separado. Use `--preferences` para escolhas manuais, ignoradas ou adiadas. O registro começa antes dessa revisão.

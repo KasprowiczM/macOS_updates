@@ -1,6 +1,14 @@
 # Início rápido (Português)
 
-**Mac com Apple Silicon obrigatório** · macOS 13+ · **v1.7.7**
+**Mac com Apple Silicon obrigatório** · macOS 13+ · **v1.8.0**
+
+## Interface de terminal
+
+Num terminal interativo, `bash update_all.sh` abre o painel e apresenta o assistente até à sua conclusão. `bash setup.sh` abre o assistente e `bash build_inventory.sh` o inventário. Pode reabrir o assistente na navegação. A conclusão e as definições visuais são guardadas sem autorizar atualizações. `--cli` escolhe a interface de texto anterior e `--tui` pede explicitamente o painel. Opções como `--dry-run` continuam na CLI; não combine `--tui` com outras opções. `--tui` exige terminal funcional e Python. Chamadas não interativas ou sem TTY continuam na CLI.
+
+Escolha os grupos antes de iniciar. A navegação fica à esquerda, ações e saída no centro e detalhes à direita quando há espaço. Apenas uma tarefa é supervisionada de cada vez; as confirmações existentes mantêm-se. As definições incluem idioma, tema, ASCII e tamanho automático. `?` abre a ajuda, Ctrl+P a paleta e `c` copia o comando, saída ou resumo em foco. Ctrl+V cola apenas na janela de resposta; Enter envia. A entrada é ocultada quando o processo desativa o eco.
+
+São necessárias pelo menos 80 colunas e 24 linhas. Por defeito, são pedidas pelo menos 140 colunas e 38 linhas em terminais compatíveis e o tamanho original ao sair; o terminal pode ignorar os pedidos. O tamanho automático pode ser desativado.
 
 ## Configuração segura e fontes das aplicações
 
@@ -20,7 +28,7 @@ O relatório normal mostra aplicações instaladas. `bash scripts/report_update_
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
 bash setup.sh --inspect
-bash build_inventory.sh
+bash build_inventory.sh --cli
 bash update_all.sh
 ```
 

@@ -57,8 +57,9 @@ print_header() { ui_print_header "$1"; }
 #
 #   mac_update_prompt_timeout     -> effective seconds (0 = wait forever)
 #   mac_update_prompt_yn <prompt> <timeout-default y|n> [<enter-default y|n>]
-#       returns 0 for yes, 1 for no. Typed n* is no; y*/t*/j*/s*/o* (the localized yes letters) is yes; an empty answer (or
-#       end of input) uses the enter-default. Any other text is NOT an answer (a stray
+#       returns 0 for yes, 1 for no. Typed n* is no; y*/t*/j*/s*/o* (the localized yes letters) is yes; a complete empty line
+#       uses the enter-default. End of input always refuses and sets MAC_UPDATE_PROMPT_EOF=1.
+#       Any other text is NOT an answer (a stray
 #       type-ahead key must not silently cancel a step): one localized "please answer
 #       yes or no" line is printed and the question is asked again, at most twice;
 #       only then the timeout default applies. When stdin is a terminal, keys typed
@@ -92,6 +93,7 @@ mac_update_prompt_yn() {
     local prompt="$1" tdef="${2:-n}" edef="${3:-}" ans="" rc=0 t started reasks=0
     [ -n "$edef" ] || edef="$tdef"
     MAC_UPDATE_PROMPT_TIMED_OUT=0
+    MAC_UPDATE_PROMPT_EOF=0
     t="$(mac_update_prompt_timeout)"
     mac_update_prompt_drain_input
     while :; do
@@ -114,17 +116,20 @@ mac_update_prompt_yn() {
             [ "$tdef" = "y" ] && return 0
             return 1
         fi
+        # A complete blank line is an intentional Enter. EOF, a closed terminal
+        # or an incomplete last answer cannot supply affirmative consent.
+        if [ "$rc" -ne 0 ]; then
+            MAC_UPDATE_PROMPT_EOF=1
+            return 1
+        fi
         case "$ans" in
             [Nn]*) return 1 ;;
             [YyTtJjSsOo]*) return 0 ;;
             '')
-                # Input ended right after an unrecognised answer: never a yes.
-                if [ "$rc" -ne 0 ] && [ "$reasks" -gt 0 ]; then return 1; fi
                 break
                 ;;
             *)
                 # Unrecognised text is never a yes, and not silently a no either.
-                if [ "$rc" -ne 0 ]; then return 1; fi  # end of input mid-word: never re-ask
                 if [ "$reasks" -ge 2 ]; then
                     [ "$tdef" = "y" ] && return 0
                     return 1

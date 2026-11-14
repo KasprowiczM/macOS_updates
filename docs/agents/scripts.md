@@ -40,6 +40,11 @@
 | `scripts/fix_inventory_dedup.py` | One-off inventory de-duplication helper |
 | `scripts/migrate_internet_i18n.py` | One-shot migrator that moved Polish literals in `update_internet_apps.sh` into `L_INTERNET_*` keys (historical) |
 | `lib/appstore_ios.sh` | iOS and iPad app detection and App Store lookup helpers (Bash 3.2+) |
+| `lib/tui.sh` | Optional terminal interface routing and CLI fallback |
+| `lib/python/terminal_app.py` | Interactive terminal application and views |
+| `lib/python/tui_recovery.py` | Preserve an active PTY task through a curses failure and restore safe foreground text interaction |
+| `lib/python/tui_backend.py` | Read-only terminal data and fixed child commands |
+| `lib/python/tui_i18n.py` | Localized terminal interface strings |
 | `lib/cli.sh` | Shared CLI flag parsing and usage definitions for orchestrators |
 | `lib/github_release.sh` | GitHub release tag and download asset lookup helpers |
 | `lib/internet_app_updates.sh` | Per-app update handler routines sourced by `update_internet_apps.sh` |

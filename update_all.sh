@@ -37,6 +37,13 @@ NC='\033[0m'
 # Katalog z skryptami (ten sam co lokalizacja skryptu master)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+. "$SCRIPT_DIR/lib/tui.sh" || exit 2
+type mac_update_tui_route >/dev/null 2>&1 || exit 2
+mac_update_tui_route home "$@"
+tui_status=$?
+[ "$MAC_UPDATE_TUI_STARTED" = 1 ] && exit "$tui_status"
+set -- "${MAC_UPDATE_TUI_ARGS[@]}"
+
 # ── Shared libraries ─────────────────────────────────────────
 . "$SCRIPT_DIR/lib/cli.sh"
 . "$SCRIPT_DIR/lib/ui.sh"
@@ -204,12 +211,28 @@ mark_stale_summary_failed() {
 # and skipped steps never call it, so only steps that really ran carry a time.
 _STEP_T0=0
 _STEP_MONOTONIC=""
+tui_phase_event() {
+    [ "${MAC_UPDATE_TUI_CHILD:-0}" = 1 ] || return 0
+    printf '@@MAC_UPDATE_PHASE %s %s\n' "$1" "$2"
+}
 step_timer_start() {
+    [ -z "${1:-}" ] || tui_phase_event "$1" running
     _STEP_T0="$(date +%s)"
     _STEP_MONOTONIC="$(python3 -c 'import time; print(time.monotonic())')"
 }
 step_timer_stop() {
-    local key="$1" now
+    local key="$1" now phase_status
+    case "$key" in
+        prescan) phase_status=ok; [ "${PLAN_PREPARE_EXIT:-0}" = 0 ] || phase_status=warn ;;
+        appstore) phase_status="${STATUS_CODE_APPSTORE:-unknown}" ;;
+        npmcli) phase_status="${STATUS_CODE_NPMCLI:-unknown}" ;;
+        brew) phase_status="${STATUS_CODE_BREW:-unknown}" ;;
+        internet) phase_status="${STATUS_CODE_INTERNET:-unknown}" ;;
+        postupdate) phase_status="${STATUS_CODE_MD:-unknown}" ;;
+        system) phase_status="${STATUS_CODE_SYSTEM:-unknown}" ;;
+        *) phase_status=unknown ;;
+    esac
+    tui_phase_event "$key" "$phase_status"
     [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && return 0
     [ -n "${SESSION_DIR:-}" ] && [ -d "$SESSION_DIR" ] || return 0
     now="$(date +%s)"
@@ -308,6 +331,16 @@ if [ "${MAC_UPDATE_DOCTOR:-0}" = "1" ]; then
     exit $?
 fi
 
+# Review preferences without starting the update pipeline.
+if [ "${MAC_UPDATE_PREFERENCES_ONLY:-0}" = "1" ]; then
+    . "$SCRIPT_DIR/i18n/loader.sh"
+    PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from plan_orchestration import main
+sys.exit(main(sys.argv[1], "preferences"))' "$SCRIPT_DIR"
+    exit $?
+fi
+
 mac_update_require_supported_platform || exit 1
 
 # ── i18n: load language strings ──────────────────────────────
@@ -399,7 +432,7 @@ echo ""
 START_TIME=$(date +%s)
 
 if [ "${MAC_UPDATE_YES:-0}" != "1" ]; then
-    read -r -p "  $L_CONFIRM_UPDATE [T/n]: " CONFIRM
+    read -r -p "  $L_ALL_CONFIRM_PLAN [T/n]: " CONFIRM
     CONFIRM="${CONFIRM:-T}"
     if [[ "$CONFIRM" =~ ^[Nn] ]]; then
         print_info "$L_UPDATE_CANCELED"
@@ -422,27 +455,6 @@ PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
 from operation_receipts import capture_provenance, write_provenance
 write_provenance(sys.argv[2], capture_provenance(sys.argv[1]))' "$SCRIPT_DIR" "$SESSION_DIR"
-
-# First consent belongs to a concrete per-target plan, never to -y.
-export MAC_UPDATE_PLAN_PATH="$SESSION_DIR/update-plan.json"
-step_timer_start
-PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
-import sys
-from plan_orchestration import main
-sys.exit(main(sys.argv[1], "prepare", sys.argv[2]))' "$SCRIPT_DIR" "$SESSION_DIR"
-PLAN_PREPARE_EXIT=$?
-step_timer_stop prescan
-PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
-import sys
-from inventory_store import load_snapshot
-from operation_receipts import write_source_diagnostics
-snapshot = load_snapshot()
-if snapshot:
-    write_source_diagnostics(sys.argv[1], snapshot)' "$SESSION_DIR"
-if [ "$PLAN_PREPARE_EXIT" -ne 0 ]; then
-    print_warn "$L_PLAN_NO_CONSENT"
-fi
-print_info "$L_ALL_SESSION_DIR_MSG $SESSION_DIR"
 
 # ============================================================
 # LOGS — persisted run log (~/Dev_Env/macOS_updates/logs/)
@@ -493,91 +505,8 @@ rotate_logs(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
 
 print_info "Run log: $LOG_FILE"
 
-# ============================================================
-# SUDO ACQUISITION — single decision point
-# ============================================================
-# Contract (2026-08-05 fix — "IDE prompted for Touch ID on every command"):
-#
-#   Exactly ONE place in this script may call an interactive `sudo`. It runs
-#   at most once per invocation, and ONLY when all of the following hold:
-#     1. a step that genuinely needs root will actually run (step 1 or step 6)
-#     2. this is not a dry run (a preview must never ask for credentials)
-#     3. stdin is a real TTY
-#
-#   Without a TTY we do NOT attempt `sudo -v`. A bare `sudo -v` in a non-TTY
-#   context (IDE task runner, agent shell, launchd) escalates to the GUI
-#   askpass/Touch ID dialog, which is why every command appeared to require
-#   elevation. Instead we export MAC_UPDATE_NO_SUDO=1 so the child scripts
-#   skip their root-only tracks and report soft (10) rather than failing.
-#
-#   Do NOT add a second sudo call anywhere. Do NOT reset SUDO_KEEPALIVE_PID
-#   after the keep-alive has started — that orphans the refresher process and
-#   leaves it running after the script exits.
-SUDO_KEEPALIVE_PID=""
-
-_needs_sudo=0
-[ "${MAC_UPDATE_SKIP_APPSTORE:-0}" != "1" ] && _needs_sudo=1
-[ "${MAC_UPDATE_SKIP_SYSTEM:-0}"   != "1" ] && _needs_sudo=1
-[ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && _needs_sudo=0
-
-if [ "$_needs_sudo" -eq 1 ] && [ ! -t 0 ]; then
-    # No controlling terminal: never prompt. Tell the children to skip the
-    # root-only tracks instead of failing on a password they cannot supply.
-    export MAC_UPDATE_NO_SUDO=1
-    print_info "$L_ALL_SUDO_NO_TTY"
-    _needs_sudo=0
-fi
-
-if [ "$_needs_sudo" -eq 1 ]; then
-    # Touch ID hint only where a prompt can actually appear.
-    if [ -x "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" ] \
-       && ! "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" --check >/dev/null 2>&1; then
-        print_info "$L_ALL_TOUCHID_HINT"
-    fi
-
-    if sudo -n true 2>/dev/null; then
-        : # timestamp already warm — do not prompt again
-    elif [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
-        sudo -v 2>/dev/null || print_warn "$L_ALL_SUDO_PREAUTH_FAILED"
-    else
-        sudo -v || print_warn "$L_ALL_SUDO_PREAUTH_FAILED"
-    fi
-
-    # Keep the timestamp warm for the whole run. Started at most once; the PID
-    # is killed in cleanup_session_dir() on every exit path including INT/TERM.
-    # It also stops by itself as soon as this shell is gone, and after
-    # MAC_UPDATE_SUDO_KEEPALIVE_MAX seconds (default 14400 = 4 h, clamped
-    # 300-14400): a run that sat 51 minutes on an unanswered question must not
-    # keep refreshing root credentials forever, yet update_system.sh uses
-    # `sudo -n` per label at the end of a long run and needs a warm timestamp.
-    _ka_max="${MAC_UPDATE_SUDO_KEEPALIVE_MAX:-14400}"
-    case "$_ka_max" in
-        ''|*[!0-9]*) _ka_max=14400 ;;
-    esac
-    [ "$_ka_max" -lt 300 ] && _ka_max=300
-    [ "$_ka_max" -gt 14400 ] && _ka_max=14400
-    if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] && sudo -n true 2>/dev/null; then
-        (
-            _macupd_sleep_pid=""
-            _macupd_parent=$$
-            _macupd_deadline=$(( $(date +%s) + _ka_max ))
-            trap '[ -n "$_macupd_sleep_pid" ] && kill "$_macupd_sleep_pid" 2>/dev/null; exit 0' INT TERM
-            while true; do
-                [ "$(date +%s)" -lt "$_macupd_deadline" ] || exit 0
-                kill -0 "$_macupd_parent" 2>/dev/null || exit 0
-                sudo -n true 2>/dev/null || exit 0
-                sleep 50 &
-                _macupd_sleep_pid=$!
-                wait "$_macupd_sleep_pid" 2>/dev/null || exit 0
-            done
-        ) &
-        SUDO_KEEPALIVE_PID=$!
-    fi
-fi
-
-# Tee everything from this point to the log file. Note: this MUST come
-# AFTER the interactive confirmation read above (tee on FD 0 is fine but
-# we already consumed user input).
+# Log preparation and consent waits as well as update steps. Only stdout
+# and stderr are redirected; stdin remains the original terminal.
 exec 3>&1 4>&2
 if command -v perl >/dev/null 2>&1; then
     exec > >(log_strip_ansi_tee "$LOG_FILE") 2>&1
@@ -689,6 +618,110 @@ if ! mac_update_lock_acquire "$SCRIPT_DIR"; then
 fi
 export MAC_UPDATE_RUN_ID="${MAC_UPDATE_RUN_ID:-$(python3 -c 'import uuid; print(uuid.uuid4())' 2>/dev/null || echo "run-$LOG_TS")}"
 write_machine_summary started || true
+
+# First consent belongs to a concrete per-target plan, never to -y.
+export MAC_UPDATE_PLAN_PATH="$SESSION_DIR/update-plan.json"
+step_timer_start prescan
+PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from plan_orchestration import main
+sys.exit(main(sys.argv[1], "prepare", sys.argv[2]))' "$SCRIPT_DIR" "$SESSION_DIR"
+PLAN_PREPARE_EXIT=$?
+step_timer_stop prescan
+PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from inventory_store import load_snapshot
+from operation_receipts import write_source_diagnostics
+snapshot = load_snapshot()
+if snapshot:
+    write_source_diagnostics(sys.argv[1], snapshot)' "$SESSION_DIR"
+if [ "$PLAN_PREPARE_EXIT" -ne 0 ]; then
+    print_warn "$L_PLAN_NO_CONSENT"
+fi
+print_info "$L_ALL_SESSION_DIR_MSG $SESSION_DIR"
+
+# ============================================================
+# SUDO ACQUISITION — single decision point
+# ============================================================
+# Contract (2026-08-05 fix — "IDE prompted for Touch ID on every command"):
+#
+#   Exactly ONE place in this script may call an interactive `sudo`. It runs
+#   at most once per invocation, and ONLY when all of the following hold:
+#     1. a step that genuinely needs root will actually run (step 1 or step 6)
+#     2. this is not a dry run (a preview must never ask for credentials)
+#     3. stdin is a real TTY
+#
+#   Without a TTY we do NOT attempt `sudo -v`. A bare `sudo -v` in a non-TTY
+#   context (IDE task runner, agent shell, launchd) escalates to the GUI
+#   askpass/Touch ID dialog, which is why every command appeared to require
+#   elevation. Instead we export MAC_UPDATE_NO_SUDO=1 so the child scripts
+#   skip their root-only tracks and report soft (10) rather than failing.
+#
+#   Do NOT add a second sudo call anywhere. Do NOT reset SUDO_KEEPALIVE_PID
+#   after the keep-alive has started — that orphans the refresher process and
+#   leaves it running after the script exits.
+SUDO_KEEPALIVE_PID=""
+
+_needs_sudo=0
+[ "${MAC_UPDATE_SKIP_APPSTORE:-0}" != "1" ] && _needs_sudo=1
+[ "${MAC_UPDATE_SKIP_SYSTEM:-0}"   != "1" ] && _needs_sudo=1
+[ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && _needs_sudo=0
+
+if [ "$_needs_sudo" -eq 1 ] && [ ! -t 0 ]; then
+    # No controlling terminal: never prompt. Tell the children to skip the
+    # root-only tracks instead of failing on a password they cannot supply.
+    export MAC_UPDATE_NO_SUDO=1
+    print_info "$L_ALL_SUDO_NO_TTY"
+    _needs_sudo=0
+fi
+
+if [ "$_needs_sudo" -eq 1 ]; then
+    # Touch ID hint only where a prompt can actually appear.
+    if [ -x "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" ] \
+       && ! "$SCRIPT_DIR/scripts/setup_touchid_sudo.sh" --check >/dev/null 2>&1; then
+        print_info "$L_ALL_TOUCHID_HINT"
+    fi
+
+    if sudo -n true 2>/dev/null; then
+        : # timestamp already warm — do not prompt again
+    elif [ "${MAC_UPDATE_JSON_SUMMARY:-0}" = "1" ]; then
+        sudo -v 2>/dev/null || print_warn "$L_ALL_SUDO_PREAUTH_FAILED"
+    else
+        sudo -v || print_warn "$L_ALL_SUDO_PREAUTH_FAILED"
+    fi
+
+    # Keep the timestamp warm for the whole run. Started at most once; the PID
+    # is killed in cleanup_session_dir() on every exit path including INT/TERM.
+    # It also stops by itself as soon as this shell is gone, and after
+    # MAC_UPDATE_SUDO_KEEPALIVE_MAX seconds (default 14400 = 4 h, clamped
+    # 300-14400): a run that sat 51 minutes on an unanswered question must not
+    # keep refreshing root credentials forever, yet update_system.sh uses
+    # `sudo -n` per label at the end of a long run and needs a warm timestamp.
+    _ka_max="${MAC_UPDATE_SUDO_KEEPALIVE_MAX:-14400}"
+    case "$_ka_max" in
+        ''|*[!0-9]*) _ka_max=14400 ;;
+    esac
+    [ "$_ka_max" -lt 300 ] && _ka_max=300
+    [ "$_ka_max" -gt 14400 ] && _ka_max=14400
+    if [ "${MAC_UPDATE_NO_SUDO_KEEPALIVE:-0}" != "1" ] && sudo -n true 2>/dev/null; then
+        (
+            _macupd_sleep_pid=""
+            _macupd_parent=$$
+            _macupd_deadline=$(( $(date +%s) + _ka_max ))
+            trap '[ -n "$_macupd_sleep_pid" ] && kill "$_macupd_sleep_pid" 2>/dev/null; exit 0' INT TERM
+            while true; do
+                [ "$(date +%s)" -lt "$_macupd_deadline" ] || exit 0
+                kill -0 "$_macupd_parent" 2>/dev/null || exit 0
+                sudo -n true 2>/dev/null || exit 0
+                sleep 50 &
+                _macupd_sleep_pid=$!
+                wait "$_macupd_sleep_pid" 2>/dev/null || exit 0
+            done
+        ) &
+        SUDO_KEEPALIVE_PID=$!
+    fi
+fi
+
 
 # ============================================================
 # Track wyników
@@ -893,6 +926,9 @@ else
         STATUS_CODE_SYSTEM="unconfirmed"
     fi
 fi
+if [ "$SYSTEM_DEFERRED" -eq 0 ]; then
+    tui_phase_event system "$STATUS_CODE_SYSTEM"
+fi
 
 # ============================================================
 # STEP 1: App Store update
@@ -904,7 +940,7 @@ if [ "${MAC_UPDATE_SKIP_APPSTORE:-0}" = "1" ]; then
     STATUS_CODE_APPSTORE="skipped"
 else
 step_header 1 6 "$L_SCRIPT_TITLE_APPSTORE"
-step_timer_start
+step_timer_start appstore
 
 if [ -f "$SCRIPT_DIR/update_appstore.sh" ]; then
     chmod +x "$SCRIPT_DIR/update_appstore.sh"
@@ -957,7 +993,7 @@ if [ "${MAC_UPDATE_SKIP_NPM:-0}" = "1" ]; then
     STATUS_CODE_NPMCLI="skipped"
 else
 step_header 2 6 "Native CLI + npm"
-step_timer_start
+step_timer_start npmcli
 if mac_update_dry_run_msg "update_npm_cli.sh"; then
     RESULT_NPMCLI="[DRY-RUN] skipped"
     STATUS_CODE_NPMCLI="skipped"
@@ -996,7 +1032,7 @@ if [ "${MAC_UPDATE_SKIP_BREW:-0}" = "1" ]; then
     STATUS_CODE_BREW="skipped"
 else
 step_header 3 6 "$L_SCRIPT_TITLE_BREW"
-step_timer_start
+step_timer_start brew
 
 if mac_update_dry_run_msg "update_brew.sh"; then
     RESULT_BREW="[DRY-RUN] skipped"
@@ -1043,7 +1079,7 @@ if [ "${MAC_UPDATE_SKIP_INTERNET:-0}" = "1" ]; then
     STATUS_CODE_INTERNET="skipped"
 else
 step_header 4 6 "$L_SCRIPT_TITLE_INTERNET"
-step_timer_start
+step_timer_start internet
 
 if mac_update_dry_run_msg "update_internet_apps.sh"; then
     RESULT_INTERNET="[DRY-RUN] skipped"
@@ -1090,7 +1126,7 @@ if [ "${MAC_UPDATE_SKIP_POSTUPDATE:-0}" = "1" ]; then
     STATUS_CODE_MD="skipped"
 else
     step_header 5 6 "$L_ALL_STEP5_DESC"
-    step_timer_start
+    step_timer_start postupdate
     if PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
 from plan_orchestration import main
@@ -1111,7 +1147,7 @@ fi
 if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
     ui_master_progress 6 6
     step_header 6 6 "$L_SYSTEM_UPDATE_TITLE"
-    step_timer_start
+    step_timer_start system
     if mac_update_dry_run_msg "update_system.sh (final step)"; then
         RESULT_SYSTEM="[DRY-RUN] skipped"
         STATUS_CODE_SYSTEM="skipped"

@@ -1,6 +1,14 @@
 # Quick Start (English)
 
-**Apple Silicon Mac required** · macOS 13+ · **v1.7.7**
+**Apple Silicon Mac required** · macOS 13+ · **v1.8.0**
+
+## Terminal workspace
+
+In an interactive terminal, `bash update_all.sh` opens the workspace and shows the first-use wizard until it is finished. `bash setup.sh` opens the wizard and `bash build_inventory.sh` opens inventory. You can reopen the wizard from its navigation item. Completion and display settings persist; they grant no update permission. Use `--cli` for the existing text interface or `--tui` to request the workspace explicitly. Explicit flags such as `--dry-run` stay in the CLI; do not combine `--tui` with other options. An explicit `--tui` requires a usable terminal and Python. Noninteractive and non-TTY invocations keep CLI behavior.
+
+Choose update groups before a run. Navigation is on the left, actions and live output in the center, and contextual details on the right when space permits. Only one supervised job runs at a time; each update retains its existing consent checks. Settings include language, theme, ASCII and automatic resizing. Press `?` for help, Ctrl+P for the action palette, and `c` to copy the focused command, output or summary. Ctrl+V pastes only into the answer dialog; Enter submits. Input is masked when the child disables echo.
+
+The interface needs at least 80 columns by 24 rows. By default it requests at least 140 columns by 38 rows on supported terminals and requests the original size on exit; the terminal may ignore either request. Automatic resizing can be disabled in settings.
 
 ## Safe setup and application sources
 
@@ -36,7 +44,7 @@ Set `MAC_UPDATE_LANG=pl` (etc.) before running the one-liner to skip the picker.
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
 bash setup.sh --inspect
-bash build_inventory.sh
+bash build_inventory.sh --cli
 bash update_all.sh
 ```
 
@@ -55,7 +63,7 @@ bash update_all.sh
 | Command | Purpose |
 |---------|---------|
 | `bash scripts/report_update_coverage.sh` | Verified, triggered, external, manual and unknown coverage |
-| `bash build_inventory.sh` | Refresh `APPLICATIONS.md` from this Mac |
+| `bash build_inventory.sh --cli` | Refresh `APPLICATIONS.md` from this Mac |
 | `bash update_all.sh --dry-run -y` | Preview all steps |
 | `bash run_tests.sh` | Verify installation |
 | `bash uninstall.sh` | Remove toolkit |

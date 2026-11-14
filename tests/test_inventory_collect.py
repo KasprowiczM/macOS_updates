@@ -1,8 +1,10 @@
+import json
 import os
 import plistlib
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lib", "python"))
 from inventory_collect import Providers, collect_snapshot, source_result
@@ -10,6 +12,88 @@ from inventory_model import validate_snapshot
 
 
 class CollectorTests(unittest.TestCase):
+    def test_complete_formula_domain_survives_bad_cask_through_resolution_and_plan(self):
+        from inventory_providers import read_brew_receipts
+        from source_resolver import resolve_snapshot
+        from update_plan import build_plan, authorize_action
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            receipt = root / "Cellar/healthy/1/INSTALL_RECEIPT.json"
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text(json.dumps({"installed_on_request": True}))
+            bad = root / "Caskroom/broken/.metadata/1/20261114/Casks/broken.json"
+            bad.parent.mkdir(parents=True)
+            bad.write_text("{}")
+            providers = Providers(list_brew=read_brew_receipts, brew_prefixes=[str(root)])
+            snapshot = collect_snapshot([], providers, None)
+            validate_snapshot(snapshot)
+            aggregate = snapshot["sources"]["brew:" + str(root)]
+            self.assertEqual(aggregate["status"], "partial")
+            self.assertFalse(aggregate["complete"])
+            self.assertEqual(aggregate["issues"], [{"reason_code": "cask_metadata_invalid", "count": 1}])
+            package = snapshot["packages"][0]
+            self.assertEqual(package["freshness"], "fresh")
+            self.assertEqual(package["source_identity"], "formula:healthy")
+            self.assertEqual(package["installed_receipt"], str(receipt))
+            self.assertEqual(package["evidence"][0]["source_status"], "ok")
+            resolutions = resolve_snapshot(snapshot, {"recipes": []})
+            self.assertEqual(resolutions[0]["source"], "homebrew")
+            self.assertEqual(resolutions[0]["capability"], "native_managed")
+            plan = build_plan(snapshot, resolutions, {}, snapshot["created_at"])
+            self.assertEqual(plan["actions"][0]["reason_codes"], ["consent_required"])
+            current = dict(package, resolution=resolutions[0], running=False)
+            self.assertEqual(authorize_action(plan["actions"][0], current, {}, snapshot["created_at"])["reason_code"],
+                             "consent_required")
+
+            import shutil
+            shutil.rmtree(receipt.parent.parent)
+            second = collect_snapshot([], providers, snapshot)
+            self.assertEqual(second["packages"][0]["package_id"], package["package_id"])
+            self.assertEqual(second["packages"][0]["presence"], "unobserved")
+            self.assertEqual(second["packages"][0]["freshness"], "stale")
+
+    def test_incomplete_formula_domain_remains_blocked_through_resolution_and_plan(self):
+        from inventory_providers import read_brew_receipts
+        from source_resolver import resolve_snapshot
+        from update_plan import build_plan
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            for name, contents in (("healthy", "{}"), ("broken", "invalid json")):
+                path = root / "Cellar" / name / "1/INSTALL_RECEIPT.json"
+                path.parent.mkdir(parents=True)
+                path.write_text(contents)
+            snapshot = collect_snapshot([], Providers(list_brew=read_brew_receipts,
+                                                       brew_prefixes=[str(root)]), None)
+            resolutions = resolve_snapshot(snapshot, {"recipes": []})
+            self.assertEqual(snapshot["packages"][0]["freshness"], "stale")
+            self.assertEqual(resolutions[0]["capability"], "inventory_only")
+            plan = build_plan(snapshot, resolutions, {}, snapshot["created_at"])
+            self.assertIn("scan_partial", plan["actions"][0]["reason_codes"])
+
+    def test_formula_domain_proof_does_not_refresh_mismatched_receipt_or_invalid_peer(self):
+        import copy
+        from inventory_providers import read_brew_receipts
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            receipt = root / "Cellar/healthy/1/INSTALL_RECEIPT.json"
+            receipt.parent.mkdir(parents=True)
+            receipt.write_text("{}")
+            bad = root / "Caskroom/broken/.metadata/1/20261114/Casks/broken.json"
+            bad.parent.mkdir(parents=True)
+            bad.write_text("{}")
+            observed = read_brew_receipts(str(root))
+            for mutate in (lambda result: result["items"][0].update(installed_receipt=str(root / "elsewhere")),
+                           lambda result: result["items"].append(dict(name="bad", evidence="invalid")),
+                           lambda result: result.update(formula_domain_complete="yes")):
+                result = copy.deepcopy(observed)
+                mutate(result)
+                snapshot = collect_snapshot([], Providers(list_brew=lambda prefix: result,
+                                                           brew_prefixes=[str(root)]), None)
+                self.assertEqual(snapshot["packages"][0]["freshness"], "stale")
+
     def test_total_directory_budget_marks_coverage_partial(self):
         from unittest.mock import patch
 

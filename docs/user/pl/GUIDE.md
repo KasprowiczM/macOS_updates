@@ -1,6 +1,14 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.7.7 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.8.0 · **Apple Silicon, macOS 13+**
+
+## Środowisko terminalowe
+
+W interaktywnym terminalu `bash update_all.sh` otwiera panel i pokazuje kreator pierwszego uruchomienia do czasu jego ukończenia. `bash setup.sh` otwiera kreator, a `bash build_inventory.sh` widok inwentarza. Kreator można ponownie otworzyć z nawigacji. Ukończenie i ustawienia wyglądu są zapisywane; nie udzielają zgody na aktualizacje. `--cli` wybiera dotychczasowy tryb tekstowy, a `--tui` jawnie otwiera panel. Opcje takie jak `--dry-run` pozostają w CLI; nie łącz `--tui` z innymi opcjami. Jawny `--tui` wymaga sprawnego terminala i Pythona. Uruchomienia bez terminala i nieinteraktywne zachowują tryb CLI.
+
+Przed uruchomieniem wybierz grupy aktualizacji. Po lewej jest nawigacja, w środku działania i bieżące wyjście, a po prawej szczegóły, gdy pozwala na to miejsce. Jednocześnie działa jedno nadzorowane zadanie; dotychczasowe zgody nadal obowiązują. Ustawienia obejmują język, motyw, ASCII i automatyczny rozmiar. `?` otwiera pomoc, Ctrl+P paletę działań, a `c` kopiuje aktywne polecenie, wyjście lub podsumowanie. Ctrl+V wkleja tylko do okna odpowiedzi; Enter wysyła odpowiedź. Dane są maskowane, gdy proces wyłącza echo.
+
+Panel wymaga co najmniej 80 kolumn i 24 wierszy. Domyślnie na obsługiwanych terminalach prosi o co najmniej 140 kolumn i 38 wierszy oraz o poprzedni rozmiar przy wyjściu; terminal może zignorować te prośby. Automatyczny rozmiar można wyłączyć w ustawieniach.
 
 ## Bezpieczny setup i źródła aplikacji
 
@@ -37,7 +45,7 @@ bash scripts/report_update_coverage.sh
 ## Dodawanie aplikacji z internetu
 
 1. Zainstaluj aplikację na Macu.
-2. `bash build_inventory.sh`
+2. `bash build_inventory.sh --cli`
 3. `bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json`
 4. Przejrzyj niewykonywalną propozycję JSON; późniejsza implementacja wymaga przeglądu i `bash run_tests.sh`.
 
@@ -48,7 +56,7 @@ Zastąp przykład dokładną ścieżką zainstalowanej aplikacji. Polecenie poka
 | Problem | Rozwiązanie |
 |---------|-------------|
 | Intel Mac | Nieobsługiwany |
-| Zły katalog aplikacji | `bash build_inventory.sh` |
+| Zły katalog aplikacji | `bash build_inventory.sh --cli` |
 | Brak aktualizacji aplikacji | `bash scripts/report_update_coverage.sh` |
 | Brak `APPLICATIONS.md` | `build_inventory.sh` lub `dev_sync/dev-sync-import.sh` (właściciel) |
 
@@ -65,6 +73,8 @@ Katalog publiczny obejmuje 47 wierszy rejestru i 48 osobnych produktów, a liczb
 
 ## Lokalny status receptur aktualizacji
 
-Przewodnik dotyczy macOS Updates 1.7.7. Publiczny katalog obejmuje 48 produktów w 47 wierszach rejestru i ma zero zatwierdzonych automatycznych receptur producentów, natywnych i pierwszej instalacji. Menedżer obsługuje zakresowe działania na zainstalowanych celach po zgodzie; niezaakceptowane aktualizacje producentów pozostają ręczne. 48 dossier i syntetyczne fixtures nie oznaczają akceptacji na żywo. Bezpośrednie pobieranie ZIP, jawna instalacja i silnik natywny są zaimplementowane; testy na osobnym Macu w T6 i aktywacja T7 pozostają do wykonania. Brak ścieżki force, adopt, migracji i bootstrapu zależności. Istniejące aplikacje użytkownika są chronione. Rekomendacje dotyczą najnowszej wersji stable konkretnego produktu. Żaden kanał nie jest zawsze najszybszy. Niepełny skan dostawcy jest ostrzeżeniem, ale niebezpieczne cele są blokowane; sprawdź źródła w JSON. Metadane Cask hosta nie są naprawiane. Scheduler dopuszcza najwyżej dwie niezależne mutacje w checkoutach tego samego użytkownika systemu; publiczne wykonanie pozostaje sekwencyjne do akceptacji niezależnych efektów. Aktualizacja systemu pobiera wyłączną blokadę globalną na końcu. Oczekujący restart lub nieznany helper może blokować mutacje do nowego, sprawdzonego dowodu uzgodnienia. Blokada nie wygasa po czasie. Automatyczne uzgadnianie stanu przy starcie nie jest jeszcze dostępne. Zobacz [centralny zapis implementacji](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Otwarte aplikacje pozostają chronione. DeepSeek Harness jest wykluczony do czasu stabilności.
+Przewodnik dotyczy macOS Updates 1.8.0. Publiczny katalog obejmuje 48 produktów w 47 wierszach rejestru i ma zero zatwierdzonych automatycznych receptur producentów, natywnych i pierwszej instalacji. Menedżer obsługuje zakresowe działania na zainstalowanych celach po zgodzie; niezaakceptowane aktualizacje producentów pozostają ręczne. 48 dossier i syntetyczne fixtures nie oznaczają akceptacji na żywo. Bezpośrednie pobieranie ZIP, jawna instalacja i silnik natywny są zaimplementowane; testy na osobnym Macu w T6 i aktywacja T7 pozostają do wykonania. Brak ścieżki force, adopt, migracji i bootstrapu zależności. Istniejące aplikacje użytkownika są chronione. Rekomendacje dotyczą najnowszej wersji stable konkretnego produktu. Żaden kanał nie jest zawsze najszybszy. Niepełny skan dostawcy jest ostrzeżeniem, ale niebezpieczne cele są blokowane; sprawdź źródła w JSON. Metadane Cask hosta nie są naprawiane. Scheduler dopuszcza najwyżej dwie niezależne mutacje w checkoutach tego samego użytkownika systemu; publiczne wykonanie pozostaje sekwencyjne do akceptacji niezależnych efektów. Aktualizacja systemu pobiera wyłączną blokadę globalną na końcu. Oczekujący restart lub nieznany helper może blokować mutacje do nowego, sprawdzonego dowodu uzgodnienia. Blokada nie wygasa po czasie. Automatyczne uzgadnianie stanu przy starcie nie jest jeszcze dostępne. Zobacz [centralny zapis implementacji](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Otwarte aplikacje pozostają chronione. DeepSeek Harness jest wykluczony do czasu stabilności.
 
-Zwykły `--dry-run` pokazuje czytelny podgląd maksymalnie 25 celów. Pełny plan JSON jest dostępny przez `--dry-run --json-summary` lub `--plan`. Podgląd nie nadaje zgody i nie wykonuje aktualizacji.
+Zwykły `--dry-run` pokazuje czytelny podgląd maksymalnie 10 celów. Pełny plan JSON jest dostępny przez `--dry-run --json-summary` lub `--plan`. Podgląd nie nadaje zgody i nie wykonuje aktualizacji.
+
+Ekran zgód pokazuje dziesięć możliwych do zatwierdzenia pozycji na stronę. Wpisz np. `1,3`, aby zatwierdzić tylko pokazane działania tych pozycji; `n` i `p` zmieniają stronę. Enter lub `q` kontynuuje bez nowych zgód. Ekran wyjaśnia limit 120 sekund na odpowiedź; upływ czasu nie oznacza zgody. Zablokowane pozycje mają osobne podsumowanie. Ręczne, ignorowane i odroczone wybory przejrzysz przez `--preferences`. Logowanie zaczyna się przed tym przeglądem.

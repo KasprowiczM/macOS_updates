@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.7.7** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.8.0** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 | At a glance | |
 |-------------|--|
@@ -14,15 +14,23 @@
 | Pipeline | 7 steps (0–6), macOS system update always last |
 | Registry | 47 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 1350 automated tests (`bash run_tests.sh`) |
+| Tests | 1441 automated tests (`bash run_tests.sh`) |
 
 Stage C activates local JSON inventory and scoped update plans. `bash update_all.sh --plan` and `--dry-run` show the same read-only decisions. A normal interactive run asks once for the displayed scopes; `-y`, EOF and unattended runs grant no new permission. Use `--preferences` to review or reset choices. Updates keep the observed source and exact destination; conflicts, missing targets and uncertain evidence defer that target. `build_inventory.sh --migration --preview` preserves old Markdown bytes and notes; accept the displayed proposal ID explicitly. Generic vendor updates remain manual until a reviewed identity and adapter are available. An old catalog entry is neither proof of installation nor consent.
 
-This documentation covers macOS Updates 1.7.7. No separate release tag has been created. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority.
+This documentation covers macOS Updates 1.8.0. No separate release tag has been created. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority.
 
 **New in v1.6.0:** Scheduled (launchd) runs find Homebrew and `mas`, and the installer verifies that the job is loaded (`--minute` and `--once-in` added). Apps you have open are never closed or replaced, Homebrew casks included. Every mid-run question times out with the safe answer "no". `bash update_all.sh --doctor` is a read-only readiness report, and real runs add pre-flight checks. Persistent vendor-feed state replaces opaque "stale feed" warnings, and HyperFrames, Superset and Open Design are installed or checked without hidden launches. Earlier 1.5.x releases are described in [CHANGELOG.md](CHANGELOG.md).
 
 Legacy vendor-feed reporting is read-only. The current manager leaves generic native and vendor adapters manual until a reviewed recipe is available. The legacy `--bootstrap-cli` flag grants no first-install permission. Acquire missing CLIs separately through their reviewed official instructions. Open apps are not closed. Check feed state with `bash scripts/check_vendor_feeds.sh`.
+
+## Terminal workspace
+
+In an interactive terminal, `bash update_all.sh` opens the workspace and shows the first-use wizard until it is finished. `bash setup.sh` opens the wizard and `bash build_inventory.sh` opens inventory. You can reopen the wizard from its navigation item. Completion and display settings persist; they grant no update permission. Use `--cli` for the existing text interface or `--tui` to request the workspace explicitly. Explicit flags such as `--dry-run` stay in the CLI; do not combine `--tui` with other options. An explicit `--tui` requires a usable terminal and Python. Noninteractive and non-TTY invocations keep CLI behavior.
+
+Choose update groups before a run. Navigation is on the left, actions and live output in the center, and contextual details on the right when space permits. Only one supervised job runs at a time; each update retains its existing consent checks. Settings include language, theme, ASCII and automatic resizing. Press `?` for help, Ctrl+P for the action palette, and `c` to copy the focused command, output or summary. Ctrl+V pastes only into the answer dialog; Enter submits. Input is masked when the child disables echo.
+
+The interface needs at least 80 columns by 24 rows. By default it requests at least 140 columns by 38 rows on supported terminals and requests the original size on exit; the terminal may ignore either request. Automatic resizing can be disabled in settings.
 
 ## Safe setup and application sources
 
@@ -247,7 +255,7 @@ Intel Macs and macOS 12 or older are not supported; the scripts exit before any 
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
 bash setup.sh --inspect
-bash build_inventory.sh
+bash build_inventory.sh --cli
 bash update_all.sh
 ```
 
@@ -326,7 +334,7 @@ Full script reference: [docs/agents/scripts.md](docs/agents/scripts.md).
 ## Adding support for a new app
 
 1. Install the app yourself (the updater never installs it for you).
-2. Run `bash build_inventory.sh` to add it to `APPLICATIONS.md`.
+2. Run `bash build_inventory.sh --cli` to add it to `APPLICATIONS.md`.
 3. To review support for the app, follow [docs/user/en/GUIDE.md](docs/user/en/GUIDE.md) or ask an AI agent:
 
 ```bash
@@ -359,7 +367,7 @@ Root `dev-sync-*.sh` wrappers call the same scripts in `dev_sync/`.
 
 ## Test
 
-The test suite covers bash syntax, Python compilation, static safety contracts, documentation guards and unit tests (591 automated tests).
+The test suite covers bash syntax, Python compilation, static safety contracts, documentation guards and unit tests (1441 automated tests).
 Pull requests run Ubuntu ShellCheck, portable Python tests, and the secret scan.
 The full `run_tests.sh` suite on a macOS runner runs only on `workflow_dispatch` or a `v*` tag — not on every push.
 
@@ -420,4 +428,6 @@ New app signals are review proposals, not executable recipes. `bash scripts/scan
 
 The public catalog has 47 registry rows for 48 separate products and zero approved automatic first-install recipes. After preview and fresh confirmation, you can choose reviewed official links for manual acquisition. Opening a page does not install the app. Changing an existing app's source requires manual migration. The separate InstallPlan shows source, destination, version, requirements, and permissions; unknown license or cost stays labeled unknown. Any future automatic recipe needs fresh-install acceptance before enablement. The catalog does not promise automatic installation for all 48 products.
 
-Plain `--dry-run` shows a readable preview of up to 25 targets. Use `--dry-run --json-summary` or `--plan` for the complete JSON plan. A preview grants no permission and performs no updates.
+Plain `--dry-run` shows a readable preview of up to 10 targets. Use `--dry-run --json-summary` or `--plan` for the complete JSON plan. A preview grants no permission and performs no updates.
+
+The consent screen shows ten eligible items per page. Enter numbers such as `1,3` to approve only their displayed actions; `n` and `p` change pages. Enter or `q` continues without new consent. The screen explains its 120-second answer limit; a timeout does not grant consent. Blocked items are summarized separately. Use `--preferences` for manual, ignored or deferred choices. Diagnostics begin before this review.

@@ -89,6 +89,7 @@ def read_brew_receipts(prefix):
             status="unavailable", roots=[str(root)], reason="manager_metadata_missing"
         )
     items, partial = [], False
+    formula_domain_complete = False
     issues = Counter()
     budget = [MAX_ENTRIES]
     for room in rooms:
@@ -100,6 +101,7 @@ def read_brew_receipts(prefix):
             partial = True
             issues["manager_directory_unreadable"] += 1
             continue
+        room_complete = True
         for token_dir in tokens:
             try:
                 if token_dir.is_symlink() or not token_dir.is_dir():
@@ -233,19 +235,26 @@ def read_brew_receipts(prefix):
                     )
             except (OSError, ValueError, TypeError) as exc:
                 partial = True
+                room_complete = False
                 reason = str(exc) if isinstance(exc, ValueError) else "manager_metadata_unreadable"
                 if reason not in {"cask_metadata_missing", "cask_metadata_invalid", "invalid_manager_directory",
                                   "unsafe_metadata_path", "linked_metadata_directory", "invalid_metadata_file",
                                   "metadata_too_large", "invalid_metadata_object", "scan_budget", "record_limit"}:
                     reason = "manager_metadata_unreadable"
                 issues[reason] += 1
-    return _result(
+        if room.name == "Cellar":
+            formula_domain_complete = room_complete
+    result = _result(
         items,
         "partial" if partial else "ok",
         [str(root)],
         "manager_metadata_incomplete" if partial else None,
         issues,
     )
+    # A successful Cellar traversal is independent of Caskroom metadata. The
+    # aggregate status still governs omissions and remains partial on errors.
+    result["formula_domain_complete"] = formula_domain_complete
+    return result
 
 
 def read_cli_manifests(prefix):

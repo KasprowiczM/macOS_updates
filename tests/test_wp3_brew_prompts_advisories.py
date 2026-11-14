@@ -104,7 +104,7 @@ class PromptHelperTests(unittest.TestCase):
         self.assertEqual(rc("y\n", "n", "n"), 0)
         self.assertEqual(rc("T\n", "n", "n"), 0)
         self.assertEqual(rc("\n", "n", "y"), 0)      # Enter -> enter default
-        self.assertEqual(rc("", "n", "y"), 0)        # EOF  -> enter default (legacy)
+        self.assertEqual(rc("", "n", "y"), 1)        # EOF never grants consent.
         self.assertEqual(rc("\n", "y", "n"), 1)
         self.assertEqual(rc("maybe\n", "y", "y"), 1)  # unrecognised is never yes
 
