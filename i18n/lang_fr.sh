@@ -1091,3 +1091,37 @@ L_PLAN_SOURCE_MANAGED="Géré par votre organisation"
 L_PLAN_NO_ELIGIBLE="Aucune action ne peut être approuvée maintenant. Les autorisations enregistrées restent valables."
 L_PLAN_PREFERENCES_CHOICES="Quels éléments autorisez-vous ? Par exemple 1,3 autorise uniquement ces actions. dN reporter, iN ignorer, mN manuel, rN réinitialiser. n page suivante, p précédente. Entrée ou q : continuer sans nouvelle autorisation."
 L_ALL_CONFIRM_PLAN="Commencer la vérification de ce Mac et revoir les autorisations de mise à jour ?"
+
+# Delegated installed vendor updater consent and recovery.
+L_PLAN_SCOPE_DELEGATED="Ouvrir l’app signée du fabricant déjà installée. Son programme choisira la version proposée selon le canal actuel. L’app reste ouverte. Fin non confirmée ; les autres mises à jour attendent cette confirmation."
+L_NATIVE_RECOVERY_TITLE="Sessions de mise à jour du fabricant non confirmées"
+L_NATIVE_RECOVERY_NONE="Aucune session déléguée ne nécessite de vérification."
+L_NATIVE_RECOVERY_SELECT="Choisissez un numéro de session ou appuyez sur Entrée pour annuler."
+L_NATIVE_RECOVERY_SCOPE="Vous confirmez uniquement la fin du programme et de ses installateurs. Cela ne confirme pas la dernière version."
+L_NATIVE_RECOVERY_CONFIRM="Après vérification, saisissez FINISHED pour confirmer qu’aucun installateur ni téléchargement ne fonctionne encore. Entrée annule."
+L_NATIVE_RECOVERY_CANCELLED="Aucune fin confirmée. Les ressources restent réservées."
+L_NATIVE_RECOVERY_REJECTED="La vérification actuelle de l’identité ou de la source a échoué. La session reste non résolue."
+L_NATIVE_RECOVERY_DONE="Votre confirmation a été enregistrée et la réservation des ressources libérée. Aucune mise à jour n’a été vérifiée."
+
+# Exact, fresh approval for the requested concurrent native batch.
+L_PLAN_BATCH_TITLE_FMT="Lot Internet automatique : %s apps admissibles."
+L_PLAN_BATCH_SCOPE="Vérifiez chaque portée indiquée, y compris tout groupe du gestionnaire fournisseur explicitement décrit. Leurs fenêtres natives ou procédures approuvées de même source peuvent fonctionner ensemble. L’accord enregistre des autorisations automatiques pour ces apps et remplace leurs choix manuels enregistrés. Les programmes natifs choisissent les versions selon leurs canaux existants. DeepSeek reste manuel. Laissez les apps ouvertes ; leur fin reste non confirmée jusqu’à la vérification de récupération."
+L_PLAN_BATCH_NONE="Aucune app Internet automatique admissible. Les apps non prises en charge et DeepSeek restent manuels ; exclusions et contrôles de source restent actifs."
+L_PLAN_BATCH_QUESTION="Après toutes les pages, saisissez AUTO pour autoriser exactement ce lot parallèle. DeepSeek reste manuel. n suivante, p précédente. Vide ou q reporte le lot sans modifier les autorisations enregistrées."
+L_PLAN_BATCH_READ_ALL="Vérifiez toutes les pages avant d’autoriser le lot. Aucune autorisation modifiée."
+L_PLAN_SCOPE_LEGACY="Lancer la procédure existante de même source ; elle peut télécharger et remplacer l’app"
+L_ALL_SYSTEM_NATIVE_PENDING="Ignoré tant que la fin du programme natif reste non confirmée ; examinez la récupération avant les mises à jour système."
+L_PLAN_BATCH_PREVIEW="Lot automatique demandé. Le lancement exige encore une nouvelle autorisation des portées exactes admissibles."
+L_PLAN_SCOPE_GOOGLE_GROUP="Groupe de mise à jour Google : peut télécharger ou remplacer TOUS les produits Google enregistrés, même hors du catalogue. La liste complète est inconnue ; la portée dépasse les apps indiquées."
+L_PLAN_PREVIEW_UNSUPPORTED="Méthode automatique indisponible ; mettez à jour manuellement"
+
+L_PLAN_DEFAULT_SCOPE="Activez les mises à jour des applications et paquets pris en charge déjà installés dans ce profil, depuis leurs sources actuelles. Les outils natifs peuvent ouvrir les applications ; les procédures approuvées peuvent les télécharger et remplacer. Les groupes Google peuvent mettre à jour TOUS les produits Google enregistrés, même hors catalogue ; la liste complète est inconnue. Les choix manuels, exclusions et reports enregistrés restent applicables. DeepSeek, conflits de sources et applications protégées restent bloqués. Ceci n’installe aucune application du catalogue et n’autorise ni fermeture ni redémarrage des applications."
+L_PLAN_DEFAULT_QUESTION="Saisissez ENABLE pour enregistrer cet accord pour les prochaines exécutions. Une réponse vide ou q le laisse désactivé. Modifiez-le ensuite dans Préférences."
+
+# Explicit optional manager installation
+L_CATALOG_MANAGER="Installation Homebrew facultative avec accord explicite"
+L_CATALOG_MANAGER_METADATA="Périmètre du gestionnaire Homebrew vérifié"
+L_INSTALL_MANAGER_VERIFIED="Installé ; reçu Homebrew vérifié"
+L_INSTALL_MANAGER_PERMISSION="Autorisation : le gestionnaire Homebrew existant peut exécuter ce cask officiel sélectionné et installer son app, ses liens CLI, ses pages de manuel et ses dépendances déclarées. La vérification porte sur le reçu du gestionnaire."
+L_INSTALL_MANAGER_DEPENDENCIES="Dépendances Homebrew déclarées"
+L_INSTALL_MANAGER_EFFECTS="Installer le cask sélectionné avec Homebrew"

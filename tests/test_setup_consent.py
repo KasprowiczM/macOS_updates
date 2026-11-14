@@ -181,7 +181,7 @@ class InstallerReadinessTests(unittest.TestCase):
                 (bindir / name).symlink_to(shutil.which(name))
             (bindir / 'bash').symlink_to('/bin/bash')
             for name, body in [('uname', 'echo arm64'), ('sw_vers', 'echo 27.0'),
-                               ('git', 'exit 0'), ('python3', 'exit 1')]:
+                               ('git', 'echo git-called >> "$HOME/git-calls"; exit 97'), ('python3', 'exit 1')]:
                 p = bindir / name
                 p.write_text('#!/bin/bash\n' + body + '\n')
                 p.chmod(0o755)
@@ -193,6 +193,7 @@ class InstallerReadinessTests(unittest.TestCase):
             self.assertNotIn('is ready', result.stdout)
             self.assertFalse((base / 'inventory-called').exists())
             self.assertFalse((base / 'coverage-called').exists())
+            self.assertFalse((base / 'git-calls').exists())
 
 class IsolatedTouchIDTests(unittest.TestCase):
     def test_foreign_pam_file_is_preserved(self):

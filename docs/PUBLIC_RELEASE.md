@@ -1,6 +1,6 @@
 # Public GitHub vs Private Cloud Overlay
 
-**Prepared source version:** v**1.8.0** (source snapshot; no separate release tag) · Repository: [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates)
+**Prepared source version:** v**1.8.2** (source snapshot; no separate release tag) · Repository: [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates)
 
 This repository is designed for **public GitHub** plus an optional **private overlay** synced to your cloud provider (Proton Drive, iCloud, Google Drive, etc.).
 

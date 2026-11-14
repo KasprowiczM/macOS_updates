@@ -78,15 +78,10 @@ PARENT_DIR="$(dirname "$MAC_UPDATE_DIR")"
 mkdir -p "$PARENT_DIR" || fail "Cannot create $PARENT_DIR"
 
 if [ -d "$MAC_UPDATE_DIR/.git" ]; then
-    info "Updating existing clone: $MAC_UPDATE_DIR"
-    git -C "$MAC_UPDATE_DIR" fetch --tags origin 2>/dev/null || git -C "$MAC_UPDATE_DIR" fetch --tags 2>/dev/null || true
+    info "Existing clone preserved: $MAC_UPDATE_DIR"
+    info "Use About > Check toolkit updates to review an update without replacing local changes."
     if [ -n "${MAC_UPDATE_REF:-}" ]; then
-        git -C "$MAC_UPDATE_DIR" checkout "$MAC_UPDATE_REF" \
-            || fail "Cannot checkout MAC_UPDATE_REF=$MAC_UPDATE_REF"
-    else
-        git -C "$MAC_UPDATE_DIR" pull --ff-only origin main 2>/dev/null \
-            || git -C "$MAC_UPDATE_DIR" pull --ff-only 2>/dev/null \
-            || fail "git pull failed in $MAC_UPDATE_DIR"
+        fail "MAC_UPDATE_REF applies to a new clone only. Choose a new MAC_UPDATE_DIR for another revision."
     fi
 else
     info "Cloning into $MAC_UPDATE_DIR"

@@ -22,6 +22,7 @@ from install_plan import (
     install_recipe_eligible,
     verified_install_bindings,
 )
+from catalog_manager_install import manager_recipe_eligible
 from artifact_acquisition import acquire_candidate
 from recipe_acceptance import validate_recipe_evidence
 from update_scheduler import claim_action_resources, claim_recovery_resources
@@ -51,6 +52,10 @@ def make_install_consent(plan, action_ids, now):
         expires_at=(timestamp(now) + datetime.timedelta(minutes=15))
         .isoformat()
         .replace("+00:00", "Z"),
+        manager_delegation_bindings={
+            a["action_id"]: digest(a["manager_preview"]) for a in plan["actions"]
+            if a["action_id"] in action_ids and "manager_preview" in a
+        },
         verified_recipe_bindings={
             a["action_id"]: copy.deepcopy(a["verified_recipe_bindings"])
             for a in plan["actions"]
@@ -114,12 +119,18 @@ def authorize_install(action, current, consent, now):
             return result
         if (
             action["kind"] != "install"
-            or action.get("adapter_id") not in ("vendor_bundle", "verified_recipe_zip")
-            or not install_recipe_eligible(
+            or action.get("adapter_id") not in ("vendor_bundle", "verified_recipe_zip", "homebrew_cask")
+            or not (install_recipe_eligible(
                 action.get("recipe", {}), current.get("verified_environment"), now
-            )
+            ) or manager_recipe_eligible(action.get("recipe", {}), now))
         ):
             return deny("install_adapter_unreviewed")
+        if action.get("adapter_id") == "homebrew_cask" and (
+            action.get("source_id") != "homebrew"
+            or consent.get("manager_delegation_bindings", {}).get(action["action_id"])
+                != digest(action.get("manager_preview"))
+        ):
+            return deny("manager_delegation_consent_missing")
         if "verified_recipe" in action["recipe"]:
             bindings = verified_install_bindings(action["recipe"])
             if (
@@ -457,6 +468,9 @@ def execute_install_action(
     try:
         validate_install_plan(plan)
         action = next(a for a in plan["actions"] if a["action_id"] == action_id)
+        if action.get("adapter_id") == "homebrew_cask":
+            from catalog_manager_install import execute_manager_install
+            return execute_manager_install(plan, action, consent, recipes, environment, snapshot, state_dir)
         if digest(recipes) != plan["recipe_fingerprint"]:
             return fail("recipe_catalog_changed")
         current = _current(action, plan, recipes, environment, snapshot, roots)
@@ -688,7 +702,7 @@ def shell_execute(argv):
         print(json.dumps(result, ensure_ascii=True))
         return (
             0
-            if result["status"] in ("installed_verified", "manual_acquisition_opened")
+            if result["status"] in ("installed_verified", "manager_installed_verified", "manual_acquisition_opened")
             else 1 if result["status"] == "recovery_required" else 10
         )
     except (ValueError, OSError, KeyError, TypeError, IndexError, StopIteration):

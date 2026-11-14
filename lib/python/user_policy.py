@@ -12,6 +12,8 @@ SCOPES = {
     "manager_update",
     "direct_update",
     "native_launch",
+    "delegated_native_update",
+    "legacy_same_source_update",
 }
 CHOICES = {
     "preserve_source",
@@ -96,6 +98,7 @@ def source_fingerprint(target, resolution):
         "team_id",
         "manifest_path",
     )
+
     claims = []
     for e in target.get("evidence", []):
         if isinstance(e, dict) and e.get("kind") in (
@@ -114,6 +117,8 @@ def source_fingerprint(target, resolution):
             adapter_id=resolution.get("adapter_id"),
             candidate_sources=sorted(resolution.get("candidate_sources", [])),
             claims=sorted(claims, key=lambda x: json.dumps(x, sort_keys=True)),
+            **({"installed_updater_contract_sha256": resolution["installed_updater_contract_sha256"]}
+               if resolution.get("installed_updater_contract_sha256") else {}),
             **(
                 {
                     "recipe_fingerprint": resolution["recipe_fingerprint"],
@@ -124,6 +129,86 @@ def source_fingerprint(target, resolution):
             ),
         )
     )
+
+
+def _deny_binding(target):
+    ref = target_ref(target)
+    if ref["kind"] == "app":
+        return dict(target=ref, path=_path(target.get("path")), real_path=_path(target.get("real_path")))
+    return dict(target=ref, prefix=_path(target.get("prefix")), manager=target.get("manager"),
+                source_identity=target.get("source_identity"))
+
+
+def deny_decision_matches(decision, target, now):
+    """Exclusions may stay sticky across added evidence; this never grants work."""
+    try:
+        if (decision.get("choice") not in ("preserve_source", "ignore")
+                or decision.get("target") != target_ref(target)
+                or timestamp(decision["created_at"]) > timestamp(now)
+                or (decision.get("expires_at") is not None
+                    and timestamp(now) >= timestamp(decision["expires_at"]))):
+            return False
+        binding = _deny_binding(target)
+        if binding["target"]["kind"] == "app":
+            if not binding.get("path") or not binding.get("real_path"):
+                return False
+        elif not binding.get("prefix") or not binding.get("source_identity"):
+            return False
+        if decision.get("deny_binding") is not None:
+            return decision["deny_binding"] == binding
+        if decision.get("identity_fingerprint") == identity_fingerprint(target):
+            return True
+        # Earlier inventory was static and had no signer. Reconstruct that exact
+        # identity hash, including both paths, only for a denial from that era.
+        raw = dict(target, team_id=None)
+        return (binding["target"]["kind"] == "app"
+                and decision.get("identity_fingerprint") == identity_fingerprint(raw))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
+
+
+def installed_update_default(policies):
+    """A profile agreement covers existing supported installations, never setup."""
+    try:
+        rule = policies.get("installed_updates", {})
+        return bool(isinstance(policies.get("profile_id"), str) and policies["profile_id"]
+                    and rule.get("enabled") is True
+                    and rule.get("scope") == "same_source_existing_only"
+                    and timestamp(rule["confirmed_at"]))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
+
+
+def get_update_decision(target, resolution, policies, now, scope):
+    """Rebind a saved profile agreement to fresh evidence for this one action."""
+    decision = get_decision(target, resolution, policies, now)
+    if decision is not None:
+        return decision
+    if (not installed_update_default(policies)
+            or timestamp(policies["installed_updates"]["confirmed_at"]) > timestamp(now)
+            or target.get("presence") != "present" or target.get("freshness") != "fresh"):
+        return None
+    source, cap = resolution.get("source"), resolution.get("capability")
+    allowed = False
+    if scope == "manager_update":
+        allowed = source in ("homebrew", "npm", "app_store") and cap == "native_managed"
+    elif scope in ("direct_update", "native_launch"):
+        expected = "reviewed_direct" if scope == "direct_update" else "reviewed_native"
+        allowed = cap == expected and bool(resolution.get("verified_recipe"))
+    elif scope in ("delegated_native_update", "legacy_same_source_update"):
+        from installed_native_updaters import installed_updater_contract
+        contract = installed_updater_contract(target)
+        expected = "native_window" if scope == "delegated_native_update" else "legacy_handler"
+        allowed = bool(source in ("unknown", "vendor") and cap == "installed_native_delegate"
+                       and contract and contract["execution_kind"] == expected
+                       and resolution.get("installed_updater_contract_sha256") == digest(contract))
+        if contract and contract.get("whole_registered_manager_scope"):
+            allowed = allowed and policies["installed_updates"].get("allow_registered_vendor_groups") is True
+    if not allowed:
+        return None
+    choice = "allow_native_launch" if scope in ("native_launch", "delegated_native_update") else "allow_update_same_source"
+    return make_decision(target, resolution, choice, scope, policies["installed_updates"]["confirmed_at"],
+                         reason="installed_updates_profile_default")
 
 
 def make_decision(
@@ -152,10 +237,13 @@ def make_decision(
     if choice == "allow_update_same_source" and action_scope not in (
         "manager_update",
         "direct_update",
+        "legacy_same_source_update",
     ):
         raise ValueError("invalid_update_scope")
-    if choice == "allow_native_launch" and action_scope != "native_launch":
+    if choice == "allow_native_launch" and action_scope not in ("native_launch", "delegated_native_update"):
         raise ValueError("invalid_launch_scope")
+    if lifecycle_permissions and action_scope == "delegated_native_update":
+        raise ValueError("delegated_lifecycle_not_authorized")
     if choice == "allow_check" and action_scope != "network_check":
         raise ValueError("invalid_check_scope")
     created = timestamp(now)
@@ -179,11 +267,14 @@ def make_decision(
         created_at=now,
         expires_at=expires_at,
         reason=reason,
+        **({"deny_binding": _deny_binding(target)} if choice in ("preserve_source", "ignore", "defer") else {}),
     )
 
 
 def decision_is_valid(decision, target, resolution, now):
     try:
+        if deny_decision_matches(decision, target, now):
+            return True
         return bool(
             decision["choice"] in CHOICES
             and decision["action_scope"] in SCOPES
@@ -231,11 +322,11 @@ def record_decision(decision, policies):
         raise ValueError("invalid_expiry")
     if decision["choice"] == "allow_update_same_source" and decision[
         "action_scope"
-    ] not in ("manager_update", "direct_update"):
+    ] not in ("manager_update", "direct_update", "legacy_same_source_update"):
         raise ValueError("invalid_scope")
     if (
         decision["choice"] == "allow_native_launch"
-        and decision["action_scope"] != "native_launch"
+        and decision["action_scope"] not in ("native_launch", "delegated_native_update")
     ):
         raise ValueError("invalid_scope")
     if (
@@ -260,5 +351,7 @@ def permits(decision, scope):
         ("allow_check", "network_check"),
         ("allow_update_same_source", "manager_update"),
         ("allow_update_same_source", "direct_update"),
+        ("allow_update_same_source", "legacy_same_source_update"),
         ("allow_native_launch", "native_launch"),
+        ("allow_native_launch", "delegated_native_update"),
     }

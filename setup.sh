@@ -83,6 +83,7 @@ fi
 # Track action failures separately from the initial readiness report.
 status=0
 confirm() {
+    [ "${MAC_UPDATE_TUI_CHILD:-0}" != 1 ] || printf '\n@@MAC_UPDATE_PROMPT\n'
     printf '%s [y/N] ' "$1"
     IFS= read -r answer || return 1
     case "$answer" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac

@@ -1113,3 +1113,37 @@ L_PLAN_SOURCE_MANAGED="Zarządzane przez Twoją organizację"
 L_PLAN_NO_ELIGIBLE="Obecnie nie można zatwierdzić żadnego działania. Wcześniejsze zgody pozostają w mocy."
 L_PLAN_PREFERENCES_CHOICES="Które pozycje zatwierdzasz? Np. 1,3 zezwala tylko na pokazane działania 1 i 3. dN odrocz, iN ignoruj, mN ręcznie, rN wyzeruj wybór. n następna strona, p poprzednia. Enter lub q: dalej bez nowych zgód."
 L_ALL_CONFIRM_PLAN="Rozpocząć sprawdzanie tego Maca i przejrzeć zgody na aktualizacje?"
+
+# Delegated installed vendor updater consent and recovery.
+L_PLAN_SCOPE_DELEGATED="Otwórz zainstalowaną podpisaną aplikację. Jej aktualizator wybierze oferowane wydanie według obecnych ustawień kanału. Aplikacja pozostanie otwarta. Wynik niepotwierdzony; inne aktualizacje czekają na potwierdzenie zakończenia."
+L_NATIVE_RECOVERY_TITLE="Niepotwierdzone sesje aktualizatorów producenta"
+L_NATIVE_RECOVERY_NONE="Żadna delegowana sesja aktualizatora nie wymaga wyjaśnienia."
+L_NATIVE_RECOVERY_SELECT="Wybierz numer jednej sesji do sprawdzenia lub naciśnij Enter, aby anulować."
+L_NATIVE_RECOVERY_SCOPE="Potwierdzasz tylko zakończenie aktualizatora i instalatorów producenta. Nie potwierdzasz najnowszej wersji."
+L_NATIVE_RECOVERY_CONFIRM="Po sprawdzeniu aplikacji i aktualizatora wpisz FINISHED, aby potwierdzić, że żaden instalator ani pobieranie już nie działa. Enter anuluje."
+L_NATIVE_RECOVERY_CANCELLED="Nie potwierdzono zakończenia. Zasoby producenta pozostają zarezerwowane."
+L_NATIVE_RECOVERY_REJECTED="Bieżąca tożsamość lub źródło nie zgadza się. Sesja pozostaje nierozstrzygnięta."
+L_NATIVE_RECOVERY_DONE="Zapisano Twoje potwierdzenie zakończenia i zwolniono rezerwację zasobów. Nie zweryfikowano aktualizacji."
+
+# Exact, fresh approval for the requested concurrent native batch.
+L_PLAN_BATCH_TITLE_FMT="Automatyczna grupa Internet: %s kwalifikujących się aplikacji."
+L_PLAN_BATCH_SCOPE="Przejrzyj każdy wymieniony zakres, w tym jawnie opisaną grupę menedżera producenta. Ich natywne okna lub zatwierdzone procedury aktualizacji z tego samego źródła mogą ruszyć równocześnie. Zgoda zapisuje automatyczne uprawnienia dla wymienionych aplikacji, zastępując ich zapisany wybór ręczny. Natywne aktualizatory wybierają wydanie według dotychczasowych ustawień kanału. DeepSeek pozostaje ręczny. Pozostaw aplikacje otwarte; zakończenie wymaga przeglądu odzyskiwania."
+L_PLAN_BATCH_NONE="Brak kwalifikujących się aplikacji automatycznych. Nieobsługiwane aplikacje i DeepSeek pozostają ręczne; wykluczenia i kontrola źródeł nadal obowiązują."
+L_PLAN_BATCH_QUESTION="Po obejrzeniu wszystkich stron wpisz AUTO, aby zatwierdzić dokładnie tę równoległą grupę. DeepSeek pozostaje ręczny. n dalej, p wstecz. Enter lub q odracza grupę bez zmiany zapisanych zgód."
+L_PLAN_BATCH_READ_ALL="Przejrzyj wszystkie strony przed zatwierdzeniem grupy. Nie zmieniono żadnej zgody."
+L_PLAN_SCOPE_LEGACY="Uruchom dotychczasową procedurę tego samego źródła; może pobrać i zastąpić aplikację"
+L_ALL_SYSTEM_NATIVE_PENDING="Pominięto, bo zakończenie natywnej aktualizacji jest niepotwierdzone; sprawdź odzyskiwanie przed aktualizacją systemu."
+L_PLAN_BATCH_PREVIEW="Żądana grupa automatyczna. Uruchomienie nadal wymaga świeżej zgody na dokładny kwalifikujący się zakres."
+L_PLAN_SCOPE_GOOGLE_GROUP="Grupa aktualizatora Google: może pobrać lub zastąpić WSZYSTKIE zarejestrowane produkty Google, także spoza katalogu. Pełna lista rejestracji jest nieznana; zakres jest szerszy niż wymienione aplikacje."
+L_PLAN_PREVIEW_UNSUPPORTED="Brak automatycznej metody aktualizacji; zaktualizuj ręcznie"
+
+L_PLAN_DEFAULT_SCOPE="Włącz aktualizacje obsługiwanych aplikacji i pakietów już zainstalowanych w tym profilu, z ich obecnych źródeł. Aktualizatory natywne mogą otwierać aplikacje; zatwierdzone procedury mogą je pobierać i zastępować. Grupy aktualizatora Google mogą aktualizować WSZYSTKIE zarejestrowane produkty Google, także spoza katalogu; pełna lista rejestracji jest nieznana. Zapisane wybory ręczne, wykluczenia i odroczenia nadal obowiązują. DeepSeek, konflikty źródeł i aplikacje chronione pozostają zablokowane. Ta zgoda nie instaluje aplikacji z katalogu i nie zezwala na zamykanie ani restart aplikacji."
+L_PLAN_DEFAULT_QUESTION="Wpisz ENABLE, aby zapisać tę zgodę na kolejne uruchomienia. Pusta odpowiedź lub q pozostawia ją wyłączoną. Zmienisz ją później w Preferencjach."
+
+# Explicit optional manager installation
+L_CATALOG_MANAGER="Opcjonalna instalacja przez Homebrew za wyraźną zgodą"
+L_CATALOG_MANAGER_METADATA="Sprawdzony zakres uprawnień menedżera Homebrew"
+L_INSTALL_MANAGER_VERIFIED="Zainstalowano; potwierdzono zapis instalacji Homebrew"
+L_INSTALL_MANAGER_PERMISSION="Zgoda: istniejący Homebrew może wykonać wybrany oficjalny cask oraz zainstalować aplikację, dowiązania CLI, strony podręcznika i zadeklarowane zależności. Weryfikacja obejmuje zapis instalacji menedżera."
+L_INSTALL_MANAGER_DEPENDENCIES="Zadeklarowane zależności Homebrew"
+L_INSTALL_MANAGER_EFFECTS="Zainstaluj wybrany cask przez Homebrew"

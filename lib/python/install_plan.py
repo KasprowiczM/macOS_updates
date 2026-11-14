@@ -5,9 +5,11 @@ import os
 import re
 import uuid
 import datetime
+import subprocess
 from user_policy import digest, timestamp
 from vendor_feeds import version_compare
 from setup_catalog import safe_official_url, match_catalog_snapshot
+from catalog_manager_install import manager_recipe_eligible
 
 DEFAULT_REQUIREMENTS = {
     "homebrew": dict(
@@ -269,6 +271,13 @@ def resolve_requirements(selections, environment, recipes):
         visiting.remove(key)
         visited.add(key)
         observed = environment.get(key, {})
+        if key == "homebrew" and any(manager_recipe_eligible(by_id[s["product_id"]]) for s in selections):
+            from catalog_manager_install import trusted_brew
+            try:
+                trusted_brew()
+                observed = dict(satisfied=True)
+            except (OSError, ValueError):
+                observed = {}
         if not isinstance(observed, dict):
             observed = {}
         version = observed.get("version")
@@ -359,11 +368,21 @@ def build_install_plan(selections, snapshot, recipes, now):
             [selection], snapshot.get("environment", {}), recipes
         )
         eligible = (
-            install_recipe_eligible(recipe, snapshot.get("environment", {}), now)
+            (install_recipe_eligible(recipe, snapshot.get("environment", {}), now)
+             or manager_recipe_eligible(recipe, now))
             and own_requirements["complete"]
             and selection["source_id"] == recipe.get("installation_source")
             and selection["source_id"] != "app_store"
         )
+        manager_preview = None
+        if eligible and recipe.get("install_adapter") == "homebrew_cask":
+            from catalog_manager_install import preview_cask, snapshot_proves_absence
+            try:
+                if not snapshot_proves_absence(snapshot, recipe["product_id"], recipe["destination"]):
+                    raise ValueError("source_absence_unproven")
+                manager_preview = preview_cask(recipe)
+            except (ValueError, OSError, subprocess.SubprocessError):
+                eligible = False
         reason = (
             "already_installed_manual_migration"
             if installed
@@ -411,6 +430,8 @@ def build_install_plan(selections, snapshot, recipes, now):
             reason_codes=[reason],
             installed=copy.deepcopy(installed),
         )
+        if manager_preview is not None:
+            action["manager_preview"] = manager_preview
         if eligible and "verified_recipe" in recipe:
             action["verified_recipe_bindings"] = verified_install_bindings(recipe)
             action["verified_environment"] = copy.deepcopy(
@@ -471,9 +492,9 @@ def validate_install_plan(plan):
         ):
             raise ValueError("install_action_changed")
         if action["kind"] == "install" and (
-            not install_recipe_eligible(
+            not (install_recipe_eligible(
                 action["recipe"], action.get("verified_environment"), plan["created_at"]
-            )
+            ) or manager_recipe_eligible(action["recipe"], plan["created_at"]))
             or action.get("destination") != action["recipe"]["destination"]
             or action.get("version") != action["recipe"]["version"]
             or action.get("artifact_effects") != [action["destination"]]
@@ -485,6 +506,15 @@ def validate_install_plan(plan):
             )
         ):
             raise ValueError("install_recipe_unreviewed")
+        if action["kind"] == "install" and manager_recipe_eligible(action["recipe"], plan["created_at"]):
+            from catalog_manager_install import validate_manager_cask
+            preview = action.get("manager_preview", {})
+            expected = validate_manager_cask(action["product_id"], preview.get("metadata"),
+                                     action["recipe"]["manager_delegation"]["stable_version"])
+            if (preview != expected or action.get("source_id") != "homebrew"
+                    or action.get("adapter_id") != action["recipe"].get("install_adapter")
+                    or action.get("permissions") != ["manager_delegated_install"]):
+                raise ValueError("manager_candidate_changed")
         if (
             action["kind"] == "install"
             and "verified_recipe" in action["recipe"]

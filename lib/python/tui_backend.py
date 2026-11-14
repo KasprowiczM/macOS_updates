@@ -26,8 +26,11 @@ from inventory_store import StoreError, _open_regular, _root
 GROUPS = ("appstore", "npm", "brew", "internet", "system")
 LANGUAGES = ("en", "pl", "de", "fr", "es", "it", "pt")
 DEFAULT_SETTINGS = dict(language="en", groups=list(GROUPS), theme="dark",
-                        ascii=False, auto_resize=True, wizard_complete=False)
+                        ascii=False, auto_resize=True, wizard_complete=False, internet_mode="automatic")
 ACTIONS = {
+    "native_recovery": dict(script="scripts/reconcile_native.sh", args=(), mutating=True),
+    "toolkit_check": dict(script="scripts/update_toolkit.sh", args=("--check",), mutating=False),
+    "toolkit_prepare": dict(script="scripts/update_toolkit.sh", args=("--prepare",), mutating=False),
     "preview": dict(script="update_all.sh", args=("--dry-run",), mutating=False, grouped=True),
     "update": dict(script="update_all.sh", args=("--cli",), mutating=True, grouped=True),
     "inventory": dict(script="build_inventory.sh", args=("--cli",), mutating=True),
@@ -58,7 +61,7 @@ def _settings(value):
     if not isinstance(value, dict) or set(value) - set(DEFAULT_SETTINGS):
         raise ValueError("invalid_tui_settings")
     result = dict(DEFAULT_SETTINGS, **value)
-    if result["language"] not in LANGUAGES or result["theme"] not in ("dark", "light"):
+    if result["language"] not in LANGUAGES or result["theme"] not in ("dark", "light") or result["internet_mode"] not in ("automatic", "per_app"):
         raise ValueError("invalid_tui_settings")
     if any(type(result[key]) is not bool for key in ("ascii", "auto_resize", "wizard_complete")):
         raise ValueError("invalid_tui_settings")
@@ -122,7 +125,7 @@ def save_settings(root, settings):
     return value
 
 
-def build_command(repo, action, groups=None, settings=None):
+def build_command(repo, action, groups=None, settings=None, install_plan=None):
     settings = _settings(settings)
     groups = _groups(settings["groups"] if groups is None else groups)
     if not isinstance(action, str) or action not in ACTIONS:
@@ -138,7 +141,18 @@ def build_command(repo, action, groups=None, settings=None):
     if action == "update" and not groups:
         raise ValueError("no_update_groups_selected")
     command = ["/bin/bash", str(script), *spec["args"]]
+    if install_plan is not None:
+        from install_execution import load_install_plan
+        from inventory_store import default_root
+        path = Path(install_plan)
+        directory = Path(_root(default_root(), False) or default_root()) / 'install-plans'
+        if action != 'catalog' or path.parent != directory or path.is_symlink() or path.resolve(strict=True) != path:
+            raise ValueError('unsafe_tui_install_plan')
+        load_install_plan(str(path))
+        command = ['/bin/bash', str(script), '--cli', '--install-plan', str(path)]
     if spec.get("grouped"):
+        if "internet" in groups and settings["internet_mode"] == "automatic":
+            command.append("--automatic-internet-batch")
         command.extend("--skip-" + group for group in GROUPS if group not in groups)
     return command
 
@@ -152,6 +166,7 @@ def _child_environment(settings):
         "MAC_UPDATE_PREFERENCES_ONLY", "MAC_UPDATE_VERIFY_ONLY", "MAC_UPDATE_JSON_SUMMARY",
         "MAC_UPDATE_INVENTORY_ONLY", "MAC_UPDATE_BOOTSTRAP_CLI", "MAC_UPDATE_PLAN_PATH",
         "MAC_UPDATE_SESSION_DIR", "MAC_UPDATE_RUN_ID", "MAC_UPDATE_ALLOW_MAJOR_UPGRADE",
+        "MAC_UPDATE_AUTOMATIC_INTERNET_BATCH",
     }
     env = {key: value for key, value in os.environ.items()
            if key not in reset and not key.startswith(("MAC_UPDATE_SKIP_", "MAC_UPDATE_SYSTEM_GUARD_"))}
@@ -215,9 +230,9 @@ def worker_main(terminal_fd, command):
 class TerminalJob:
     """One explicitly started job; no auto answers, logging or forced shutdown."""
 
-    def __init__(self, repo, action, groups=None, settings=None):
+    def __init__(self, repo, action, groups=None, settings=None, install_plan=None):
         self.settings = _settings(settings)
-        self.command = build_command(repo, action, groups, self.settings)
+        self.command = build_command(repo, action, groups, self.settings, install_plan=install_plan)
         self._process = None
         self._master = None
         self._size = (24, 80)

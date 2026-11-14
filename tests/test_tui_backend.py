@@ -60,10 +60,58 @@ class BackendTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_command(self.repo, action, groups, self.settings)
 
+    def test_automatic_internet_batch_is_a_closed_requested_mode_not_a_grant(self):
+        settings = dict(self.settings, internet_mode='automatic')
+        for action in ('preview', 'update'):
+            command = build_command(self.repo, action, ['internet'], settings)
+            self.assertEqual(command.count('--automatic-internet-batch'), 1)
+            self.assertNotIn('--yes', command)
+            self.assertNotIn('-y', command)
+            self.assertNotIn('--automatic-internet-batch', build_command(self.repo, action, ['brew'], settings))
+            self.assertNotIn('--automatic-internet-batch', build_command(self.repo, action, ['internet'], dict(settings, internet_mode='per_app')))
+        self.assertNotIn('--automatic-internet-batch', build_command(self.repo, 'preferences', GROUPS, settings))
+        with self.assertRaises(ValueError):
+            build_command(self.repo, 'update', GROUPS, dict(settings, internet_mode='automatic;touch fixture'))
+
+    def test_old_display_settings_receive_mode_without_policy_writes(self):
+        from tui_backend import _settings
+        old = {key: value for key, value in self.settings.items() if key != 'internet_mode'}
+        self.assertEqual(_settings(old)['internet_mode'], 'automatic')
+        self.assertFalse((self.root / 'state').exists())
+        state = self.root / 'mode-state'
+        save_settings(state, dict(self.settings, internet_mode='per_app'))
+        self.assertEqual(load_settings(state)['internet_mode'], 'per_app')
+        self.assertEqual([p.name for p in state.iterdir()], ['tui-settings.json'])
+
+    def test_inherited_batch_request_does_not_override_per_app_mode(self):
+        from tui_backend import _child_environment
+        with patch.dict(os.environ, {'MAC_UPDATE_AUTOMATIC_INTERNET_BATCH': '1'}):
+            self.assertIsNone(_child_environment(dict(self.settings, internet_mode='per_app')).get('MAC_UPDATE_AUTOMATIC_INTERNET_BATCH'))
+
     def test_preferences_cannot_dispatch_saved_update_permissions(self):
         command = build_command(self.repo, "preferences", GROUPS, self.settings)
         self.assertIn("--preferences-only", command)
         self.assertNotIn("--preferences", command)
+
+    def test_catalog_plan_uses_private_existing_file_and_fixed_argv(self):
+        state = self.root/'private-state'
+        save_settings(state, self.settings)
+        directory = state/'install-plans'
+        directory.mkdir(mode=0o700)
+        plan = directory/'selection.json'
+        plan.write_text('{}')
+        plan.chmod(0o600)
+        with patch.dict(os.environ, {'MAC_UPDATE_STATE_DIR':str(state)}), \
+             patch('install_execution.load_install_plan', return_value={'fixture':True}) as load:
+            command = build_command(self.repo, 'catalog', settings=self.settings, install_plan=plan)
+            self.assertEqual(command, ['/bin/bash',str(self.repo/'setup.sh'),'--cli','--install-plan',str(plan)])
+            load.assert_called_once_with(str(plan))
+            for action, path in (('update',plan), ('catalog',self.root/'foreign.json')):
+                with self.assertRaises(ValueError):
+                    build_command(self.repo, action, settings=self.settings, install_plan=path)
+        with patch.dict(os.environ, {'MAC_UPDATE_STATE_DIR':str(state)}):
+            with self.assertRaises((ValueError,StoreError)):
+                build_command(self.repo, 'catalog', settings=self.settings, install_plan=plan)
 
     def test_script_symlink_cannot_escape_the_selected_repository(self):
         outside = self.root / "outside.sh"

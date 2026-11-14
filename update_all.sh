@@ -322,6 +322,14 @@ if [ "${MAC_UPDATE_INVENTORY_ONLY:-0}" = "1" ]; then
     export MAC_UPDATE_SKIP_BREW=1 MAC_UPDATE_SKIP_INTERNET=1 MAC_UPDATE_YES=1
 fi
 
+# CLI progress and batch review defaults. Neither setting grants permission.
+if [ "${MAC_UPDATE_TUI_CHILD:-0}" != "1" ]; then
+    export MAC_UPDATE_AUTOMATIC_INTERNET_BATCH="${MAC_UPDATE_AUTOMATIC_INTERNET_BATCH:-1}"
+    if [ "${MAC_UPDATE_JSON_SUMMARY:-0}" != "1" ] && [ "${MAC_UPDATE_JSON_RESULTS:-0}" != "1" ]; then
+        export MAC_UPDATE_CLI_PROGRESS=1
+    fi
+fi
+
 # --doctor: a read-only report. It runs before the platform guard (so an
 # unsupported platform is reported, not just fatal) and before everything that
 # mutates or records: no session dir, no run log, no lock, no sudo, no summary.
@@ -930,6 +938,61 @@ if [ "$SYSTEM_DEFERRED" -eq 0 ]; then
     tui_phase_event system "$STATUS_CODE_SYSTEM"
 fi
 
+# The joint queue starts only after consent and sudo preparation.
+# Once started, a missing or invalid report is a hard failure, never a retry.
+MIXED_QUEUE_STARTED=0
+MIXED_APPSTORE=1 MIXED_NPM=1 MIXED_BREW=1 MIXED_INTERNET=1 MIXED_PENDING=0
+if [ "${MAC_UPDATE_MIXED_QUEUE:-1}" = "1" ] && [ "${MAC_UPDATE_DRY_RUN:-0}" != "1" ] && [ "${PLAN_PREPARE_EXIT:-10}" -eq 0 ]; then
+    set --
+    [ "${MAC_UPDATE_SKIP_APPSTORE:-0}" = "1" ] || set -- "$@" app_store
+    [ "${MAC_UPDATE_SKIP_NPM:-0}" = "1" ] || set -- "$@" npm
+    [ "${MAC_UPDATE_SKIP_BREW:-0}" = "1" ] || set -- "$@" homebrew
+    [ "${MAC_UPDATE_SKIP_INTERNET:-0}" = "1" ] || set -- "$@" vendor
+    if [ "$#" -gt 0 ]; then
+        MIXED_QUEUE_STARTED=1
+        MAC_UPDATE_ADAPTER_REPORT="$SESSION_DIR/adapter-report.json"; export MAC_UPDATE_ADAPTER_REPORT
+        rm -f "$MAC_UPDATE_ADAPTER_REPORT" || { MIXED_QUEUE_STARTED=0; unset MAC_UPDATE_ADAPTER_REPORT; }
+        if [ "$MIXED_QUEUE_STARTED" = 1 ]; then
+        PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from policy_runtime import main
+sys.exit(main(sys.argv[1:]))' adapters "$MAC_UPDATE_PLAN_PATH" "$@"
+        MIXED_EXIT=$?
+        MIXED_CODES=$(python3 - "$MAC_UPDATE_ADAPTER_REPORT" "$MIXED_EXIT" "$@" <<'PY_MIXED_REPORT'
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as stream:
+        report = json.load(stream)
+    codes = report["adapters"]
+    selected = sys.argv[3:]
+    if report["schema_version"] != 1 or set(codes) != set(selected) or type(report.get("native_batch_pending")) is not bool:
+        raise ValueError("invalid adapter report")
+    if any(type(code) is not int or code not in (0, 1, 10) for code in codes.values()):
+        raise ValueError("invalid adapter status")
+    aggregate = 1 if 1 in codes.values() else max(codes.values(), default=0)
+    if aggregate != int(sys.argv[2]):
+        raise ValueError("adapter exit mismatch")
+    print(*(codes.get(adapter, 0) for adapter in ("app_store", "npm", "homebrew", "vendor")), int(report["native_batch_pending"]))
+except (OSError, ValueError, TypeError, KeyError):
+    sys.exit(1)
+PY_MIXED_REPORT
+) || MIXED_CODES="1 1 1 1 1"
+        read -r MIXED_APPSTORE MIXED_NPM MIXED_BREW MIXED_INTERNET MIXED_PENDING <<EOF_MIXED_CODES
+$MIXED_CODES
+EOF_MIXED_CODES
+        unset MAC_UPDATE_ADAPTER_REPORT
+        fi
+    fi
+fi
+
+mixed_queue_result() {
+    case "$1" in
+        0) MIXED_RESULT="$L_ALL_RESULT_OK"; MIXED_STATUS=ok ;;
+        10) MIXED_RESULT="⚠️  ${L_ALL_RESULT_DEGRADED:-completed with warnings}"; MIXED_STATUS=warn; DEGRADED=1 ;;
+        *) MIXED_RESULT="$L_STATUS_ERROR"; MIXED_STATUS=error; OVERALL_EXIT=1; BLOCKING_EXIT=1 ;;
+    esac
+}
+
 # ============================================================
 # STEP 1: App Store update
 # ============================================================
@@ -938,6 +1001,11 @@ if [ "${MAC_UPDATE_SKIP_APPSTORE:-0}" = "1" ]; then
     print_info "Skipped step 1 (--skip-appstore)"
     RESULT_APPSTORE="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_APPSTORE="skipped"
+elif [ "$MIXED_QUEUE_STARTED" = "1" ]; then
+    mixed_queue_result "$MIXED_APPSTORE"
+    RESULT_APPSTORE="$MIXED_RESULT"
+    STATUS_CODE_APPSTORE="$MIXED_STATUS"
+    tui_phase_event appstore "$STATUS_CODE_APPSTORE"
 else
 step_header 1 6 "$L_SCRIPT_TITLE_APPSTORE"
 step_timer_start appstore
@@ -991,6 +1059,11 @@ if [ "${MAC_UPDATE_SKIP_NPM:-0}" = "1" ]; then
     print_info "Skipped step 2 (--skip-npm)"
     RESULT_NPMCLI="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_NPMCLI="skipped"
+elif [ "$MIXED_QUEUE_STARTED" = "1" ]; then
+    mixed_queue_result "$MIXED_NPM"
+    RESULT_NPMCLI="$MIXED_RESULT"
+    STATUS_CODE_NPMCLI="$MIXED_STATUS"
+    tui_phase_event npmcli "$STATUS_CODE_NPMCLI"
 else
 step_header 2 6 "Native CLI + npm"
 step_timer_start npmcli
@@ -1030,6 +1103,11 @@ if [ "${MAC_UPDATE_SKIP_BREW:-0}" = "1" ]; then
     print_info "Skipped step 3 (--skip-brew)"
     RESULT_BREW="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_BREW="skipped"
+elif [ "$MIXED_QUEUE_STARTED" = "1" ]; then
+    mixed_queue_result "$MIXED_BREW"
+    RESULT_BREW="$MIXED_RESULT"
+    STATUS_CODE_BREW="$MIXED_STATUS"
+    tui_phase_event brew "$STATUS_CODE_BREW"
 else
 step_header 3 6 "$L_SCRIPT_TITLE_BREW"
 step_timer_start brew
@@ -1077,6 +1155,11 @@ if [ "${MAC_UPDATE_SKIP_INTERNET:-0}" = "1" ]; then
     print_info "Skipped step 4 (--skip-internet)"
     RESULT_INTERNET="$L_ALL_RESULT_SKIPPED"
     STATUS_CODE_INTERNET="skipped"
+elif [ "$MIXED_QUEUE_STARTED" = "1" ]; then
+    mixed_queue_result "$MIXED_INTERNET"
+    RESULT_INTERNET="$MIXED_RESULT"
+    STATUS_CODE_INTERNET="$MIXED_STATUS"
+    tui_phase_event internet "$STATUS_CODE_INTERNET"
 else
 step_header 4 6 "$L_SCRIPT_TITLE_INTERNET"
 step_timer_start internet
@@ -1151,6 +1234,11 @@ if [ "$SYSTEM_DEFERRED" -eq 1 ]; then
     if mac_update_dry_run_msg "update_system.sh (final step)"; then
         RESULT_SYSTEM="[DRY-RUN] skipped"
         STATUS_CODE_SYSTEM="skipped"
+    elif [ "$MIXED_PENDING" = "1" ]; then
+        RESULT_SYSTEM="${L_ALL_SYSTEM_NATIVE_PENDING:-Skipped while native updater completion is unconfirmed; inspect recovery before system updates.}"
+        STATUS_CODE_SYSTEM="skipped"
+        DEGRADED=1
+        print_warn "$RESULT_SYSTEM"
     elif [ "$BLOCKING_EXIT" -ne 0 ]; then
         # Only a blocking hard failure may defer macOS updates. Soft/degraded
         # results (exit 10) never reach this branch — see the severity contract.

@@ -1115,3 +1115,37 @@ L_PLAN_SOURCE_MANAGED="Managed by your organization"
 L_PLAN_NO_ELIGIBLE="No actions can be approved now. Saved permissions remain in effect."
 L_PLAN_PREFERENCES_CHOICES="Which items do you allow? For example 1,3 approves only those scopes. dN defer, iN ignore, mN manual, rN reset. n next page, p previous. Enter or q: continue without new consent."
 L_ALL_CONFIRM_PLAN="Start checking this Mac and review update permissions?"
+
+# Delegated installed vendor updater consent and recovery.
+L_PLAN_SCOPE_DELEGATED="Open the installed signed vendor app and let its updater choose the offered release using its existing channel settings. Leave the app open. Completion is unconfirmed; other updates wait for recovery confirmation."
+L_NATIVE_RECOVERY_TITLE="Unconfirmed vendor updater sessions"
+L_NATIVE_RECOVERY_NONE="No delegated vendor updater session needs recovery."
+L_NATIVE_RECOVERY_SELECT="Select one session number to review, or press Enter to cancel."
+L_NATIVE_RECOVERY_SCOPE="This confirms only that the vendor updater and its installers have finished. It does not confirm the latest version."
+L_NATIVE_RECOVERY_CONFIRM="After checking the app and vendor updater, type FINISHED to confirm no installer or download is still running. Enter cancels."
+L_NATIVE_RECOVERY_CANCELLED="No recovery confirmed. Vendor resources remain reserved."
+L_NATIVE_RECOVERY_REJECTED="Fresh identity or source checks failed. The session remains unresolved."
+L_NATIVE_RECOVERY_DONE="Your completion report was recorded and the resource reservation was released. No update was verified."
+
+# Exact, fresh approval for the requested concurrent native batch.
+L_PLAN_BATCH_TITLE_FMT="Automatic Internet batch: %s eligible apps."
+L_PLAN_BATCH_SCOPE="Review each listed scope, including any explicitly disclosed vendor-manager group. Their native windows or approved same-source handlers may run concurrently. Approving saves automatic permissions for these listed apps, replacing their saved manual choices. Native updaters select releases using their existing channel settings. DeepSeek stays manual. Leave apps open; completion remains unconfirmed until recovery review."
+L_PLAN_BATCH_NONE="No eligible automatic Internet apps. Unsupported apps and DeepSeek stay manual; exclusions and source checks remain in force."
+L_PLAN_BATCH_QUESTION="Type AUTO to approve this exact concurrent batch after viewing every page. DeepSeek stays manual. n next, p previous. Empty or q defers this batch without changing saved permissions."
+L_PLAN_BATCH_READ_ALL="Review every page before approving the batch. No permission has changed."
+L_PLAN_SCOPE_LEGACY="Run the existing same-source handler; it may download and replace the app"
+L_ALL_SYSTEM_NATIVE_PENDING="Skipped while native updater completion is unconfirmed; inspect recovery before system updates."
+L_PLAN_BATCH_PREVIEW="Requested automatic batch. Run still requires fresh approval for the exact eligible scopes."
+L_PLAN_SCOPE_GOOGLE_GROUP="Google updater group: may download or replace ALL registered Google products, including products outside this catalog. The complete registration list is unknown; this scope is broader than the listed apps."
+L_PLAN_PREVIEW_UNSUPPORTED="Automatic update method unavailable; update manually"
+
+L_PLAN_DEFAULT_SCOPE="Enable updates for supported apps and packages already installed in this profile, using their current sources. Native updaters may open apps; approved handlers may download and replace them. Google updater groups may update ALL registered Google products, including products outside this catalog; the complete registration list is unknown. Saved manual, ignored and deferred choices stay in force. DeepSeek, source conflicts and protected apps remain blocked. This does not install catalog apps or grant permission to quit or restart apps."
+L_PLAN_DEFAULT_QUESTION="Type ENABLE to save this agreement for future runs. Empty or q leaves it disabled. Change it later in Preferences."
+
+# Explicit optional manager installation
+L_CATALOG_MANAGER="Optional Homebrew installation with explicit permission"
+L_CATALOG_MANAGER_METADATA="Reviewed Homebrew manager contract"
+L_INSTALL_MANAGER_VERIFIED="Installed; Homebrew receipt verified"
+L_INSTALL_MANAGER_PERMISSION="Permission: the existing Homebrew manager may execute this selected official cask, its app, CLI links, manual pages and declared dependencies. Verification covers the manager receipt."
+L_INSTALL_MANAGER_DEPENDENCIES="Declared Homebrew dependencies"
+L_INSTALL_MANAGER_EFFECTS="Install selected cask through Homebrew"

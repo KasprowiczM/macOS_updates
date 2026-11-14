@@ -6,6 +6,23 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-11-14
+
+- Restore readable text-mode group and target progress, including waiting and unconfirmed outcomes, instead of silent mixed-queue execution.
+- Keep contextual instructions in the terminal sidebar and test compact layouts with real terminal emulation.
+- Add one explicitly saved agreement for supported installed-app updates from current sources. Per-app exclusions, conflicts and protected targets remain effective; catalog installation is separate.
+- Narrow Homebrew ownership checks so unrelated incomplete metadata does not invalidate every native application.
+- Add outcome-specific next steps after a run, including source comparison without automatic migration.
+
+## [1.8.1] - 2026-11-14 (local checkpoint included in 1.8.2)
+
+- Reworked terminal controls with focusable buttons, automatic answer entry, saved inventory search/filter/sort and persistent preview rows.
+- Added per-target observational status, activity and elapsed time without inventing completion percentages.
+- Added About and explicit pinned toolkit update preview/application, preserving local code and settings. Re-running the installer preserves existing clones.
+- Restored installed-product automation through distinct signed native-window and legacy same-source download scopes, with one explicit batch approval. DeepSeek stays manual; Open Design reports its unavailable automatic method. No live product acceptance is claimed.
+- Added concurrent Internet batch execution under a shared exclusive reservation, grouped Microsoft and Google work, bounded simultaneous version observation and group recovery. Google requires explicit whole-updater scope; Office receives selected product IDs. Other managers remain serialized.
+- Updated all seven interface languages and guides. No host application updates were run for this change.
+
 ## [1.8.0] - 2026-11-14
 
 - Add a seven-language terminal workspace with a first-use wizard, group selection, persistent display settings, contextual details, live output, help and a fixed-action palette.

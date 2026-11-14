@@ -17,17 +17,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Session:
-    def __init__(self, repo, state, log, pidfile):
+    def __init__(self, repo, state, log, pidfile, rows=36, columns=120, initial_view='home'):
         self.master, self.slave = os.openpty()
-        self.resize(36, 120, notify=False)
+        self.resize(rows, columns, notify=False)
         env = os.environ.copy()
         env.update(TERM='xterm-256color', MAC_UPDATE_STATE_DIR=str(state),
                    MAC_UPDATE_LANG='en', FIXTURE_LOG=str(log), FIXTURE_PID=str(pidfile), PYTHONUNBUFFERED='1')
         env.pop('TMUX', None)
         env.pop('STY', None)
         code = ('import sys; sys.path.insert(0, sys.argv[1]); '
-                'from terminal_app import run; sys.exit(run(sys.argv[2]))')
-        self.proc = subprocess.Popen([sys.executable, '-c', code, str(ROOT / 'lib/python'), str(repo)],
+                'from terminal_app import run; sys.exit(run(sys.argv[2],sys.argv[3]))')
+        self.proc = subprocess.Popen([sys.executable, '-c', code, str(ROOT / 'lib/python'), str(repo), initial_view],
                                      stdin=self.slave, stdout=self.slave, stderr=self.slave,
                                      env=env, start_new_session=True)
         self.pidfile = pidfile
@@ -121,28 +121,59 @@ printf 'FIXTURE_PREVIEW_DONE\\n'
             self.session.close()
         self.temp.cleanup()
 
-    def start(self, completed=False):
+    def start(self, completed=False, rows=36, columns=120, initial_view='home'):
         if completed:
             (self.state / 'tui-settings.json').write_text(json.dumps({'wizard_complete': True, 'auto_resize': False}))
             (self.state / 'tui-settings.json').chmod(0o600)
-        self.session = Session(self.repo, self.state, self.log, self.pidfile)
+        self.session = Session(self.repo, self.state, self.log, self.pidfile, rows, columns, initial_view)
         return self.session
 
     def test_wizard_help_resize_and_clean_exit_without_actions(self):
         session = self.start()
         session.wait_for('Welcome')
         session.send('?')
-        session.wait_for('Dashboard help')
+        session.wait_for('When an operation asks a question')
         session.resize(18, 60)
         session.wait_for('Enlarge the terminal')
         session.resize(36, 120)
-        session.wait_for('Dashboard help')
+        session.wait_for('When an operation asks a question')
         session.send(b'\x1b')
-        session.send('q')
-        session.wait_for('Use i to open the answer dialog')
         session.send('q')
         session.finish()
         self.assertFalse(self.log.exists(), 'UI started a fixture action without permission')
+
+    def test_context_is_drawn_in_real_narrow_curses_session_and_after_resize(self):
+        session = self.start(completed=True, rows=30, columns=100)
+        session.deadline = time.monotonic() + 3
+        session.wait_for('Help and status')
+        session.wait_for('Workflow: Idle')
+        session.resize(38,140)
+        session.wait_for('Help and status')
+        session.send('q')
+        session.finish()
+        self.assertFalse(self.log.exists())
+
+    def test_real_curses_context_survives_every_width_and_prompt(self):
+        for rows, width in ((24,80),(30,100),(30,120),(38,140)):
+            for view in ('updates','inventory','wizard'):
+                with self.subTest(size=(rows,width),view=view):
+                    session = self.start(completed=True,rows=rows,columns=width,initial_view=view)
+                    session.wait_for('Help and status')
+                    session.wait_for('Workflow: Idle')
+                    session.wait_for('Enter')
+                    session.send('d')
+                    session.wait_for('FIXTURE_PREVIEW_READY')
+                    session.send('i')
+                    session.wait_for('Read the scope.')
+                    session.wait_for('Enter')
+                    session.send('fixture-answer\r')
+                    session.wait_for('Operation finished')
+                    session.send('q')
+                    session.finish()
+                    session.close()
+                    self.session = None
+        self.assertTrue(all(line.startswith('--dry-run') or line == 'answer:fixture-answer'
+                            for line in self.log.read_text().splitlines()))
 
     def test_preview_output_and_explicit_answer(self):
         session = self.start(completed=True)
@@ -158,7 +189,7 @@ printf 'FIXTURE_PREVIEW_DONE\\n'
         session.wait_for('Operation finished')
         session.send('q')
         session.finish()
-        self.assertEqual(self.log.read_text().splitlines(), ['--dry-run', 'answer:fixture-answer'])
+        self.assertEqual(self.log.read_text().splitlines(), ['--dry-run --automatic-internet-batch', 'answer:fixture-answer'])
 
 
 if __name__ == '__main__':

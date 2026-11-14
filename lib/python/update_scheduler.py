@@ -12,6 +12,7 @@ import fcntl
 import json
 import os
 import tempfile
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from inventory_store import _root, _open_regular, StoreError
@@ -71,6 +72,24 @@ def _exclusive(action):
     )
 
 
+def _resource_overlap(left, right):
+    if left == right:
+        return True
+    if left.startswith("path:") and right.startswith("path:"):
+        a, b = left[5:], right[5:]
+        try:
+            return os.path.commonpath((a, b)) in (a, b)
+        except ValueError:
+            return True  # Invalid or incomparable paths cannot prove independence.
+    if left.startswith(("manager:", "shared:")) and right.startswith(("manager:", "shared:")):
+        left_kind, left_name = left.split(":", 2)[:2]
+        right_kind, right_name = right.split(":", 2)[:2]
+        if left_name == right_name and (left_kind == right_kind == "manager" or
+                                        left_name in ("google_updater", "mau")):
+            return True
+    return False
+
+
 def _conflicts(action, rows):
     resources = set(_resources(action))
     return bool(
@@ -78,7 +97,8 @@ def _conflicts(action, rows):
         and (
             _exclusive(action)
             or any(
-                row.get("exclusive") is True or resources.intersection(row["resources"])
+                row.get("exclusive") is True
+                or any(_resource_overlap(a, b) for a in resources for b in row["resources"])
                 for row in rows
             )
         )
@@ -103,6 +123,14 @@ def schedule_ready_actions(actions, resource_state, limits):
                 dict(resources=_resources(action), exclusive=_exclusive(action))
             )
     return selected
+
+
+def _batch_members(value):
+    if (not isinstance(value, list) or not 1 <= len(value) <= 64
+            or any(not isinstance(item, str) or not item or len(item) > 256 for item in value)
+            or len(set(value)) != len(value)):
+        raise ValueError("invalid_batch_members")
+    return list(value)
 
 
 def _load(root):
@@ -139,6 +167,8 @@ def _load(root):
             ):
                 raise ValueError("invalid_scheduler_registry")
             _resources(row)
+            if "batch_member_action_ids" in row:
+                _batch_members(row["batch_member_action_ids"])
             ids.add(row["lease_id"])
             actions.add(row["action_id"])
         if len(data["leases"]) > MAX_MUTATIONS:
@@ -201,6 +231,32 @@ def assert_resources_available(resources, state_dir=None, owner_action_id=None):
             raise ValueError("pending_updater_session")
 
 
+def assert_active_batch_member(owner_action_id, action_id, state_dir=None):
+    """Require a live lease that explicitly admits this action to its batch."""
+    if not isinstance(owner_action_id, str) or not owner_action_id or not isinstance(action_id, str) or not action_id:
+        raise ValueError("mutation_lease_lost")
+    with _registry(state_dir, False) as (_, data):
+        owners = [row for row in data["leases"] if row["action_id"] == owner_action_id]
+        if len(owners) != 1 or owners[0]["status"] != "active":
+            raise ValueError("mutation_lease_lost")
+        owner = owners[0]
+        pid = owner.get("owner_pid")
+        if type(pid) is not int or pid <= 0:
+            raise ValueError("mutation_lease_lost")
+        try:
+            os.kill(pid, 0)
+        except PermissionError:
+            pass  # A process owned by another user still exists.
+        except OSError:
+            raise ValueError("mutation_lease_lost") from None
+        members = owner.get("batch_member_action_ids")
+        if members is None:
+            if owner_action_id != action_id or owner_action_id.startswith("native-batch:"):
+                raise ValueError("mutation_lease_member_mismatch")
+        elif action_id not in _batch_members(members):
+            raise ValueError("mutation_lease_member_mismatch")
+
+
 class ResourceLease:
     def __init__(self, lease_id, action_id, state_dir):
         self.lease_id = lease_id
@@ -241,6 +297,7 @@ def claim_action_resources(action, state_dir=None):
     if not isinstance(action_id, str) or not action_id or len(action_id) > 256:
         raise ValueError("invalid_action_id")
     resources = _resources(action)
+    members = _batch_members(action["batch_member_action_ids"]) if "batch_member_action_ids" in action else None
     with _registry(state_dir) as (root, data):
         rows = data["leases"]
         if any(r["action_id"] == action_id for r in rows) or _conflicts(action, rows):
@@ -259,6 +316,8 @@ def claim_action_resources(action, state_dir=None):
                 created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
             )
         )
+        if members is not None:
+            rows[-1]["batch_member_action_ids"] = members
         _write(root, data)
     return ResourceLease(lease_id, action_id, state_dir)
 
@@ -306,6 +365,65 @@ def claim_recovery_resources(
             _write(root, data)
             return ResourceLease(existing["lease_id"], original_action_id, state_dir)
     return claim_action_resources(action, state_dir)
+
+
+
+def execute_exclusive_batch(actions, execute, state_dir=None):
+    """Fan out launch requests under one global barrier and retain uncertainty.
+
+    The callback must not finish or release the shared lease. It returns an
+    outcome stating whether a vendor launch started or requires recovery.
+    """
+    actions = list(actions)
+    if not actions:
+        return []
+    if len(actions) > 64 or len({a["action_id"] for a in actions}) != len(actions):
+        raise ValueError("invalid_batch")
+    resources = sorted({resource for action in actions for resource in _resources(action)})
+    group = dict(action_id="native-batch:" + str(uuid.uuid4()), resources=resources,
+                 batch_member_action_ids=[action["action_id"] for action in actions],
+                 scope_complete=False, parallel_safe=False)
+    lease = claim_action_resources(group, state_dir)
+    results = []
+    try:
+        deadline = time.monotonic() + 30
+        with ThreadPoolExecutor(max_workers=len(actions)) as pool:
+            futures = []
+            managers = set()
+            for action in actions:
+                manager = action.get("legacy_manager_group")
+                if manager in ("google", "mau") and manager in managers:
+                    futures.append(None)
+                    continue
+                if manager in ("google", "mau"):
+                    managers.add(manager)
+                    members = [a for a in actions if a.get("legacy_manager_group") == manager]
+                    action = dict(action, batch_group_actions=members)
+                action = dict(action, batch_observation_deadline_monotonic=deadline)
+                futures.append(pool.submit(execute, action, lease))
+            for action, future in zip(actions, futures):
+                if future is None:
+                    outcome = dict(status="deferred_by_user", reason_code="shared_manager_requested_unconfirmed",
+                                   verified=False, mutation_started=False, recovery_required=False,
+                                   _exit_code=10)
+                else:
+                    try:
+                        outcome = dict(future.result())
+                    except Exception:
+                        outcome = dict(status="recovery_required", reason_code="executor_interrupted",
+                                       verified=False, mutation_started=True, recovery_required=True)
+                outcome["action_id"] = action["action_id"]
+                results.append(outcome)
+        if any(r.get("mutation_started") is not False or r.get("recovery_required") is not False
+               for r in results):
+            lease.pending("native_batch_completion_unconfirmed")
+        else:
+            lease.finish("not_triggered", helpers_complete=True)
+        return results
+    except BaseException:
+        if not lease.closed:
+            lease.pending("native_batch_observer_interrupted")
+        raise
 
 
 def execute_queue(actions, execute, state_dir=None, cancelled=None):

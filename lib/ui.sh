@@ -97,6 +97,7 @@ mac_update_prompt_yn() {
     t="$(mac_update_prompt_timeout)"
     mac_update_prompt_drain_input
     while :; do
+        [ "${MAC_UPDATE_TUI_CHILD:-0}" != 1 ] || printf '\n@@MAC_UPDATE_PROMPT\n'
         printf '  %s' "$prompt"
         started=$SECONDS
         if [ "$t" -gt 0 ]; then

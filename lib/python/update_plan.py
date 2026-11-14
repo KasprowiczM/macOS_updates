@@ -7,12 +7,31 @@ from user_policy import (
     identity_fingerprint,
     source_fingerprint,
     get_decision,
+    get_update_decision,
     permits,
     digest,
     timestamp,
 )
 
 MAX_PLAN_AGE = 900
+POLICY_REASONS = {
+    "preserve_source": "manual_by_policy",
+    "ignore": "ignored_by_policy",
+    "defer": "deferred_by_user",
+}
+
+
+def related_policy_reason(package, related_targets, policies, now):
+    """A manager wrapper cannot bypass exclusions on the apps it replaces."""
+    from source_resolver import resolve_target
+    snapshot = dict(instances=related_targets, packages=[package], sources={})
+    for related in related_targets:
+        resolution = resolve_target(related, snapshot, {"recipes": []})
+        decision = get_decision(related, resolution, policies, now)
+        reason = POLICY_REASONS.get((decision or {}).get("choice"))
+        if reason:
+            return reason
+    return None
 
 
 def artifact_effects(target):
@@ -33,6 +52,8 @@ def artifact_effects(target):
 
 def build_plan(snapshot, resolutions, policies, now):
     timestamp(now)
+    if policies.get("profile_id") not in (None, snapshot["profile_id"]):
+        raise ValueError("policy_profile_mismatch")
     plan = dict(
         schema_version=1,
         plan_id=str(uuid.uuid4()),
@@ -65,7 +86,8 @@ def build_plan(snapshot, resolutions, policies, now):
             ),
         )
         source, cap = resolution.get("source"), resolution.get("capability")
-        scope = (
+        scope = ("legacy_same_source_update" if resolution.get("installed_updater_contract", {}).get("execution_kind") == "legacy_handler"
+                 else "delegated_native_update") if cap == "installed_native_delegate" else (
             "manager_update"
             if source in ("homebrew", "npm", "app_store")
             else (
@@ -78,9 +100,15 @@ def build_plan(snapshot, resolutions, policies, now):
         )
         kind = "update" if scope != "local_observation" else "manual"
         reasons = []
-        if source == "conflict":
+        if "deepseek_manual_only" in resolution.get("reason_codes", []):
+            kind = "manual"
+            reasons.append("deepseek_manual_only")
+        elif cap == "unsupported_automatic":
+            kind = "unsupported"
+            reasons.append("unsupported_automatic_method")
+        elif source == "conflict":
             reasons.append("source_conflict")
-        elif source == "unknown":
+        elif source == "unknown" and cap != "installed_native_delegate":
             kind = "manual"
             reasons.append("manual_by_policy")
         elif target.get("presence") != "present":
@@ -96,16 +124,20 @@ def build_plan(snapshot, resolutions, policies, now):
         if ref["kind"] == "app" and source == "homebrew" and ref["id"] in related:
             kind = "skip"
             reasons.append("covered_by_package")
-        decision = get_decision(target, resolution, policies, now)
+        decision = get_update_decision(target, resolution, policies, now, scope)
         choice = decision.get("choice") if decision else None
-        policy_reason = {
-            "preserve_source": "manual_by_policy",
-            "ignore": "ignored_by_policy",
-            "defer": "deferred_by_user",
-        }.get(choice)
+        policy_reason = POLICY_REASONS.get(choice)
         if policy_reason:
             kind = "skip" if choice in ("ignore", "defer") else "manual"
             reasons.append(policy_reason)
+        related_targets = [
+            copy.deepcopy(a) for a in snapshot.get("instances", [])
+            if a["instance_id"] in target.get("related_instance_ids", [])
+        ]
+        inherited_reason = related_policy_reason(target, related_targets, policies, now)
+        if inherited_reason:
+            kind = "manual" if inherited_reason == "manual_by_policy" else "skip"
+            reasons.append(inherited_reason)
         if kind == "update" and not permits(decision, scope):
             reasons.append("consent_required")
         if reasons:
@@ -141,12 +173,22 @@ def build_plan(snapshot, resolutions, policies, now):
             snapshot_generation=plan["snapshot_generation"],
             base_snapshot_id=plan["base_snapshot_id"],
             expected_policy_fingerprint=plan["policy_fingerprint"],
-            related_targets=[
-                copy.deepcopy(a)
-                for a in snapshot.get("instances", [])
-                if a["instance_id"] in target.get("related_instance_ids", [])
-            ],
+            related_targets=related_targets,
         )
+        if cap == "installed_native_delegate":
+            contract = resolution["installed_updater_contract"]
+            action.update(
+                kind="open_native_updater" if kind == "update" and scope == "delegated_native_update" else kind,
+                installed_updater_contract_sha256=digest(contract),
+                scope_complete=contract["scope_complete"],
+                parallel_safe=contract["parallel_safe"],
+                shared_resources=copy.deepcopy(contract["shared_resources"]),
+                release_selection=contract["release_selection"],
+                execution_kind=contract["execution_kind"],
+                legacy_manager_group=contract.get("legacy_manager_group"),
+                legacy_registry_name=contract.get("registered_name"),
+                whole_registered_manager_scope=contract.get("whole_registered_manager_scope"),
+            )
         if resolution.get("verified_recipe"):
             from recipe_acceptance import (
                 recipe_fingerprint,
@@ -212,6 +254,8 @@ def authorize_action(action, current, policy, now):
                             "ignored_by_policy",
                             "deferred_by_user",
                             "manual_by_policy",
+                            "deepseek_manual_only",
+                            "unsupported_automatic_method",
                         )
                     ),
                     "manual_by_policy",
@@ -228,7 +272,9 @@ def authorize_action(action, current, policy, now):
         resolution = current.get("resolution", {})
         if resolution.get("source") == "conflict":
             return deny("source_conflict")
-        if resolution.get("source") in (None, "unknown") or resolution.get(
+        if (resolution.get("source") in (None, "unknown")
+                and not (action.get("action_scope") in ("delegated_native_update", "legacy_same_source_update")
+                         and resolution.get("capability") == "installed_native_delegate")) or resolution.get(
             "capability"
         ) in (None, "inventory_only"):
             return deny("source_unavailable")
@@ -243,7 +289,12 @@ def authorize_action(action, current, policy, now):
             return deny(
                 "target_running" if current.get("running") else "running_state_unknown"
             )
-        decision = get_decision(current, resolution, policy, now)
+        inherited_reason = related_policy_reason(
+            current, action.get("related_targets", []), policy, now
+        )
+        if inherited_reason:
+            return deny(inherited_reason)
+        decision = get_update_decision(current, resolution, policy, now, action["action_scope"])
         if not permits(decision, action["action_scope"]):
             return deny("consent_required")
         if action["action_scope"] == "manager_update" and resolution.get(
@@ -260,6 +311,15 @@ def authorize_action(action, current, policy, now):
             and resolution.get("capability") != "reviewed_native"
         ):
             return deny("scope_mismatch")
+        if action["action_scope"] in ("delegated_native_update", "legacy_same_source_update"):
+            if (resolution.get("capability") != "installed_native_delegate"
+                    or resolution.get("installed_updater_contract_sha256") != action.get("installed_updater_contract_sha256")):
+                return deny("scope_mismatch")
+            expected_scope = ("legacy_same_source_update" if resolution["installed_updater_contract"]["execution_kind"] == "legacy_handler" else "delegated_native_update")
+            if action["action_scope"] != expected_scope:
+                return deny("scope_mismatch")
+            if action.get("whole_registered_manager_scope") != resolution["installed_updater_contract"].get("whole_registered_manager_scope"):
+                return deny("scope_mismatch")
         result.update(allowed=True, reason_code="allowed")
         return result
     except (KeyError, ValueError, TypeError, AttributeError):

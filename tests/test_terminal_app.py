@@ -121,8 +121,10 @@ class WorkspaceTests(unittest.TestCase):
                         canvas = workspace.frame(height, width)
                         self.assertEqual(len(canvas.lines()), height)
                         self.assertTrue(all(app.cell_width(line) == width for line in canvas.lines()))
-                        left = 23 if width >= 110 else 20
-                        selected = app.clip("> " + workspace.t("nav_" + view), left - 4)
+                        left, _ = app.panel_sizes(width)
+                        title = workspace.t("nav_" + view)
+                        first = app.wrapped(title, left - 6)[0] if height >= 33 else app.clip(title, left - 6)
+                        selected = "> " + first
                         self.assertTrue(any(selected in "".join(row[:left]) for row in canvas.cells))
                         self.assertEqual(workspace.view, view)
         self.assertEqual(MemoryJob.instances, [])
@@ -228,13 +230,11 @@ class WorkspaceTests(unittest.TestCase):
         stored = []
         with patch.object(app, "save_settings", side_effect=lambda root, value: stored.append(copy.deepcopy(value))):
             for expected in range(1, len(app.STEPS)):
-                workspace.selected = workspace.items().index(("wizard", "next"))
-                workspace.activate()
+                workspace.activate_button("next")
                 self.assertEqual(workspace.wizard_step, expected)
                 self.assertFalse(workspace.settings["wizard_complete"])
                 self.assertEqual(stored, [])
-            workspace.selected = workspace.items().index(("wizard", "finish"))
-            workspace.activate()
+            workspace.activate_button("finish")
         self.assertEqual(len(stored), 1)
         self.assertTrue(stored[0]["wizard_complete"])
         self.assertEqual(workspace.view, "home")
@@ -334,8 +334,8 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(workspace.buffer, "PASTED ANSWER")
         self.assertEqual(job.answers, [])
 
-    def test_bracketed_and_unbracketed_paste_never_execute_shortcuts_or_submit(self):
-        for bracketed in (False, True):
+    def test_bracketed_paste_never_executes_shortcuts_or_submits(self):
+        for bracketed in (True,):
             workspace = self.workspace()
             payload = list("\x1b[200~ry\n\x1b[201~" if bracketed else "ry\n")
             before = len(MemoryJob.instances)

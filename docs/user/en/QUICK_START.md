@@ -1,6 +1,6 @@
 # Quick Start (English)
 
-**Apple Silicon Mac required** · macOS 13+ · **v1.8.0**
+**Apple Silicon Mac required** · macOS 13+ · **v1.8.2**
 
 ## Terminal workspace
 

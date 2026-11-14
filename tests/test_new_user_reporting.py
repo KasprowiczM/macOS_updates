@@ -162,6 +162,8 @@ internet_dispatch_run_all
             'uname': 'echo arm64', 'sw_vers': 'echo 27.0',
             'pgrep': 'exit 1', 'mdls': 'echo 1.0',
             'defaults': 'echo 1.0',
+            # This synthetic unsigned bundle must not query the host signer.
+            'codesign': 'exit 1', 'spctl': 'exit 1',
             'brew': 'echo "$*" >> "$COMMAND_LOG"; case "$*" in *install*|*upgrade*|*adopt*) exit 96;; esac; exit ' + ('0' if brew_available else '1'),
         }
         for name, body in programs.items():

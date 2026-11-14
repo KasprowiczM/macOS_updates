@@ -1,6 +1,6 @@
 # Démarrage rapide (Français)
 
-**Mac Apple Silicon requis** · macOS 13+ · **v1.8.0**
+**Mac Apple Silicon requis** · macOS 13+ · **v1.8.2**
 
 ## Interface terminal
 

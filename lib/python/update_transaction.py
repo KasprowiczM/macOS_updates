@@ -55,16 +55,22 @@ def prepare_transaction(action, current):
     )
     _require(current.get("running") is False, "running_or_unknown")
     _require(
-        action.get("adapter_id") in ("github_dmg", "mozilla_dmg"),
+        action.get("adapter_id") in ("github_dmg", "mozilla_dmg", "legacy_verified_bundle"),
         "artifact_adapter_unreviewed",
     )
     expected = action.get("expected_target", {})
-    for field in ("bundle_id", "team_id", "channel"):
+    for field in ("bundle_id", "team_id"):
         _require(
             expected.get(field) not in (None, "", "unknown")
             and current.get(field) == expected[field],
             "identity_changed",
         )
+    from installed_native_updaters import legacy_replacement_channel_allowed
+    _require(
+        (expected.get("channel") not in (None, "", "unknown") and current.get("channel") == expected["channel"])
+        or legacy_replacement_channel_allowed(action, current),
+        "identity_changed",
+    )
     # Policy authorization additionally compares canonical identity/source
     # fingerprints, receipt evidence, profile, generation and decision expiry.
     return {

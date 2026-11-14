@@ -76,11 +76,11 @@ class PublicCatalogAcceptanceTests(unittest.TestCase):
             sum(install_recipe_eligible(row) for row in catalog["recipes"]), 0
         )
         self.assertTrue(
-            all(row["installation_status"] == "manual" for row in view["rows"])
+            all(row["installation_status"] == ("manager_delegated" if row["product_id"] == "keepassxc-gui" else "manual") for row in view["rows"])
         )
         for row in view["rows"]:
             self.assertFalse(row["selected"])
-            self.assertEqual(row["evidence_level"], "metadata_only")
+            self.assertEqual(row["evidence_level"], "manager_delegation" if row["product_id"] == "keepassxc-gui" else "metadata_only")
             self.assertFalse(row["installed"])
             for source in row["sources"]:
                 if source["official_url"]:

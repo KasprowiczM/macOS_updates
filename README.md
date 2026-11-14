@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.8.0** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.8.2** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 | At a glance | |
 |-------------|--|
@@ -14,21 +14,21 @@
 | Pipeline | 7 steps (0–6), macOS system update always last |
 | Registry | 47 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 1441 automated tests (`bash run_tests.sh`) |
+| Tests | 1624 automated tests (`bash run_tests.sh`) |
 
-Stage C activates local JSON inventory and scoped update plans. `bash update_all.sh --plan` and `--dry-run` show the same read-only decisions. A normal interactive run asks once for the displayed scopes; `-y`, EOF and unattended runs grant no new permission. Use `--preferences` to review or reset choices. Updates keep the observed source and exact destination; conflicts, missing targets and uncertain evidence defer that target. `build_inventory.sh --migration --preview` preserves old Markdown bytes and notes; accept the displayed proposal ID explicitly. Generic vendor updates remain manual until a reviewed identity and adapter are available. An old catalog entry is neither proof of installation nor consent.
-
-This documentation covers macOS Updates 1.8.0. No separate release tag has been created. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority.
+macOS Updates 1.8.2 keeps installed applications on their detected sources. Setup offers one saved agreement for supported same-source updates; per-app exclusions, conflicts and protected targets still apply. The author catalog is optional and starts with nothing selected. Additional installations require a separate preview and approval. Native updater windows can run concurrently; DeepSeek Harness stays manual and unsupported methods remain explicitly unavailable. Opening an updater is not proof that the latest stable release was installed.
 
 **New in v1.6.0:** Scheduled (launchd) runs find Homebrew and `mas`, and the installer verifies that the job is loaded (`--minute` and `--once-in` added). Apps you have open are never closed or replaced, Homebrew casks included. Every mid-run question times out with the safe answer "no". `bash update_all.sh --doctor` is a read-only readiness report, and real runs add pre-flight checks. Persistent vendor-feed state replaces opaque "stale feed" warnings, and HyperFrames, Superset and Open Design are installed or checked without hidden launches. Earlier 1.5.x releases are described in [CHANGELOG.md](CHANGELOG.md).
 
-Legacy vendor-feed reporting is read-only. The current manager leaves generic native and vendor adapters manual until a reviewed recipe is available. The legacy `--bootstrap-cli` flag grants no first-install permission. Acquire missing CLIs separately through their reviewed official instructions. Open apps are not closed. Check feed state with `bash scripts/check_vendor_feeds.sh`.
+Exact-candidate catalog recipes still require acceptance. Recognized Internet handlers use the separate freshly consented automatic batch described above. The legacy `--bootstrap-cli` flag grants no first-install permission. Acquire missing CLIs separately through their reviewed official instructions. Open apps are not closed. Check feed state with `bash scripts/check_vendor_feeds.sh`.
+
+Automatic Internet mode uses the saved agreement when it covers the eligible group; otherwise it offers a separate AUTO review. Authorized native windows open concurrently and scoped download handlers share the supervised batch; Microsoft and Google tasks are grouped. App Store and Homebrew ownership remain separate. DeepSeek Harness stays manual; Open Design currently reports an unavailable automatic method rather than pretending to update. Vendor-selected versions follow existing channel settings. A changed version is reported separately from verified completion. Unconfirmed vendor work retains the batch reservation and defers the system update; Diagnostics offers an explicit, freshly checked recovery review. Google approval explicitly covers all products registered with its updater, including products outside the catalog whose complete list is unknown. This is separate from exact-candidate catalog recipe acceptance. Use `bash update_all.sh --cli --automatic-internet-batch` for the same group review without the terminal workspace; add `--dry-run` for an observational preview.
 
 ## Terminal workspace
 
 In an interactive terminal, `bash update_all.sh` opens the workspace and shows the first-use wizard until it is finished. `bash setup.sh` opens the wizard and `bash build_inventory.sh` opens inventory. You can reopen the wizard from its navigation item. Completion and display settings persist; they grant no update permission. Use `--cli` for the existing text interface or `--tui` to request the workspace explicitly. Explicit flags such as `--dry-run` stay in the CLI; do not combine `--tui` with other options. An explicit `--tui` requires a usable terminal and Python. Noninteractive and non-TTY invocations keep CLI behavior.
 
-Choose update groups before a run. Navigation is on the left, actions and live output in the center, and contextual details on the right when space permits. Only one supervised job runs at a time; each update retains its existing consent checks. Settings include language, theme, ASCII and automatic resizing. Press `?` for help, Ctrl+P for the action palette, and `c` to copy the focused command, output or summary. Ctrl+V pastes only into the answer dialog; Enter submits. Input is masked when the child disables echo.
+Choose update groups before a run. Navigation is on the left, actions and live output in the center, and contextual details in the right sidebar on every screen. Only one supervised job runs at a time; each update retains its existing consent checks. Settings include language, theme, ASCII and automatic resizing. Press `?` for help, Ctrl+P for the action palette, and `c` to copy the focused command, output or summary. Ctrl+V pastes only into the answer dialog; Enter submits. Input is masked when the child disables echo.
 
 The interface needs at least 80 columns by 24 rows. By default it requests at least 140 columns by 38 rows on supported terminals and requests the original size on exit; the terminal may ignore either request. Automatic resizing can be disabled in settings.
 
@@ -68,7 +68,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTALL.md)
 | 5 | **Postupdate/history** — refresh `APPLICATIONS.md`, append `UPDATES.md` atomically |
 | 6 | **macOS (final)** — per-label `softwareupdate -i <label> -R` (restart-required labels in the final batch); deferred after a blocking hard failure in steps 1–4 or when authorization is unavailable |
 
-**Important:** Normal updates act only on installed software whose source was observed and whose scoped action was approved. The separate optional catalog can show absent apps, but it does not install automatically. Manual acquisition requires preview and fresh confirmation. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Step 5 is reporting-only. Unknown installed apps are listed for review.
+**Important:** Normal updates act only on installed software whose source was observed and whose scoped action was approved. The separate optional catalog can show absent apps, and requires separate approval before installation. Manual acquisition requires preview and fresh confirmation. The final macOS step may restart the Mac, so it runs last and retains mandatory `-R`. Step 5 is reporting-only. Unknown installed apps are listed for review.
 
 Coverage is deliberately explicit: **verified direct** means the updater confirmed the package/version path; **triggered-unverified** means an app was launched to let its vendor updater run but completion cannot be proven; **externally managed** means the vendor or App Store owns the update lifecycle; **manual** requires user action; **unknown** has no registered method.
 
@@ -108,6 +108,7 @@ The registry ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/i
 | `-h`, `--help` | Show usage and exit `0` |
 | `--doctor` | Read-only readiness report (platform, tools, launchd `PATH`, LaunchAgent, sudo, disk, power, network, last run); no sudo prompt, no run log; exit `0` ok / `10` warnings / `1` problem |
 | `--dry-run` | Preview every step, mutate nothing, never ask for credentials |
+| `--automatic-internet-batch` | Review the installed Internet group once, then run approved scopes concurrently; DeepSeek remains manual. |
 | `--verify-only` | Verify installed app versions against history without mutating |
 | `--json-summary` | Print a JSON result object on stdout after the run |
 | `--bootstrap-cli` | The legacy CLI flag grants no first-install permission. Acquire missing CLIs separately through their reviewed official instructions. |
@@ -367,7 +368,7 @@ Root `dev-sync-*.sh` wrappers call the same scripts in `dev_sync/`.
 
 ## Test
 
-The test suite covers bash syntax, Python compilation, static safety contracts, documentation guards and unit tests (1441 automated tests).
+The test suite covers bash syntax, Python compilation, static safety contracts, documentation guards and unit tests (1624 automated tests).
 Pull requests run Ubuntu ShellCheck, portable Python tests, and the secret scan.
 The full `run_tests.sh` suite on a macOS runner runs only on `workflow_dispatch` or a `v*` tag — not on every push.
 
@@ -426,7 +427,7 @@ Full list: [docs/agents/troubleshooting.md](docs/agents/troubleshooting.md)
 
 New app signals are review proposals, not executable recipes. `bash scripts/scan_update_feeds.sh` prints an aggregated summary. Proposal export supports preview and explicit acceptance; it is redacted, stays local, and is never uploaded. `bash setup.sh --catalog` opens the optional catalog with no selection. `-y`, noninteractive runs, and EOF install nothing. In the menu, `check <number>` compares only selected sources. Results show the latest confirmed compatible stable version and date, cached for 24 hours. Unknown stays unknown. A public Mac App Store listing does not prove availability to your account, and no channel is always fastest.
 
-The public catalog has 47 registry rows for 48 separate products and zero approved automatic first-install recipes. After preview and fresh confirmation, you can choose reviewed official links for manual acquisition. Opening a page does not install the app. Changing an existing app's source requires manual migration. The separate InstallPlan shows source, destination, version, requirements, and permissions; unknown license or cost stays labeled unknown. Any future automatic recipe needs fresh-install acceptance before enablement. The catalog does not promise automatic installation for all 48 products.
+The optional catalog starts unselected. A separately approved Homebrew installation is available for KeePassXC when fresh source and absence checks pass. Its preview lists the manager command and declared effects; verification is a Homebrew receipt, not vendor recipe acceptance. Other entries retain their reviewed official acquisition paths. Existing apps are never migrated automatically. Source comparison recommends only what current stable-release evidence supports.
 
 Plain `--dry-run` shows a readable preview of up to 10 targets. Use `--dry-run --json-summary` or `--plan` for the complete JSON plan. A preview grants no permission and performs no updates.
 

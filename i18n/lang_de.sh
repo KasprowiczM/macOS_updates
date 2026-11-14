@@ -1091,3 +1091,37 @@ L_PLAN_SOURCE_MANAGED="Von Ihrer Organisation verwaltet"
 L_PLAN_NO_ELIGIBLE="Derzeit können keine Aktionen bestätigt werden. Gespeicherte Berechtigungen gelten weiterhin."
 L_PLAN_PREFERENCES_CHOICES="Welche Einträge erlauben Sie? Zum Beispiel 1,3 erlaubt nur diese Aktionen. dN verschieben, iN ignorieren, mN manuell, rN zurücksetzen. n nächste Seite, p vorherige. Enter oder q: ohne neue Zustimmung fortfahren."
 L_ALL_CONFIRM_PLAN="Diesen Mac prüfen und Aktualisierungsberechtigungen ansehen?"
+
+# Delegated installed vendor updater consent and recovery.
+L_PLAN_SCOPE_DELEGATED="Die installierte signierte Hersteller-App öffnen. Ihr Updater wählt das angebotene Release mit den bestehenden Kanaleinstellungen. Die App bleibt geöffnet. Abschluss unbestätigt; andere Updates warten auf die Abschlussbestätigung."
+L_NATIVE_RECOVERY_TITLE="Unbestätigte Sitzungen des Hersteller-Updaters"
+L_NATIVE_RECOVERY_NONE="Keine delegierte Updater-Sitzung erfordert eine Klärung."
+L_NATIVE_RECOVERY_SELECT="Eine Sitzungsnummer zur Prüfung wählen oder mit Eingabe abbrechen."
+L_NATIVE_RECOVERY_SCOPE="Dies bestätigt nur, dass der Hersteller-Updater und seine Installer beendet sind. Die neueste Version wird nicht bestätigt."
+L_NATIVE_RECOVERY_CONFIRM="App und Updater prüfen. FINISHED eingeben, um zu bestätigen, dass kein Installer oder Download mehr läuft. Eingabe bricht ab."
+L_NATIVE_RECOVERY_CANCELLED="Kein Abschluss bestätigt. Hersteller-Ressourcen bleiben reserviert."
+L_NATIVE_RECOVERY_REJECTED="Aktuelle Identitäts- oder Quellenprüfung fehlgeschlagen. Die Sitzung bleibt ungeklärt."
+L_NATIVE_RECOVERY_DONE="Ihre Abschlussmeldung wurde erfasst und die Ressourcenreservierung freigegeben. Kein Update wurde verifiziert."
+
+# Exact, fresh approval for the requested concurrent native batch.
+L_PLAN_BATCH_TITLE_FMT="Automatischer Internet-Stapel: %s geeignete Apps."
+L_PLAN_BATCH_SCOPE="Jeden aufgeführten Bereich prüfen, einschließlich ausdrücklich genannter Hersteller-Manager-Gruppen. Ihre nativen Fenster oder freigegebenen Verfahren derselben Quelle können gleichzeitig laufen. Die Freigabe speichert automatische Berechtigungen für diese Apps und ersetzt ihre manuellen Entscheidungen. Native Updater wählen Versionen gemäß ihren bestehenden Kanaleinstellungen. DeepSeek bleibt manuell. Apps offen lassen; der Abschluss bleibt bis zur Wiederherstellungsprüfung unbestätigt."
+L_PLAN_BATCH_NONE="Keine geeigneten automatischen Internet-Apps. Nicht unterstützte Apps und DeepSeek bleiben manuell; Ausschlüsse und Quellenprüfungen gelten weiter."
+L_PLAN_BATCH_QUESTION="Nach Prüfung aller Seiten AUTO eingeben, um genau diesen parallelen Stapel freizugeben. DeepSeek bleibt manuell. n weiter, p zurück. Leer oder q verschiebt den Stapel ohne gespeicherte Freigaben zu ändern."
+L_PLAN_BATCH_READ_ALL="Vor der Freigabe alle Seiten prüfen. Keine Erlaubnis wurde geändert."
+L_PLAN_SCOPE_LEGACY="Bisheriges Verfahren derselben Quelle starten; es kann die App herunterladen und ersetzen"
+L_ALL_SYSTEM_NATIVE_PENDING="Übersprungen, da der native Updater nicht bestätigt beendet ist; vor Systemupdates die Wiederherstellung prüfen."
+L_PLAN_BATCH_PREVIEW="Automatischen Stapel angefordert. Der Start erfordert weiterhin eine neue Freigabe der genauen geeigneten Bereiche."
+L_PLAN_SCOPE_GOOGLE_GROUP="Google-Updater-Gruppe: kann ALLE registrierten Google-Produkte herunterladen oder ersetzen, auch außerhalb dieses Katalogs. Die vollständige Registrierungsliste ist unbekannt; der Bereich umfasst mehr als die aufgeführten Apps."
+L_PLAN_PREVIEW_UNSUPPORTED="Automatisches Updateverfahren nicht verfügbar; manuell aktualisieren"
+
+L_PLAN_DEFAULT_SCOPE="Updates für unterstützte Apps und Pakete aktivieren, die in diesem Profil bereits installiert sind, aus ihren bisherigen Quellen. Native Updater dürfen Apps öffnen; genehmigte Verfahren dürfen sie herunterladen und ersetzen. Google-Updater-Gruppen dürfen ALLE registrierten Google-Produkte aktualisieren, auch außerhalb dieses Katalogs; die vollständige Liste ist unbekannt. Gespeicherte manuelle Entscheidungen, Ausschlüsse und Aufschübe bleiben bestehen. DeepSeek, Quellenkonflikte und geschützte Apps bleiben gesperrt. Dies installiert keine Katalog-Apps und erlaubt kein Schließen oder Neustarten von Apps."
+L_PLAN_DEFAULT_QUESTION="ENABLE eingeben, um diese Zustimmung für künftige Läufe zu speichern. Leer oder q lässt sie deaktiviert. Später in Einstellungen ändern."
+
+# Explicit optional manager installation
+L_CATALOG_MANAGER="Optionale Homebrew-Installation mit ausdrücklicher Zustimmung"
+L_CATALOG_MANAGER_METADATA="Geprüfter Berechtigungsumfang für Homebrew"
+L_INSTALL_MANAGER_VERIFIED="Installiert; Homebrew-Installationsnachweis geprüft"
+L_INSTALL_MANAGER_PERMISSION="Erlaubnis: Der vorhandene Homebrew-Manager darf diesen ausgewählten offiziellen Cask mit App, CLI-Verknüpfungen, Handbuchseiten und deklarierten Abhängigkeiten installieren. Die Prüfung umfasst den Installationsnachweis des Managers."
+L_INSTALL_MANAGER_DEPENDENCIES="Deklarierte Homebrew-Abhängigkeiten"
+L_INSTALL_MANAGER_EFFECTS="Ausgewählten Cask mit Homebrew installieren"

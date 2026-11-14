@@ -1123,6 +1123,89 @@ def collect_run_items(
     return items
 
 
+NEXT_STEP_COPY = {
+    "en": (
+        "Next steps",
+        "Rebuild the inventory and review the affected sources",
+        "Review saved automatic-update preferences and per-app exclusions",
+        "Close the affected running apps when convenient, then retry",
+        "Resolve the source conflict before updating; no source was changed",
+        "Check the vendor updater result, then reconcile pending work",
+        "Compare available stable-release evidence before choosing another source; no migration is automatic",
+    ),
+    "pl": (
+        "Co dalej",
+        "Odbuduj inwentarz i sprawdź źródła z niepełnymi danymi",
+        "Sprawdź zapisane ustawienia automatycznych aktualizacji i wykluczenia aplikacji",
+        "Zamknij wskazane uruchomione aplikacje w dogodnym momencie i ponów aktualizację",
+        "Rozwiąż konflikt źródła przed aktualizacją; źródło nie zostało zmienione",
+        "Sprawdź wynik aktualizatora producenta, następnie rozlicz oczekujące operacje",
+        "Porównaj dostępne dane o stabilnych wydaniach przed wyborem innego źródła; migracja nigdy nie jest automatyczna",
+    ),
+    "de": (
+        "Nächste Schritte", "Inventar neu erstellen und betroffene Quellen prüfen",
+        "Gespeicherte Einstellungen für automatische Updates und App-Ausschlüsse prüfen",
+        "Betroffene laufende Apps bei Gelegenheit schließen und erneut versuchen",
+        "Quellenkonflikt vor dem Update lösen; keine Quelle wurde geändert",
+        "Ergebnis des Hersteller-Updaters prüfen und ausstehende Vorgänge abgleichen",
+        "Verfügbare Daten zu stabilen Versionen vor einem Quellenwechsel vergleichen; keine automatische Migration",
+    ),
+    "es": (
+        "Siguientes pasos", "Reconstruye el inventario y revisa las fuentes afectadas",
+        "Revisa las preferencias guardadas de actualización automática y las exclusiones",
+        "Cierra las aplicaciones afectadas cuando puedas y vuelve a intentarlo",
+        "Resuelve el conflicto de fuentes antes de actualizar; no se cambió ninguna fuente",
+        "Comprueba el resultado del actualizador del fabricante y revisa las operaciones pendientes",
+        "Compara los datos disponibles de versiones estables antes de cambiar de fuente; la migración nunca es automática",
+    ),
+    "fr": (
+        "Prochaines étapes", "Reconstruisez l’inventaire et vérifiez les sources concernées",
+        "Vérifiez les préférences enregistrées de mise à jour automatique et les exclusions",
+        "Fermez les applications concernées au moment qui vous convient, puis réessayez",
+        "Résolvez le conflit de sources avant la mise à jour ; aucune source n’a été modifiée",
+        "Vérifiez le résultat de l’outil du fabricant, puis examinez les opérations en attente",
+        "Comparez les données disponibles sur les versions stables avant de changer de source ; aucune migration automatique",
+    ),
+    "it": (
+        "Prossimi passi", "Ricostruisci l’inventario e controlla le fonti interessate",
+        "Controlla le preferenze salvate per gli aggiornamenti automatici e le esclusioni",
+        "Chiudi le applicazioni interessate quando puoi e riprova",
+        "Risolvi il conflitto delle fonti prima di aggiornare; nessuna fonte è stata modificata",
+        "Controlla il risultato dell’updater del produttore e verifica le operazioni in sospeso",
+        "Confronta i dati disponibili sulle versioni stabili prima di cambiare fonte; nessuna migrazione automatica",
+    ),
+    "pt": (
+        "Próximos passos", "Reconstrua o inventário e verifique as fontes afetadas",
+        "Reveja as preferências guardadas de atualização automática e as exclusões",
+        "Feche as aplicações afetadas quando for conveniente e tente novamente",
+        "Resolva o conflito de fontes antes de atualizar; nenhuma fonte foi alterada",
+        "Verifique o resultado do atualizador do fabricante e reveja as operações pendentes",
+        "Compare os dados disponíveis de versões estáveis antes de mudar de fonte; nenhuma migração é automática",
+    ),
+}
+
+
+def next_step_advice(summary: dict[str, Any], lang: str = "en") -> list[str]:
+    """Bounded, read-only advice derived from outcomes, never an approval."""
+    text = NEXT_STEP_COPY.get(lang, NEXT_STEP_COPY["en"])
+    items = [item for item in summary.get("items", []) if isinstance(item, dict)]
+    statuses = {item.get("action_status") for item in items}
+    reasons = {item.get("details") for item in items if isinstance(item.get("details"), str)}
+    advice = []
+    if "scan_partial" in statuses:
+        advice.append(text[1] + ": bash build_inventory.sh --cli")
+    if statuses & {"manual_by_policy", "ignored_by_policy"} or "consent_required" in reasons:
+        advice.append(text[2] + ": bash update_all.sh --cli --preferences")
+    if "target_running" in reasons:
+        advice.append(text[3] + ".")
+    if "source_conflict" in statuses or "source_conflict" in reasons:
+        advice.append(text[4] + ": bash update_all.sh --cli --plan")
+    if statuses & {"vendor_updater_observing", "observed_version_changed", "legacy_handler_completed_unconfirmed", "recovery_required"}:
+        advice.append(text[5] + ": bash scripts/reconcile_native.sh")
+    advice.append(text[6] + ": bash scripts/report_update_coverage.sh --compare-sources")
+    return advice
+
+
 def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     """Format the 4-section terminal summary string."""
     i18n = SUMMARY_I18N.get(lang, SUMMARY_I18N["en"])
@@ -1253,6 +1336,8 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
             else:
                 lines.append(f"   • {adv.get('text', '')}{src_str}")
 
+    lines.extend(["", NEXT_STEP_COPY.get(lang, NEXT_STEP_COPY["en"])[0] + ":"])
+    lines.extend("   • " + advice for advice in next_step_advice(summary, lang))
     lines.append("")
     try:
         inv_line = inv_fmt % inventory_count

@@ -39,7 +39,7 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(view["registry_rows"], 47)
         self.assertTrue(all(row["selected"] is False for row in view["rows"]))
         self.assertTrue(
-            all(row["installation_status"] == "manual" for row in view["rows"])
+            all(row["installation_status"] == ("manager_delegated" if row["product_id"] == "keepassxc-gui" else "manual") for row in view["rows"])
         )
 
     def test_installed_products_offer_review_or_manual_migration(self):

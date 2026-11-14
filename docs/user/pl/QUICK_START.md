@@ -1,6 +1,6 @@
 # Szybki start (Polski)
 
-**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.8.0**
+**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.8.2**
 
 ## Środowisko terminalowe
 

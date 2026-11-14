@@ -44,7 +44,7 @@ class ProductContractTests(unittest.TestCase):
     def parsed(self, product, source, body):
         return _parse(product, source, dict(body=json.dumps(body)), ENV, NOW)
 
-    def test_every_actual_product_contract_matches_manifest_and_remains_manual(self):
+    def test_product_contracts_match_manifest_and_keep_manager_authority_separate(self):
         view = build_catalog_view(dict(environment=ENV), self.catalog, [], {})
         by_id = {r["product_id"]: r for r in view["rows"]}
         source_urls = {
@@ -75,12 +75,17 @@ class ProductContractTests(unittest.TestCase):
                             source["manifest"]["source_id"]
                         ],
                     )
+                delegated = product["product_id"] == "keepassxc-gui"
                 self.assertEqual(
-                    by_id[product["product_id"]]["installation_status"], "manual"
+                    by_id[product["product_id"]]["installation_status"],
+                    "manager_delegated" if delegated else "manual",
                 )
                 self.assertEqual(
-                    by_id[product["product_id"]]["evidence_level"], "metadata_only"
+                    by_id[product["product_id"]]["evidence_level"],
+                    "manager_delegation" if delegated else "metadata_only",
                 )
+                self.assertFalse(by_id[product["product_id"]]["selected"])
+                self.assertFalse(product["installation_authority"])
 
     def test_real_captured_source_metadata_obeys_product_specific_parsers(self):
         for product in self.products:

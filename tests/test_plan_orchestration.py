@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "lib/python"))
-from plan_orchestration import format_preview, parse_choices, review_choices
+from plan_orchestration import format_preview, parse_choices, review_choices, review_internet_batch, prepare_run
 
 
 class ChoiceTests(unittest.TestCase):
@@ -82,6 +82,13 @@ class ChoiceTests(unittest.TestCase):
         ):
             result = review_choices({"actions": actions}, stream, output)
         return result, output.getvalue()
+
+    def test_tui_prompt_is_explicit_and_cli_has_no_control_marker(self):
+        for child in ('0', '1'):
+            with patch.dict(os.environ, {'MAC_UPDATE_TUI_CHILD': child}):
+                result, output = self.review([self.action()], 'a1\n')
+            self.assertEqual(result, {'a': 'allow_update_same_source'})
+            self.assertEqual('@@MAC_UPDATE_PROMPT' in output, child == '1')
 
     def numbered_actions(self, count, **changes):
         return [self.action(action_id="id%d" % n,
@@ -203,6 +210,151 @@ print(json.dumps(dict(result=result, review=output.getvalue(), preview=format_pr
         self.assertEqual(result, {})
         self.assertIn("Waiting for your choice", output)
         self.assertIn("Choice timed out. No new permissions changed.", output)
+
+    def batch_action(self, index=1, **changes):
+        return self.action(action_id='batch%d' % index, kind='manual', adapter_id='vendor', action_scope='delegated_native_update',
+                           reason_codes=['manual_by_policy'], expected_resolution={'source': 'vendor'},
+                           expected_target={'name': 'Fixture%d' % index}, **changes)
+
+    def batch_review(self, actions, answer, **environment):
+        stream, output = self.TTY(answer), io.StringIO()
+        env = {'MAC_UPDATE_YES': '0', 'MAC_UPDATE_NONINTERACTIVE': '0', **environment}
+        with patch.dict(os.environ, env), patch('plan_orchestration.batch_approval_choice',
+                side_effect=lambda action: 'allow_native_launch' if action['action_scope'] == 'delegated_native_update' and action['reason_codes'] in ([], ['manual_by_policy'], ['consent_required']) else None), \
+             patch('plan_orchestration.select.select', return_value=([stream], [], [])):
+            result = review_internet_batch({'actions': actions}, stream, output)
+        return result, output.getvalue()
+
+    def test_batch_requires_exact_explicit_word_and_all_pages_before_any_grant(self):
+        actions = [self.batch_action(i) for i in range(1, 18)]
+        choices, output = self.batch_review(actions, 'AUTO\n')
+        self.assertEqual(choices, {})
+        self.assertNotIn('Fixture11', output)
+        choices, output = self.batch_review(actions, 'n\nAUTO\n')
+        self.assertEqual(choices, {a['action_id']: 'allow_native_launch' for a in actions})
+        self.assertIn('Fixture17', output)
+        self.assertIn('/fixture/Applications/Example.app', output)
+        self.assertIn('concurrently', output)
+        self.assertIn('DeepSeek', output)
+
+    def test_batch_cancel_yes_noninteractive_and_untrusted_stream_never_grant(self):
+        actions = [self.batch_action()]
+        for answer in ('', '\n', 'q\n', 'yes\n', '1\n', 'auto\n', 'AUTO,1\n'):
+            self.assertEqual(self.batch_review(actions, answer)[0], {})
+        for env in ({'MAC_UPDATE_YES': '1'}, {'MAC_UPDATE_NONINTERACTIVE': '1'}):
+            self.assertEqual(self.batch_review(actions, 'AUTO\n', **env)[0], {})
+        with patch('plan_orchestration.batch_approval_choice', return_value='allow_native_launch'):
+            self.assertEqual(review_internet_batch({'actions': actions}, io.StringIO('AUTO\n'), io.StringIO()), {})
+
+    def test_batch_does_not_offer_exclusions_or_other_manager_scopes(self):
+        actions = [self.batch_action(), self.batch_action(2), self.batch_action(3)]
+        actions[1]['reason_codes'] = ['ignored_by_policy']
+        actions[2]['action_scope'] = 'manager_update'
+        choices, output = self.batch_review(actions, 'AUTO\n')
+        self.assertEqual(choices, {'batch1': 'allow_native_launch'})
+        self.assertNotIn('Fixture2', output)
+        self.assertNotIn('Fixture3', output)
+
+    def test_declined_batch_defers_saved_grants_for_this_run_without_policy_writes(self):
+        import copy
+        import plan_orchestration as planner
+        plan = {'actions': [self.batch_action()]}
+        plan['actions'][0]['reason_codes'] = []
+        with tempfile.TemporaryDirectory() as session, patch.dict(os.environ, {'MAC_UPDATE_AUTOMATIC_INTERNET_BATCH': '1'}), \
+             patch.object(planner, 'batch_approval_choice', return_value='allow_native_launch'), \
+             patch.object(planner, 'review_internet_batch', return_value={}), \
+             patch.object(planner, 'review_choices', return_value={}) as ordinary, \
+             patch.object(planner, 'build_runtime_plan', return_value=copy.deepcopy(plan)), \
+             patch.object(planner, 'refresh_inventory'), patch('update_transaction.recover_pending_transactions', return_value=[]), \
+             patch.object(planner, 'record_plan_decisions') as record, patch.object(planner, 'save_plan') as save, \
+             patch.object(planner, 'emit_plan'):
+            self.assertEqual(prepare_run('/fixture', session, self.TTY(''), io.StringIO()), 0)
+            self.assertEqual(ordinary.call_args.args[0]['actions'], [])
+            deferred = save.call_args.args[0]['actions'][0]
+            self.assertIn('deferred_by_user', deferred['reason_codes'])
+            self.assertEqual(deferred['kind'], 'skip')
+            record.assert_not_called()
+        self.assertEqual(plan['actions'][0]['reason_codes'], [])
+
+
+    def test_batch_keeps_native_launch_and_replacement_permissions_distinct(self):
+        from test_installed_native_updaters import target, plan_for
+        native = plan_for(target(), 'preserve_source')[0]['actions'][0]
+        installed = target('/Applications/KeePassXC.app')
+        installed.update(instance_id='keepass', name='KeePassXC', bundle_id='org.keepassxc.keepassxc', team_id='FIXTURE123')
+        installed['evidence'][0].update(bundle_id=installed['bundle_id'], team_id=installed['team_id'])
+        replacement = plan_for(installed, 'preserve_source')[0]['actions'][0]
+        stream, output = self.TTY('AUTO\n'), io.StringIO()
+        with patch.dict(os.environ, {'MAC_UPDATE_YES': '0', 'MAC_UPDATE_NONINTERACTIVE': '0'}), \
+             patch('plan_orchestration.select.select', return_value=([stream], [], [])):
+            choices = review_internet_batch({'actions': [native, replacement]}, stream, output)
+        self.assertEqual(choices[native['action_id']], 'allow_native_launch')
+        self.assertEqual(choices[replacement['action_id']], 'allow_update_same_source')
+        self.assertIn('download and replace', output.getvalue())
+        self.assertIn('native updater', output.getvalue())
+        self.assertEqual(native['reason_codes'], ['manual_by_policy'])
+        self.assertEqual(replacement['reason_codes'], ['manual_by_policy'])
+        google = target('/Applications/Google Chrome.app')
+        google.update(instance_id='chrome', name='Google Chrome', bundle_id='com.google.Chrome', team_id='GOOGLEFIXT')
+        google['evidence'][0].update(bundle_id=google['bundle_id'], team_id=google['team_id'])
+        group = plan_for(google, 'preserve_source')[0]['actions'][0]
+        stream, output = self.TTY('AUTO\n'), io.StringIO()
+        with patch.dict(os.environ, {'MAC_UPDATE_YES':'0', 'MAC_UPDATE_NONINTERACTIVE':'0'}), \
+             patch('plan_orchestration.select.select', return_value=([stream], [], [])):
+            decisions = review_internet_batch({'actions':[group]}, stream, output)
+        self.assertEqual(decisions, {group['action_id']:'allow_update_same_source'})
+        self.assertIn('ALL registered Google products', output.getvalue())
+        self.assertIn('complete registration list is unknown', output.getvalue())
+        self.assertIn('broader than the listed apps', output.getvalue())
+
+    def test_batch_navigation_uses_one_finite_timeout_budget(self):
+        with patch('plan_orchestration.time.monotonic', side_effect=[0, 60, 121]):
+            choices, output = self.batch_review([self.batch_action(i) for i in range(1, 18)], 'n\nAUTO\n')
+        self.assertEqual(choices, {})
+        self.assertIn('60 seconds remaining', output)
+        self.assertIn('timed out', output)
+
+    def test_fresh_batch_choices_record_once_before_other_manager_review(self):
+        import copy
+        import plan_orchestration as planner
+        native = self.batch_action()
+        manager = self.action(action_id='manager', adapter_id='homebrew')
+        plan = {'actions': [native, manager]}
+        events = []
+        def record(current, choices):
+            events.append(('record', choices))
+            refreshed = copy.deepcopy(current)
+            for action in refreshed['actions']:
+                if action['action_id'] in choices:
+                    action['reason_codes'] = []
+            return refreshed
+        def ordinary(current, stream, output):
+            self.assertEqual([a['action_id'] for a in current['actions']], ['manager'])
+            events.append(('ordinary', None))
+            return {'manager': 'allow_update_same_source'}
+        with tempfile.TemporaryDirectory() as session, patch.dict(os.environ, {'MAC_UPDATE_AUTOMATIC_INTERNET_BATCH': '1'}), \
+             patch.object(planner, 'batch_approval_choice', side_effect=lambda a: 'allow_native_launch' if a['action_scope']=='delegated_native_update' else None), \
+             patch.object(planner, 'review_internet_batch', return_value={'batch1':'allow_native_launch'}), \
+             patch.object(planner, 'review_choices', side_effect=ordinary), \
+             patch.object(planner, 'record_plan_decisions', side_effect=record), \
+             patch.object(planner, 'build_runtime_plan', return_value=copy.deepcopy(plan)), \
+             patch.object(planner, 'refresh_inventory'), patch('update_transaction.recover_pending_transactions', return_value=[]), \
+             patch.object(planner, 'save_plan') as save, patch.object(planner, 'emit_plan'):
+            self.assertEqual(prepare_run('/fixture', session, self.TTY(''), io.StringIO()), 0)
+            self.assertEqual(events, [('record', {'batch1':'allow_native_launch'}), ('ordinary', None), ('record', {'manager':'allow_update_same_source'})])
+            self.assertTrue(all(not a['reason_codes'] for a in save.call_args.args[0]['actions']))
+
+    def test_batch_and_system_barrier_labels_exist_in_all_seven_languages(self):
+        keys = ('L_PLAN_BATCH_TITLE_FMT', 'L_PLAN_BATCH_SCOPE', 'L_PLAN_BATCH_NONE',
+                'L_PLAN_BATCH_QUESTION', 'L_PLAN_BATCH_READ_ALL', 'L_PLAN_SCOPE_LEGACY',
+                'L_ALL_SYSTEM_NATIVE_PENDING', 'L_PLAN_SCOPE_GOOGLE_GROUP', 'L_PLAN_BATCH_PREVIEW')
+        for language in ('en', 'pl', 'de', 'es', 'fr', 'it', 'pt'):
+            text = (ROOT / 'i18n' / ('lang_'+language+'.sh')).read_text()
+            for key in keys:
+                self.assertEqual(sum(line.startswith(key+'=') for line in text.splitlines()), 1, (language,key))
+            question = next(line for line in text.splitlines() if line.startswith('L_PLAN_BATCH_QUESTION='))
+            self.assertIn('AUTO', question)
+
 
 
 class PlanOrchestrationTests(unittest.TestCase):

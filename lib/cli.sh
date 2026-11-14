@@ -11,6 +11,7 @@ Options:
       --plan                     Show the local JSON action plan without writes
       --preferences              Review or reset saved per-app choices
       --preferences-only         Review saved choices without running updates
+      --automatic-internet-batch Review and authorize the installed internet-app group together
       --tui                      Open the terminal interface
       --cli                      Use the legacy command-line interface
       --dry-run                  Show the same local plan without writes
@@ -56,6 +57,7 @@ mac_update_parse_cli() {
             --plan) export MAC_UPDATE_PLAN_ONLY=1 ;;
             --preferences) export MAC_UPDATE_PREFERENCES=1 ;;
             --preferences-only) export MAC_UPDATE_PREFERENCES=1 MAC_UPDATE_PREFERENCES_ONLY=1 ;;
+            --automatic-internet-batch) export MAC_UPDATE_AUTOMATIC_INTERNET_BATCH=1 ;;
             --dry-run) export MAC_UPDATE_DRY_RUN=1 ;;
             --doctor) export MAC_UPDATE_DOCTOR=1 ;;
             --verify-only) export MAC_UPDATE_VERIFY_ONLY=1 ;;

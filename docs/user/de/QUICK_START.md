@@ -1,6 +1,6 @@
 # Schnellstart (Deutsch)
 
-**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.8.0**
+**Mac mit Apple Silicon erforderlich** · macOS 13+ · **v1.8.2**
 
 ## Terminaloberfläche
 

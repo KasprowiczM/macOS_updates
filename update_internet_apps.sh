@@ -71,8 +71,24 @@ mac_update_require_supported_platform || exit 1
 
 # Active execution uses the same scoped plan as standalone manager adapters.
 . "$SCRIPT_DIR/lib/update_policy.sh"
-mac_update_policy_run_adapter vendor
-exit $?
+if [ "${1:-}" != "--scoped-legacy" ]; then
+    mac_update_policy_run_adapter vendor
+    exit $?
+fi
+[ "$#" -eq 4 ] || exit 2
+mac_update_tool_usable python3 || exit 10
+MAC_UPDATE_PLAN_PATH="$2"
+MAC_UPDATE_ACTION_ID="$3"
+MAC_UPDATE_BATCH_OWNER="$4"
+export MAC_UPDATE_PLAN_PATH MAC_UPDATE_ACTION_ID MAC_UPDATE_BATCH_OWNER
+. "$SCRIPT_DIR/lib/scoped_legacy.sh"
+scoped_legacy_prepare || exit $?
+# A delayed or manually invoked child cannot mutate outside its active batch.
+PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from installed_native_updaters import record_legacy_writer_start
+sys.exit(0 if record_legacy_writer_start() else 10)' || exit $?
+
 
 print_header() { ui_print_header "$1"; }
 
@@ -414,6 +430,11 @@ firefox_dev_version() {
 capture_internet_app_versions() {
     internet_capture_versions "$1"
 }
+
+# The internal scoped bridge never enters the all-product dispatcher below.
+. "$SCRIPT_DIR/lib/internet_app_updates.sh"
+scoped_legacy_execute
+exit $?
 
 # ── Snapshot PRZED aktualizacją ───────────────────────────────
 if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then

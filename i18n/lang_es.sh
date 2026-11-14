@@ -1116,3 +1116,37 @@ L_PLAN_SOURCE_MANAGED="Gestionado por tu organización"
 L_PLAN_NO_ELIGIBLE="Ahora no se puede aprobar ninguna acción. Los permisos guardados siguen vigentes."
 L_PLAN_PREFERENCES_CHOICES="¿Qué elementos autorizas? Por ejemplo 1,3 autoriza solo esas acciones. dN aplazar, iN ignorar, mN manual, rN restablecer. n página siguiente, p anterior. Intro o q: continuar sin nuevos permisos."
 L_ALL_CONFIRM_PLAN="¿Comenzar a revisar este Mac y los permisos de actualización?"
+
+# Delegated installed vendor updater consent and recovery.
+L_PLAN_SCOPE_DELEGATED="Abrir la app firmada del fabricante instalada. Su actualizador elegirá la versión ofrecida con el canal actual. La app queda abierta. Finalización sin confirmar; otras actualizaciones esperan la confirmación."
+L_NATIVE_RECOVERY_TITLE="Sesiones del actualizador del fabricante sin confirmar"
+L_NATIVE_RECOVERY_NONE="Ninguna sesión delegada requiere revisión."
+L_NATIVE_RECOVERY_SELECT="Elija el número de una sesión o pulse Intro para cancelar."
+L_NATIVE_RECOVERY_SCOPE="Solo confirma que el actualizador y sus instaladores han terminado. No confirma la última versión."
+L_NATIVE_RECOVERY_CONFIRM="Tras revisar la app y el actualizador, escriba FINISHED para confirmar que no queda ningún instalador ni descarga en ejecución. Intro cancela."
+L_NATIVE_RECOVERY_CANCELLED="No se confirmó la finalización. Los recursos siguen reservados."
+L_NATIVE_RECOVERY_REJECTED="Falló la comprobación actual de identidad u origen. La sesión sigue sin resolver."
+L_NATIVE_RECOVERY_DONE="Se registró su confirmación y se liberó la reserva de recursos. No se verificó ninguna actualización."
+
+# Exact, fresh approval for the requested concurrent native batch.
+L_PLAN_BATCH_TITLE_FMT="Lote automático de Internet: %s apps aptas."
+L_PLAN_BATCH_SCOPE="Revisa cada ámbito indicado, incluido cualquier grupo del gestor del proveedor descrito expresamente. Sus ventanas nativas o procesos aprobados del mismo origen pueden ejecutarse a la vez. La aprobación guarda permisos automáticos para estas apps y sustituye sus elecciones manuales guardadas. Los actualizadores nativos eligen versiones según sus canales existentes. DeepSeek sigue manual. Deja las apps abiertas; la finalización requiere revisar la recuperación."
+L_PLAN_BATCH_NONE="No hay apps de Internet aptas. Las no compatibles y DeepSeek siguen manuales; se mantienen exclusiones y comprobaciones de origen."
+L_PLAN_BATCH_QUESTION="Tras revisar todas las páginas escribe AUTO para aprobar este lote paralelo exacto. DeepSeek sigue manual. n siguiente, p anterior. Vacío o q aplaza el lote sin cambiar permisos guardados."
+L_PLAN_BATCH_READ_ALL="Revisa todas las páginas antes de aprobar el lote. No se ha cambiado ningún permiso."
+L_PLAN_SCOPE_LEGACY="Ejecutar el proceso existente del mismo origen; puede descargar y sustituir la app"
+L_ALL_SYSTEM_NATIVE_PENDING="Omitido mientras no se confirme el fin del actualizador nativo; revisa la recuperación antes de actualizar el sistema."
+L_PLAN_BATCH_PREVIEW="Lote automático solicitado. Ejecutarlo exige una nueva aprobación de los ámbitos exactos aptos."
+L_PLAN_SCOPE_GOOGLE_GROUP="Grupo del actualizador Google: puede descargar o sustituir TODOS los productos Google registrados, incluso fuera del catálogo. La lista completa es desconocida; el ámbito supera las apps indicadas."
+L_PLAN_PREVIEW_UNSUPPORTED="Método automático no disponible; actualiza manualmente"
+
+L_PLAN_DEFAULT_SCOPE="Activa actualizaciones de aplicaciones y paquetes compatibles ya instalados en este perfil, desde sus fuentes actuales. Los actualizadores nativos pueden abrir aplicaciones; los procedimientos aprobados pueden descargarlas y reemplazarlas. Los grupos de Google pueden actualizar TODOS los productos Google registrados, incluso fuera del catálogo; la lista completa es desconocida. Se mantienen decisiones manuales, exclusiones y aplazamientos. DeepSeek, conflictos de fuentes y aplicaciones protegidas siguen bloqueados. Esto no instala aplicaciones del catálogo ni permite cerrarlas o reiniciarlas."
+L_PLAN_DEFAULT_QUESTION="Escribe ENABLE para guardar este permiso para futuras ejecuciones. Vacío o q lo deja desactivado. Puedes cambiarlo en Preferencias."
+
+# Explicit optional manager installation
+L_CATALOG_MANAGER="Instalación opcional mediante Homebrew con permiso explícito"
+L_CATALOG_MANAGER_METADATA="Alcance revisado del gestor Homebrew"
+L_INSTALL_MANAGER_VERIFIED="Instalado; registro de Homebrew verificado"
+L_INSTALL_MANAGER_PERMISSION="Permiso: el gestor Homebrew existente puede ejecutar este cask oficial seleccionado e instalar la app, enlaces CLI, páginas del manual y dependencias declaradas. La verificación cubre el registro del gestor."
+L_INSTALL_MANAGER_DEPENDENCIES="Dependencias declaradas de Homebrew"
+L_INSTALL_MANAGER_EFFECTS="Instalar el cask seleccionado mediante Homebrew"

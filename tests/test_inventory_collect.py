@@ -53,7 +53,7 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(second["packages"][0]["presence"], "unobserved")
             self.assertEqual(second["packages"][0]["freshness"], "stale")
 
-    def test_incomplete_formula_domain_remains_blocked_through_resolution_and_plan(self):
+    def test_incomplete_formula_domain_preserves_exact_healthy_receipt_observation(self):
         from inventory_providers import read_brew_receipts
         from source_resolver import resolve_snapshot
         from update_plan import build_plan
@@ -67,10 +67,11 @@ class CollectorTests(unittest.TestCase):
             snapshot = collect_snapshot([], Providers(list_brew=read_brew_receipts,
                                                        brew_prefixes=[str(root)]), None)
             resolutions = resolve_snapshot(snapshot, {"recipes": []})
-            self.assertEqual(snapshot["packages"][0]["freshness"], "stale")
-            self.assertEqual(resolutions[0]["capability"], "inventory_only")
+            self.assertFalse(snapshot["sources"]["brew:" + str(root)]["complete"])
+            self.assertEqual(snapshot["packages"][0]["freshness"], "fresh")
+            self.assertEqual(resolutions[0]["capability"], "native_managed")
             plan = build_plan(snapshot, resolutions, {}, snapshot["created_at"])
-            self.assertIn("scan_partial", plan["actions"][0]["reason_codes"])
+            self.assertEqual(plan["actions"][0]["reason_codes"], ["consent_required"])
 
     def test_formula_domain_proof_does_not_refresh_mismatched_receipt_or_invalid_peer(self):
         import copy

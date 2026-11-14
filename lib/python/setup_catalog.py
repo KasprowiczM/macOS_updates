@@ -111,6 +111,19 @@ def load_setup_catalog(script_dir=None):
                 revision=manifest.get("reviewed_at"),
             )
         )
+    # A closed manager contract grants no vendor-artifact acceptance. The live
+    # official cask and exact metadata are reviewed again for selected previews.
+    for row in recipes:
+        if row["product_id"] == "keepassxc-gui":
+            stable = evidence.get("keepassxc", {})
+            record = stable.get("metadata", {})
+            if record.get("prerelease") is False and record.get("draft") is False:
+                row.update(manager_delegation=dict(token="keepassxc", stable_version=record.get("tag_name"),
+                                                  reviewed_at=stable.get("observed_at")),
+                           install_adapter="homebrew_cask", installation_source="homebrew", channel="stable",
+                           bundle_id="org.keepassxc.keepassxc",
+                           version=record.get("tag_name"), destination="/Applications/KeePassXC.app",
+                           artifact_effects=["/Applications/KeePassXC.app"], permissions=["manager_delegated_install"])
     catalog = dict(
         schema_version=1,
         recipes=recipes,
@@ -207,6 +220,7 @@ def match_catalog_snapshot(snapshot, recipes):
 def build_catalog_view(snapshot, recipes, recommendations, filters):
     snapshot = match_catalog_snapshot(snapshot, recipes)
     from install_plan import install_recipe_eligible
+    from catalog_manager_install import manager_recipe_eligible
 
     recommendations = {r["product_id"]: r for r in recommendations}
     installed = {}
@@ -239,11 +253,11 @@ def build_catalog_view(snapshot, recipes, recommendations, filters):
                     "already_installed"
                     if present
                     else (
-                        "automatic"
+                        "manager_delegated" if manager_recipe_eligible(recipe) else ("automatic"
                         if install_recipe_eligible(
                             recipe, snapshot.get("environment", {})
                         )
-                        else "manual"
+                        else "manual")
                     )
                 ),
                 sources=copy.deepcopy(recipe.get("sources", [])),
@@ -254,9 +268,9 @@ def build_catalog_view(snapshot, recipes, recommendations, filters):
                 latest_compatible_stable=recommendation.get("latest_compatible_stable"),
                 as_of=recommendation.get("as_of"),
                 evidence_level=(
-                    "first_install_verified"
+                    "manager_delegation" if manager_recipe_eligible(recipe) else ("first_install_verified"
                     if install_recipe_eligible(recipe, snapshot.get("environment", {}))
-                    else "metadata_only"
+                    else "metadata_only")
                 ),
                 license_review=recipe.get("license_review", "unknown"),
                 limitations=["manual_migration_only"] if present else [],
@@ -280,6 +294,30 @@ def build_catalog_view(snapshot, recipes, recommendations, filters):
             if target.get("presence") == "present" and not target.get("product_id")
         ),
     )
+
+
+
+def prepare_catalog_selections(pairs, snapshot, recipes, now):
+    """Build a plan only for explicit, canonical product and source selections."""
+    from install_plan import build_install_plan
+    if not isinstance(pairs, (list, tuple)) or len(pairs) > 1000:
+        raise ValueError("invalid_selections")
+    by_id = {item["product_id"]: item for item in recipes.get("recipes", [])}
+    selected = []
+    seen = set()
+    for pair in pairs:
+        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
+            raise ValueError("invalid_selection")
+        product_id, source_id = pair
+        if not isinstance(product_id, str) or not isinstance(source_id, str) or product_id in seen:
+            raise ValueError("invalid_selection")
+        recipe = by_id.get(product_id)
+        if not recipe or source_id not in {source.get("source_id") for source in recipe.get("sources", [])}:
+            raise ValueError("unknown_source")
+        seen.add(product_id)
+        selected.append(dict(product_id=product_id, edition=recipe["edition"],
+                             source_id=source_id, architecture="arm64"))
+    return build_install_plan(selected, snapshot, recipes, now)
 
 
 def parse_selections(text, view):
@@ -336,6 +374,8 @@ def _label(value):
         ),
         "manual": ("L_CATALOG_MANUAL", "Manual acquisition"),
         "automatic": ("L_CATALOG_AUTOMATIC", "Reviewed first-install adapter"),
+        "manager_delegated": ("L_CATALOG_MANAGER", "Optional Homebrew installation with explicit permission"),
+        "manager_delegation": ("L_CATALOG_MANAGER_METADATA", "Reviewed Homebrew manager contract"),
         "gui": ("L_CATALOG_GUI", "Desktop application"),
         "cli": ("L_CATALOG_CLI", "Command-line tool"),
         "suite": ("L_CATALOG_SUITE", "Application suite"),
@@ -356,6 +396,7 @@ def _label(value):
             "Official page opened. Acquire the application yourself, then rescan.",
         ),
         "installed_verified": ("L_INSTALL_RESULT_VERIFIED", "Installed and verified"),
+        "manager_installed_verified": ("L_INSTALL_MANAGER_VERIFIED", "Installed; Homebrew receipt verified"),
         "deferred": (
             "L_INSTALL_RESULT_DEFERRED",
             "Deferred. Review a new preview before retrying.",
@@ -502,9 +543,12 @@ def print_install_preview(plan, output):
             ),
             file=output,
         )
+        if action.get("adapter_id") == "homebrew_cask":
+            print(_message("L_INSTALL_MANAGER_PERMISSION", "Permission: the existing Homebrew manager may execute this selected official cask, its app, CLI links, manual pages and declared dependencies. Verification covers the manager receipt."), file=output)
+            print("    " + _message("L_INSTALL_MANAGER_DEPENDENCIES", "Declared Homebrew dependencies") + ": " + _text(action["manager_preview"]["metadata"].get("depends_on", {})), file=output)
         if action["permissions"]:
             print(
-                "    " + ", ".join(_text(x) for x in action["permissions"]), file=output
+                "    " + ", ".join(_message("L_INSTALL_MANAGER_EFFECTS", "Install selected cask through Homebrew") if x == "manager_delegated_install" else _text(x) for x in action["permissions"]), file=output
             )
         if action["official_url"]:
             print("    " + action["official_url"], file=output)
@@ -537,6 +581,11 @@ def _interactive(stream):
 
 def _answer(stream, timeout=120):
     import select
+    import os
+    import sys
+
+    if os.environ.get("MAC_UPDATE_TUI_CHILD") == "1":
+        print("\n@@MAC_UPDATE_PROMPT", file=sys.stdout, flush=True)
 
     ready, _, _ = select.select([stream], [], [], timeout)
     if not ready:
@@ -578,6 +627,11 @@ def _fresh_catalog_snapshot(recipes, preview_snapshot, script_dir=None):
 
 def _rescan_requested(stream, timeout=120):
     import select
+    import os
+    import sys
+
+    if os.environ.get("MAC_UPDATE_TUI_CHILD") == "1":
+        print("\n@@MAC_UPDATE_PROMPT", file=sys.stdout, flush=True)
 
     ready, _, _ = select.select([stream], [], [], timeout)
     if not ready:
@@ -629,7 +683,7 @@ def approve_install_preview(plan, recipes, snapshot, stream, output, environment
         if result["status"] == "recovery_required":
             code = 1
         elif (
-            result["status"] not in ("manual_acquisition_opened", "installed_verified")
+            result["status"] not in ("manual_acquisition_opened", "installed_verified", "manager_installed_verified")
             and code != 1
         ):
             code = 10
@@ -668,7 +722,8 @@ def catalog_main(script_dir, mode="catalog", plan_path=None, stream=None, output
         from inventory_migration import collect_current_snapshot
         from install_execution import recover_installations
 
-        recovery = recover_installations(state_dir=default_root())
+        from catalog_manager_install import recover_manager_installations
+        recovery = recover_installations(state_dir=default_root()) + recover_manager_installations(state_dir=default_root())
         if recovery:
             print(
                 _message("L_INSTALL_RECOVERY", "Interrupted installation review")

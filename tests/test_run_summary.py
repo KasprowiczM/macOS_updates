@@ -19,6 +19,33 @@ from run_summary import (  # noqa: E402
 )
 
 
+class NextStepAdviceTests(unittest.TestCase):
+    def test_advice_is_deduplicated_and_does_not_grant_permission(self):
+        from run_summary import next_step_advice
+        summary = {"items": [{"action_status": "scan_partial"}] * 200 + [
+            {"action_status": "deferred_by_user", "details": "target_running"},
+            {"action_status": "manual_by_policy"},
+            {"action_status": "source_conflict"},
+        ]}
+        import copy
+        original = copy.deepcopy(summary)
+        advice = next_step_advice(summary, "pl")
+        self.assertLessEqual(len(advice), 6)
+        self.assertEqual(summary, original)
+        self.assertTrue(any("build_inventory.sh" in line for line in advice))
+        self.assertTrue(any("--preferences" in line for line in advice))
+        self.assertTrue(any("--compare-sources" in line for line in advice))
+
+    def test_no_recovery_instruction_without_pending_work_and_all_languages(self):
+        from run_summary import next_step_advice
+        for lang in ("en", "pl", "de", "es", "fr", "it", "pt"):
+            clean = next_step_advice({"items": []}, lang)
+            self.assertEqual(len(clean), 1)
+            self.assertNotIn("reconcile_native.sh", " ".join(clean))
+            pending = next_step_advice({"items": [{"action_status": "vendor_updater_observing"}]}, lang)
+            self.assertTrue(any("reconcile_native.sh" in line for line in pending))
+
+
 class PendingMeasurementTests(unittest.TestCase):
     def test_missing_measurement_is_unknown_not_zero(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

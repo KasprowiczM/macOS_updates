@@ -89,6 +89,7 @@ def read_brew_receipts(prefix):
             status="unavailable", roots=[str(root)], reason="manager_metadata_missing"
         )
     items, partial = [], False
+    complete_package_receipts = []
     formula_domain_complete = False
     issues = Counter()
     budget = [MAX_ENTRIES]
@@ -108,6 +109,7 @@ def read_brew_receipts(prefix):
                     raise ValueError("invalid_manager_directory")
                 token = token_dir.name
                 if room.name == "Cellar":
+                    token_receipts = []
                     for version_dir in _entries(token_dir, budget):
                         receipt = version_dir / "INSTALL_RECEIPT.json"
                         data = _regular_json(receipt, root)
@@ -134,6 +136,10 @@ def read_brew_receipts(prefix):
                                 ],
                             )
                         )
+                        token_receipts.append(str(receipt))
+                    # A token is complete only after every installed version
+                    # was read. A malformed sibling token does not negate it.
+                    complete_package_receipts.extend(token_receipts)
                 else:
                     candidates = []
                     for version_dir in _entries(token_dir / ".metadata", budget):
@@ -254,6 +260,7 @@ def read_brew_receipts(prefix):
     # A successful Cellar traversal is independent of Caskroom metadata. The
     # aggregate status still governs omissions and remains partial on errors.
     result["formula_domain_complete"] = formula_domain_complete
+    result["complete_package_receipts"] = complete_package_receipts
     return result
 
 
@@ -261,6 +268,7 @@ def read_cli_manifests(prefix):
     root = Path(os.path.realpath(prefix))
     modules = root / "lib/node_modules"
     items, partial = [], False
+    complete_package_receipts = []
     issues = Counter()
     budget = [MAX_ENTRIES]
     try:
@@ -269,7 +277,7 @@ def read_cli_manifests(prefix):
             for entry in _entries(modules, budget):
                 # npm's hidden lockfile describes the directory, not a package.
                 # A symlink or directory with this name is still suspicious.
-                if entry.name == ".package-lock.json" and not entry.is_symlink() and entry.is_file():
+                if entry.name in (".package-lock.json", ".DS_Store") and not entry.is_symlink() and entry.is_file():
                     continue
                 candidates.extend(
                     _entries(entry, budget) if entry.name.startswith("@") else [entry]
@@ -303,6 +311,7 @@ def read_cli_manifests(prefix):
                         ],
                     )
                 )
+                complete_package_receipts.append(str(path))
             except (OSError, ValueError, TypeError) as exc:
                 partial = True
                 reason = str(exc) if isinstance(exc, ValueError) else "package_metadata_unreadable"
@@ -330,13 +339,63 @@ def read_cli_manifests(prefix):
         issues["package_directory_unreadable"] += 1
     if not root.exists():
         return _result(status="unavailable", roots=[str(root)], reason="prefix_missing")
-    return _result(
+    result = _result(
         items,
         "partial" if partial else "ok",
         [str(root)],
         "package_metadata_incomplete" if partial else None,
         issues,
     )
+    result["complete_package_receipts"] = complete_package_receipts
+    return result
+
+
+def package_observation_complete(source, package):
+    """Exact existing receipt proof; never proves absence or cask ownership."""
+    try:
+        manager = package.get("manager")
+        prefix = package.get("prefix")
+        identity = package.get("source_identity")
+        receipt = package.get("installed_receipt")
+        proofs = source.get("complete_package_receipts")
+        evidence = package.get("evidence")
+        if (source.get("status") != "partial" or source.get("complete") is not False
+                or not isinstance(prefix, str) or not os.path.isabs(prefix)
+                or source.get("covered_roots") != [prefix]
+                or not isinstance(identity, str) or not identity
+                or not isinstance(proofs, list) or len(proofs) > MAX_ENTRIES
+                or any(not isinstance(p, str) or not os.path.isabs(p) for p in proofs)
+                or proofs.count(receipt) != 1
+                or not isinstance(evidence, list) or not evidence):
+            return False
+        if manager == "homebrew":
+            if (source.get("reason_code") != "manager_metadata_incomplete"
+                    or type(source.get("formula_domain_complete")) is not bool
+                    or not identity.startswith("formula:")):
+                return False
+            token, version = identity[len("formula:"):], package.get("version")
+            if any(not isinstance(v, str) or not v or v in (".", "..") or "/" in v
+                   for v in (token, version)):
+                return False
+            expected = os.path.join(prefix, "Cellar", token, version, "INSTALL_RECEIPT.json")
+            return receipt == expected and all(
+                isinstance(e, dict) and e.get("kind") == "homebrew"
+                and e.get("token") == token and e.get("prefix") == prefix
+                and e.get("installed_receipt") == receipt and e.get("artifact_path") is None
+                for e in evidence)
+        if manager == "npm" and source.get("reason_code") == "package_metadata_incomplete":
+            parts = identity.split("/")
+            if (any(p in ("", ".", "..") for p in parts)
+                    or len(parts) != (2 if identity.startswith("@") else 1)):
+                return False
+            expected = os.path.join(prefix, "lib", "node_modules", identity, "package.json")
+            return receipt == expected and all(
+                isinstance(e, dict) and e.get("kind") == "npm"
+                and e.get("name") == identity and e.get("prefix") == prefix
+                and e.get("manifest_path") == receipt for e in evidence)
+        return False
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
 
 
 def read_mas(run=subprocess.run):

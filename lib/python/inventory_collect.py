@@ -8,6 +8,7 @@ import stat
 import uuid
 from dataclasses import dataclass, field
 from inventory_model import _timestamp
+from inventory_providers import package_observation_complete
 
 MAX_RECORDS = 10000
 MAX_ENTRIES = 50000
@@ -596,6 +597,15 @@ def collect_snapshot(roots, providers, previous):
             domain = sources.setdefault(domain_key, source_result(
                 "ok", observed_at=package_source["observed_at"],
                 covered_roots=[os.path.join(package["prefix"], "Cellar")]))
+            for evidence in package["evidence"]:
+                evidence.update(source_key=domain_key, source_status="ok", source_complete=True)
+            package["freshness"] = "fresh"
+            package_source = domain
+        elif package_source and package_observation_complete(package_source, package):
+            domain_key = package_kind + "_receipt:" + package["installed_receipt"]
+            domain = sources.setdefault(domain_key, source_result(
+                "ok", observed_at=package_source["observed_at"],
+                covered_roots=[package["installed_receipt"]]))
             for evidence in package["evidence"]:
                 evidence.update(source_key=domain_key, source_status="ok", source_complete=True)
             package["freshness"] = "fresh"

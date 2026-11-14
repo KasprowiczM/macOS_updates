@@ -1,5 +1,7 @@
 # Scripts Reference
 
+`lib/python/catalog_manager_install.py` provides the closed Homebrew catalog first-install adapter. It validates stable cask metadata and declared effects separately from vendor recipe acceptance; selected acquisition requires its own preview and consent.
+
 | Script | Purpose |
 |--------|---------|
 | `install.sh` | Clone, language, readiness inspection, inventory and coverage when Python 3.9+ is usable; exit 10 for incomplete readiness |
@@ -42,6 +44,15 @@
 | `lib/appstore_ios.sh` | iOS and iPad app detection and App Store lookup helpers (Bash 3.2+) |
 | `lib/tui.sh` | Optional terminal interface routing and CLI fallback |
 | `lib/python/terminal_app.py` | Interactive terminal application and views |
+| `lib/python/tui_widgets.py` | Reusable terminal controls, tables and honest activity indicators |
+| `lib/python/tui_events.py` | Bounded observational candidate and target status protocol; grants no authority |
+| `lib/python/tui_inventory.py` | Saved inventory table and atomic exclusion edits; re-enabling requires fresh consent |
+| `lib/python/tui_toolkit.py` | Private receipt handoff after terminal restoration, followed by separate confirmation |
+| `lib/python/toolkit_update.py` | Explicit official upstream check, pinned preview and guarded fast-forward self-update |
+| `scripts/update_toolkit.sh` | Toolkit check/preview/apply CLI; preserves local edits by refusing unsafe updates |
+| `lib/scoped_legacy.sh` | One admitted legacy handler, exact target binding, transactional copy bridge and supervisor-owned native launch requests |
+| `lib/python/installed_native_updaters.py` | Explicit signed installed-vendor delegation, pending journals and user-reported recovery; separate from recipe acceptance |
+| `scripts/reconcile_native.sh` | Review pending native sessions and confirm vendor completion without launching or terminating apps |
 | `lib/python/tui_recovery.py` | Preserve an active PTY task through a curses failure and restore safe foreground text interaction |
 | `lib/python/tui_backend.py` | Read-only terminal data and fixed child commands |
 | `lib/python/tui_i18n.py` | Localized terminal interface strings |
@@ -268,3 +279,31 @@ Never copy another user's `APPLICATIONS.md` — use `build_inventory.sh` or pres
 `build_inventory.sh --shadow` invokes the importable `lib/python/inventory_shadow.py` module directly and never enters `update_all.sh`. New modules: `lib/python/inventory_model.py` (schema), `lib/python/inventory_collect.py` (bounded observations and reconciliation), `lib/python/inventory_providers.py` (static manager metadata and bounded mas query), `lib/python/inventory_store.py` (private JSON and generation checks), `lib/python/app_recipes.py` (strict declarative catalog) and `lib/python/source_resolver.py` (pure decisions). `brew_casks.installed_inventory_source` and `brew_inventory_snapshot_json` expose the shared static Homebrew provider.
 
 `--shadow --dry-run` observes without writing state. `--json` emits machine-readable decisions. Repeated `--root PATH` replaces the default scan roots. No vendor feed, application, npm script, Ruby cask or updater is executed. An explicit `mas list --json` query has a ten-second timeout. Normal build/update entrypoints retain stage A behavior until stage C activation.
+
+## Self-update recovery
+
+A failed or timed-out toolkit fetch or merge retains an exclusive scheduler lease. Do not remove the scheduler registry. First inspect the checkout with `git status` and `git log -1`, and inspect the process list for any Git or transport process still writing this checkout. Resolve any incomplete Git operation before recovery. A timeout may leave a detached helper, so the direct Git process exiting alone does not prove that all writers finished.
+
+After independently confirming that all writers have stopped and the checkout has been inspected, list the pending leases from the checkout root:
+
+```bash
+PYTHONPATH=lib/python python3 -c 'from update_scheduler import pending_sessions; print(*pending_sessions(), sep="\n")'
+```
+
+To release only the inspected toolkit update lease, replace both placeholders with the exact values shown above and run this command. It refuses other action types and requires the full action ID as a separate confirmation:
+
+```bash
+PYTHONPATH=lib/python python3 - LEASE_ID ACTION_ID <<'PY'
+import sys
+from update_scheduler import pending_sessions, reconcile_session
+lease_id, action_id = sys.argv[1:]
+rows = [r for r in pending_sessions() if r['lease_id'] == lease_id and r['action_id'] == action_id]
+if len(rows) != 1 or not action_id.startswith('toolkit-update:') or rows[0]['status'] != 'recovery_required':
+    raise SystemExit('No matching toolkit recovery lease')
+if input('After inspecting the checkout and confirming all writers stopped, type the full action ID: ').strip() != action_id:
+    raise SystemExit('Recovery cancelled')
+if not reconcile_session(lease_id, {'action_id': action_id, 'helpers_complete': True, 'target_reobserved': True}):
+    raise SystemExit('Recovery failed')
+print('Recovery lease released')
+PY
+```

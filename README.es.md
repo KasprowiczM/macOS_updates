@@ -6,9 +6,7 @@
 
 **Sitio web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repositorio:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licencia:** [MIT](LICENSE) · **Cambios:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.8.0** : Orquestador de actualizaciones en un solo comando, para **Macs con Apple Silicon y macOS 13-27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
-
-La etapa C activa inventario JSON local y planes con permisos específicos. `bash update_all.sh --plan` y `--dry-run` muestran las mismas decisiones sin guardar. Un proceso interactivo pregunta una vez por los alcances mostrados; `-y`, EOF y ejecución desatendida no conceden permisos nuevos. Use `--preferences` para revisar o restablecer decisiones. Las actualizaciones conservan origen y destino observados; conflictos, destinos ausentes o evidencia incierta aplazan ese destino. `build_inventory.sh --migration --preview` conserva bytes originales de Markdown y notas; acepte expresamente el ID mostrado. Las actualizaciones genéricas del proveedor siguen siendo manuales hasta verificar identidad y adaptador. Una entrada de catálogo no demuestra instalación ni consentimiento.
+> **v1.8.2** : Orquestador de actualizaciones en un solo comando, para **Macs con Apple Silicon y macOS 13-27**. Coordina actualizaciones de paquetes verificadas y activadores honestos de los actualizadores de cada app para el **software ya instalado en este Mac**. **Multilingüe** (7 idiomas). Capa privada opcional en la nube mediante [`dev_sync/`](dev_sync/README.md).
 
 | De un vistazo | |
 |---------------|--|
@@ -16,19 +14,21 @@ La etapa C activa inventario JSON local y planes con permisos específicos. `bas
 | Flujo | 7 pasos (0–6); la actualización de macOS va siempre al final |
 | Registro | 47 apps de Internet · 11 métodos de actualización (véase [Métodos de actualización](#métodos-de-actualización)) |
 | Idiomas | EN, PL, ES, FR, DE, IT, PT (CLI y documentación) |
-| Pruebas | 1441 pruebas automáticas (`bash run_tests.sh`) |
+| Pruebas | 1624 pruebas automáticas (`bash run_tests.sh`) |
 
-Esta documentación describe macOS Updates 1.8.0. No se ha creado una etiqueta de lanzamiento separada. El gestor actúa solo sobre objetivos instalados con fuente observada y tras una nueva aprobación. Los adaptadores genéricos nativos y de proveedores siguen siendo manuales hasta disponer de recetas revisadas. El catálogo público opcional abarca 48 productos y ofrece enlaces oficiales revisados para la obtención manual; no hay recetas aprobadas de primera instalación automática. La lista de métodos siguiente describe capacidades, no autoriza su ejecución.
+macOS Updates 1.8.2 conserva las fuentes detectadas de las aplicaciones instaladas. La configuración ofrece un permiso guardado para actualizaciones compatibles de la misma fuente; se respetan exclusiones, conflictos y destinos protegidos. El catálogo del autor es opcional y comienza sin selecciones. Las instalaciones adicionales requieren una vista previa y aprobación separadas. Los actualizadores nativos pueden ejecutarse en paralelo; DeepSeek Harness sigue siendo manual y los métodos no compatibles se indican. Abrir un actualizador no demuestra que se haya instalado la última versión estable.
 
 **Novedades de la v1.6.0:** Las ejecuciones programadas (launchd) encuentran Homebrew y `mas`, y el instalador comprueba que el trabajo esté cargado (se añaden `--minute` y `--once-in`). Las apps abiertas nunca se cierran ni se reemplazan, tampoco los casks de Homebrew. Cada pregunta durante la ejecución caduca con la respuesta segura «no». `bash update_all.sh --doctor` es un informe de preparación de solo lectura y las ejecuciones reales añaden comprobaciones previas. El estado persistente de los feeds de fabricante sustituye las opacas advertencias de «feed obsoleto», y HyperFrames, Superset y Open Design se instalan o comprueban sin lanzamientos ocultos. Las versiones 1.5.x anteriores se describen en [CHANGELOG.md](CHANGELOG.md).
 
-Los informes heredados de feeds de proveedores son de solo lectura. El gestor actual mantiene manuales los adaptadores genéricos nativos y de proveedores hasta que haya una receta revisada. La opción heredada `--bootstrap-cli` no autoriza una primera instalación. Instala las CLI ausentes por separado con instrucciones oficiales verificadas. Las apps abiertas no se cierran. Consulta los feeds con `bash scripts/check_vendor_feeds.sh`.
+Las recetas del catálogo para versiones concretas siguen requiriendo aceptación. Los actualizadores reconocidos usan el lote automático separado y aprobado de nuevo descrito arriba. La opción heredada `--bootstrap-cli` no autoriza una primera instalación. Instala las CLI ausentes por separado con instrucciones oficiales verificadas. Las apps abiertas no se cierran. Consulta los feeds con `bash scripts/check_vendor_feeds.sh`.
+
+El modo automático utiliza el permiso guardado si cubre el grupo elegible; de lo contrario ofrece una revisión AUTO separada. Las ventanas nativas autorizadas se abren en paralelo y las descargas comparten el grupo supervisado; las tareas Microsoft y Google se agrupan. Se conserva la gestión por App Store y Homebrew. DeepSeek Harness sigue manual; Open Design indica actualmente que no dispone de un método automático. El proveedor elige versiones según la configuración del canal existente. Un cambio de versión no equivale a finalización verificada. El trabajo sin confirmar mantiene el bloqueo del grupo y aplaza la actualización del sistema; Diagnóstico ofrece una revisión explícita de recuperación con nueva verificación de identidad. El permiso Google cubre todos los productos registrados con su actualizador, incluso fuera del catálogo, cuya lista completa se desconoce. Esto es independiente de aceptar una receta para una versión concreta. `bash update_all.sh --cli --automatic-internet-batch` permite la misma revisión sin interfaz de terminal; añade `--dry-run` para una vista previa sin cambios.
 
 ## Interfaz de terminal
 
 En un terminal interactivo, `bash update_all.sh` abre el panel y muestra el asistente hasta completarlo. `bash setup.sh` abre el asistente y `bash build_inventory.sh` el inventario. El asistente se puede volver a abrir desde la navegación. Su finalización y los ajustes visuales se guardan sin conceder permisos de actualización. `--cli` selecciona la interfaz de texto anterior y `--tui` solicita el panel explícitamente. Opciones como `--dry-run` siguen en CLI; no combines `--tui` con otras opciones. `--tui` requiere un terminal funcional y Python. Las ejecuciones sin TTY o no interactivas siguen en CLI.
 
-Elige grupos antes de iniciar. La navegación está a la izquierda, las acciones y la salida en el centro y los detalles a la derecha cuando hay espacio. Solo se supervisa una tarea a la vez; siguen vigentes las confirmaciones existentes. Los ajustes incluyen idioma, tema, ASCII y tamaño automático. `?` abre ayuda, Ctrl+P la paleta y `c` copia el comando, la salida o el resumen enfocado. Ctrl+V pega solo en el cuadro de respuesta; Enter envía. La entrada se oculta si el proceso desactiva el eco.
+Elige grupos antes de iniciar. La navegación está a la izquierda, las acciones y la salida en el centro y la ayuda y los detalles a la derecha en cada pantalla. Solo se supervisa una tarea a la vez; siguen vigentes las confirmaciones existentes. Los ajustes incluyen idioma, tema, ASCII y tamaño automático. `?` abre ayuda, Ctrl+P la paleta y `c` copia el comando, la salida o el resumen enfocado. Ctrl+V pega solo en el cuadro de respuesta; Enter envía. La entrada se oculta si el proceso desactiva el eco.
 
 Se necesitan al menos 80 columnas y 24 filas. Por defecto se solicitan al menos 140 columnas y 38 filas en terminales compatibles y el tamaño original al salir; el terminal puede ignorar ambas solicitudes. El tamaño automático se puede desactivar.
 
@@ -68,7 +68,7 @@ Consulta [docs/INSTALL.md](docs/INSTALL.md) · [docs/UNINSTALL.md](docs/UNINSTAL
 | 5 | **Post-actualización/historial** — actualiza `APPLICATIONS.md` y añade a `UPDATES.md` de forma atómica |
 | 6 | **macOS (final)** — por etiqueta `softwareupdate -i <label> -R` (etiquetas que requieren reinicio en el lote final); se aplaza tras un fallo grave bloqueante en los pasos 1–4 o si no hay autorización |
 
-**Importante:** Las actualizaciones normales actúan solo sobre software instalado con fuente observada y alcance aprobado. El catálogo opcional separado puede mostrar apps ausentes, pero no las instala automáticamente. La obtención manual requiere vista previa y nueva aprobación. El paso final de macOS puede reiniciar el Mac, por lo que va el último y conserva el obligatorio `-R`. El paso 5 solo genera informes. Las apps desconocidas se listan para revisión.
+**Importante:** Las actualizaciones normales actúan solo sobre software instalado con fuente observada y alcance aprobado. El catálogo opcional separado puede mostrar apps ausentes, y su instalación requiere aprobación separada. La obtención manual requiere vista previa y nueva aprobación. El paso final de macOS puede reiniciar el Mac, por lo que va el último y conserva el obligatorio `-R`. El paso 5 solo genera informes. Las apps desconocidas se listan para revisión.
 
 La cobertura es deliberadamente explícita: **verified direct** significa que el actualizador confirmó la ruta de paquete/versión; **triggered-unverified**, que se abrió la app para que su actualizador se ejecutara pero no se puede probar que terminó; **externally managed**, que el proveedor o el App Store gestionan el ciclo de actualización; **manual** requiere acción del usuario; **unknown** no tiene método registrado.
 
@@ -108,6 +108,7 @@ El registro ([`config/internet_apps.txt`](config/internet_apps.txt), [`config/in
 | `-h`, `--help` | Muestra la ayuda y sale con `0` |
 | `--doctor` | Informe de preparación solo de lectura (plataforma, herramientas, `PATH` de launchd, LaunchAgent, sudo, disco, energía, red, última ejecución); sin petición de sudo ni registro de ejecución; salida `0` ok / `10` avisos / `1` problema |
 | `--dry-run` | Previsualiza cada paso, no modifica nada y nunca pide credenciales |
+| `--automatic-internet-batch` | Revisar una vez el grupo instalado y ejecutar los ámbitos aprobados en paralelo; DeepSeek sigue manual. |
 | `--verify-only` | Verifica las versiones instaladas contra el historial sin modificar nada |
 | `--json-summary` | Imprime un objeto JSON con el resultado en stdout al terminar |
 | `--bootstrap-cli` | La opción heredada CLI no autoriza una primera instalación. Instala las CLI ausentes por separado con instrucciones oficiales verificadas. |
@@ -369,7 +370,7 @@ Los envoltorios `dev-sync-*.sh` de la raíz llaman a los mismos scripts de `dev_
 
 ## Pruebas
 
-La batería cubre la sintaxis de bash, la compilación de Python, los contratos estáticos de seguridad, las guardas de documentación y las pruebas unitarias (1441 pruebas automáticas).
+La batería cubre la sintaxis de bash, la compilación de Python, los contratos estáticos de seguridad, las guardas de documentación y las pruebas unitarias (1624 pruebas automáticas).
 Los pull requests ejecutan ShellCheck en Ubuntu, pruebas portables de Python y el análisis de secretos.
 La suite completa de `run_tests.sh` en un runner macOS solo se ejecuta con `workflow_dispatch` o una etiqueta `v*`, no en cada push.
 
@@ -428,7 +429,7 @@ Lista completa: [docs/agents/troubleshooting.md](docs/agents/troubleshooting.md)
 
 Las nuevas señales de aplicaciones son propuestas para revisar, no recetas ejecutables. `bash scripts/scan_update_feeds.sh` muestra un resumen agregado. La exportación permite previsualizar y aceptar explícitamente; se redacta, permanece local y nunca se sube. `bash setup.sh --catalog` abre el catálogo sin elementos seleccionados. `-y`, las ejecuciones no interactivas y EOF no instalan nada. En el menú, `check <number>` compara solo las fuentes elegidas. Los resultados indican la última versión estable compatible confirmada y fecha, con caché de 24 horas. Lo desconocido sigue siendo desconocido. Una ficha pública de Mac App Store no demuestra que la app esté disponible para tu cuenta.
 
-El catálogo público contiene 47 filas de registro para 48 productos y cero recetas aprobadas de instalación automática inicial. Tras la vista previa y una nueva confirmación, elige enlaces oficiales revisados para obtener la aplicación manualmente. Abrir una página no instala la app. Cambiar la fuente de una app existente requiere migración manual. El InstallPlan separado muestra fuente, destino, versión, requisitos y permisos; licencia y coste desconocidos se indican como tales. Las futuras recetas automáticas necesitarán aprobación de primera instalación. El catálogo no promete instalar automáticamente todos los productos.
+El catálogo opcional comienza sin selecciones. KeePassXC permite instalación separadamente aprobada mediante Homebrew tras comprobar la fuente y su ausencia. La vista previa muestra el comando y los efectos declarados; se verifica el recibo Homebrew, no una receta del fabricante. Las demás entradas conservan vías oficiales revisadas. Las aplicaciones existentes nunca se migran automáticamente. Las recomendaciones se basan en datos disponibles de versiones estables.
 
 `--dry-run` muestra una vista previa legible de hasta 10 objetivos. `--dry-run --json-summary` o `--plan` ofrece el plan JSON completo. La vista previa no concede permiso ni ejecuta actualizaciones.
 

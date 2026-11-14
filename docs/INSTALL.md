@@ -1,6 +1,6 @@
 # Installation
 
-**Version:** see `VERSION` in repo root (currently **1.8.0**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
+**Version:** see `VERSION` in repo root (currently **1.8.2**) · **Platform:** Apple Silicon (arm64), macOS 13 to 27 · Website: <https://macos-updates.64bit.site>
 
 ## One-line install (new Mac, Apple Silicon)
 
@@ -58,7 +58,7 @@ bash update_all.sh
 
 After inspection and inventory collection, run `bash setup.sh --catalog` to browse the public catalog. No item is selected by default. `check <number>` compares the reviewed sources for a chosen product; a newer compatible stable version can produce advice, never an automatic migration. Missing tools or metadata remain explicit limitations.
 
-Selection produces a separate InstallPlan and a fresh confirmation prompt. All current public entries offer manual acquisition or require further review; none has automatic first-install acceptance. Requirements are shown before approval and are not silently installed. Opening an official page does not mean installation succeeded. Return to scan the actual local application before treating it as installed. See [catalog acceptance](catalog/ACCEPTANCE.md).
+Selection produces a separate InstallPlan and a fresh confirmation prompt. KeePassXC supports separately consented Homebrew manager installation after fresh metadata and absence checks. Other entries retain reviewed official acquisition paths or require further review. Manager receipt verification is separate from vendor recipe acceptance. Requirements are shown before approval and are not silently installed. Opening an official page does not mean installation succeeded. Return to scan the actual local application before treating it as installed. See [catalog acceptance](catalog/ACCEPTANCE.md).
 
 Existing Markdown inventory requires `bash build_inventory.sh --migration --preview` and explicit acceptance of the displayed proposal ID. Keep the private backup until the new report and preserved notes are checked. `bash update_all.sh --plan` previews existing-app actions without granting new permissions. Review saved decisions with `bash update_all.sh --preferences`.
 
@@ -98,5 +98,6 @@ preference writes. An interactive run offers concrete targets and scopes. `-y` a
 unattended runs use only existing valid decisions. Use `--preferences` to change or
 reset those decisions. Missing Homebrew or mas produces a capability status, never
 an implicit install. Conflicting receipts and manager records defer that target.
-Reviewed direct-download recipes are currently empty, so unreviewed vendor paths
-remain manual. Standalone updater scripts also require the scoped plan.
+Recognized installed vendor applications use separately approved native or same-source handlers. Unsupported mechanisms remain explicit. The saved ENABLE agreement covers supported installed-source updates, while manual choices and exclusions continue to apply. Standalone updater scripts also require the scoped plan.
+
+Existing clones are preserved by the installer. Use About in the terminal workspace to check and preview toolkit updates. `MAC_UPDATE_REF` applies only to a new clone; use a separate destination for another revision.

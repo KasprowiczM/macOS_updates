@@ -17,12 +17,14 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from tui_events import emit_target
 from app_recipes import load_recipes, load_verified_recipes
 from inventory_collect import read_bundle_static
 from inventory_providers import (
     read_brew_receipts,
     read_cli_manifests,
     read_mas,
+    package_observation_complete,
 )
 from inventory_store import (
     _root,
@@ -122,6 +124,27 @@ def save_policies(policies, state_dir=None):
         _atomic_json(os.path.join(root, "policy.json"), policies)
 
 
+def set_installed_update_default(enabled, state_dir=None, *, allow_registered_vendor_groups=False):
+    """Persist one explicit profile agreement without creating per-app grants."""
+    if type(enabled) is not bool or type(allow_registered_vendor_groups) is not bool:
+        raise ValueError("invalid_installed_update_agreement")
+    with locked_state(state_dir or default_root()) as root:
+        policies = copy.deepcopy(load_policies(root))
+        snapshot = load_snapshot(root)
+        if enabled and snapshot is None:
+            raise StoreError("saved_inventory_required")
+        profile = snapshot["profile_id"] if snapshot else policies.get("profile_id")
+        if policies.get("profile_id") not in (None, profile):
+            raise ValueError("policy_profile_mismatch")
+        policies.update(schema_version=1, revision=policies.get("revision", 0)+1,
+                        profile_id=profile, decisions=policies.get("decisions", []),
+                        installed_updates=dict(enabled=enabled, scope="same_source_existing_only",
+                            allow_registered_vendor_groups=allow_registered_vendor_groups,
+                            confirmed_at=utc_now()))
+        _atomic_json(os.path.join(root, "policy.json"), policies)
+        return policies
+
+
 def save_plan(plan, path):
     # Plans are immutable files: a changed policy produces a new plan and path.
     _atomic_json(path, plan, exclusive=True)
@@ -175,6 +198,8 @@ def build_runtime_plan(script_dir, state_dir=None, filters=None):
 
     root = state_dir or default_root()
     snapshot = collect_current_snapshot(script_dir, root)
+    from installed_native_updaters import enrich_installed_updater_identities
+    snapshot = enrich_installed_updater_identities(snapshot)
     policies = load_policies(root)
     if policies.get("profile_id") not in (None, snapshot["profile_id"]):
         raise ValueError("policy_profile_mismatch")
@@ -225,6 +250,13 @@ def record_plan_decisions(plan, choices, state_dir=None):
                 policies = record_decision(decision, policies)
         if choices:
             _atomic_json(os.path.join(root, "policy.json"), policies)
+    return rebind_plan_policies(plan, policies)
+
+
+def rebind_plan_policies(plan, policies):
+    """Rebuild an observed plan after a saved policy change without host reads."""
+    if policies.get("profile_id") not in (None, plan["profile_id"]):
+        raise ValueError("policy_profile_mismatch")
     snapshot = dict(
         snapshot_id=plan["snapshot_id"],
         profile_id=plan["profile_id"],
@@ -525,7 +557,10 @@ def _current_app(expected):
         observed_at=utc_now(),
     )
     # A previous team identifier must be checked again, never copied as authority.
-    if expected.get("team_id"):
+    if any(e.get("kind") == "installed_native_updater" for e in expected.get("evidence", [])):
+        from installed_native_updaters import inspect_installed_target
+        result = inspect_installed_target(result)
+    elif expected.get("team_id"):
         try:
             # codesign's diagnostics are normally on stderr; use bounded explicit
             # verification below rather than trusting the saved signature.
@@ -595,11 +630,13 @@ def reobserve_action(action):
                 resolution={},
             )
         current = dict(expected, **matches[0])
+        receipt_complete = package_observation_complete(source, current)
         current.update(
             prefix=os.path.realpath(expected["prefix"]),
             presence="present",
             freshness=(
-                "fresh" if source["status"] == "ok" and source["complete"] else "stale"
+                "fresh" if (source["status"] == "ok" and source["complete"])
+                or receipt_complete else "stale"
             ),
             observed_at=utc_now(),
         )
@@ -619,8 +656,25 @@ def reobserve_action(action):
             for e in expected.get("evidence", [])
             if e.get("kind") == "homebrew" and e.get("prefix")
         }
+        if action.get("action_scope") in ("delegated_native_update", "legacy_same_source_update"):
+            configured = [p for p in os.environ.get(
+                "MAC_UPDATE_BREW_PREFIXES", "/opt/homebrew:/usr/local"
+            ).split(os.pathsep) if p]
+            if len(configured) > 32 or any(not os.path.isabs(p) for p in configured):
+                current["freshness"] = "stale"
+            else:
+                prefixes.update(configured)
         for prefix in prefixes:
             source = read_brew_receipts(prefix)
+            if action.get("action_scope") in ("delegated_native_update", "legacy_same_source_update") and (
+                source.get("status") != "ok" or source.get("complete") is not True
+            ):
+                from installed_native_updaters import probe_brew_app_ownership
+                # Missing manager roots and unrelated package errors do not
+                # invalidate this signed application's metadata. Incomplete
+                # ownership of the actual target still fails closed.
+                if probe_brew_app_ownership(prefix, current.get("real_path")) != "clear":
+                    current["freshness"] = "stale"
             for p in source["items"]:
                 for e in p.get("evidence", []):
                     if e.get("artifact_path") == current.get("real_path"):
@@ -724,9 +778,11 @@ def guard_action(plan_path, action_id, state_dir=None, owner_action_id=None):
         plan = load_plan(plan_path)
         action = next(a for a in plan["actions"] if a["action_id"] == action_id)
         result["target"] = action["target"]
-        from update_scheduler import assert_resources_available, resource_keys
+        from update_scheduler import assert_resources_available, assert_active_batch_member, resource_keys
 
         try:
+            if owner_action_id is not None:
+                assert_active_batch_member(owner_action_id, action_id, state_dir)
             assert_resources_available(
                 resource_keys(action), state_dir, owner_action_id
             )
@@ -952,7 +1008,8 @@ def _prepare_command(action, current):
 
 
 def _execute_action(
-    plan_path, adapter, action, state_dir=None, lease=None, allow_mutation=True
+    plan_path, adapter, action, state_dir=None, lease=None, allow_mutation=True,
+    batch_managed=False,
 ):
     code = 0
     outcome = dict(
@@ -977,16 +1034,17 @@ def _execute_action(
                 ):
                     locks.enter_context(
                         TargetLock(
-                            resource, state_dir, action["action_id"] if lease else None
+                            resource, state_dir, lease.action_id if lease else None
                         )
                     )
             guard = guard_action(
                 plan_path,
                 action["action_id"],
                 state_dir,
-                action["action_id"] if lease else None,
+                lease.action_id if lease else None,
             )
             if not guard["allowed"]:
+                outcome["mutation_started"] = False
                 outcome["reason_code"] = guard["reason_code"]
                 outcome["status"] = (
                     guard["reason_code"]
@@ -1009,10 +1067,22 @@ def _execute_action(
                     code = 10
             elif not allow_mutation:
                 outcome.update(
-                    status="deferred_by_user", reason_code="plan_requires_refresh"
+                    status="deferred_by_user", reason_code="plan_requires_refresh", mutation_started=False
                 )
                 code = 10
             else:
+                if action.get("action_scope") in ("delegated_native_update", "legacy_same_source_update"):
+                    from installed_native_updaters import run_delegated_update
+                    outcome.update(run_delegated_update(
+                        action, lease,
+                        batch_managed=batch_managed, plan_path=plan_path,
+                        observation_timeout=30 if batch_managed else 0,
+                        authorize=lambda: guard_action(
+                            plan_path, action["action_id"], state_dir,
+                            lease.action_id if lease else None,
+                        )["allowed"],
+                    ))
+                    return outcome, 1 if outcome.get("status") == "update_failed" else 10
                 if action.get("recipe"):
                     outcome.update(
                         _execute_reviewed_recipe(plan_path, action, state_dir, lease)
@@ -1175,6 +1245,15 @@ def _execute_action(
 
 
 def run_adapter(plan_path, adapter, state_dir=None):
+    return run_adapters(plan_path, (adapter,), state_dir)
+
+
+def run_adapters(plan_path, adapters, state_dir=None):
+    adapters = tuple(adapters)
+    if not adapters or len(set(adapters)) != len(adapters) or any(
+        adapter not in ("app_store", "npm", "homebrew", "vendor") for adapter in adapters
+    ):
+        return 1
     if not plan_path:
         print("deferred_by_user: a reviewed action plan is required.")
         return 10
@@ -1183,25 +1262,49 @@ def run_adapter(plan_path, adapter, state_dir=None):
     except (OSError, ValueError, TypeError):
         print("invalid_plan")
         return 1
-    from update_scheduler import execute_queue, resource_keys
+    from update_scheduler import execute_queue, execute_exclusive_batch, resource_keys
     from operation_receipts import phase_receipt
+    from tui_events import emit_phase
+    import threading
 
-    selected = [
-        a
-        for a in plan["actions"]
-        if a.get("adapter_id") == adapter
-        or (
-            adapter == "vendor"
-            and a.get("expected_resolution", {}).get("source")
-            not in ("homebrew", "npm", "app_store")
-        )
-    ]
+    phase_lock = threading.Lock()
+    phase_started = set()
+
+    def phase_start(adapter):
+        with phase_lock:
+            if adapter not in phase_started:
+                phase_started.add(adapter)
+                emit_phase(adapter, "running")
+
+    def phase_finish(adapter, current_results):
+        action_ids = {a["action_id"] for a in selected if adapter_for(a) == adapter}
+        if not action_ids:
+            emit_phase(adapter, "skipped")
+            return
+        codes = [r.get("_exit_code", 10) for r in current_results if r.get("action_id") in action_ids]
+        status = "error" if 1 in codes else "warn" if len(codes) != len(action_ids) or any(c != 0 for c in codes) else "ok"
+        emit_phase(adapter, status)
+
+    def adapter_for(action):
+        adapter = action.get("adapter_id")
+        if adapter in ("app_store", "npm", "homebrew"):
+            return adapter
+        if action.get("expected_resolution", {}).get("source") not in (
+            "homebrew", "npm", "app_store"
+        ):
+            return "vendor"
+        return None
+
+    selected = [a for a in plan["actions"] if adapter_for(a) in adapters]
     results = []
     queued = []
+    delegated = []
     for action in selected:
+        adapter = adapter_for(action)
         # Report blocked entries without fsyncing hundreds of mutation leases.
         # A changed fresh guard cannot promote these entries without readmission.
         if os.environ.get("MAC_UPDATE_DRY_RUN") == "1" or action.get("reason_codes"):
+            phase_start(adapter)
             outcome, code = _execute_action(
                 plan_path,
                 adapter,
@@ -1209,18 +1312,22 @@ def run_adapter(plan_path, adapter, state_dir=None):
                 state_dir,
                 allow_mutation=os.environ.get("MAC_UPDATE_DRY_RUN") == "1",
             )
+            emit_target(action, outcome)
             results.append(dict(outcome, _exit_code=code))
         else:
-            queued.append(
-                dict(
-                    action,
-                    resources=resource_keys(action),
-                    scope_complete=True,
-                    parallel_safe=False,
-                )
-            )  # T6 acceptance precedes parallel activation.
+            entry = dict(
+                action, resources=resource_keys(action),
+                scope_complete=action.get("scope_complete", True), parallel_safe=False,
+            )
+            if action.get("action_scope") in ("delegated_native_update", "legacy_same_source_update"):
+                delegated.append(entry)
+            else:
+                queued.append(entry)
 
-    def execute(action, lease):
+    def execute(action, lease, batch_managed=False):
+        adapter = adapter_for(action)
+        phase_start(adapter)
+        emit_target(action)
         with phase_receipt(
             os.environ.get("MAC_UPDATE_SESSION_DIR") or _root(state_dir, True),
             run_id=plan["plan_id"],
@@ -1228,11 +1335,19 @@ def run_adapter(plan_path, adapter, state_dir=None):
             recipe_revision=str(action.get("recipe", {}).get("revision", "manager")),
             phase="action",
         ) as event:
-            outcome, code = _execute_action(
-                plan_path, adapter, action, state_dir, lease
-            )
+            if batch_managed:
+                outcome, code = _execute_action(
+                    plan_path, adapter, action, state_dir, lease, batch_managed=True
+                )
+            else:
+                outcome, code = _execute_action(
+                    plan_path, adapter, action, state_dir, lease
+                )
+            emit_target(action, outcome)
             event["outcome"] = outcome["status"]
             event["evidence_type"] = outcome.get("evidence_type", "none")
+        if batch_managed:
+            return dict(outcome, _exit_code=code)
         if lease.closed:
             pass  # The native supervisor already proved completion and released it.
         elif outcome.get("lease_managed"):
@@ -1249,24 +1364,80 @@ def run_adapter(plan_path, adapter, state_dir=None):
         return dict(outcome, _exit_code=code)
 
     results.extend(execute_queue(queued, execute, state_dir))
+    delegated_adapters = {adapter_for(action) for action in delegated}
+    for adapter in adapters:
+        if adapter not in delegated_adapters:
+            phase_finish(adapter, results)
+    native_batch_pending = False
+    if delegated:
+        try:
+            batch_results = execute_exclusive_batch(
+                delegated, lambda action, lease: execute(action, lease, True), state_dir
+            )
+        except ValueError:
+            batch_results = [dict(action_id=a["action_id"], status="deferred_by_user",
+                                  reason_code="resources_pending", verified=False,
+                                  mutation_started=False, recovery_required=False, _exit_code=10)
+                             for a in delegated]
+        native_batch_pending = any(r.get("mutation_started") is not False or
+                                   r.get("recovery_required") is not False for r in batch_results)
+        delegated_by_id = {a["action_id"]: a for a in delegated}
+        for outcome in batch_results:
+            if outcome.get("reason_code") in ("shared_manager_requested_unconfirmed", "resources_pending", "executor_interrupted"):
+                emit_target(delegated_by_id[outcome["action_id"]], outcome)
+        results.extend(batch_results)
+    for adapter in adapters:
+        if adapter in delegated_adapters:
+            phase_finish(adapter, results)
     code = 0
+    adapter_codes = {adapter: 0 for adapter in adapters}
+    action_adapters = {action["action_id"]: adapter_for(action) for action in selected}
+    selected_by_id = {action["action_id"]: action for action in selected}
     for outcome in results:
+        emit_target(selected_by_id[outcome["action_id"]], outcome)
         current_code = outcome.pop("_exit_code", 10)
+        current_code = 1 if current_code == 1 else 0 if current_code == 0 else 10
+        adapter = action_adapters[outcome["action_id"]]
+        previous = adapter_codes[adapter]
+        adapter_codes[adapter] = 1 if 1 in (previous, current_code) else max(previous, current_code)
         code = 1 if code == 1 or current_code == 1 else max(code, current_code)
         _append("action-results.jsonl", outcome, state_dir)
         if os.environ.get("MAC_UPDATE_JSON_RESULTS") == "1":
             print(json.dumps(outcome, ensure_ascii=True))
+    report_path = os.environ.get("MAC_UPDATE_ADAPTER_REPORT")
+    if report_path:
+        directory = os.path.dirname(os.path.abspath(report_path))
+        fd, temporary = tempfile.mkstemp(prefix=".adapter-report-", dir=directory)
+        try:
+            with os.fdopen(fd, "w") as stream:
+                json.dump({"schema_version": 1, "adapters": adapter_codes,
+                           "native_batch_pending": native_batch_pending}, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, report_path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
     return code
 
 
 def main(argv):
     try:
+        if argv[0] == "reconcile-native" and len(argv) == 1:
+            from installed_native_updaters import native_recovery_cli
+            return native_recovery_cli()
+        if argv[0] == "native-sessions" and len(argv) == 1:
+            from installed_native_updaters import pending_delegated_sessions
+            print(json.dumps(pending_delegated_sessions(), ensure_ascii=True))
+            return 0
         if argv[0] == "guard":
             result = guard_action(argv[1], argv[2])
             print(json.dumps(result, ensure_ascii=True))
             return 0 if result["allowed"] else 10
         if argv[0] == "adapter":
             return run_adapter(argv[1], argv[2])
+        if argv[0] == "adapters":
+            return run_adapters(argv[1], argv[2:])
         if argv[0] == "target-lock":
             with TargetLock(argv[1]):
                 return subprocess.call(argv[2:], stdin=subprocess.DEVNULL)

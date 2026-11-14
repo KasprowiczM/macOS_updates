@@ -1,4 +1,4 @@
-# macOS Updates (v1.8.0)
+# macOS Updates (v1.8.2)
 
 Claude Code entry point. The shared project contract (quick commands, reference docs, non-negotiable rules) lives in `AGENTS.md` and is imported here so there is exactly one copy to maintain:
 

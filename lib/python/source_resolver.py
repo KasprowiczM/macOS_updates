@@ -225,6 +225,16 @@ def resolve_target(target, snapshot, recipes):
             for e in evidence
         )
     )
+    # Delegating to the installed signed application is a separate, explicit
+    # trust choice. It neither invents installation provenance nor accepts a
+    # candidate payload or lifecycle operation.
+    if (ref["kind"] == "app" and not degraded and source in ("unknown", "vendor")
+            and "duplicate_bundle_id" not in reasons and verified_recipe is None):
+        from installed_native_updaters import installed_updater_contract
+        delegated = installed_updater_contract(target)
+        if delegated:
+            capability = "installed_native_delegate"
+            adapter = "installed_native:" + delegated["contract_id"]
     # v2 profiles never inherit execution authority from legacy capability rows.
     if ref["kind"] == "app" and not degraded and source in ("unknown", "vendor"):
         from app_recipes import validate_recipe
@@ -313,6 +323,14 @@ def resolve_target(target, snapshot, recipes):
             elif resolution["capability"] == "inventory_only":
                 capability, adapter = "inventory_only", None
                 reasons.append("related_target_unavailable")
+    if ref["kind"] == "app" and path:
+        installed_name = os.path.basename(path)
+        if installed_name == "DeepSeek Harness.app":
+            capability, adapter, verified_recipe = "inventory_only", None, None
+            reasons.append("deepseek_manual_only")
+        elif installed_name == "Open Design.app" and source in ("unknown", "vendor"):
+            capability, adapter, verified_recipe = "unsupported_automatic", None, None
+            reasons.append("unsupported_automatic_method")
     result = {
         "target": dict(ref),
         "source": source,
@@ -322,6 +340,10 @@ def resolve_target(target, snapshot, recipes):
         "reason_codes": reasons,
         "candidate_sources": sorted(sources),
     }
+    if capability == "installed_native_delegate":
+        from user_policy import digest
+        result["installed_updater_contract"] = delegated
+        result["installed_updater_contract_sha256"] = digest(delegated)
     if verified_recipe is not None and capability in (
         "reviewed_direct",
         "reviewed_native",

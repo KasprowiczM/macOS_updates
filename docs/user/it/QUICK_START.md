@@ -1,6 +1,6 @@
 # Avvio rapido (Italiano)
 
-**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.8.0**
+**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.8.2**
 
 ## Interfaccia terminale
 
