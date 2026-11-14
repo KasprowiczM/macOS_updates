@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "product_id": "appcleaner-gui",
+  "edition": "gui",
+  "version_comparison_policy": "numeric",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://freemacsoft.net/appcleaner/",
+        "allowed_hosts": [
+          "freemacsoft.net"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "appcleaner",
+        "observed_at": "2026-11-13T20:44:09.156434+00:00"
+      },
+      "evidence_reference": {
+        "key": "appcleaner",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:09.156434+00:00",
+        "public_response_sha256": "bc3a32c5091eb4c6e6c89441d0911f8ca75b356b1d4f284e3d975ea87f9ccbb9",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://freemacsoft.net/appcleaner/"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/appcleaner.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "appcleaner",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:appcleaner",
+        "observed_at": "2026-11-13T20:44:04.949929+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:appcleaner",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:04.949929+00:00",
+        "public_response_sha256": "86f1b5ef8d235fe9da51c35960adc6b925150296a6b81bee88c81324246ebb72",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "3.7"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/appcleaner"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Oficjalny artefakt; ocenić Sparkle",
+    "install_candidate": "Oficjalny artefakt",
+    "known_scope_blocker": "Podpis, minOS i rzeczywisty zakres single-bundle",
+    "wave": 1
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Podpis, minOS i rzeczywisty zakres single-bundle"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

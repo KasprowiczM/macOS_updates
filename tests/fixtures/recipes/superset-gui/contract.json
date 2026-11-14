@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "product_id": "superset-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://api.github.com/repos/paradevai/paradev/releases/latest",
+        "allowed_hosts": [
+          "api.github.com"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": false,
+        "evidence_key": "superset-release",
+        "observed_at": "2026-11-13T20:45:25.701877+00:00"
+      },
+      "evidence_reference": {
+        "key": "superset-release",
+        "status": 200,
+        "observed_at": "2026-11-13T20:45:25.701877+00:00",
+        "public_response_sha256": "89572d8c31ab74d6ef90b3fd54c350eaff4154559644e56b361880b7b7f8aa04",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://github.com/paradevai/paradev/releases"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Oficjalny artefakt",
+    "install_candidate": "Oficjalny artefakt",
+    "known_scope_blocker": "Tożsamość produktu, dodatkowe narzędzia i skutki pierwszego startu",
+    "wave": 2
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Tożsamość produktu, dodatkowe narzędzia i skutki pierwszego startu"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

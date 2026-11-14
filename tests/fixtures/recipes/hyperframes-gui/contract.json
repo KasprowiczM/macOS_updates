@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "product_id": "hyperframes-gui",
+  "edition": "gui",
+  "version_comparison_policy": "build_b",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://static.heygen.ai/hyperframes-oss/desktop/latest.json",
+        "allowed_hosts": [
+          "static.heygen.ai"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "feed:HyperFrames",
+        "observed_at": "2026-11-13T20:44:06.897959+00:00"
+      },
+      "evidence_reference": {
+        "key": "feed:HyperFrames",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:06.897959+00:00",
+        "public_response_sha256": "c7885fef4cbc941f4708807aac9326e0ed58f3de91bed892d8cfc2264e4f6134",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": null
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Oficjalny artefakt",
+    "install_candidate": "Oficjalny artefakt",
+    "known_scope_blocker": "Historia direct update nie certyfikuje nowej instalacji",
+    "wave": 2
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Historia direct update nie certyfikuje nowej instalacji"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

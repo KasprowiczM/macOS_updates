@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "product_id": "microsoft-powerpoint-gui",
+  "edition": "gui",
+  "version_comparison_policy": "office_release_family",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+        "allowed_hosts": [
+          "learn.microsoft.com"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "office",
+        "observed_at": "2026-11-13T20:44:11.168091+00:00"
+      },
+      "evidence_reference": {
+        "key": "office",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:11.168091+00:00",
+        "public_response_sha256": "dd5f3a787fe09f85ee331f3ec3232df4695c05031da019d69bac8f8b3e1183b7",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://www.microsoft.com/en-US/microsoft-365/powerpoint"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/microsoft-powerpoint.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "microsoft-powerpoint",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:microsoft-powerpoint",
+        "observed_at": "2026-11-13T20:44:03.602732+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:microsoft-powerpoint",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:03.602732+00:00",
+        "public_response_sha256": "5f03a2e1172539bd2c06f89e928e7052c3a835e84d9efc51a3dec94c7ae99bec",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "16.115.26110837"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/microsoft-powerpoint"
+    },
+    {
+      "manifest": {
+        "source_id": "app_store",
+        "updater_id": "app_store",
+        "url": "https://itunes.apple.com/lookup?id=462062816&entity=macSoftware&country=us",
+        "allowed_hosts": [
+          "itunes.apple.com"
+        ],
+        "parser": "app_store_mac",
+        "stable_policy": "public_store_listing",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "store_id": 462062816,
+        "bundle_id": "com.microsoft.Powerpoint",
+        "region": "us",
+        "evidence_key": "mas-office-us",
+        "observed_at": "2026-11-13T20:44:40.512715+00:00"
+      },
+      "evidence_reference": {
+        "key": "mas-office-us",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:40.512715+00:00",
+        "public_response_sha256": "467825cc73c8e6a66e1e4762ceb7ce1aafc982cb0887d119d6c013066cb30a43",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "store_platform_unverified"
+      },
+      "official_url": "https://apps.apple.com/app/id462062816"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "MAU dla vendor; App Store dla receipt",
+    "install_candidate": "Vendor installer lub App Store",
+    "known_scope_blocker": "Otwarta prezentacja, brak wymuszonego terminate",
+    "wave": 2
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Otwarta prezentacja, brak wymuszonego terminate"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

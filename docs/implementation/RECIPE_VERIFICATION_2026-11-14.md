@@ -25,3 +25,9 @@ Add observable native sessions, separate accepted lifecycle effects and consent,
 The T3/T4 integration shares the scheduler admission layer so direct, manager, installation and native writers use the same state directory across cooperating checkouts of one OS user. This is not coordination with unrelated third-party updaters or other OS users. The concrete direct and first-install executor accepts a bounded ZIP containing one signed bundle; DMG, PKG, bootstrap and unknown effects remain manual. Lifecycle consent never follows ordinary update consent. Restart has its own accepted lifecycle effect and explicit permission. Production native drivers and the public schema-v2 recipe list remain empty.
 
 An independent review found and closed retry-timeout lease release, prejournal phantom recovery, original-lease recovery and external-install adoption gaps. Five dedicated regressions exercise these cases. Install recovery checks the committed bundle inode as well as signature, version and build; it cannot adopt an independently created matching app.
+
+## T5, source 1.7.5
+
+Add 48 product dossiers, real source/parser contracts and synthetic safety scenarios; preserve unknown identity and unaccepted native/payload behavior as manual.
+
+T5 includes 48 manifest-bound product contracts, 50 captured source metadata parser cases, 33 unreviewed parser denials, five App Store projection denials and 12 historical product parser fixtures. Shared synthetic scenarios cover absence, versions, source conflicts, permissions and incomplete evidence. Exact signed production payloads and native trigger/readiness/helper contracts remain product-specific gates before T6; metadata or passing synthetic tests cannot close them. DeepSeek is exclusion-only.

@@ -15,7 +15,7 @@ As of 2026-11-14, `config/verified_recipes.json` contains an empty schema v2 rec
 | `allowed_artifacts`, `download_hosts` | Exact artifact types and HTTPS download hosts; no wildcards, URL credentials or fragments. Redirects must be independently checked by acquisition. |
 | `candidate` | Exact release binding described below. A version string by itself is insufficient. |
 | `requirement_graph` | Exact `nodes` and `edges`; nodes have `id`, `kind` (`permission` or `dependency`), `value` and scoped `operations`. Edges have `from` and `to`, refer to declared nodes and must form a DAG. All applicable nodes are obligations. An update never installs dependencies. Dependency installation is an explicit install effect and must finish before a parent operation can rely on its availability. |
-| `effect_scope` | Separate lists for `update`, `install` and `lifecycle`. Update allows `replace_existing_app`, `native_update`, `manager_update`; install allows `install_app`, `install_dependency`; lifecycle allows `launch_app`, `quit_owned_app`. An empty operation scope cannot authorize execution. Source/channel migration and session restart are outside this contract. |
+| `effect_scope` | Separate lists for `update`, `install` and `lifecycle`. Update allows `replace_existing_app`, `native_update`, `manager_update`; install allows `install_app`, `install_dependency`; lifecycle allows `launch_app`, `quit_owned_app`, `restart_owned_app`. An empty operation scope cannot authorize execution. Source/channel migration and session restart are outside this contract. |
 | `observation_contract` | Exact `preflight`, `postflight`, `requires_artifact_hash`. Identity, source, version and build are mandatory on both sides; preflight also covers requirements and postflight signature. Artifact hash verification is mandatory. |
 | `limits` | Positive bounded integers: `maximum_bytes`, `maximum_expanded_bytes`, `maximum_entries`, `maximum_evidence_age_days`. |
 | `matrix_ids` | Research matrix identifiers, all present in catalog metadata. Coverage is not acceptance. |
@@ -64,3 +64,60 @@ The caller must refresh source ownership, identity, presence, running-state poli
 `tests/fixtures/recipes/valid_v2.json` is synthetic, uses reserved example identities/hosts, and contains no live records. Unit tests construct synthetic records in memory to verify both acceptance and rejection branches. They are not product acceptance evidence.
 
 Run the guarded tests with `bash run_tests.sh --unit-only --pattern 'test_recipe_acceptance.py'`. Product-specific dossiers record unknown facts and fixture scope explicitly; no dossier, matrix membership or passing mock can populate the live catalog by itself.
+
+## Product dossiers
+
+The 47 active dossiers reconcile existing metadata and retain unresolved production identity facts. Their 893 scenario executions cover shared fail-closed safety contracts. They do not establish 47 product-specific updater protocols. DeepSeek has one separate deferred exclusion fixture. All product update, installation and lifecycle live records remain missing.
+
+| Product identifier | Wave | State |
+| --- | --- | --- |
+| [google-chrome-gui](google-chrome-gui.md) | 3 | Product acceptance pending |
+| [firefox-developer-edition-gui](firefox-developer-edition-gui.md) | 4 | Product acceptance pending |
+| [brave-browser-gui](brave-browser-gui.md) | 2 | Product acceptance pending |
+| [chatgpt-gui](chatgpt-gui.md) | 4 | Product acceptance pending |
+| [codex-gui](codex-gui.md) | 4 | Product acceptance pending |
+| [claude-gui](claude-gui.md) | 4 | Product acceptance pending |
+| [comet-gui](comet-gui.md) | 4 | Product acceptance pending |
+| [gemini-gui](gemini-gui.md) | 4 | Product acceptance pending |
+| [perplexity-gui](perplexity-gui.md) | 4 | Product acceptance pending |
+| [antigravity-gui](antigravity-gui.md) | 4 | Product acceptance pending |
+| [antigravity-ide-gui](antigravity-ide-gui.md) | 4 | Product acceptance pending |
+| [lm-studio-gui](lm-studio-gui.md) | 3 | Product acceptance pending |
+| [opencode-gui](opencode-gui.md) | 2 | Product acceptance pending |
+| [cursor-gui](cursor-gui.md) | 4 | Product acceptance pending |
+| [open-design-gui](open-design-gui.md) | 2 | Product acceptance pending |
+| [hyperframes-gui](hyperframes-gui.md) | 2 | Product acceptance pending |
+| [superset-gui](superset-gui.md) | 2 | Product acceptance pending |
+| [deepseek-harness-gui](deepseek-harness-gui.md) | 4 | Deferred pending stable |
+| [grok-bot-gui](grok-bot-gui.md) | 4 | Product acceptance pending |
+| [obsidian-gui](obsidian-gui.md) | 2 | Product acceptance pending |
+| [protonvpn-gui](protonvpn-gui.md) | 3 | Product acceptance pending |
+| [keepassxc-gui](keepassxc-gui.md) | 1 | Product acceptance pending |
+| [proton-mail-gui](proton-mail-gui.md) | 2 | Product acceptance pending |
+| [zoom-us-gui](zoom-us-gui.md) | 3 | Product acceptance pending |
+| [google-drive-gui](google-drive-gui.md) | 3 | Product acceptance pending |
+| [megasync-gui](megasync-gui.md) | 3 | Product acceptance pending |
+| [proton-drive-gui](proton-drive-gui.md) | 3 | Product acceptance pending |
+| [microsoft-excel-gui](microsoft-excel-gui.md) | 2 | Product acceptance pending |
+| [microsoft-word-gui](microsoft-word-gui.md) | 1 | Product acceptance pending |
+| [microsoft-outlook-gui](microsoft-outlook-gui.md) | 2 | Product acceptance pending |
+| [microsoft-powerpoint-gui](microsoft-powerpoint-gui.md) | 2 | Product acceptance pending |
+| [microsoft-onenote-gui](microsoft-onenote-gui.md) | 2 | Product acceptance pending |
+| [microsoft-teams-gui](microsoft-teams-gui.md) | 3 | Product acceptance pending |
+| [visual-studio-code-gui](visual-studio-code-gui.md) | 2 | Product acceptance pending |
+| [warp-gui](warp-gui.md) | 4 | Product acceptance pending |
+| [codeedit-gui](codeedit-gui.md) | 1 | Product acceptance pending |
+| [docker-desktop-gui](docker-desktop-gui.md) | 3 | Product acceptance pending |
+| [appcleaner-gui](appcleaner-gui.md) | 1 | Product acceptance pending |
+| [spotify-gui](spotify-gui.md) | 2 | Product acceptance pending |
+| [capcut-gui](capcut-gui.md) | 2 | Product acceptance pending |
+| [ledger-live-gui](ledger-live-gui.md) | 3 | Product acceptance pending |
+| [trezor-suite-gui](trezor-suite-gui.md) | 3 | Product acceptance pending |
+| [remote-desktop-manager-gui](remote-desktop-manager-gui.md) | 3 | Product acceptance pending |
+| [ipmiview-gui](ipmiview-gui.md) | 4 | Product acceptance pending |
+| [inkscape-gui](inkscape-gui.md) | 2 | Product acceptance pending |
+| [unifi-gui](unifi-gui.md) | 4 | Product acceptance pending |
+| [wifiman-gui](wifiman-gui.md) | 4 | Product acceptance pending |
+| [picsart-gui](picsart-gui.md) | 4 | Product acceptance pending |
+
+Product contract tests also bind each dossier to the actual source manifest and official catalog links. They exercise 50 captured metadata projections, 33 unreviewed parser denials, five App Store platform-unverified projections and 12 historical product parser fixtures. These observations establish source/parser behavior only; they are not signed payload or native-updater protocol acceptance.

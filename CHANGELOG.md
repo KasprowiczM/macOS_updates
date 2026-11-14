@@ -6,6 +6,11 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.7.5] - 2026-11-14 (local checkpoint T5)
+
+- Add 48 product dossiers, real source/parser contracts and synthetic safety scenarios; preserve unknown identity and unaccepted native/payload behavior as manual.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
 ## [1.7.4] - 2026-11-14 (local checkpoint T4)
 
 - Add observable native sessions, separate accepted lifecycle effects and consent, owned-process checks, durable helper barriers and recovery regression coverage.

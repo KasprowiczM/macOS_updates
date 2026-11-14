@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "product_id": "gemini-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://gemini.google/overview/",
+        "allowed_hosts": [
+          "gemini.google"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": false,
+        "evidence_key": "gemini",
+        "observed_at": "2026-11-13T20:44:11.787109+00:00"
+      },
+      "evidence_reference": {
+        "key": "gemini",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:11.787109+00:00",
+        "public_response_sha256": "af3b3a37e2cab7f27b985eb579abd6faf1baef6c25d9bf40df3da6911ef881a0",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://gemini.google/overview/"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Po identity review",
+    "install_candidate": "Po identity review",
+    "known_scope_blocker": "Potwierdzić oficjalny produkt macOS, edycję i podpis; nie pomylić z PWA",
+    "wave": 4
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Potwierdzić oficjalny produkt macOS, edycję i podpis; nie pomylić z PWA"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

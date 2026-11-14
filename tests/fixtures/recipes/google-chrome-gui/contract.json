@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "product_id": "google-chrome-gui",
+  "edition": "gui",
+  "version_comparison_policy": "numeric",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions?pageSize=1",
+        "allowed_hosts": [
+          "versionhistory.googleapis.com"
+        ],
+        "parser": "chrome_versions",
+        "stable_policy": "reviewed_endpoint",
+        "architectures": [
+          "arm64"
+        ],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "chrome",
+        "observed_at": "2026-11-13T20:44:07.698569+00:00"
+      },
+      "evidence_reference": {
+        "key": "chrome",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:07.698569+00:00",
+        "public_response_sha256": "93548618efb2bb9798fc1807d063637eda6da4b90ac84ec77ae8af58aa0196d1",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "158.0.8127.37"
+        ],
+        "stable_confirmed": [
+          true
+        ]
+      },
+      "official_url": "https://www.google.com/chrome/"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/google-chrome.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "google-chrome",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:google-chrome",
+        "observed_at": "2026-11-13T20:43:59.263200+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:google-chrome",
+        "status": 200,
+        "observed_at": "2026-11-13T20:43:59.263200+00:00",
+        "public_response_sha256": "d102c3b5da44017b80f16797011b98388117ec17ab4a5f5516bf1326468a7148",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "157.0.8103.79"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/google-chrome"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "GoogleUpdater lub obecny manager",
+    "install_candidate": "Oficjalny artefakt",
+    "known_scope_blocker": "Zakres wszystkich zarejestrowanych aplikacji; offered rollout; usługi updatera",
+    "wave": 3
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Zakres wszystkich zarejestrowanych aplikacji; offered rollout; usługi updatera"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [
+    {
+      "path": "vendor_feeds/versionhistory.json",
+      "parser": "version_history_public",
+      "version": "154.0.8037.58",
+      "format": "json",
+      "scope": "Existing historical sanitized parser fixture; not current product payload or signature evidence."
+    }
+  ],
+  "live_acceptance": false
+}

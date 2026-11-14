@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "product_id": "microsoft-excel-gui",
+  "edition": "gui",
+  "version_comparison_policy": "office_release_family",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+        "allowed_hosts": [
+          "learn.microsoft.com"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "office",
+        "observed_at": "2026-11-13T20:44:11.168091+00:00"
+      },
+      "evidence_reference": {
+        "key": "office",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:11.168091+00:00",
+        "public_response_sha256": "dd5f3a787fe09f85ee331f3ec3232df4695c05031da019d69bac8f8b3e1183b7",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://www.microsoft.com/en-US/microsoft-365/excel"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/microsoft-excel.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "microsoft-excel",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:microsoft-excel",
+        "observed_at": "2026-11-13T20:44:03.046286+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:microsoft-excel",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:03.046286+00:00",
+        "public_response_sha256": "c45a21b5f556a26c6fb8c7ec23baf3a9ed07aa2c976e5dfdb5656c6bb9f8cc5d",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "16.115.26110837"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/microsoft-excel"
+    },
+    {
+      "manifest": {
+        "source_id": "app_store",
+        "updater_id": "app_store",
+        "url": "https://itunes.apple.com/lookup?id=462058435&entity=macSoftware&country=us",
+        "allowed_hosts": [
+          "itunes.apple.com"
+        ],
+        "parser": "app_store_mac",
+        "stable_policy": "public_store_listing",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "store_id": 462058435,
+        "bundle_id": "com.microsoft.Excel",
+        "region": "us",
+        "evidence_key": "mas-mac",
+        "observed_at": "2026-11-13T20:45:25.001416+00:00"
+      },
+      "evidence_reference": {
+        "key": "mas-mac",
+        "status": 200,
+        "observed_at": "2026-11-13T20:45:25.001416+00:00",
+        "public_response_sha256": "97a34ab304a67091e614c0e04ae8d5aebafcb61e07ab4d340d818526ac5c7e3d",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "store_platform_unverified"
+      },
+      "official_url": "https://apps.apple.com/us/app/microsoft-excel/id462058435?mt=12&uo=4"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "MAU dla vendor; App Store dla receipt",
+    "install_candidate": "Vendor installer lub App Store",
+    "known_scope_blocker": "Osobne źródła; aktualizacja MAU, zakres instalatora i licencja",
+    "wave": 2
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Osobne źródła; aktualizacja MAU, zakres instalatora i licencja"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

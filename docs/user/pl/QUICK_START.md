@@ -1,6 +1,6 @@
 # Szybki start (Polski)
 
-**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.7.4**
+**Wymagany Mac z Apple Silicon** · macOS 13+ · **v1.7.5**
 
 ## Bezpieczny setup i źródła aplikacji
 

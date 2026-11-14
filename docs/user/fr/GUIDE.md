@@ -1,6 +1,6 @@
 # Guide utilisateur (Français)
 
-**Version :** 1.7.4 · **Apple Silicon, macOS 13+**
+**Version :** 1.7.5 · **Apple Silicon, macOS 13+**
 
 ## Configuration sûre et sources des applications
 

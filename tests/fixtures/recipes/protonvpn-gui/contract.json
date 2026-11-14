@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "product_id": "protonvpn-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://protonvpn.com/download-macos",
+        "allowed_hosts": [
+          "protonvpn.com"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "protonvpn-download",
+        "observed_at": "2026-11-13T20:45:26.366859+00:00"
+      },
+      "evidence_reference": {
+        "key": "protonvpn-download",
+        "status": 200,
+        "observed_at": "2026-11-13T20:45:26.366859+00:00",
+        "public_response_sha256": "517e4062e6ae0056cb924861ac015cd59dd81377101108c6b213dea4d64ba6ef",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://protonvpn.com/"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/protonvpn.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "protonvpn",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:protonvpn",
+        "observed_at": "2026-11-13T20:44:01.735004+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:protonvpn",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:01.735004+00:00",
+        "public_response_sha256": "0869c603c3906d7932e43d443c5b14ae4365e4a8271729e0a9b13fe1a68f7bdf",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "6.5.2"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/protonvpn"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Updater producenta lub manager",
+    "install_candidate": "Instalator po pełnym scope review",
+    "known_scope_blocker": "VPN, rozszerzenia i privileged helpers; aktywne połączenie",
+    "wave": 3
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "VPN, rozszerzenia i privileged helpers; aktywne połączenie"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [
+    {
+      "path": "vendor_feeds/protonvpn_channels.xml",
+      "parser": "parse_sparkle_appcast",
+      "version": "6.5.1",
+      "format": "text",
+      "scope": "Existing historical sanitized parser fixture; not current product payload or signature evidence."
+    }
+  ],
+  "live_acceptance": false
+}
