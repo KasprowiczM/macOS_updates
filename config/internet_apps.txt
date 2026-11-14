@@ -1,0 +1,49 @@
+# Canonical internet-app list (one app name per line; # comments allowed)
+# Used by lib/internet_apps.sh, update_all.sh prescan, update_internet_apps.sh, migration_setup.sh
+Google Chrome
+Firefox Developer Edition
+Brave Browser
+ChatGPT / Codex
+Claude
+Comet
+Gemini
+Perplexity
+Antigravity
+Antigravity IDE
+LM Studio
+OpenCode
+Cursor
+Open Design
+HyperFrames
+Superset
+DeepSeek Harness
+Grok Bot
+Obsidian
+ProtonVPN
+KeePassXC
+Proton Mail
+zoom.us
+Google Drive
+MEGAsync
+Proton Drive
+Microsoft Excel
+Microsoft Word
+Microsoft Outlook
+Microsoft PowerPoint
+Microsoft OneNote
+Microsoft Teams
+Visual Studio Code
+Warp
+CodeEdit
+Docker Desktop
+AppCleaner
+Spotify
+CapCut
+Ledger Live
+Trezor Suite
+Remote Desktop Manager
+IPMIView
+Inkscape
+UniFi
+WiFiman
+Picsart

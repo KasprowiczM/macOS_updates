@@ -1,0 +1,26 @@
+# ============================================================
+# config/vendor_direct_first.txt — bypass updater launch cycle
+# Apps listed here skip the silent launch and stage-wait cycle
+# when idle, jumping directly to vendor_direct_install.
+# One app name per line (must match vendor_feeds.txt / registry).
+# Comments start with #.
+#
+# OpenCode (2026-09-28): its Tauri updater installed nothing in the 90 s
+# stage wait; the verified vendor tarball did. Launching it only added 150 s.
+# ============================================================
+Cursor
+OpenCode
+
+# Verified vendor artifacts avoid an idle GUI staging cycle. Running apps
+# remain untouched, and Proton rollout restrictions are checked separately.
+ChatGPT / Codex
+Proton Mail
+Proton Drive
+
+# HyperFrames, Superset (2026-11-10): a hidden launch did not make their own
+# updaters install (HyperFrames sat idle; Superset only showed up as updated
+# after the toolkit quit it). Both publish a checksummed arm64 zip of the same
+# notarized bundle (same bundle ID and Team ID). See also vendor_launch_policy.txt:
+# they are never launched, not even when the direct install fails.
+HyperFrames
+Superset

@@ -1,0 +1,30 @@
+# ============================================================
+# config/vendor_feeds.txt — vendor truth for internet apps (v1.5.0)
+# Format: App Name|kind|feed_url|arg|artifact|allowed_host
+#   kind: sparkle | json | yml | kv
+#   arg:  sparkle -> comma channels or '-' ; json -> selector name ; yml -> '-' ; kv -> productinfo prefix
+#   artifact: zip | dmg | tar.gz | -   ('-' = verify only, never install from vendor)
+#   allowed_host: exact download host, '-' when artifact is '-'
+# The feed is the source of truth; a Homebrew cask may only confirm "behind".
+# URLs mirror each cask's livecheck block (verified 2026-09-23).
+# ============================================================
+ChatGPT / Codex|sparkle|https://persistent.oaistatic.com/codex-app-prod/appcast.xml|-|zip|persistent.oaistatic.com
+Claude|json|https://downloads.claude.ai/releases/darwin/universal/RELEASES.json|claude_releases|zip|downloads.claude.ai
+Cursor|json|https://api2.cursor.sh/updates/api/update/darwin-arm64/cursor/0.0.0/stable|cursor_update|zip|downloads.cursor.com
+Warp|json|https://releases.warp.dev/channel_versions.json|warp_channels|-|-
+Antigravity|yml|https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml|-|zip|storage.googleapis.com
+Antigravity IDE|json|https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin-arm64/stable/latest|antigravity_ide|zip|edgedl.me.gvt1.com
+OpenCode|yml|https://github.com/anomalyco/opencode/releases/latest/download/latest-mac.yml|-|zip|github.com
+Proton Drive|json|https://proton.me/download/drive/macos/version.json|proton_releases|dmg|proton.me
+Proton Mail|json|https://proton.me/download/mail/macos/version.json|proton_releases|dmg|proton.me
+Docker Desktop|sparkle|https://desktop.docker.com/mac/main/arm64/appcast.xml|-|dmg|desktop.docker.com
+Open Design|json|https://releases.open-design.ai/stable/latest/metadata.json|open_design_metadata|-|-
+HyperFrames|json|https://static.heygen.ai/hyperframes-oss/desktop/latest.json|hyperframes_latest|zip|static.heygen.ai
+Superset|yml|https://github.com/paradevai/paradev/releases/latest/download/latest-mac.yml|-|zip|github.com
+# DeepSeek Harness: the app's own electron-updater feed (Resources/app-update.yml: generic provider, channel
+# "nightly" -> nightly-mac.yml; latest-mac.yml 404s). Pre-release versions ("0.2.2-rc.1") order correctly.
+DeepSeek Harness|yml|https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml|-|-|-
+# Grok Bot (Cursor "sand" product): the endpoint compiled into the app (api2.cursor.sh/updates, stable -> "sand");
+# 0.0.0 always returns the newest build as {"url","name"}.
+Grok Bot|json|https://api2.cursor.sh/updates/api/update/darwin-arm64/sand/0.0.0/stable|cursor_update|-|-
+Remote Desktop Manager|kv|https://devolutions.net/productinfo.htm|RDMMacbin|dmg|cdn.devolutions.net

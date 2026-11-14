@@ -1,0 +1,2800 @@
+{
+  "schema_version": 1,
+  "scope": "Public metadata only; not install/update or offered-version proof",
+  "observations": [
+    {
+      "key": "brew:google-chrome",
+      "url": "https://formulae.brew.sh/api/cask/google-chrome.json",
+      "observed_at": "2026-11-13T20:43:59.263200+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/google-chrome.json",
+      "http_date": "Fri, 13 Nov 2026 20:43:59 GMT",
+      "sha256": "d102c3b5da44017b80f16797011b98388117ec17ab4a5f5516bf1326468a7148",
+      "metadata": {
+        "token": "google-chrome",
+        "version": "157.0.8103.79",
+        "homepage": "https://www.google.com/chrome/",
+        "url": "https://dl.google.com/chrome/mac/universal/stable/GGRO/googlechrome.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:firefox@developer-edition",
+      "url": "https://formulae.brew.sh/api/cask/firefox@developer-edition.json",
+      "observed_at": "2026-11-13T20:43:59.361704+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/firefox@developer-edition.json",
+      "http_date": "Fri, 13 Nov 2026 20:43:59 GMT",
+      "sha256": "96c3bed5e608370e46a746e8b0b0fc4357a04f8c58a6fb5241312b56d7d35119",
+      "metadata": {
+        "token": "firefox@developer-edition",
+        "version": "161.0b2",
+        "homepage": "https://www.mozilla.org/firefox/developer/",
+        "url": "https://download-installer.cdn.mozilla.net/pub/devedition/releases/161.0b2/mac/en-US/Firefox%20161.0b2.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:brave-browser",
+      "url": "https://formulae.brew.sh/api/cask/brave-browser.json",
+      "observed_at": "2026-11-13T20:43:59.537927+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/brave-browser.json",
+      "http_date": "Fri, 13 Nov 2026 20:43:59 GMT",
+      "sha256": "081324a4aa2864bdf0374eed08ff34a8c90c5f57287cf2d568827a72a33cf068",
+      "metadata": {
+        "token": "brave-browser",
+        "version": "1.99.57.0",
+        "homepage": "https://brave.com/",
+        "url": "https://updates-cdn.bravesoftware.com/sparkle/Brave-Browser/stable-arm64/199.57/Brave-Browser-arm64.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:chatgpt",
+      "url": "https://formulae.brew.sh/api/cask/chatgpt.json",
+      "observed_at": "2026-11-13T20:43:59.706331+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/chatgpt.json",
+      "http_date": "Fri, 13 Nov 2026 20:43:59 GMT",
+      "sha256": "4373ba4b48c392b49dece39343d892fc0eda629ad172cd9004f8ea73d8ca5047",
+      "metadata": {
+        "token": "chatgpt",
+        "version": "26.1111.21308",
+        "homepage": "https://chatgpt.com/",
+        "url": "https://persistent.oaistatic.com/codex-app-prod/ChatGPT-darwin-arm64-26.1111.21308.zip",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:codex-app",
+      "url": "https://formulae.brew.sh/api/cask/codex-app.json",
+      "observed_at": "2026-11-13T20:43:59.895633+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/codex-app.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:00 GMT",
+      "sha256": "0b4368d4fdc5658d7069d0f7723481a1d82e88225dc9b54306cf0c208c2d40e2",
+      "metadata": {
+        "token": "codex-app",
+        "version": "26.623.141536",
+        "homepage": "https://openai.com/codex",
+        "url": "https://persistent.oaistatic.com/codex-app-prod/Codex-darwin-arm64-26.623.141536.zip",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": true,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:claude",
+      "url": "https://formulae.brew.sh/api/cask/claude.json",
+      "observed_at": "2026-11-13T20:44:00.078015+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/claude.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:00 GMT",
+      "sha256": "2c6afa7147fbb8d529a8242184fba329caad9fcd67daad323053fe93f0c9848d",
+      "metadata": {
+        "token": "claude",
+        "version": "5.11492.2,b1edc63367ca6fb5fa8d5a72604951a71b37dd58",
+        "homepage": "https://claude.com/download",
+        "url": "https://downloads.claude.ai/releases/darwin/universal/5.11492.2/Claude-b1edc63367ca6fb5fa8d5a72604951a71b37dd58.zip",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:comet",
+      "url": "https://formulae.brew.sh/api/cask/comet.json",
+      "observed_at": "2026-11-13T20:44:00.258571+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/comet.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:00 GMT",
+      "sha256": "ee4ccaf11542405436ee493c3a0a8a0348b435effe4e925aba8741a787c96c21",
+      "metadata": {
+        "token": "comet",
+        "version": "145.2.7632.4581",
+        "homepage": "https://www.perplexity.ai/comet",
+        "url": "https://www.perplexity.ai/rest/browser/download?channel=stable&platform=mac_arm64",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:perplexity",
+      "url": "https://formulae.brew.sh/api/cask/perplexity.json",
+      "observed_at": "2026-11-13T20:44:00.439014+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/perplexity.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:00 GMT",
+      "sha256": "8f0dcc67f189e437b0cb80126412959bb60348dd07f6afcd4cffd9d881e42c97",
+      "metadata": {
+        "token": "perplexity",
+        "version": "26.44.0",
+        "homepage": "https://www.perplexity.ai/personal-computer",
+        "url": "https://macos-download.perplexity.ai/Perplexity.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "15"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:antigravity",
+      "url": "https://formulae.brew.sh/api/cask/antigravity.json",
+      "observed_at": "2026-11-13T20:44:00.621118+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/antigravity.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:00 GMT",
+      "sha256": "7cee163856b583169bed9f63439fe19fd59779ef98af531535c3f0cc0843a28e",
+      "metadata": {
+        "token": "antigravity",
+        "version": "2.31.2,6470801290035200",
+        "homepage": "https://antigravity.google/product/antigravity-2",
+        "url": "https://storage.googleapis.com/antigravity-public/antigravity-hub/2.31.2-6470801290035200/darwin-arm/Antigravity.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:antigravity-ide",
+      "url": "https://formulae.brew.sh/api/cask/antigravity-ide.json",
+      "observed_at": "2026-11-13T20:44:00.805780+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/antigravity-ide.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:00 GMT",
+      "sha256": "3dbd999805c324a8f361bfde83d04b569696755ce9de5be321ecb742627c14d9",
+      "metadata": {
+        "token": "antigravity-ide",
+        "version": "2.7.0,4507555968450560",
+        "homepage": "https://antigravity.google/product/antigravity-ide",
+        "url": "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/2.7.0-4507555968450560/darwin-arm/Antigravity%20IDE.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:lm-studio",
+      "url": "https://formulae.brew.sh/api/cask/lm-studio.json",
+      "observed_at": "2026-11-13T20:44:00.994195+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/lm-studio.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:01 GMT",
+      "sha256": "63d0b07414beb197fb0ff364fd95e9197e82797d54bf2a4866bf81c2d7e4d5c9",
+      "metadata": {
+        "token": "lm-studio",
+        "version": "0.4.28,2",
+        "homepage": "https://lmstudio.ai/",
+        "url": "https://installers.lmstudio.ai/darwin/arm64/0.4.28-2/LM-Studio-0.4.28-2-arm64.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "arch": [
+            {
+              "type": "arm",
+              "bits": 64
+            }
+          ],
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:opencode-desktop",
+      "url": "https://formulae.brew.sh/api/cask/opencode-desktop.json",
+      "observed_at": "2026-11-13T20:44:01.195172+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/opencode-desktop.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:01 GMT",
+      "sha256": "8a8485a7040ef33a527482a3f529cab1194a94dfff38c9902bfe8cd352e7230d",
+      "metadata": {
+        "token": "opencode-desktop",
+        "version": "2.3.0",
+        "homepage": "https://opencode.ai/",
+        "url": "https://opencode.ai/files/bin/2.3.0/opencode-desktop-mac-arm64.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:cursor",
+      "url": "https://formulae.brew.sh/api/cask/cursor.json",
+      "observed_at": "2026-11-13T20:44:01.378202+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/cursor.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:01 GMT",
+      "sha256": "018e399f6ce21c28ca8f16ca5fe2e7abf5a1fbf9cc9b7aca21d00a17f376f0a4",
+      "metadata": {
+        "token": "cursor",
+        "version": "3.30.8,4a44c846d0b817fab060823f93c63ea2861ac192",
+        "homepage": "https://www.cursor.com/",
+        "url": "https://downloads.cursor.com/production/4a44c846d0b817fab060823f93c63ea2861ac192/darwin/arm64/Cursor-darwin-arm64.zip",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:obsidian",
+      "url": "https://formulae.brew.sh/api/cask/obsidian.json",
+      "observed_at": "2026-11-13T20:44:01.555068+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/obsidian.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:01 GMT",
+      "sha256": "ea8b26074f43ccb8a75425b15c091b4a6ac7c2e9740c231675cc9d5cb18ab239",
+      "metadata": {
+        "token": "obsidian",
+        "version": "1.15.1",
+        "homepage": "https://obsidian.md/",
+        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.1/Obsidian-1.15.1.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:protonvpn",
+      "url": "https://formulae.brew.sh/api/cask/protonvpn.json",
+      "observed_at": "2026-11-13T20:44:01.735004+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/protonvpn.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:01 GMT",
+      "sha256": "0869c603c3906d7932e43d443c5b14ae4365e4a8271729e0a9b13fe1a68f7bdf",
+      "metadata": {
+        "token": "protonvpn",
+        "version": "6.5.2",
+        "homepage": "https://protonvpn.com/",
+        "url": "https://vpn.protondownload.com/download/macos/6.5.2/ProtonVPN_mac_v6.5.2.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "14"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:keepassxc",
+      "url": "https://formulae.brew.sh/api/cask/keepassxc.json",
+      "observed_at": "2026-11-13T20:44:01.931722+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/keepassxc.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:02 GMT",
+      "sha256": "2dcdb23e7df9a0d5f9352fd3c5d4dfdef7e052d5e27635280c1f15b7b1bcd251",
+      "metadata": {
+        "token": "keepassxc",
+        "version": "2.8.0,2.8.0-1",
+        "homepage": "https://keepassxc.org/",
+        "url": "https://github.com/keepassxreboot/keepassxc/releases/download/2.8.0/KeePassXC-2.8.0-1-arm64.dmg",
+        "auto_updates": null,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": {
+          "cask": [
+            "keepassxc@beta",
+            "keepassxc@snapshot"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:proton-mail",
+      "url": "https://formulae.brew.sh/api/cask/proton-mail.json",
+      "observed_at": "2026-11-13T20:44:02.111180+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/proton-mail.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:02 GMT",
+      "sha256": "e3a4a9c4f9ea88350dac1ba934318ab407541c0c4a897b4f66f2614eb2c0c142",
+      "metadata": {
+        "token": "proton-mail",
+        "version": "1.16.1",
+        "homepage": "https://proton.me/mail",
+        "url": "https://proton.me/download/mail/macos/1.16.1/ProtonMail-desktop.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:zoom",
+      "url": "https://formulae.brew.sh/api/cask/zoom.json",
+      "observed_at": "2026-11-13T20:44:02.302390+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/zoom.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:02 GMT",
+      "sha256": "4be87f451caf4f0766e5eeb6d53fd69f821e1a3748ed82c6d59ea1a2ea3cae97",
+      "metadata": {
+        "token": "zoom",
+        "version": "7.2.5.90525",
+        "homepage": "https://www.zoom.us/",
+        "url": "https://cdn.zoom.us/prod/7.2.5.90525/arm64/zoomusInstallerFull.pkg",
+        "auto_updates": true,
+        "depends_on": {},
+        "conflicts_with": {
+          "cask": [
+            "zoom-for-it-admins"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:google-drive",
+      "url": "https://formulae.brew.sh/api/cask/google-drive.json",
+      "observed_at": "2026-11-13T20:44:02.472452+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/google-drive.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:02 GMT",
+      "sha256": "c1d08f4eda56fc8878decf84d61b05bd7d35ee68358ff1e060a39a8f413dbc21",
+      "metadata": {
+        "token": "google-drive",
+        "version": "134.0.1",
+        "homepage": "https://www.google.com/drive/",
+        "url": "https://dl.google.com/drive-file-stream/5-percent/GoogleDrive.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:megasync",
+      "url": "https://formulae.brew.sh/api/cask/megasync.json",
+      "observed_at": "2026-11-13T20:44:02.686801+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/megasync.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:02 GMT",
+      "sha256": "ec6274169b5dd713457cec0df9c09532d7f6433d3f37ae8a842b9db51cc95059",
+      "metadata": {
+        "token": "megasync",
+        "version": "6.7.0.3",
+        "homepage": "https://mega.nz/sync",
+        "url": "https://mega.nz/MEGAsyncSetupArm64.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:proton-drive",
+      "url": "https://formulae.brew.sh/api/cask/proton-drive.json",
+      "observed_at": "2026-11-13T20:44:02.865540+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/proton-drive.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:03 GMT",
+      "sha256": "208ab7b3916d293c463ab08340d1cfd3cdbed9c05d6a50a06a4c12549817b382",
+      "metadata": {
+        "token": "proton-drive",
+        "version": "3.1.1",
+        "homepage": "https://proton.me/drive",
+        "url": "https://proton.me/download/drive/macos/3.1.1/ProtonDrive-3.1.1.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:microsoft-excel",
+      "url": "https://formulae.brew.sh/api/cask/microsoft-excel.json",
+      "observed_at": "2026-11-13T20:44:03.046286+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/microsoft-excel.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:03 GMT",
+      "sha256": "c45a21b5f556a26c6fb8c7ec23baf3a9ed07aa2c976e5dfdb5656c6bb9f8cc5d",
+      "metadata": {
+        "token": "microsoft-excel",
+        "version": "16.115.26110837",
+        "homepage": "https://www.microsoft.com/en-US/microsoft-365/excel",
+        "url": "https://res.public.onecdn.static.microsoft/mro1cdnstorage/C1297A47-86C4-4C1F-97FA-950631F94777/MacAutoupdate/Microsoft_Excel_16.115.26110837_Installer.pkg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": {
+          "cask": [
+            "microsoft-office",
+            "microsoft-office-businesspro"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:microsoft-word",
+      "url": "https://formulae.brew.sh/api/cask/microsoft-word.json",
+      "observed_at": "2026-11-13T20:44:03.233588+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/microsoft-word.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:03 GMT",
+      "sha256": "d5489a75b5d9b4541aa70cdb98eba72f70cdfa09b69c545240efeca7e414c963",
+      "metadata": {
+        "token": "microsoft-word",
+        "version": "16.115.26110837",
+        "homepage": "https://www.microsoft.com/en-US/microsoft-365/word",
+        "url": "https://res.public.onecdn.static.microsoft/mro1cdnstorage/C1297A47-86C4-4C1F-97FA-950631F94777/MacAutoupdate/Microsoft_Word_16.115.26110837_Installer.pkg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": {
+          "cask": [
+            "microsoft-office",
+            "microsoft-office-businesspro"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:microsoft-outlook",
+      "url": "https://formulae.brew.sh/api/cask/microsoft-outlook.json",
+      "observed_at": "2026-11-13T20:44:03.420465+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/microsoft-outlook.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:03 GMT",
+      "sha256": "6c849b89f1dc3cfa5860ddcf35366955c9b319c6b5bd24f3bc955b54b2b23752",
+      "metadata": {
+        "token": "microsoft-outlook",
+        "version": "16.115.26110837",
+        "homepage": "https://www.microsoft.com/en-us/microsoft-365/outlook/outlook-for-business",
+        "url": "https://res.public.onecdn.static.microsoft/mro1cdnstorage/C1297A47-86C4-4C1F-97FA-950631F94777/MacAutoupdate/Microsoft_Outlook_16.115.26110837_Installer.pkg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": {
+          "cask": [
+            "microsoft-office",
+            "microsoft-office-businesspro"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:microsoft-powerpoint",
+      "url": "https://formulae.brew.sh/api/cask/microsoft-powerpoint.json",
+      "observed_at": "2026-11-13T20:44:03.602732+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/microsoft-powerpoint.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:03 GMT",
+      "sha256": "5f03a2e1172539bd2c06f89e928e7052c3a835e84d9efc51a3dec94c7ae99bec",
+      "metadata": {
+        "token": "microsoft-powerpoint",
+        "version": "16.115.26110837",
+        "homepage": "https://www.microsoft.com/en-US/microsoft-365/powerpoint",
+        "url": "https://res.public.onecdn.static.microsoft/mro1cdnstorage/C1297A47-86C4-4C1F-97FA-950631F94777/MacAutoupdate/Microsoft_PowerPoint_16.115.26110837_Installer.pkg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": {
+          "cask": [
+            "microsoft-office",
+            "microsoft-office-businesspro"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:microsoft-onenote",
+      "url": "https://formulae.brew.sh/api/cask/microsoft-onenote.json",
+      "observed_at": "2026-11-13T20:44:03.841168+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/microsoft-onenote.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:04 GMT",
+      "sha256": "4b2453d7cca24067709e34e6295bd7b9b2e8c44af2f46e2e36ff7924c3b676cb",
+      "metadata": {
+        "token": "microsoft-onenote",
+        "version": "16.115.26110837",
+        "homepage": "https://www.microsoft.com/en-us/microsoft-365/onenote/digital-note-taking-app",
+        "url": "https://res.public.onecdn.static.microsoft/mro1cdnstorage/C1297A47-86C4-4C1F-97FA-950631F94777/MacAutoupdate/Microsoft_OneNote_16.115.26110837_Updater.pkg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "15"
+            ]
+          }
+        },
+        "conflicts_with": {
+          "cask": [
+            "microsoft-office",
+            "microsoft-office-businesspro"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:microsoft-teams",
+      "url": "https://formulae.brew.sh/api/cask/microsoft-teams.json",
+      "observed_at": "2026-11-13T20:44:04.018500+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/microsoft-teams.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:04 GMT",
+      "sha256": "d039e63228a132dead909bdd324ef1cef0dbd19541ea538ea026606d489643b8",
+      "metadata": {
+        "token": "microsoft-teams",
+        "version": "26289.204.5281.6363",
+        "homepage": "https://www.microsoft.com/en/microsoft-teams/group-chat-software/",
+        "url": "https://statics.teams.cdn.office.net/production-osx/26289.204.5281.6363/MicrosoftTeams.pkg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "14"
+            ]
+          }
+        },
+        "conflicts_with": {
+          "cask": [
+            "microsoft-office-businesspro"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:visual-studio-code",
+      "url": "https://formulae.brew.sh/api/cask/visual-studio-code.json",
+      "observed_at": "2026-11-13T20:44:04.201223+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/visual-studio-code.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:04 GMT",
+      "sha256": "8d144012d5b51f40ab3d7c62314f4689c691fd026d9f30d33675d189e00ae632",
+      "metadata": {
+        "token": "visual-studio-code",
+        "version": "1.146.0",
+        "homepage": "https://code.visualstudio.com/",
+        "url": "https://update.code.visualstudio.com/1.146.0/darwin-arm64/stable",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:warp",
+      "url": "https://formulae.brew.sh/api/cask/warp.json",
+      "observed_at": "2026-11-13T20:44:04.387197+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/warp.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:04 GMT",
+      "sha256": "54564225f312bc1f8f32caaf6a24d27be62035e97f783556366be1a2d8f67a24",
+      "metadata": {
+        "token": "warp",
+        "version": "0.2026.11.11.08.17.stable_01",
+        "homepage": "https://www.warp.dev/terminal",
+        "url": "https://app.warp.dev/download/brew?version=v0.2026.11.11.08.17.stable_01&package=dmg",
+        "auto_updates": true,
+        "depends_on": {},
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:codeedit",
+      "url": "https://formulae.brew.sh/api/cask/codeedit.json",
+      "observed_at": "2026-11-13T20:44:04.567241+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/codeedit.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:04 GMT",
+      "sha256": "b8e15eb73d7e1a8e1d0aa52080f2e7389fe10ed910ce2109bd596e80cec94041",
+      "metadata": {
+        "token": "codeedit",
+        "version": "0.3.6",
+        "homepage": "https://www.codeedit.app/",
+        "url": "https://github.com/CodeEditApp/CodeEdit/releases/download/v0.3.6/CodeEdit.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:docker-desktop",
+      "url": "https://formulae.brew.sh/api/cask/docker-desktop.json",
+      "observed_at": "2026-11-13T20:44:04.753211+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/docker-desktop.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:04 GMT",
+      "sha256": "534177a26fa2fcd17b020f9f4b6e3a837b89c8c82a68cdfb349724d941573bdb",
+      "metadata": {
+        "token": "docker-desktop",
+        "version": "4.99.0,245822",
+        "homepage": "https://www.docker.com/products/docker-desktop",
+        "url": "https://desktop.docker.com/mac/main/arm64/245822/Docker.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "14"
+            ]
+          }
+        },
+        "conflicts_with": {
+          "cask": [
+            "rancher"
+          ]
+        },
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:appcleaner",
+      "url": "https://formulae.brew.sh/api/cask/appcleaner.json",
+      "observed_at": "2026-11-13T20:44:04.949929+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/appcleaner.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:05 GMT",
+      "sha256": "86f1b5ef8d235fe9da51c35960adc6b925150296a6b81bee88c81324246ebb72",
+      "metadata": {
+        "token": "appcleaner",
+        "version": "3.7",
+        "homepage": "https://freemacsoft.net/appcleaner/",
+        "url": "https://www.freemacsoft.net/downloads/AppCleaner_3.7.zip",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "15"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:spotify",
+      "url": "https://formulae.brew.sh/api/cask/spotify.json",
+      "observed_at": "2026-11-13T20:44:05.120233+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/spotify.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:05 GMT",
+      "sha256": "40f828dfbfc175c11b0a1d046c077a59b66645289d6b16d78fb40decea1edc4f",
+      "metadata": {
+        "token": "spotify",
+        "version": "1.3.9.2055",
+        "homepage": "https://www.spotify.com/",
+        "url": "https://download.scdn.co/SpotifyARM64.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:capcut",
+      "url": "https://formulae.brew.sh/api/cask/capcut.json",
+      "observed_at": "2026-11-13T20:44:05.301179+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/capcut.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:05 GMT",
+      "sha256": "a0b8b0211264ec3a3c23e098a5a67f72f6fdfb4d9d1f7906e0a991970216f288",
+      "metadata": {
+        "token": "capcut",
+        "version": "9.7.1.4778",
+        "homepage": "https://www.capcut.com/",
+        "url": "https://sf16-web-tos-buz.capcutstatic.com/obj/capcut-web-buz-sg/packages/CapCut_9_7_1_4778_capcutpc_0_creatortool_nosandbox.dmg",
+        "auto_updates": null,
+        "depends_on": {
+          "macos": {}
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:ledger-wallet",
+      "url": "https://formulae.brew.sh/api/cask/ledger-wallet.json",
+      "observed_at": "2026-11-13T20:44:05.476056+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/ledger-wallet.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:05 GMT",
+      "sha256": "b143bd3f0a5c9bbb0f90c4ac99276e05784e4e0b87e12112b1af268f7a14cc64",
+      "metadata": {
+        "token": "ledger-wallet",
+        "version": "4.28.0",
+        "homepage": "https://shop.ledger.com/pages/ledger-wallet",
+        "url": "https://download.live.ledger.com/ledger-live-desktop-4.28.0-mac.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "13"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:ledger-live",
+      "url": "https://formulae.brew.sh/api/cask/ledger-live.json",
+      "observed_at": "2026-11-13T20:44:05.646406+00:00",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "key": "brew:trezor-suite",
+      "url": "https://formulae.brew.sh/api/cask/trezor-suite.json",
+      "observed_at": "2026-11-13T20:44:05.824355+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/trezor-suite.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "6193b633d20e6acbb27b4bdd273f5be94a5bd18bad334b6700ee8bb2d8e3d1df",
+      "metadata": {
+        "token": "trezor-suite",
+        "version": "26.10.3",
+        "homepage": "https://suite.trezor.io/",
+        "url": "https://data.trezor.io/suite/releases/desktop/latest/Trezor-Suite-26.10.3-mac-arm64.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "12"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:remote-desktop-manager",
+      "url": "https://formulae.brew.sh/api/cask/remote-desktop-manager.json",
+      "observed_at": "2026-11-13T20:44:06.012473+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/remote-desktop-manager.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "7ea9072369843cf6b71ddf76febfaccd3407cf35e60073bf4eb3c72a5409e4ec",
+      "metadata": {
+        "token": "remote-desktop-manager",
+        "version": "2026.3.3.1",
+        "homepage": "https://mac.remotedesktopmanager.com/",
+        "url": "https://cdn.devolutions.net/download/Mac/Devolutions.RemoteDesktopManager.Mac.2026.3.3.1.dmg",
+        "auto_updates": true,
+        "depends_on": {
+          "macos": {
+            ">=": [
+              "14"
+            ]
+          }
+        },
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "brew:inkscape",
+      "url": "https://formulae.brew.sh/api/cask/inkscape.json",
+      "observed_at": "2026-11-13T20:44:06.193357+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/inkscape.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "47955e3a0831d7ac53704f5797f8d583f00ee99a97a47d6f497e379f7eae9d68",
+      "metadata": {
+        "token": "inkscape",
+        "version": "1.4.4",
+        "homepage": "https://inkscape.org/",
+        "url": "https://media.inkscape.org/dl/resources/file/Inkscape-1.4.4_arm64.dmg",
+        "auto_updates": null,
+        "depends_on": {},
+        "conflicts_with": null,
+        "deprecated": false,
+        "disabled": false
+      }
+    },
+    {
+      "key": "feed:ChatGPT / Codex",
+      "url": "https://persistent.oaistatic.com/codex-app-prod/appcast.xml",
+      "observed_at": "2026-11-13T20:44:06.012299+00:00",
+      "status": 200,
+      "final_url": "https://persistent.oaistatic.com/codex-app-prod/appcast.xml",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "d9869f972022c16eb7c86c6d1090a416b2e07aecfa7f071d11f0bf4c479a77de",
+      "excerpt": "<?xml version='1.0' encoding='utf-8'?>\n<rss xmlns:sparkle=\"http://www.andymatuschak.org/xml-namespaces/sparkle\" version=\"2.0\">\n    <channel>\n        <title>Codex</title>\n        <item>\n            <title>26.1111.21308</title>\n            <pubDate>Fri, 13 Nov 2026 01:59:16 +0000</pubDate>\n            <sparkle:version>27194</sparkle:version>\n            <sparkle:shortVersionString>26.1111.21308</sparkle:shortVersionString>\n            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>\n            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>\n            <enclosure url=\"https://persistent.oaistatic.com/codex-app-prod/ChatGPT-darwin-arm64-26.1111.21308.zip\" length=\"835870020\" type=\"application/octet-stream\" sparkle:edSignature=\"9IiyzEE+Th3iPaIGe+oNrIpfasuDfv8zuh2b+ee/ScPj1noe6cDrZQbFGFhtAJ17dACQ/V7XA+tZMav+ii+WDA==\" />\n            <sparkle:deltas>\n                <enclosure url=\"https://persistent.oaistatic.com/codex-app-prod/ChatGPT27194-26605-arm64.delta\" sparkle:deltaFrom=\"26605\" length=\"110321942\" type=\"application/octet-stream\" sparkle:deltaFromSparkleExecutableSize=\"959584\" sparkle:deltaFromSparkleLocales=\"de,ar,el,ja,fa,uk,zh_CN\" sparkle:edSignature=\"wu8PTUiAkptDy7f76RlAGxBlI14nxsmwj7ZQWZ6r8awVH/oiew36VCJR+/zs3BaFfDwNJg1o96aK/E6KOibjBw==\" />\n                <enclosure url=\"https://persistent.oaistatic.com/codex-app-prod/ChatGPT27194-25894-arm64.delta\" sparkle:deltaFrom=\"25894\" length=\"118575946\" type=\"application/octet-stream\" sparkle:deltaFromSparkleExecutableSize=\"959584\" sparkle:deltaFromSparkleLocales=\"de,ar,el,ja,fa,uk,zh_CN\" sparkle:edSignature=\"mQx91UTNbQhteTt3LVGJB1LugvNRpDha5C8CS4uUzpZ75GcjacBvaJd3TmJG3FSMm1ZzI6oLeUm8/r0/fy4KCw==\" />\n                <enclosure url=\"https://persistent.oaistatic.com/codex-app-prod/ChatGPT271"
+    },
+    {
+      "key": "feed:Claude",
+      "url": "https://downloads.claude.ai/releases/darwin/universal/RELEASES.json",
+      "observed_at": "2026-11-13T20:44:06.083040+00:00",
+      "status": 200,
+      "final_url": "https://downloads.claude.ai/releases/darwin/universal/RELEASES.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "7d3b4fa7734ce76838e3885b0f075a1788dc05866d803117b31353494f3e3d3e",
+      "metadata": {
+        "currentRelease": "5.11492.2",
+        "releases": [
+          {
+            "version": "5.11492.2",
+            "updateTo": {
+              "name": "Claude 5.11492.2",
+              "version": "5.11492.2",
+              "pub_date": "2026-11-13T01:04:40.680Z",
+              "url": "https://downloads.claude.ai/releases/darwin/universal/5.11492.2/Claude-b1edc63367ca6fb5fa8d5a72604951a71b37dd58.zip",
+              "notes": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "feed:Cursor",
+      "url": "https://api2.cursor.sh/updates/api/update/darwin-arm64/cursor/0.0.0/stable",
+      "observed_at": "2026-11-13T20:44:06.193215+00:00",
+      "status": 200,
+      "final_url": "https://api2.cursor.sh/updates/api/update/darwin-arm64/cursor/0.0.0/stable",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "0c07a7a7909aa45e9b109b603770e4b86b45ad17792fa0d02a4c509f255020e3",
+      "metadata": {
+        "url": "https://downloads.cursor.com/production/5f54c8173e5552412beb40702adac16275677fa0/darwin/arm64/Cursor-darwin-arm64.zip",
+        "name": "3.30.14"
+      }
+    },
+    {
+      "key": "feed:Warp",
+      "url": "https://releases.warp.dev/channel_versions.json",
+      "observed_at": "2026-11-13T20:44:06.279753+00:00",
+      "status": 200,
+      "final_url": "https://releases.warp.dev/channel_versions.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "b08652c4b1dfb1ec781ddbbf98ec8b2d60d867b236fcce8a9af52b735e171dfa",
+      "metadata": {
+        "stable": {
+          "last_prominent_update": "v0.2026.11.04.08.17.stable_01",
+          "soft_cutoff": "v0.2026.09.30.08.29.stable_04",
+          "version": "v0.2026.11.11.08.17.stable_01"
+        },
+        "preview": {
+          "last_prominent_update": "v0.2026.11.04.08.17.preview_01",
+          "soft_cutoff": "v0.2026.09.30.08.29.preview_01",
+          "version": "v0.2026.11.11.08.17.preview_01"
+        },
+        "dev": {
+          "last_prominent_update": "v0.2025.03.05.08.02.dev_00",
+          "soft_cutoff": "v0.2023.05.12.08.03.dev_00",
+          "version": "v0.2026.11.13.08.16.dev_00"
+        },
+        "beta": {
+          "version": "v0.2024.12.18.08.02.beta_00"
+        },
+        "canary": {
+          "version": "v0.2022.09.29.08.08.canary_00"
+        }
+      }
+    },
+    {
+      "key": "feed:Antigravity",
+      "url": "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml",
+      "observed_at": "2026-11-13T20:44:06.367947+00:00",
+      "status": 200,
+      "final_url": "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-arm64-mac.yml",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "374326b2d134fe4e40f4ab261f490bc024aed7a3edc326dc51e8087590e3c509",
+      "excerpt": "version: 2.32.0\nfiles:\n  - url: https://storage.googleapis.com/antigravity-public/antigravity-hub/2.32.0-6141816156848128/darwin-arm/Antigravity.zip\n    sha512: y2/m1+3CXEmL3aynK+QZ3tY0bvkHpOOjP1cfrjlYWYnog0C/HPCoq56j0QG9EsfJ92MwiUQWExu493FRKpbX2g==\n    size: 216294632\npath: Antigravity.zip\nsha512: y2/m1+3CXEmL3aynK+QZ3tY0bvkHpOOjP1cfrjlYWYnog0C/HPCoq56j0QG9EsfJ92MwiUQWExu493FRKpbX2g==\n"
+    },
+    {
+      "key": "feed:Antigravity IDE",
+      "url": "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin-arm64/stable/latest",
+      "observed_at": "2026-11-13T20:44:06.577640+00:00",
+      "status": 200,
+      "final_url": "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin-arm64/stable/latest",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "329ad6e737daac1db7d48d96f65e1fe5cb816bc658140bf3a2975abdc8ad9469",
+      "metadata": {
+        "timestamp": 1794388235,
+        "supportsFastUpdate": true,
+        "version": "71bedb45923debaf49871bdcb7c7d3a47918e247",
+        "ideVersion": "Antigravity IDE",
+        "productVersion": "1.107.0",
+        "name": "1.107.0",
+        "hash": "f22c5d64137d17d1bf1256753344531ba2d770af",
+        "sha256hash": "2fe11b6378e7721f8c12c2b9f00239de20cc28076b6a2e2635c337e5c8537593",
+        "url": "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/2.7.0-4507555968450560/darwin-arm/Antigravity IDE.zip",
+        "displayName": "macOS for Apple Silicon (.zip)"
+      }
+    },
+    {
+      "key": "feed:OpenCode",
+      "url": "https://github.com/anomalyco/opencode/releases/latest/download/latest-mac.yml",
+      "observed_at": "2026-11-13T20:44:06.584309+00:00",
+      "status": 200,
+      "final_url": "https://release-assets.githubusercontent.com/github-production-release-asset/975734319/15b59539-ee10-4e1c-ac84-0e7532824438?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-11-13T21%3A40%3A23Z&rscd=attachment%3B+filename%3Dlatest-mac.yml&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-11-13T20%3A39%3A34Z&ske=2026-11-13T21%3A40%3A23Z&sks=b&skv=2018-11-09&sig=g6jBS3w%2BN2DHd%2B4vXPYMXWvQdRxKS6qClT0qF0F%2F8f0%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5NDYwMjk0NywibmJmIjoxNzk0NjAyNjQ3LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.YVQz7jvt0LE2avpIx8CQhp8PGForfjDiVRyNrfjqqr4&response-content-disposition=attachment%3B%20filename%3Dlatest-mac.yml&response-content-type=application%2Foctet-stream",
+      "http_date": "Fri, 13 Nov 2026 20:44:07 GMT",
+      "sha256": "b55f22824dff40adca8d41a837e58fcb56737fe315ced1827e6aa5ee07ef98f1",
+      "excerpt": "version: 1.19.5\nfiles:\n  - url: opencode-desktop-mac-arm64.zip\n    sha512: c9vDPBqJJ5Le8FHSoIQhayByaGIF7V1JTi25sfvzAQq1ttPL31Dyg9wZdahe8DMeVe0HvnVFEpBi0lVq55xikg==\n    size: 150173778\n  - url: opencode-desktop-mac-arm64.dmg\n    sha512: 5S3uRA46IFeLnqhqetcFrnuf1Fle7zxlYh3FiwmwKMoQKUG5JE5VTNO7lC8S2P8xDawB+KECgkeoTAVhatl8Fw==\n    size: 151552711\n  - url: opencode-desktop-mac-x64.zip\n    sha512: /DWG85/L3H2v51353lCSorfgruNzCL9YgpP8Q/6lt6Pi2ALh7EBGZoUTvTxGTnno1qMMJ3kkLDIsfYN/q5Usjw==\n    size: 155113071\n  - url: opencode-desktop-mac-x64.dmg\n    sha512: 9uAQ1ZlXg9VreDXhFEHyKGGAIpa0O9N29ktrKh49zJy3/Ljl9GIWRC/AJKzPEqSQgquO7dw62PbMSqtU3+tmWw==\n    size: 156439009\nreleaseDate: '2026-10-28T05:59:42.651Z'\n"
+    },
+    {
+      "key": "feed:Proton Drive",
+      "url": "https://proton.me/download/drive/macos/version.json",
+      "observed_at": "2026-11-13T20:44:06.603173+00:00",
+      "status": 200,
+      "final_url": "https://proton.me/download/drive/macos/version.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "277b758879bfc71e9de25ba61c3d004cfe0bf7d0fc3c9fec2fa4051b23da946d",
+      "metadata": {
+        "Releases": [
+          {
+            "CategoryName": "Stable",
+            "Version": "3.1.1",
+            "ReleaseDate": "2026-11-09",
+            "File": {
+              "Url": "https://proton.me/download/drive/macos/3.1.1/ProtonDrive-3.1.1.dmg",
+              "Sha512CheckSum": "27fa01154bd9284c21a2537b7330a63f57f9cbcd9dbc1615eb473ade6dec78aad55dd998033e7bc2c92b0b953c8b6b6e6819515ca4b8269d64f4ec3484080689"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "key": "feed:Proton Mail",
+      "url": "https://proton.me/download/mail/macos/version.json",
+      "observed_at": "2026-11-13T20:44:06.735502+00:00",
+      "status": 200,
+      "final_url": "https://proton.me/download/mail/macos/version.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:06 GMT",
+      "sha256": "614b8c41b7617a6a570c4e0cf8a28d22d73c8a04013c43f287178ca51260825b",
+      "metadata": {
+        "Releases": [
+          {
+            "CategoryName": "Stable",
+            "Version": "1.16.1",
+            "ReleaseDate": "2026-11-02",
+            "File": [
+              {
+                "Identifier": "Apple Disk Image",
+                "Url": "https://proton.me/download/mail/macos/ProtonMail-desktop.dmg",
+                "Sha512CheckSum": "7d904fbba9caf9f927d46e7d9c1682ec06af4e8dc0cfcc96621e702e627b234cfa10a9c92257aa97ab35a50e7d444b76ad3317d7901d0b61fed8c0be11857dc8"
+              }
+            ],
+            "ReleaseNotes": [],
+            "RolloutProportion": 1,
+            "ManualUpdate": [
+              "0.9.0"
+            ],
+            "MinimumAppVersion": "1.15.1",
+            "MinimumOsVersion": "12.0.0"
+          }
+        ]
+      }
+    },
+    {
+      "key": "feed:Docker Desktop",
+      "url": "https://desktop.docker.com/mac/main/arm64/appcast.xml",
+      "observed_at": "2026-11-13T20:44:06.795279+00:00",
+      "status": 200,
+      "final_url": "https://desktop.docker.com/mac/main/arm64/appcast.xml",
+      "http_date": "Fri, 13 Nov 2026 20:00:19 GMT",
+      "sha256": "420b01aaff2481c2cd96896d5ff2be25f7d1a4151d278bfe544a5d001f8d7aa7",
+      "excerpt": "<rss version=\"2.0\" xmlns:sparkle=\"http://www.andymatuschak.org/xml-namespaces/sparkle\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:d4w=\"http://www.docker.com/docker-for-windows\">\n  <channel>\n    <title>Docker for Mac</title>\n    <link>https://desktop.docker.com/mac/main/arm64/229452/Docker.dmg</link>\n    <item>\n      <title>Version 4.99.0 (245822)</title>\n      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>\n      <pubDate>2026-11-09T09:43:37Z</pubDate>\n      <description></description>\n      <enclosure url=\"https://desktop.docker.com/mac/main/arm64/245822/Docker.dmg\" sparkle:version=\"245822\" sparkle:shortVersionString=\"4.99.0\" length=\"573453282\" type=\"application/octet-stream\" d4w:url=\"\" previousBuild=\"245422\"></enclosure>\n      <sparkle:deltas>\n        <enclosure url=\"https://desktop.docker.com/mac/main/arm64/245822/Docker-245422.delta\" sparkle:version=\"245822\" sparkle:shortVersionString=\"4.99.0\" sparkle:deltaFrom=\"245422\" length=\"89414703\" type=\"application/octet-stream\"></enclosure>\n        <enclosure url=\"https://desktop.docker.com/mac/main/arm64/245822/Docker-244584.delta\" sparkle:version=\"245822\" sparkle:shortVersionString=\"4.99.0\" sparkle:deltaFrom=\"244584\" length=\"109945815\" type=\"application/octet-stream\"></enclosure>\n        <enclosure url=\"https://desktop.docker.com/mac/main/arm64/245822/Docker-244472.delta\" sparkle:version=\"245822\" sparkle:shortVersionString=\"4.99.0\" sparkle:deltaFrom=\"244472\" length=\"113429427\" type=\"application/octet-stream\"></enclosure>\n        <enclosure url=\"https://desktop.docker.com/mac/main/arm64/245822/Docker-244132.delta\" sparkle:version=\"245822\" sparkle:shortVersionString=\"4.99.0\" sparkle:deltaFrom=\"244132\" length=\"192838132\" type=\"application/octet-stream\"></enclosure>\n        <enclosure url=\"https://de"
+    },
+    {
+      "key": "feed:Open Design",
+      "url": "https://releases.open-design.ai/stable/latest/metadata.json",
+      "observed_at": "2026-11-13T20:44:06.846125+00:00",
+      "status": 200,
+      "final_url": "https://releases.open-design.ai/stable/latest/metadata.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:07 GMT",
+      "sha256": "c7098c785159b66b0c290ae23e3060ef41b2341188864578f222d423ba5ff14d",
+      "metadata": {
+        "baseVersion": "0.27.1",
+        "releaseVersion": "0.27.1",
+        "stableVersion": "0.27.1",
+        "versionTag": "open-design-v0.27.1",
+        "channel": "stable",
+        "generatedAt": "2026-11-10T03:03:21.863Z",
+        "expectedPlatforms": [
+          "mac_arm64",
+          "win_x64",
+          "mac_x64"
+        ],
+        "failedPlatforms": []
+      }
+    },
+    {
+      "key": "feed:HyperFrames",
+      "url": "https://static.heygen.ai/hyperframes-oss/desktop/latest.json",
+      "observed_at": "2026-11-13T20:44:06.897959+00:00",
+      "status": 200,
+      "final_url": "https://static.heygen.ai/hyperframes-oss/desktop/latest.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:08 GMT",
+      "sha256": "c7885fef4cbc941f4708807aac9326e0ed58f3de91bed892d8cfc2264e4f6134",
+      "metadata": {
+        "build": "b980",
+        "sha": "89b3b2cc81739700e501f87224e12af36ffe0f97",
+        "url": "https://static.heygen.ai/hyperframes-oss/desktop/HyperFrames-b980-89b3b2cc8.zip",
+        "sha256": "89a7bc56fab51b3b622b48fd4b99c5895a9c7dc95ead93a6c563edd09c6f8044",
+        "arm64": {
+          "url": "https://static.heygen.ai/hyperframes-oss/desktop/HyperFrames-b980-89b3b2cc8-arm64.zip",
+          "bytes": 152314077,
+          "sha256": "b56890a252eca102bec186336df27616886f7ce9e03e3ed570e5182021299a7d",
+          "dmg": {
+            "url": "https://static.heygen.ai/hyperframes-oss/desktop/Install-HyperFrames-arm64-b980.dmg",
+            "bytes": 125513118,
+            "sha256": "d237aca03cdcb64dbfdc849be5181b5d3d33bc838128297657f209a0be602a5b"
+          }
+        }
+      }
+    },
+    {
+      "key": "feed:Superset",
+      "url": "https://github.com/paradevai/paradev/releases/latest/download/latest-mac.yml",
+      "observed_at": "2026-11-13T20:44:07.145636+00:00",
+      "status": 200,
+      "final_url": "https://release-assets.githubusercontent.com/github-production-release-asset/1080370450/59656f86-b469-405d-a1fb-f9958bd02688?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-11-13T21%3A41%3A55Z&rscd=attachment%3B+filename%3Dlatest-mac.yml&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-11-13T20%3A41%3A28Z&ske=2026-11-13T21%3A41%3A55Z&sks=b&skv=2018-11-09&sig=ZNUUNbRCGZZ6xkcwIZyD%2FUVqPFuUWVg7IWmBafDv4VI%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc5NDYwMjk0NywibmJmIjoxNzk0NjAyNjQ3LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.YVQz7jvt0LE2avpIx8CQhp8PGForfjDiVRyNrfjqqr4&response-content-disposition=attachment%3B%20filename%3Dlatest-mac.yml&response-content-type=application%2Foctet-stream",
+      "http_date": "Fri, 13 Nov 2026 20:44:07 GMT",
+      "sha256": "fa018bb79881a72555d191da89acdb02039cd0e77afb2f2fa2f1820d5209e7ee",
+      "excerpt": "version: '2.0.8'\nfiles:\n  - url: 'Superset-2.0.8-arm64-mac.zip'\n    sha512: 'u7hQNTQL6fRqyZA+MJFHerut2jNl7Qv+CB3ewL8fdeGwT3umKCMse2B5kPem+s5KtwCnpR/1hnB7tCgWzVIG1Q=='\n    size: 240866657\n  - url: 'Paradev-2.0.8-arm64.dmg'\n    sha512: '3ueFDuAwrFbATC6hDCbEdtMvG+O6XydHvNMCa3dNGooSFKMep1R8/aAFOVRosmQU5geqdVLM5MUKvEEKm9cmdw=='\n    size: 250250275\n  - url: 'Superset-2.0.8-mac.zip'\n    sha512: 'Cdlu7i9gHXlplHm+s2fFEXdxtgda4Rk49juda88A1yTHY+CoOKbHFxQ9qMuPpa0js/Y/oY4N4avJRXsSwXJlgg=='\n    size: 252984375\n  - url: 'Paradev-2.0.8-x64.dmg'\n    sha512: 'BRsrRFDeqduf0/+x+GtHHOGh08+dHRcbiDy1eokYUxLdRFJVU/YBsZJzmxzTq6bUq86Q4YurPJGT/b2Pa6ayDA=='\n    size: 262445775\npath: 'Superset-2.0.8-arm64-mac.zip'\nsha512: 'u7hQNTQL6fRqyZA+MJFHerut2jNl7Qv+CB3ewL8fdeGwT3umKCMse2B5kPem+s5KtwCnpR/1hnB7tCgWzVIG1Q=='\nreleaseDate: '2026-11-10T02:06:45.704Z'\nminimumSystemVersion: '22.0.0'\n"
+    },
+    {
+      "key": "feed:DeepSeek Harness",
+      "url": "https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml",
+      "observed_at": "2026-11-13T20:44:07.145499+00:00",
+      "status": 200,
+      "final_url": "https://download.deepseek.com/dsh-desk/feeds/mac-arm64/nightly-mac.yml",
+      "http_date": "Fri, 13 Nov 2026 20:44:07 GMT",
+      "sha256": "7043b285fcfff967fb68884814045e7da3035b58a925f92f620d50196884f49e",
+      "excerpt": "version: 0.2.2-rc.3\nfiles:\n  - url: >-\n      https://download.deepseek.com/dsh-desk/bin/mac-arm64/deepseek-harness-0.2.2-rc.3-mac-arm64.zip\n    size: 362840431\n    sha512: >-\n      UThWXKCqiiUnjFgij655+Gc1MgiSl+Ybl71jkQi48BhcBCN0XSDNT4GGmGJY3nvEqnkLT3LtWbL6wy6t/kRxIw==\npath: >-\n  https://download.deepseek.com/dsh-desk/bin/mac-arm64/deepseek-harness-0.2.2-rc.3-mac-arm64.zip\nsha512: >-\n  UThWXKCqiiUnjFgij655+Gc1MgiSl+Ybl71jkQi48BhcBCN0XSDNT4GGmGJY3nvEqnkLT3LtWbL6wy6t/kRxIw==\nstagingPercentage: 100\nreleaseDate: '2026-11-13T07:40:14.455Z'\n"
+    },
+    {
+      "key": "feed:Grok Bot",
+      "url": "https://api2.cursor.sh/updates/api/update/darwin-arm64/sand/0.0.0/stable",
+      "observed_at": "2026-11-13T20:44:07.323659+00:00",
+      "status": 200,
+      "final_url": "https://api2.cursor.sh/updates/api/update/darwin-arm64/sand/0.0.0/stable",
+      "http_date": "Fri, 13 Nov 2026 20:44:07 GMT",
+      "sha256": "26a11bb07dab29a3dd148cc22f722abeae0395edeb0af15101d6273fdfde99c2",
+      "metadata": {
+        "url": "https://downloads.cursor.com/grokbot/stable/darwin-arm64/1.0.3/Grok_Bot_1.0.3.zip",
+        "name": "1.0.3"
+      }
+    },
+    {
+      "key": "feed:Remote Desktop Manager",
+      "url": "https://devolutions.net/productinfo.htm",
+      "observed_at": "2026-11-13T20:44:07.689480+00:00",
+      "status": 200,
+      "final_url": "https://devolutions.net/productinfo.htm",
+      "http_date": "Fri, 13 Nov 2026 20:44:07 GMT",
+      "sha256": "e131cd6b6e6cf95cac40a18146d7df0714e677b0479a0ffeb19adcb96b9a28f4",
+      "excerpt": "RDMMacbin.Version=2026.3.3.1\nRDMMacbin.Url=https://cdn.devolutions.net/download/Mac/Devolutions.RemoteDesktopManager.Mac.2026.3.3.1.dmg\nRDMMacbin.hash=2787C0783F5AEDAF55997FF20826E9277B68F08BB7E216A9B14CD58114068D86\nRDMMacbinBeta.Version=2026.3.3.1\nRDMMacbinBeta.Url=https://cdn.devolutions.net/download/Mac/Devolutions.RemoteDesktopManager.Mac.2026.3.3.1.dmg\nRDMMacbinBeta.hash=2787C0783F5AEDAF55997FF20826E9277B68F08BB7E216A9B14CD58114068D86\nRDMMacbinLts.Version=2026.2.6.1\nRDMMacbinLts.Url=https://cdn.devolutions.net/download/Mac/Devolutions.RemoteDesktopManager.Mac.2026.2.6.1.dmg\nRDMMacbinLts.hash=BC6CBE37013505C77E80959075C2F06413B69385A88C47398D1848EF86C6B515"
+    },
+    {
+      "key": "chrome",
+      "url": "https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions?pageSize=1",
+      "observed_at": "2026-11-13T20:44:07.698569+00:00",
+      "status": 200,
+      "final_url": "https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions?pageSize=1",
+      "http_date": "Fri, 13 Nov 2026 20:44:07 GMT",
+      "sha256": "93548618efb2bb9798fc1807d063637eda6da4b90ac84ec77ae8af58aa0196d1",
+      "metadata": {
+        "versions": [
+          {
+            "name": "chrome/platforms/mac_arm64/channels/stable/versions/158.0.8127.37",
+            "version": "158.0.8127.37"
+          }
+        ],
+        "nextPageToken": "3905175611"
+      }
+    },
+    {
+      "key": "firefox",
+      "url": "https://product-details.mozilla.org/1.0/firefox_versions.json",
+      "observed_at": "2026-11-13T20:44:07.784928+00:00",
+      "status": 200,
+      "final_url": "https://product-details.mozilla.org/1.0/firefox_versions.json",
+      "http_date": "Fri, 13 Nov 2026 20:40:57 GMT",
+      "sha256": "2cd8f1b3cf72eb8f632bd05b0416c499d2c2f6a8e57ef4db62b3e7954e8dfd16",
+      "metadata": {
+        "FIREFOX_AURORA": "",
+        "FIREFOX_DEVEDITION": "161.0b3",
+        "FIREFOX_ESR": "153.7.0esr",
+        "FIREFOX_ESR115": "115.45.0esr",
+        "FIREFOX_ESR_NEXT": "",
+        "FIREFOX_NIGHTLY": "162.0a1",
+        "LAST_MERGE_DATE": "2026-11-05",
+        "LAST_RELEASE_DATE": "2026-11-10",
+        "LAST_STRINGFREEZE_DATE": "2026-11-04",
+        "LATEST_FIREFOX_DEVEL_VERSION": "161.0b3",
+        "LATEST_FIREFOX_OLDER_VERSION": "3.6.28",
+        "LATEST_FIREFOX_RELEASED_DEVEL_VERSION": "161.0b3",
+        "LATEST_FIREFOX_VERSION": "160.0",
+        "NEXT_MERGE_DATE": "2026-11-19",
+        "NEXT_RELEASE_DATE": "2026-11-20",
+        "NEXT_STRINGFREEZE_DATE": "2026-11-18"
+      }
+    },
+    {
+      "key": "brave",
+      "url": "https://api.github.com/repos/brave/brave-browser/releases/latest",
+      "observed_at": "2026-11-13T20:44:07.862584+00:00",
+      "status": 200,
+      "final_url": "https://api.github.com/repos/brave/brave-browser/releases/latest",
+      "http_date": "Fri, 13 Nov 2026 20:44:08 GMT",
+      "sha256": "d9a473e4df94409c9f765e5473c5cb9d3464af3b0ff20f6cf92e68c311e587d1",
+      "metadata": {
+        "tag_name": "v1.99.57",
+        "name": "Release v1.99.57 (Chromium 157.0.8103.79) ",
+        "prerelease": false,
+        "draft": false,
+        "published_at": "2026-11-12T04:08:44Z",
+        "html_url": "https://github.com/brave/brave-browser/releases/tag/v1.99.57"
+      }
+    },
+    {
+      "key": "keepassxc",
+      "url": "https://api.github.com/repos/keepassxreboot/keepassxc/releases/latest",
+      "observed_at": "2026-11-13T20:44:08.317555+00:00",
+      "status": 200,
+      "final_url": "https://api.github.com/repos/keepassxreboot/keepassxc/releases/latest",
+      "http_date": "Fri, 13 Nov 2026 20:44:08 GMT",
+      "sha256": "7c575e9d5c0665b6ea3044a89b30c8224cc7273b432bf5e29727aba8c2316053",
+      "metadata": {
+        "tag_name": "2.8.0",
+        "name": "Release 2.8.0",
+        "prerelease": false,
+        "draft": false,
+        "published_at": "2026-10-21T21:57:23Z",
+        "html_url": "https://github.com/keepassxreboot/keepassxc/releases/tag/2.8.0"
+      }
+    },
+    {
+      "key": "codeedit",
+      "url": "https://api.github.com/repos/CodeEditApp/CodeEdit/releases/latest",
+      "observed_at": "2026-11-13T20:44:08.641281+00:00",
+      "status": 200,
+      "final_url": "https://api.github.com/repos/CodeEditApp/CodeEdit/releases/latest",
+      "http_date": "Fri, 13 Nov 2026 20:44:08 GMT",
+      "sha256": "deb3b08259130d0967c44d88b46d0b2691d445cf1b347c495e840cbd7b9b167d",
+      "metadata": {
+        "tag_name": "v0.3.6",
+        "name": "v0.3.6",
+        "prerelease": false,
+        "draft": false,
+        "published_at": "2025-08-26T20:35:39Z",
+        "html_url": "https://github.com/CodeEditApp/CodeEdit/releases/tag/v0.3.6"
+      }
+    },
+    {
+      "key": "trezor",
+      "url": "https://api.github.com/repos/trezor/trezor-suite/releases/latest",
+      "observed_at": "2026-11-13T20:44:08.942825+00:00",
+      "status": 200,
+      "final_url": "https://api.github.com/repos/trezor/trezor-suite/releases/latest",
+      "http_date": "Fri, 13 Nov 2026 20:44:09 GMT",
+      "sha256": "d2b35497850bd570f1205bf329638e711417e74253afbfee1a5eb16fca36d179",
+      "metadata": {
+        "tag_name": "v26.10.3",
+        "name": "v26.10.3",
+        "prerelease": false,
+        "draft": false,
+        "published_at": "2026-10-29T12:33:50Z",
+        "html_url": "https://github.com/trezor/trezor-suite/releases/tag/v26.10.3"
+      }
+    },
+    {
+      "key": "vscode",
+      "url": "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest",
+      "observed_at": "2026-11-13T20:44:08.641211+00:00",
+      "status": 200,
+      "final_url": "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest",
+      "http_date": "Fri, 13 Nov 2026 20:44:08 GMT",
+      "sha256": "6cd268c36fcff6621c4bc1a62b7365144580464847a8928cad169b7d5f8a1342",
+      "metadata": {
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-darwin-arm64.zip",
+        "name": "1.146.0",
+        "version": "69047191fc427f2f92828279aae1d90d8eeda7ab",
+        "productVersion": "1.146.0",
+        "hash": "f74b624e5058103c6b828acd3e313d75fb0acaa2",
+        "timestamp": 1794339449048,
+        "sha256hash": "6e8d27ee0c5a8f2aa3c43e373407eecd11c270c3fe7f46100ef682aac14bb648",
+        "supportsFastUpdate": true,
+        "notes": "69047191fc427f2f92828279aae1d90d8eeda7ab"
+      }
+    },
+    {
+      "key": "lmstudio",
+      "url": "https://lmstudio.ai/download",
+      "observed_at": "2026-11-13T20:44:08.711273+00:00",
+      "status": 200,
+      "final_url": "https://lmstudio.ai/download",
+      "http_date": "Fri, 13 Nov 2026 20:44:09 GMT",
+      "sha256": "8f69e23b0246d99d7bd391b15ed1f634f64c8d6542da403d124503bc8af0d2a9",
+      "title": "Download LM Studio - Mac, Linux, Windows",
+      "excerpt": " Download LM Studio - Mac, Linux, Windows (() => { const documentElement = document.documentElement; const classList = documentElement.classList; const getStoredTheme = () => { try { const storedTheme = localStorage.getItem(\"theme\"); return storedTheme === \"light\" || storedTheme === \"dark\" ? storedTheme : null; } catch { return null; } }; const resolvedTheme = getStoredTheme() ?? (window.matchMedia(\"(prefers-color-scheme: dark)\").matches ? \"dark\" : \"light\"); classList.remove(\"light\", \"dark\"); cl"
+    },
+    {
+      "key": "obsidian",
+      "url": "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/desktop-releases.json",
+      "observed_at": "2026-11-13T20:44:08.942765+00:00",
+      "status": 200,
+      "final_url": "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/desktop-releases.json",
+      "http_date": "Fri, 13 Nov 2026 20:44:09 GMT",
+      "sha256": "67755befc525d0d61213141012e81382cd1a6843f5963b4ff7a88abfa0d9dbd5",
+      "metadata": {
+        "minimumVersion": "1.1.9",
+        "latestVersion": "1.15.1",
+        "downloadUrl": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.1/obsidian-1.15.1.asar.gz",
+        "hash": "P2gIwUIEBjNJ1aelm58vY3lYBj+oXu6+dn4T4G0xTA8=",
+        "signature": "e3jAQiUjC729X4kizHMTCUb19cquQAhW0JppzdSEgJXorH6DJIVmUB6brZHdf+xitwllDRdsHwyRe4rGaiFyTmLl5IEartx99/ozZZpUW8MApBt9ecu2w6viQkg5V4kppHpk2GeS53ubspJvQe+WO7jBjT9+kEqa814DBjBYlIpUXJjbIgFpir3Gsbw7vOgR85PgH8XORdp7Fx9twd6r6o6VGWYhu6EEwbov+F9apiYzcJyE09CWeAuXmgk0BZReMua5Mw9uPitxwaeicfBv9gJTbvk1TkE5EsJHLQ8XtCBFzXgwKSZNOT9lOZDSso7llfgN/nHDsLPZdsxpthccTA==",
+        "beta": {
+          "minimumVersion": "1.1.9",
+          "latestVersion": "1.15.1",
+          "downloadUrl": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.1/obsidian-1.15.1.asar.gz",
+          "hash": "P2gIwUIEBjNJ1aelm58vY3lYBj+oXu6+dn4T4G0xTA8=",
+          "signature": "e3jAQiUjC729X4kizHMTCUb19cquQAhW0JppzdSEgJXorH6DJIVmUB6brZHdf+xitwllDRdsHwyRe4rGaiFyTmLl5IEartx99/ozZZpUW8MApBt9ecu2w6viQkg5V4kppHpk2GeS53ubspJvQe+WO7jBjT9+kEqa814DBjBYlIpUXJjbIgFpir3Gsbw7vOgR85PgH8XORdp7Fx9twd6r6o6VGWYhu6EEwbov+F9apiYzcJyE09CWeAuXmgk0BZReMua5Mw9uPitxwaeicfBv9gJTbvk1TkE5EsJHLQ8XtCBFzXgwKSZNOT9lOZDSso7llfgN/nHDsLPZdsxpthccTA=="
+        }
+      }
+    },
+    {
+      "key": "protonvpn",
+      "url": "https://protonvpn.com/download/macos",
+      "observed_at": "2026-11-13T20:44:09.060937+00:00",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "key": "appcleaner",
+      "url": "https://freemacsoft.net/appcleaner/",
+      "observed_at": "2026-11-13T20:44:09.156434+00:00",
+      "status": 200,
+      "final_url": "https://freemacsoft.net/appcleaner/",
+      "http_date": "Fri, 13 Nov 2026 20:44:09 GMT",
+      "sha256": "bc3a32c5091eb4c6e6c89441d0911f8ca75b356b1d4f284e3d975ea87f9ccbb9",
+      "title": "AppCleaner",
+      "excerpt": "Version 3.7 For macOS 15 and later Version 3.6.8 For macOS 10.14 up to 15.6 Version 3.6 For macOS 10.13 Version 3.4 For macOS 10.10 up to 10.12 &copy; 2026 FreeMacSoft . All rights reserved. (adsbygoogle = window.adsbygoogle || []).push({}); "
+    },
+    {
+      "key": "spotify",
+      "url": "https://www.spotify.com/download/mac/",
+      "observed_at": "2026-11-13T20:44:09.221528+00:00",
+      "status": 200,
+      "final_url": "https://www.spotify.com/pl/download/mac/",
+      "http_date": "Fri, 13 Nov 2026 20:44:09 GMT",
+      "sha256": "135fca7c9136069ab307b19be2f639915caffcc53e6f386f97f892fb8ac7d28d",
+      "title": "Pobieranie na Mac - Spotify",
+      "excerpt": " Pobieranie na Mac - Spotify .MGUgc{margin:0 auto;max-width:750px;}/*!sc*/ @media (min-width:992px){.MGUgc{max-width:970px;}}/*!sc*/ @media (min-width:1200px){.MGUgc{max-width:1170px;}}/*!sc*/ data-styled.g1[id=\"sc-7ae703d6-0\"]{content:\"MGUgc,\"}/*!sc*/ .YcIib{padding-bottom:var(--encore-spacing-base);}/*!sc*/ @media (min-width:768px){.YcIib{padding-bottom:var(--encore-spacing-looser);}}/*!sc*/ data-styled.g5[id=\"sc-82c90237-0\"]{content:\"YcIib,\"}/*!sc*/ .jPkorG{padding:0 var(--encore-spacing-loos"
+    },
+    {
+      "key": "capcut",
+      "url": "https://www.capcut.com/tools/desktop-video-editor",
+      "observed_at": "2026-11-13T20:44:09.260170+00:00",
+      "status": 200,
+      "final_url": "https://www.capcut.com/tools/desktop-video-editor",
+      "http_date": "Fri, 13 Nov 2026 20:44:09 GMT",
+      "sha256": "7089f0163139fc11b489a685ad70fcf7c2a265ec8cbb5c70390b83b351216e38",
+      "title": "CapCut Desktop | Powerful AI Photo &amp; Video Editor with Dreamina Seedance 2.5",
+      "excerpt": " {\"__agw_build_branch\":\"feat/astrajs-1.0.3\",\"__agw_build_version\":\"1.0.0.65.0\",\"__agw_cluster\":\"default\",\"__agw_env\":\"prod\",\"__agw_idc\":\"my2\",\"__agw_is_ppe\":false,\"__agw_log_id\":\"20261114044409418829754090F9ED9DF5\",\"__agw_psm\":\"growth.capcut.common_seo\",\"__agw_timestamp\":1794602649} CapCut Desktop | Powerful AI Photo &amp; Video Editor with Dreamina Seedance 2.5 .astra-img{display:inline-block;font-size:0;height:100%;line-height:0;overflow:hidden;width:100%}.astra-img img{height:100%;object-fit:"
+    },
+    {
+      "key": "inkscape",
+      "url": "https://inkscape.org/release/",
+      "observed_at": "2026-11-13T20:44:09.478745+00:00",
+      "error": "The read operation timed out"
+    },
+    {
+      "key": "mega",
+      "url": "https://mega.io/desktop",
+      "observed_at": "2026-11-13T20:44:09.677149+00:00",
+      "status": 200,
+      "final_url": "https://mega.io/desktop",
+      "http_date": "Fri, 13 Nov 2026 20:44:10 GMT",
+      "sha256": "35dd6a65e62e3926cf96c78b84223d990ed643a0b6b83c8189b4889366dd9630",
+      "title": "MEGA Desktop App: Windows, Mac and Linux",
+      "excerpt": " MEGA Desktop App: Windows, Mac and Linux {\"@context\":\"https:\\/\\/schema.org\",\"@graph\":[{\"@type\":\"WebPage\",\"@id\":\"https:\\/\\/mega.io\\/desktop\",\"url\":\"https:\\/\\/mega.io\\/desktop\",\"name\":\"MEGA Desktop App: Windows, Mac and Linux\",\"isPartOf\":{\"@id\":\"https:\\/\\/mega.io\\/#website\"},\"datePublished\":\"2022-11-30T14:12:02+00:00\",\"dateModified\":\"2026-11-08T23:48:59+00:00\",\"description\":\"Get full control over your uploads and downloads, and sync or back up to easily access the latest version of your content a"
+    },
+    {
+      "key": "zoom",
+      "url": "https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061222",
+      "observed_at": "2026-11-13T20:44:09.998484+00:00",
+      "status": 200,
+      "final_url": "https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061222",
+      "http_date": "Fri, 13 Nov 2026 20:44:12 GMT",
+      "sha256": "0731ab26808b96cdaf0866495ff4c6b706b274b192fdc9a23aa483f7c82b6357",
+      "title": "Release notes for the Zoom Workplace app",
+      "excerpt": " Release notes for the Zoom Workplace app {\"@context\":\"https://schema.org\",\"@type\":\"TechArticle\",\"headline\":\"Release notes for the Zoom Workplace app\",\"publisher\":\"Zoom\",\"url\":\"https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061222\",\"articleSection\":\"Zoom Releases by Product\",\"dateModified\":\"2026-11-13 14:15:45\",\"articleBody\":\" Zoom provides up-to-date release notes for the Zoom Workplace app on all supported platforms: Windows, macOS, Linux, Android, iOS, Android (Intune), iO"
+    },
+    {
+      "key": "google-drive",
+      "url": "https://support.google.com/a/answer/7577057",
+      "observed_at": "2026-11-13T20:44:10.259314+00:00",
+      "status": 200,
+      "final_url": "https://knowledge.workspace.google.com/admin/drive/google-drive-for-desktop-release-notes?visit_id=639301994503290187-105809137&rd=1",
+      "http_date": "Fri, 13 Nov 2026 20:44:10 GMT",
+      "sha256": "e17def8d610011585e30fbd0e5af3d8e2eaba0932d40eb0fae8dc3bba24a1613",
+      "title": "Google Drive for desktop release notes &nbsp;|&nbsp; Drive & Docs &nbsp;|&nbsp; Google Workspace Help",
+      "excerpt": " Google Drive for desktop release notes &nbsp;|&nbsp; Drive & Docs &nbsp;|&nbsp; Google Workspace Help { \"@context\": \"https://schema.org\", \"@type\": \"Article\", \"headline\": \"Google Drive for desktop release notes\" } { \"@context\": \"https://schema.org\", \"@type\": \"BreadcrumbList\", \"itemListElement\": [{ \"@type\": \"ListItem\", \"position\": 1, \"name\": \"Administrators\", \"item\": \"https://knowledge.workspace.google.com/admin\" },{ \"@type\": \"ListItem\", \"position\": 2, \"name\": \"Set up &amp; manage services\", \"ite"
+    },
+    {
+      "key": "office",
+      "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+      "observed_at": "2026-11-13T20:44:11.168091+00:00",
+      "status": 200,
+      "final_url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+      "http_date": "Fri, 13 Nov 2026 20:44:11 GMT",
+      "sha256": "dd5f3a787fe09f85ee331f3ec3232df4695c05031da019d69bac8f8b3e1183b7",
+      "title": "Update history for Office for Mac - Office release notes | Microsoft Learn",
+      "excerpt": "ns, such as Word, PowerPoint, and Excel. All packages are 64-bit only. The build date is listed in parentheses, in a YYMMDD format, after the version number. The install package is used if you don't have the application already installed, while the update package is used to update an existing installation. To view release notes, see Release notes. November 10, 2026 Version 16.115 (26110837) Application Download links SHA-256 Word Install package Update package 5DB08593BC098F70E02CD2C4A2D0B5A724BB0CAE6BC4DA26BF208EB716717C2D Excel Install package Update package DE94B56243D96210C65188FC6D23DC0E1614D6746765C14584E6451B61607EFF PowerPoint Install package Update package 3178997F7A53596D2902833D6878DD5B594D3345025C64B83159DFCC93962334 Outlook Install package Update package 89A5F392DE320615C0940716D19778D8C1EF3A012130147AEF87D000A0C25675 OneNote Update package Not applicable Release history for Office for Mac The following table provides release history information and download links for Office for Mac. The table is ordered by release date, "
+    },
+    {
+      "key": "teams",
+      "url": "https://learn.microsoft.com/en-us/officeupdates/teams-app-versioning",
+      "observed_at": "2026-11-13T20:44:11.462543+00:00",
+      "status": 200,
+      "final_url": "https://learn.microsoft.com/en-us/officeupdates/teams-app-versioning",
+      "http_date": "Fri, 13 Nov 2026 20:44:11 GMT",
+      "sha256": "a6ae8ca6d0190028f6f6d4079e58e1f3af967def61fb8e0595cbe6dea8b122b2",
+      "title": "Version update history for Teams app deployments - Office release notes | Microsoft Learn",
+      "excerpt": " Version update history for Teams app deployments - Office release notes | Microsoft Learn (function () { try { var stored = localStorage.getItem('theme'); var theme = /^(light|dark|high-contrast)$/.test(stored) ? stored : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; document.documentElement.classList.add('theme-' + theme); } catch (e) {} })();; (function () { try { var state = JSON.parse(localStorage.getItem('atlas-layout-preferences') || '{}'); var view = state[\"docs-"
+    },
+    {
+      "key": "perplexity",
+      "url": "https://www.perplexity.ai/download/mac",
+      "observed_at": "2026-11-13T20:44:11.734394+00:00",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "key": "gemini",
+      "url": "https://gemini.google/overview/",
+      "observed_at": "2026-11-13T20:44:11.787109+00:00",
+      "status": 200,
+      "final_url": "https://gemini.google/overview/",
+      "http_date": "Fri, 13 Nov 2026 20:44:13 GMT",
+      "sha256": "af3b3a37e2cab7f27b985eb579abd6faf1baef6c25d9bf40df3da6911ef881a0",
+      "title": "Czym jest Gemini i\u00a0jak dzia\u0142a",
+      "excerpt": " Czym jest Gemini i jak dzia\u0142a @layer bds.base, bds.component, mws.base, mws.component, base, component, template; (function(){ var ua=navigator.userAgent; var p=(navigator.userAgentData||{}).platform||''; var os=''; if(/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1))os='ios'; else if(/Android/.test(ua))os='android'; else if(/CrOS/.test(ua))os='chromeos'; else if(p==='Windows'||/Windows/.test(ua))os='windows'; else if(p==='macOS'||/Macintosh|Mac OS X/.test(ua))os="
+    },
+    {
+      "key": "ipmiview",
+      "url": "https://www.supermicro.com/en/solutions/management-software/ipmi-utilities",
+      "observed_at": "2026-11-13T20:44:13.319716+00:00",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "key": "unifi",
+      "url": "https://apps.apple.com/us/app/unifi/id1057750338",
+      "observed_at": "2026-11-13T20:44:13.395357+00:00",
+      "status": 200,
+      "final_url": "https://apps.apple.com/us/app/unifi/id1057750338",
+      "http_date": "Fri, 13 Nov 2026 20:44:13 GMT",
+      "sha256": "13c6427e80488a69b9ff10fd795572777fd2c89612900bb8ce3744dbca525385",
+      "title": "\u200eUniFi App - App Store",
+      "excerpt": " \u200eUniFi App - App Store {\"@context\":\"https://schema.org\",\"@id\":\"https://apps.apple.com/#organization\",\"@type\":\"Organization\",\"name\":\"App Store\",\"url\":\"https://apps.apple.com\",\"logo\":\"https://apps.apple.com/assets/app-store.png\",\"sameAs\":[\"https://www.wikidata.org/wiki/Q368215\",\"https://twitter.com/AppStore\",\"https://www.instagram.com/appstore/\",\"https://www.facebook.com/appstore/\"],\"parentOrganization\":{\"@type\":\"Organization\",\"name\":\"Apple\",\"@id\":\"https://www.apple.com/#organization\",\"url\":\"http"
+    },
+    {
+      "key": "wifiman",
+      "url": "https://apps.apple.com/us/app/ubiquiti-wifiman/id1385561119",
+      "observed_at": "2026-11-13T20:44:13.949411+00:00",
+      "status": 200,
+      "final_url": "https://apps.apple.com/us/app/ubiquiti-wifiman/id1385561119",
+      "http_date": "Fri, 13 Nov 2026 20:44:14 GMT",
+      "sha256": "09d64e775875a4cca24c4d8d55299c10fe0b1f1b8b152f9f8b2ec1b9318afed0",
+      "title": "\u200eUbiquiti WiFiman App - App Store",
+      "excerpt": " \u200eUbiquiti WiFiman App - App Store {\"@context\":\"https://schema.org\",\"@id\":\"https://apps.apple.com/#organization\",\"@type\":\"Organization\",\"name\":\"App Store\",\"url\":\"https://apps.apple.com\",\"logo\":\"https://apps.apple.com/assets/app-store.png\",\"sameAs\":[\"https://www.wikidata.org/wiki/Q368215\",\"https://twitter.com/AppStore\",\"https://www.instagram.com/appstore/\",\"https://www.facebook.com/appstore/\"],\"parentOrganization\":{\"@type\":\"Organization\",\"name\":\"Apple\",\"@id\":\"https://www.apple.com/#organization\","
+    },
+    {
+      "key": "picsart",
+      "url": "https://apps.apple.com/us/app/picsart-ai-photo-video-editor/id587366035",
+      "observed_at": "2026-11-13T20:44:14.302885+00:00",
+      "status": 200,
+      "final_url": "https://apps.apple.com/us/app/picsart-ai-photo-editor-video/id587366035",
+      "http_date": "Fri, 13 Nov 2026 20:44:14 GMT",
+      "sha256": "c2262b8ddc54c2b5a9b3a6844ab16bc8509e7986d6a117087de283ce297caf3a",
+      "title": "\u200ePicsart AI Photo Editor, Video App - App Store",
+      "excerpt": " \u200ePicsart AI Photo Editor, Video App - App Store {\"@context\":\"https://schema.org\",\"@id\":\"https://apps.apple.com/#organization\",\"@type\":\"Organization\",\"name\":\"App Store\",\"url\":\"https://apps.apple.com\",\"logo\":\"https://apps.apple.com/assets/app-store.png\",\"sameAs\":[\"https://www.wikidata.org/wiki/Q368215\",\"https://twitter.com/AppStore\",\"https://www.instagram.com/appstore/\",\"https://www.facebook.com/appstore/\"],\"parentOrganization\":{\"@type\":\"Organization\",\"name\":\"Apple\",\"@id\":\"https://www.apple.com/#"
+    },
+    {
+      "key": "chatgpt",
+      "url": "https://help.openai.com/en/articles/9703738-macos-app-release-notes",
+      "observed_at": "2026-11-13T20:44:14.302748+00:00",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "key": "codex",
+      "url": "https://developers.openai.com/codex/app/",
+      "observed_at": "2026-11-13T20:44:14.800922+00:00",
+      "status": 200,
+      "final_url": "https://learn.chatgpt.com/docs/app",
+      "http_date": "Fri, 13 Nov 2026 20:44:15 GMT",
+      "sha256": "4d4ff92fe4921689d86d059cad3125269194ac476f3f21ce3d16a494a9033ab4",
+      "title": "\n  ChatGPT desktop app | ChatGPT Learn\n",
+      "excerpt": " (function(){const siteVariantDomains = [{\"id\":\"chatgpt-docs\",\"domains\":[\"learn.chatgpt.com\",\"learn.chatgpt-staging.com\",\"learn-chatgpt-preview.localhost\"]}]; const forcedSiteVariantId = undefined; const siteVariantQueryParam = \"site_variant\"; const chatGptSiteVariant = \"chatgpt\"; const chatGptDocsVariantId = \"chatgpt-docs\"; const developersOpenAiHostname = \"developers.openai.com\"; (() => { const hostname = window.location.hostname.toLowerCase().replace(/\\.$/, \"\"); const queryVariant = hostname "
+    },
+    {
+      "key": "claude",
+      "url": "https://support.claude.com/en/articles/10065433-installing-claude-desktop",
+      "observed_at": "2026-11-13T20:44:15.191850+00:00",
+      "status": 200,
+      "final_url": "https://support.claude.com/en/articles/10065433-install-claude-desktop",
+      "http_date": "Fri, 13 Nov 2026 20:44:15 GMT",
+      "sha256": "a2ba14116b5b36f4f62d5e26eeee89ab6d24817da9d3c6503f6ed3526a35c056",
+      "title": "Install Claude Desktop | Claude Help Center",
+      "excerpt": " {\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\"ListItem\",\"item\":\"https://support.claude.com/en/\",\"name\":\"All Collections\",\"position\":1},{\"@type\":\"ListItem\",\"item\":\"https://support.claude.com/en/collections/16163169-claude-desktop\",\"name\":\"Claude Desktop\",\"position\":2},{\"@type\":\"ListItem\",\"item\":\"https://support.claude.com/en/collections/17879568-general\",\"name\":\"General\",\"position\":3},{\"@type\":\"ListItem\",\"name\":\"Install Claude Desktop\",\"position\":4}]} {\"@"
+    },
+    {
+      "key": "comet",
+      "url": "https://www.perplexity.ai/comet",
+      "observed_at": "2026-11-13T20:44:15.455406+00:00",
+      "error": "HTTP Error 403: Forbidden"
+    },
+    {
+      "key": "ledger",
+      "url": "https://www.ledger.com/ledger-live",
+      "observed_at": "2026-11-13T20:44:15.507759+00:00",
+      "status": 200,
+      "final_url": "https://shop.ledger.com/pages/ledger-wallet",
+      "http_date": "Fri, 13 Nov 2026 17:14:53 GMT",
+      "sha256": "f136015067a5834d8d53c4d12ace5d8e8eebe90df26c1e9be9f18e2346752cbc",
+      "title": "Ledger Wallet (ex. Ledger Live) - Crypto App | Ledger",
+      "excerpt": " Ledger Wallet (ex. Ledger Live) - Crypto App | Ledger {\"@context\":\"https://schema.org\",\"@type\":\"SoftwareApplication\",\"name\":\"Ledger Wallet\",\"applicationCategory\":\"FinanceApplication\",\"operatingSystem\":\"Windows, macOS, Linux, iOS, Android\",\"offers\":{\"@type\":\"Offer\",\"price\":\"0\",\"priceCurrency\":\"USD\"},\"keywords\":\"crypto wallet app, ledger live, ledger wallet, defi, hardware wallet companion, crypto management\"} {\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{\"@type\":\""
+    },
+    {
+      "key": "mas-search:IPMIView",
+      "url": "https://itunes.apple.com/search?term=IPMIView&entity=software&country=us&limit=4",
+      "observed_at": "2026-11-13T20:44:38.150834+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/search?term=IPMIView&entity=software&country=us&limit=4",
+      "http_date": "Fri, 13 Nov 2026 20:44:38 GMT",
+      "sha256": "9d0bcd6427c04513ba54fffe1799ec37fffc7b69b7ca9ac24a35f4a56bc9a977",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "Supermicro IPMIView",
+          "trackId": 952163566,
+          "artistName": "Super Micro Computer, Inc.",
+          "bundleId": "com.supermicro.ipmiview",
+          "version": "1.12.0",
+          "currentVersionReleaseDate": "2026-09-29T08:15:32Z",
+          "minimumOsVersion": "15.5",
+          "trackViewUrl": "https://apps.apple.com/us/app/supermicro-ipmiview/id952163566?uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "mas-search:UniFi",
+      "url": "https://itunes.apple.com/search?term=UniFi&entity=software&country=us&limit=4",
+      "observed_at": "2026-11-13T20:44:38.552212+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/search?term=UniFi&entity=software&country=us&limit=4",
+      "http_date": "Fri, 13 Nov 2026 20:44:38 GMT",
+      "sha256": "e48f98f6afaea4ae31ebf2e5e7f074cabc725ea1259e3ba193282a64d7c86ef9",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "UniFi",
+          "trackId": 1057750338,
+          "artistName": "Ubiquiti Inc.",
+          "bundleId": "com.ubnt.unifiac",
+          "version": "11.1.0",
+          "currentVersionReleaseDate": "2026-11-12T16:52:33Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/unifi/id1057750338?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "UniFi Endpoint",
+          "trackId": 6450954172,
+          "artistName": "Ubiquiti Inc.",
+          "bundleId": "com.ui.uid.standard",
+          "version": "4.1.0",
+          "currentVersionReleaseDate": "2026-11-09T08:52:00Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/unifi-endpoint/id6450954172?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "UniFi Protect",
+          "trackId": 1392492235,
+          "artistName": "Ubiquiti Inc.",
+          "bundleId": "com.ubnt.protect",
+          "version": "3.14.0",
+          "currentVersionReleaseDate": "2026-10-16T10:37:08Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/unifi-protect/id1392492235?uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "mas-search:WiFiman",
+      "url": "https://itunes.apple.com/search?term=WiFiman&entity=software&country=us&limit=4",
+      "observed_at": "2026-11-13T20:44:38.982058+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/search?term=WiFiman&entity=software&country=us&limit=4",
+      "http_date": "Fri, 13 Nov 2026 20:44:39 GMT",
+      "sha256": "aeda0abfb246e0a6beccddc002bfc23e7351c7941486196f2ddda5c01b54d6c1",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "Ubiquiti WiFiman",
+          "trackId": 1385561119,
+          "artistName": "Ubiquiti Inc.",
+          "bundleId": "com.ubnt.wifiman",
+          "version": "1.37.2",
+          "currentVersionReleaseDate": "2026-11-11T01:01:15Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/ubiquiti-wifiman/id1385561119?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "UniFi",
+          "trackId": 1057750338,
+          "artistName": "Ubiquiti Inc.",
+          "bundleId": "com.ubnt.unifiac",
+          "version": "11.1.0",
+          "currentVersionReleaseDate": "2026-11-12T16:52:33Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/unifi/id1057750338?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Fing - Network Scanner",
+          "trackId": 430921107,
+          "artistName": "Fing Limited",
+          "bundleId": "overlook.fing",
+          "version": "12.13.5",
+          "currentVersionReleaseDate": "2026-10-19T06:59:29Z",
+          "minimumOsVersion": "16.4",
+          "trackViewUrl": "https://apps.apple.com/us/app/fing-network-scanner/id430921107?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Wifi Analyzer Network Analyzer",
+          "trackId": 1602804552,
+          "artistName": "LE NGUYEN QUANG PHUOC",
+          "bundleId": "com.tlabs.networkanalyzer",
+          "version": "2.7",
+          "currentVersionReleaseDate": "2022-10-24T00:32:10Z",
+          "minimumOsVersion": "13.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/wifi-analyzer-network-analyzer/id1602804552?uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "mas-search:Picsart",
+      "url": "https://itunes.apple.com/search?term=Picsart&entity=software&country=us&limit=4",
+      "observed_at": "2026-11-13T20:44:39.449382+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/search?term=Picsart&entity=software&country=us&limit=4",
+      "http_date": "Fri, 13 Nov 2026 20:44:39 GMT",
+      "sha256": "3517d877c8388cca4d78aabe54b4cffc725aa2d53c9df6a9ffdb47d417d661d2",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "Picsart AI Photo Editor, Video",
+          "trackId": 587366035,
+          "artistName": "PicsArt, Inc.",
+          "bundleId": "com.picsart.studio",
+          "version": "30.9.6",
+          "currentVersionReleaseDate": "2026-11-10T14:35:53Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/picsart-ai-photo-editor-video/id587366035?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Canva AI Photo & Video Editor",
+          "trackId": 897446215,
+          "artistName": "Canva",
+          "bundleId": "com.canva.canvaeditor",
+          "version": "4.235.0",
+          "currentVersionReleaseDate": "2026-11-12T22:04:07Z",
+          "minimumOsVersion": "15.4",
+          "trackViewUrl": "https://apps.apple.com/us/app/canva-ai-photo-video-editor/id897446215?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Pinterest",
+          "trackId": 429047995,
+          "artistName": "Pinterest, Inc.",
+          "bundleId": "pinterest",
+          "version": "14.44",
+          "currentVersionReleaseDate": "2026-11-12T16:42:21Z",
+          "minimumOsVersion": "16.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/pinterest/id429047995?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "PicCollage: Magic Photo Editor",
+          "trackId": 448639966,
+          "artistName": "Cardinal Blue",
+          "bundleId": "com.cardinalblue.PicCollage",
+          "version": "8.68.3",
+          "currentVersionReleaseDate": "2026-11-12T02:05:44Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/piccollage-magic-photo-editor/id448639966?uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "mas-search:Perplexity",
+      "url": "https://itunes.apple.com/search?term=Perplexity&entity=software&country=us&limit=4",
+      "observed_at": "2026-11-13T20:44:39.713328+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/search?term=Perplexity&entity=software&country=us&limit=4",
+      "http_date": "Fri, 13 Nov 2026 20:44:40 GMT",
+      "sha256": "2737c59b0954b59cbd3f7817937abbecc6024f1838daf9e933bf7baebf7ad7b2",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "Perplexity: AI Agent & Search",
+          "trackId": 1668000334,
+          "artistName": "Perplexity AI, Inc.",
+          "bundleId": "ai.perplexity.app",
+          "version": "26.45.0",
+          "currentVersionReleaseDate": "2026-11-13T18:11:27Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/perplexity-ai-agent-search/id1668000334?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Claude by Anthropic",
+          "trackId": 6473753684,
+          "artistName": "Anthropic PBC",
+          "bundleId": "com.anthropic.claude",
+          "version": "1.261111.19",
+          "currentVersionReleaseDate": "2026-11-12T08:32:08Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/claude-by-anthropic/id6473753684?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "ChatGPT",
+          "trackId": 6448311069,
+          "artistName": "OpenAI OpCo, LLC",
+          "bundleId": "com.openai.chat",
+          "version": "1.2026.307",
+          "currentVersionReleaseDate": "2026-11-10T17:56:25Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Grok",
+          "trackId": 6670324846,
+          "artistName": "X Corp.",
+          "bundleId": "ai.x.GrokApp",
+          "version": "1.4.65",
+          "currentVersionReleaseDate": "2026-11-12T14:06:46Z",
+          "minimumOsVersion": "17.4",
+          "trackViewUrl": "https://apps.apple.com/us/app/grok/id6670324846?uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "mas-search:CapCut",
+      "url": "https://itunes.apple.com/search?term=CapCut&entity=software&country=us&limit=4",
+      "observed_at": "2026-11-13T20:44:40.254844+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/search?term=CapCut&entity=software&country=us&limit=4",
+      "http_date": "Fri, 13 Nov 2026 20:44:40 GMT",
+      "sha256": "1886bac3a84df212d8ce7bd115c190cebacf47d1b67ffb8986eb67d71ef2f1af",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "CapCut: Photo & Video Editor",
+          "trackId": 1500855883,
+          "artistName": "Bytedance Pte. Ltd",
+          "bundleId": "com.lemon.lvoverseas",
+          "version": "20.1.0",
+          "currentVersionReleaseDate": "2026-11-10T04:32:02Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/capcut-photo-video-editor/id1500855883?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "ChatGPT",
+          "trackId": 6448311069,
+          "artistName": "OpenAI OpCo, LLC",
+          "bundleId": "com.openai.chat",
+          "version": "1.2026.307",
+          "currentVersionReleaseDate": "2026-11-10T17:56:25Z",
+          "minimumOsVersion": "18.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/chatgpt/id6448311069?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "InShot - Video Editor",
+          "trackId": 997362197,
+          "artistName": "SHANTANU PTE. LTD.",
+          "bundleId": "com.camerasideas.InstaShot",
+          "version": "2.1.0",
+          "currentVersionReleaseDate": "2026-11-03T20:19:34Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/inshot-video-editor/id997362197?uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "mas-office-us",
+      "url": "https://itunes.apple.com/lookup?id=586683407,462054704,985367838,462062816,784801555&country=us",
+      "observed_at": "2026-11-13T20:44:40.512715+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/lookup?id=586683407,462054704,985367838,462062816,784801555&country=us",
+      "http_date": "Fri, 13 Nov 2026 20:44:40 GMT",
+      "sha256": "467825cc73c8e6a66e1e4762ceb7ce1aafc982cb0887d119d6c013066cb30a43",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "Microsoft Excel",
+          "trackId": 586683407,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Office.Excel",
+          "version": "2.115.3",
+          "currentVersionReleaseDate": "2026-11-09T05:04:44Z",
+          "minimumOsVersion": "26.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/microsoft-excel/id586683407?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft Word",
+          "trackId": 462054704,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Word",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-11T05:53:19Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/microsoft-word/id462054704?mt=12&uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft Outlook",
+          "trackId": 985367838,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Outlook",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-10T15:52:58Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/microsoft-outlook/id985367838?mt=12&uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft PowerPoint",
+          "trackId": 462062816,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Powerpoint",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-10T15:29:10Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/microsoft-powerpoint/id462062816?mt=12&uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft OneNote",
+          "trackId": 784801555,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.onenote.mac",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-10T15:29:13Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/microsoft-onenote/id784801555?mt=12&uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "mas-office-pl",
+      "url": "https://itunes.apple.com/lookup?id=586683407,462054704,985367838,462062816,784801555&country=pl",
+      "observed_at": "2026-11-13T20:44:40.890717+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/lookup?id=586683407,462054704,985367838,462062816,784801555&country=pl",
+      "http_date": "Fri, 13 Nov 2026 20:44:41 GMT",
+      "sha256": "6bd537bf18b69e480d0664a0202c829fe168b9b8929aac548396a0397b695b2c",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "Microsoft Excel",
+          "trackId": 586683407,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Office.Excel",
+          "version": "2.115.3",
+          "currentVersionReleaseDate": "2026-11-09T05:04:44Z",
+          "minimumOsVersion": "26.0",
+          "trackViewUrl": "https://apps.apple.com/pl/app/microsoft-excel/id586683407?uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft Word",
+          "trackId": 462054704,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Word",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-11T05:53:19Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/pl/app/microsoft-word/id462054704?mt=12&uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft Outlook",
+          "trackId": 985367838,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Outlook",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-10T15:52:58Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/pl/app/microsoft-outlook/id985367838?mt=12&uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft PowerPoint",
+          "trackId": 462062816,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Powerpoint",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-10T15:29:10Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/pl/app/microsoft-powerpoint/id462062816?mt=12&uo=4",
+          "formattedPrice": "Free"
+        },
+        {
+          "trackName": "Microsoft OneNote",
+          "trackId": 784801555,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.onenote.mac",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-10T15:29:13Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/pl/app/microsoft-onenote/id784801555?mt=12&uo=4",
+          "formattedPrice": "Free"
+        }
+      ]
+    },
+    {
+      "key": "codex-docs",
+      "url": "https://developers.openai.com/codex/changelog/",
+      "observed_at": "2026-11-13T20:44:41.240755+00:00",
+      "status": 200,
+      "final_url": "https://learn.chatgpt.com/docs/changelog",
+      "http_date": "Fri, 13 Nov 2026 20:44:41 GMT",
+      "sha256": "f1930cb03204b0172fb99b5595bcc71dbfae4d24b71615749843796764bd6b1e",
+      "title": "\n  ChatGPT &amp; Codex changelog | ChatGPT Learn\n",
+      "excerpt": " (function(){const siteVariantDomains = [{\"id\":\"chatgpt-docs\",\"domains\":[\"learn.chatgpt.com\",\"learn.chatgpt-staging.com\",\"learn-chatgpt-preview.localhost\"]}]; const forcedSiteVariantId = undefined; const siteVariantQueryParam = \"site_variant\"; const chatGptSiteVariant = \"chatgpt\"; const chatGptDocsVariantId = \"chatgpt-docs\"; const developersOpenAiHostname = \"developers.openai.com\"; (() => { const hostname = window.location.hostname.toLowerCase().replace(/\\.$/, \"\"); const queryVariant = hostname "
+    },
+    {
+      "key": "chatgpt-docs",
+      "url": "https://developers.openai.com/apps-sdk/",
+      "observed_at": "2026-11-13T20:44:41.658163+00:00",
+      "status": 200,
+      "final_url": "https://developers.openai.com/plugins",
+      "http_date": "Fri, 13 Nov 2026 20:44:41 GMT",
+      "sha256": "9ab9cc64ecf21c3a9726bf406b98bdaf1f5b84e140fc1ade95aa557fa8d0338d",
+      "title": "\n  Plugin development for ChatGPT and Codex | OpenAI Developers\n",
+      "excerpt": " (function(){const siteVariantDomains = [{\"id\":\"chatgpt-docs\",\"domains\":[\"learn.chatgpt.com\",\"learn.chatgpt-staging.com\",\"learn-chatgpt-preview.localhost\"]}]; const forcedSiteVariantId = undefined; const siteVariantQueryParam = \"site_variant\"; const chatGptSiteVariant = \"chatgpt\"; const chatGptDocsVariantId = \"chatgpt-docs\"; const developersOpenAiHostname = \"developers.openai.com\"; (() => { const hostname = window.location.hostname.toLowerCase().replace(/\\.$/, \"\"); const queryVariant = hostname "
+    },
+    {
+      "key": "chrome-releases",
+      "url": "https://chromereleases.googleblog.com/search/label/Stable%20updates",
+      "observed_at": "2026-11-13T20:44:42.038852+00:00",
+      "status": 200,
+      "final_url": "https://chromereleases.googleblog.com/search/label/Stable%20updates",
+      "http_date": "Fri, 13 Nov 2026 20:44:42 GMT",
+      "sha256": "a0ff7db596b54c44eb92e0597f0152c9056d28f57ae94580eeeb1d8af30ced4f",
+      "title": "\nChrome Releases: Stable updates\n",
+      "excerpt": " Chrome Releases: Stable updates */ .header-outer { border-bottom: 1px solid #e0e0e0; background: #ffffff; } html, .Label h2, #sidebar .rss a, .BlogArchive h2, .FollowByEmail h2.title, .widget .post h2 { font-family: Roboto, sans-serif; } .plusfollowers h2.title, .post h2.title, .widget h2.title { font-family: Roboto, sans-serif; } .widget-item-control { height: 100%; } .widget.Header, #header { position: relative; height: 100%; width: 100%; } } .widget.Header .header-logo1 { float: left; margin"
+    },
+    {
+      "key": "firefox-dev",
+      "url": "https://www.mozilla.org/en-US/firefox/developer/",
+      "observed_at": "2026-11-13T20:44:42.964695+00:00",
+      "status": 200,
+      "final_url": "https://www.firefox.com/en-US/channel/desktop/developer/?redirect_source=mozilla-org",
+      "http_date": "Fri, 13 Nov 2026 20:44:43 GMT",
+      "sha256": "efd54e334849f4fb5b190345689993d3fe597797780541b97c0371586f87abc0",
+      "title": "Firefox Developer Edition \u2014 Firefox.com",
+      "excerpt": " Firefox Developer Edition \u2014 Firefox.com Browser Mobile Enterprise What\u2019s New What\u2019s Next Extensions &amp; Themes Support Download Firefox Features Protection Control Focus About Firefox features View all Firefox Features Resources Data Protection Blog Podcast Newsletter Release Notes Get Firefox Get Firefox Firefox for mobile Get Firefox on your phone Menu Menu Browser Mobile Enterprise What\u2019s New What\u2019s Next Extensions &amp; Themes Support Download Firefox Features Protection Control Focus Abo"
+    },
+    {
+      "key": "mau",
+      "url": "https://learn.microsoft.com/en-us/microsoft-365-apps/mac/update-office-for-mac",
+      "observed_at": "2026-11-13T20:44:43.518010+00:00",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "key": "brave-releases",
+      "url": "https://brave.com/latest/",
+      "observed_at": "2026-11-13T20:44:43.709051+00:00",
+      "status": 200,
+      "final_url": "https://brave.com/latest/",
+      "http_date": "Fri, 13 Nov 2026 20:44:43 GMT",
+      "sha256": "aaae3dbf7575e8e0902171d4d73a38a8c33ebd57cb8d521dfb5ab71d274948e9",
+      "title": "Brave Release Notes | Brave",
+      "excerpt": " Brave Release Notes | Brave :root { --footnotes: \"Footnotes\"; } Yes Dismiss Browser Downloads Desktop Android iOS Features Shields adblocker VPN Privacy features Premium services Brave Origin Browser AI More features Brave vs. other browsers Search Try Brave Search Ask Brave Search features Web Discovery Project Brave vs. other search engines Search API Get started Get API key API features Use cases Sign up Log in Resources Developer docs How-to guides Tools &amp; integrations MCP Server Latest"
+    },
+    {
+      "key": "proton-drive-appcast",
+      "url": "https://proton.me/download/drive/macos/appcast.xml",
+      "observed_at": "2026-11-13T20:44:44.011425+00:00",
+      "status": 200,
+      "final_url": "https://proton.me/download/drive/macos/appcast.xml",
+      "http_date": "Fri, 13 Nov 2026 20:44:44 GMT",
+      "sha256": "a761f08454811f5f54923c6cd2a9ca9d9aecb96c7c05a85fa278a0793786811d",
+      "title": "Proton Drive",
+      "excerpt": " Proton Drive 3.1.1 Mon, 09 Nov 2026 03:02:04 -0800 stable 12919.3 3.1.1 13.0 3.1.0 Mon, 28 Sep 2026 17:36:38 +0100 stable 12778.3 3.1.0 13.0 "
+    },
+    {
+      "key": "mas-mac",
+      "url": "https://itunes.apple.com/lookup?id=462058435,6714467650,1635333298&entity=macSoftware&country=us",
+      "observed_at": "2026-11-13T20:45:25.001416+00:00",
+      "status": 200,
+      "final_url": "https://itunes.apple.com/lookup?id=462058435,6714467650,1635333298&entity=macSoftware&country=us",
+      "http_date": "Fri, 13 Nov 2026 20:45:25 GMT",
+      "sha256": "97a34ab304a67091e614c0e04ae8d5aebafcb61e07ab4d340d818526ac5c7e3d",
+      "title": "",
+      "metadata": [
+        {
+          "trackName": "Microsoft Excel",
+          "trackId": 462058435,
+          "artistName": "Microsoft Corporation",
+          "bundleId": "com.microsoft.Excel",
+          "version": "16.115",
+          "currentVersionReleaseDate": "2026-11-10T15:29:10Z",
+          "minimumOsVersion": "15.0",
+          "trackViewUrl": "https://apps.apple.com/us/app/microsoft-excel/id462058435?mt=12&uo=4"
+        },
+        {
+          "trackName": null,
+          "trackId": null,
+          "artistName": "Lochard",
+          "bundleId": null,
+          "version": null,
+          "currentVersionReleaseDate": null,
+          "minimumOsVersion": null,
+          "trackViewUrl": null
+        }
+      ]
+    },
+    {
+      "key": "opencode-release",
+      "url": "https://api.github.com/repos/anomalyco/opencode/releases/latest",
+      "observed_at": "2026-11-13T20:45:25.333994+00:00",
+      "status": 200,
+      "final_url": "https://api.github.com/repos/anomalyco/opencode/releases/latest",
+      "http_date": "Fri, 13 Nov 2026 20:45:25 GMT",
+      "sha256": "68bfb038f5a69d7d64012cd1ed2ddd2657d17a43af44056d311d145edb041b64",
+      "metadata": {
+        "tag_name": "v1.19.5",
+        "name": "v1.19.5",
+        "prerelease": false,
+        "draft": false,
+        "published_at": "2026-10-28T06:17:49Z",
+        "html_url": "https://github.com/anomalyco/opencode/releases/tag/v1.19.5"
+      }
+    },
+    {
+      "key": "superset-release",
+      "url": "https://api.github.com/repos/paradevai/paradev/releases/latest",
+      "observed_at": "2026-11-13T20:45:25.701877+00:00",
+      "status": 200,
+      "final_url": "https://api.github.com/repos/paradevai/paradev/releases/latest",
+      "http_date": "Fri, 13 Nov 2026 20:45:25 GMT",
+      "sha256": "89572d8c31ab74d6ef90b3fd54c350eaff4154559644e56b361880b7b7f8aa04",
+      "metadata": {
+        "tag_name": "desktop-v2.0.8",
+        "name": "Paradev Desktop desktop-v2.0.8",
+        "prerelease": false,
+        "draft": false,
+        "published_at": "2026-11-10T02:41:37Z",
+        "html_url": "https://github.com/ParadevAI/Paradev/releases/tag/desktop-v2.0.8"
+      }
+    },
+    {
+      "key": "ledger-release",
+      "url": "https://api.github.com/repos/LedgerHQ/ledger-live/releases/latest",
+      "observed_at": "2026-11-13T20:45:26.040290+00:00",
+      "status": 200,
+      "final_url": "https://api.github.com/repos/LedgerHQ/ledger-live/releases/latest",
+      "http_date": "Fri, 13 Nov 2026 20:45:26 GMT",
+      "sha256": "1be3c72daa602735581101d8a10af2f6856104f400386f0e0d85d65b12b638f2",
+      "metadata": {
+        "tag_name": "live-mobile@4.28.0",
+        "name": null,
+        "prerelease": false,
+        "draft": false,
+        "published_at": "2026-11-12T10:21:52Z",
+        "html_url": "https://github.com/LedgerHQ/ledger-live/releases/tag/live-mobile%404.28.0"
+      }
+    },
+    {
+      "key": "protonvpn-download",
+      "url": "https://protonvpn.com/download-macos",
+      "observed_at": "2026-11-13T20:45:26.366859+00:00",
+      "status": 200,
+      "final_url": "https://protonvpn.com/download-macos",
+      "http_date": "Fri, 13 Nov 2026 20:45:26 GMT",
+      "sha256": "517e4062e6ae0056cb924861ac015cd59dd81377101108c6b213dea4d64ba6ef",
+      "title": "",
+      "excerpt": " \ufffd\b\u0000\u0000\u0000\u0000\u0000\u0000\u0003\ufffd\ufffdv\ufffdF\ufffd/\ufffdw\ufffdS\ufffd\ufffd\ufffdn\ufffd \u0002\ufffd \ufffd\ufffd\u024b\u007f>\ufffd\ufffdM\ufffdi\ufffd\ufffd\u0001>Y\ufffd\ufffd\ufffd@\u0013\ufffd\u0192\ufffd\u001ahYSi,\ufffdx]\u000f\ufffd:\ufffd\ufffd,\ufffd\ufffdiQ4\u0013\ufffd\u10c9\ufffd\ufffd\ufffd\u0007S\ufffdp\u0016OxU\ufffdf\ufffd\u035a\ufffd j\ufffdi\u03a7b\ufffd \ufffd\ufffd,\ufffdFcq\ufffd7\"o\u0006\ufffdq\ufffd4\ufffdA\"\ufffd\ufffdX\ufffd\ufffd\ufffd\ufffd\ufffd \ufffd\ufffdZ\ufffd\ufffd \u0ad9\ufffd\ufffd~\ufffd\u0004Yo\ufffd\u0001c\bh\ufffd\ufffd\u05ce\ufffd`\ufffd\u0006'\ufffd\ufffd\ufffd \ufffd\ufffd\u03a8\ufffd5\ufffd\ufffdVH\ufffd\ufffdPG\ufffdDTx~\ufffd\ufffdh\ufffdN\u001a\ufffduv\ufffd\ufffd`W\ufffd\u0743,\ufffd\u07f2Jd\u0003\ufffd\ufffdD\\\u4e48\u001b\ufffdM*1\u001ah\ufffd\ufffd)\ufffd\ufffd] \ufffd\ufffd,o\ufffd\ufffd*\ufffd\"7\ufffdbW\ubf98\ufffd^Vb$\ufffdxr\ufffdW\ufffdo\ufffd\ufffd\ufffd$W\ufffd \ufffd\ufffd\u0011\u0017\u04eb7{\ufffd\ufffde%\ufffd\u0007\ud2fb\ufffd\"o\ufffd\ufffd4oD\ufffd\ufffd5>\u007f\ufffdU\u0287\ufffd0Dn \u0017\ufffd\ufffd\ufffd1^\u000f4\ufffd\ufffdX3/\ufffd\ufffd\ufffd\ufffd\ufffd\u2aa8\ufffdJ\ufffdi>\ufffdx^\ufffd\ufffdi1\ufffd\ufffd\ufffd$\ufffd\ufffd_\ufffd\ufffd\ufffd>\ufffd\ufffd\ufffdc\ufffd\ufffd\u02ccW\u2d9a\ufffd\ufffdy& \ufffd u\ufffd\u0011\ufffd\u0005;e\ufffd\ufffd4\ufffd\ufffd{\ufffd\u0019M\ufffds\ufffd\ufffd\ufffd\ufffd\ufffd^\ufffdcyQMy\ufffd\ufffd P\ufffd \ufffdL\ufffdE\ufffd\ufffd\ufffd&i]f|\ufffd\ufffd\ufffdc^\uecfa\ufffd\ufffd\u062c\ufffdv\ufffd0\ufffd=6\u0002\ufffdfG\ufffd\ufffd\ufffd\ufffd\ufffd3v\ufffdN\ufffd \ufffd\ufffd\ufffd\ufffd;\ufffd\u007fMP\u07fd\ufffd_\ufffd,\u001b\ufffd\ufffd\ufffdu&\ufffd\ufffdG,i\ufffdq\ufffd\ufffd\ufffd\ufffd\ufffd\u0017\ufffd\ufffd\ufffd\ufffdYM\u0015\u077f\ufffd[\ufffd\u0017\ufffd\u066d\ufffd/\ufffdtt\ufffd\ufffd\u06e6\u0242\ufffd.\ufffdUI\ufffdf+\ufffd\ufffd\ufffdS\ufffd\ufffd\ufffd\ufffd\u001aH\ufffd\ufffdyg"
+    },
+    {
+      "key": "gemini-cask",
+      "url": "https://formulae.brew.sh/api/cask/gemini.json",
+      "observed_at": "2026-11-13T20:45:26.524206+00:00",
+      "status": 200,
+      "final_url": "https://formulae.brew.sh/api/cask/gemini.json",
+      "http_date": "Fri, 13 Nov 2026 20:45:26 GMT",
+      "sha256": "75c006ea1d309b239765862c10d52943ecac20083848bacf8e2fe4b2e66cd8e2",
+      "title": "",
+      "excerpt": "{\"token\":\"gemini\",\"full_token\":\"gemini\",\"old_tokens\":[],\"tap\":\"homebrew/cask\",\"name\":[\"Gemini\"],\"desc\":\"Disk space cleaner that finds and deletes duplicated and similar files\",\"homepage\":\"https://macpaw.com/gemini\",\"url\":\"https://dl.devmate.com/com.macpaw.site.Gemini2/406/1781745541/Gemini2-406.zip\",\"url_specs\":{},\"version\":\"2.10.1,406,1781745541\",\"autobump\":true,\"no_autobump_message\":null,\"skip_livecheck\":false,\"installed\":null,\"installed_time\":null,\"bundle_version\":null,\"bundle_short_version\":"
+    },
+    {
+      "key": "mas-mac-search:CapCut",
+      "url": "https://itunes.apple.com/search?term=CapCut&entity=macSoftware&country=us&limit=5",
+      "observed_at": "2026-11-13T20:45:52.554669+00:00",
+      "status": 200,
+      "metadata": [
+        {
+          "trackName": "CapCut: Photo & Video Editor",
+          "trackId": 1500855883,
+          "artistName": "Bytedance Pte. Ltd",
+          "bundleId": "com.lemon.lvoverseas",
+          "version": "20.1.0",
+          "minimumOsVersion": "15.0",
+          "currentVersionReleaseDate": "2026-11-10T04:32:02Z",
+          "trackViewUrl": "https://apps.apple.com/us/app/capcut-photo-video-editor/id1500855883?uo=4"
+        },
+        {
+          "trackName": "Canva AI Photo & Video Editor",
+          "trackId": 897446215,
+          "artistName": "Canva",
+          "bundleId": "com.canva.canvaeditor",
+          "version": "4.235.0",
+          "minimumOsVersion": "15.4",
+          "currentVersionReleaseDate": "2026-11-12T22:04:07Z",
+          "trackViewUrl": "https://apps.apple.com/us/app/canva-ai-photo-video-editor/id897446215?uo=4"
+        },
+        {
+          "trackName": "iMovie",
+          "trackId": 408981434,
+          "artistName": "Apple",
+          "bundleId": "com.apple.iMovieApp",
+          "version": "10.4.5",
+          "minimumOsVersion": "26.6",
+          "currentVersionReleaseDate": "2026-09-29T17:05:01Z",
+          "trackViewUrl": "https://apps.apple.com/us/app/imovie/id408981434?mt=12&uo=4"
+        },
+        {
+          "trackName": "DaVinci Resolve",
+          "trackId": 571213070,
+          "artistName": "Blackmagic Design Inc",
+          "bundleId": "com.blackmagic-design.DaVinciResolveLite",
+          "version": "21.2",
+          "minimumOsVersion": "15.0",
+          "currentVersionReleaseDate": "2026-11-06T10:24:17Z",
+          "trackViewUrl": "https://apps.apple.com/us/app/davinci-resolve/id571213070?mt=12&uo=4"
+        }
+      ]
+    },
+    {
+      "key": "mas-mac-search:Perplexity",
+      "url": "https://itunes.apple.com/search?term=Perplexity&entity=macSoftware&country=us&limit=5",
+      "observed_at": "2026-11-13T20:45:52.865720+00:00",
+      "status": 200,
+      "metadata": [
+        {
+          "trackName": "Perxity: AI Answers",
+          "trackId": 6812282407,
+          "artistName": "Byron Tam",
+          "bundleId": "com.byr.328p36p13x17y",
+          "version": "1.2",
+          "minimumOsVersion": "15.0",
+          "currentVersionReleaseDate": "2026-10-02T17:11:58Z",
+          "trackViewUrl": "https://apps.apple.com/us/app/perxity-ai-answers/id6812282407?mt=12&uo=4"
+        },
+        {
+          "trackName": "Canva AI Photo & Video Editor",
+          "trackId": 897446215,
+          "artistName": "Canva",
+          "bundleId": "com.canva.canvaeditor",
+          "version": "4.235.0",
+          "minimumOsVersion": "15.4",
+          "currentVersionReleaseDate": "2026-11-12T22:04:07Z",
+          "trackViewUrl": "https://apps.apple.com/us/app/canva-ai-photo-video-editor/id897446215?uo=4"
+        }
+      ]
+    },
+    {
+      "key": "cask-source:google-chrome",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/g/google-chrome.rb",
+      "observed_at": "2026-11-13T20:49:21.350598+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://versionhistory.googleapis.com/v1/chrome/platforms/mac/channels/stable/versions/all/releases?filter=endtime%3Dnone,fraction%3D1"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:firefox@developer-edition",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/f/firefox@developer-edition.rb",
+      "observed_at": "2026-11-13T20:49:21.849136+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://product-details.mozilla.org/1.0/firefox_versions.json"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:brave-browser",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/b/brave-browser.rb",
+      "observed_at": "2026-11-13T20:49:22.130592+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://updates.bravesoftware.com/sparkle/Brave-Browser/#{folder}/appcast.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:chatgpt",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/c/chatgpt.rb",
+      "observed_at": "2026-11-13T20:49:22.388233+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://persistent.oaistatic.com/codex-app-prod/appcast#{livecheck_arch}.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:codex-app",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/c/codex-app.rb",
+      "observed_at": "2026-11-13T20:49:22.765564+00:00",
+      "status": 200,
+      "auto_updates": true
+    },
+    {
+      "key": "cask-source:claude",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/c/claude.rb",
+      "observed_at": "2026-11-13T20:49:23.095485+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://downloads.claude.ai/releases/darwin/universal/RELEASES.json"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:comet",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/c/comet.rb",
+      "observed_at": "2026-11-13T20:49:23.482238+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://www.perplexity.ai/rest/browser/update?browser=1.1.1.1&channel=stable&platform=mac_#{arch}&machine=0"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:perplexity",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/p/perplexity.rb",
+      "observed_at": "2026-11-13T20:49:23.791879+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://macos-download.perplexity.ai/appcast.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:antigravity",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/a/antigravity.rb",
+      "observed_at": "2026-11-13T20:49:24.074074+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://antigravity-hub-auto-updater-974169037036.us-central1.run.app/manifest/latest-#{livecheck_arch}-mac.yml?noCache=#{Time.now.to_i}"
+      ],
+      "livecheck_strategies": [
+        "electron_builder"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:antigravity-ide",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/a/antigravity-ide.rb",
+      "observed_at": "2026-11-13T20:49:24.380128+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://antigravity-ide-auto-updater-974169037036.us-central1.run.app/api/update/darwin#{livecheck_arch}/stable/latest"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:lm-studio",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/l/lm-studio.rb",
+      "observed_at": "2026-11-13T20:49:24.715131+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://versions-prod.lmstudio.ai/update/#{os}/#{livecheck_arch}/#{version.csv.first}"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:opencode-desktop",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/o/opencode-desktop.rb",
+      "observed_at": "2026-11-13T20:49:25.085035+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://opencode.ai/update/api/latest/desktop/opencode/latest-mac.yml"
+      ],
+      "livecheck_strategies": [
+        "electron_builder"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:cursor",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/c/cursor.rb",
+      "observed_at": "2026-11-13T20:49:25.399565+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://api2.cursor.sh/updates/api/update/#{os}-#{arch}/cursor/0.0.0/stable"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:obsidian",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/o/obsidian.rb",
+      "observed_at": "2026-11-13T20:49:25.664146+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/desktop-releases.json"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:protonvpn",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/p/protonvpn.rb",
+      "observed_at": "2026-11-13T20:49:25.993790+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://protonvpn.com/download/macos/updates/v5/sparkle.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:keepassxc",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/k/keepassxc.rb",
+      "observed_at": "2026-11-13T20:49:26.278327+00:00",
+      "status": 200,
+      "auto_updates": false,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [
+        "github_latest"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:proton-mail",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/p/proton-mail.rb",
+      "observed_at": "2026-11-13T20:49:26.546988+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://proton.me/download/mail/macos/version.json"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:zoom",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/z/zoom.rb",
+      "observed_at": "2026-11-13T20:49:26.951283+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://www.zoom.us/client/latest/zoomusInstallerFull.pkg#{livecheck_folder}"
+      ],
+      "livecheck_strategies": [
+        "header_match"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:google-drive",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/g/google-drive.rb",
+      "observed_at": "2026-11-13T20:49:27.240234+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [
+        "extract_plist"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:megasync",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/m/megasync.rb",
+      "observed_at": "2026-11-13T20:49:27.638599+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://github.com/meganz/MEGAsync"
+      ],
+      "livecheck_strategies": [],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:proton-drive",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/p/proton-drive.rb",
+      "observed_at": "2026-11-13T20:49:27.927328+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://proton.me/download/drive/macos/appcast.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:microsoft-excel",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/m/microsoft-excel.rb",
+      "observed_at": "2026-11-13T20:49:28.280333+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:microsoft-word",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/m/microsoft-word.rb",
+      "observed_at": "2026-11-13T20:49:28.598843+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:microsoft-outlook",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/m/microsoft-outlook.rb",
+      "observed_at": "2026-11-13T20:49:28.910017+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:microsoft-powerpoint",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/m/microsoft-powerpoint.rb",
+      "observed_at": "2026-11-13T20:49:29.578177+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:microsoft-onenote",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/m/microsoft-onenote.rb",
+      "observed_at": "2026-11-13T20:49:30.001693+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:microsoft-teams",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/m/microsoft-teams.rb",
+      "observed_at": "2026-11-13T20:49:30.410673+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://config.teams.microsoft.com/config/v1/MicrosoftTeams/#{version}?environment=prod&audienceGroup=general&teamsRing=general&agent=TeamsBuilds"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:visual-studio-code",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/v/visual-studio-code.rb",
+      "observed_at": "2026-11-13T20:49:30.769810+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:warp",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/w/warp.rb",
+      "observed_at": "2026-11-13T20:49:31.125279+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://releases.warp.dev/channel_versions.json"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:codeedit",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/c/codeedit.rb",
+      "observed_at": "2026-11-13T20:49:31.410920+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [
+        "github_latest"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:docker-desktop",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/d/docker-desktop.rb",
+      "observed_at": "2026-11-13T20:49:31.732703+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://desktop.docker.com/mac/main/#{arch}/appcast.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:appcleaner",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/a/appcleaner.rb",
+      "observed_at": "2026-11-13T20:49:32.059376+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://freemacsoft.net/appcleaner/Updates.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:spotify",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/s/spotify.rb",
+      "observed_at": "2026-11-13T20:49:32.322300+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [],
+      "livecheck_strategies": [
+        "extract_plist"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:capcut",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/c/capcut.rb",
+      "observed_at": "2026-11-13T20:49:32.584725+00:00",
+      "status": 200,
+      "auto_updates": false,
+      "livecheck_urls_as_ruby_templates": [
+        "https://editor-api-sg.capcutapi.com/service/settings/v3/?aid=359289&device_platform=mac&channel=capcutpc_0&version_code=1&os_version=26.4&region=GB&traffic_type=release"
+      ],
+      "livecheck_strategies": [
+        "json"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:ledger-wallet",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/l/ledger-wallet.rb",
+      "observed_at": "2026-11-13T20:49:32.860707+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://download.live.ledger.com/latest-mac.yml"
+      ],
+      "livecheck_strategies": [
+        "electron_builder"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:trezor-suite",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/t/trezor-suite.rb",
+      "observed_at": "2026-11-13T20:49:33.198423+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://data.trezor.io/suite/releases/desktop/latest/latest-mac.yml"
+      ],
+      "livecheck_strategies": [
+        "electron_builder"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:remote-desktop-manager",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/r/remote-desktop-manager.rb",
+      "observed_at": "2026-11-13T20:49:33.477096+00:00",
+      "status": 200,
+      "auto_updates": true,
+      "livecheck_urls_as_ruby_templates": [
+        "https://cdn.devolutions.net/download/Mac/RemoteDesktopManager.xml"
+      ],
+      "livecheck_strategies": [
+        "sparkle"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    },
+    {
+      "key": "cask-source:inkscape",
+      "url": "https://raw.githubusercontent.com/Homebrew/homebrew-cask/master/Casks/i/inkscape.rb",
+      "observed_at": "2026-11-13T20:49:33.803698+00:00",
+      "status": 200,
+      "auto_updates": false,
+      "livecheck_urls_as_ruby_templates": [
+        "https://inkscape.org/release/all/#{livecheck_folder}/"
+      ],
+      "livecheck_strategies": [
+        "page_match"
+      ],
+      "note": "Static source only. Templates not executed; endpoints not independently probed in this pass."
+    }
+  ]
+}

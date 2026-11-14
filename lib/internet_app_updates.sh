@@ -1,0 +1,2704 @@
+#!/usr/bin/env bash
+# lib/internet_app_updates.sh — per-app update handlers (sourced by update_internet_apps.sh)
+# Requires: helpers from update_internet_apps.sh (print_*, app_version, silent_launch_app, etc.)
+
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$_LIB_DIR/version.sh" ]; then
+    . "$_LIB_DIR/version.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/version.sh" ]; then
+    . "$SCRIPT_DIR/lib/version.sh"
+fi
+if [ -f "$_LIB_DIR/vendor_feeds.sh" ]; then
+    . "$_LIB_DIR/vendor_feeds.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/vendor_feeds.sh" ]; then
+    . "$SCRIPT_DIR/lib/vendor_feeds.sh"
+fi
+if [ -f "$_LIB_DIR/proc.sh" ]; then
+    . "$_LIB_DIR/proc.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/proc.sh" ]; then
+    . "$SCRIPT_DIR/lib/proc.sh"
+fi
+if [ -f "$_LIB_DIR/brew.sh" ]; then
+    . "$_LIB_DIR/brew.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/brew.sh" ]; then
+    . "$SCRIPT_DIR/lib/brew.sh"
+fi
+if [ -f "$_LIB_DIR/internet_handlers.sh" ]; then
+    . "$_LIB_DIR/internet_handlers.sh"
+elif [ -n "${SCRIPT_DIR:-}" ] && [ -f "$SCRIPT_DIR/lib/internet_handlers.sh" ]; then
+    . "$SCRIPT_DIR/lib/internet_handlers.sh"
+fi
+
+GOOGLE_KEYSTONE_RAN=0
+GOOGLE_KEYSTONE_EXIT=1
+GOOGLE_KEYSTONE_USER_INIT=0
+GOOGLE_KEYSTONE_SYS_INIT=0
+GOOGLE_KEYSTONE_DEADLINE=0
+GOOGLE_OMAHA_INC=""
+MAU_TEAMS21_VERIFIED=0
+MAU_TEAMS21_OFFERED=0
+MAU_LISTED=0
+google_keystone_check() {
+    local agent="$1"
+    local appid="${2:-}"
+
+    local user_log="$HOME/Library/Application Support/Google/GoogleUpdater/updater.log"
+    local sys_log="/Library/Application Support/Google/GoogleUpdater/updater.log"
+    local user_init=0 sys_init=0 deadline=0
+
+    local init_file=""
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        init_file="$MAC_UPDATE_SESSION_DIR/google_omaha_init.txt"
+    fi
+
+    if [ -n "$init_file" ] && [ -f "$init_file" ]; then
+        read -r user_init sys_init deadline < "$init_file" 2>/dev/null || { user_init=0; sys_init=0; deadline=0; }
+    elif [ -z "$init_file" ] && [ "$GOOGLE_KEYSTONE_RAN" -eq 1 ]; then
+        if [ "$GOOGLE_KEYSTONE_EXIT" -ne 0 ]; then
+            return "$GOOGLE_KEYSTONE_EXIT"
+        fi
+        user_init="$GOOGLE_KEYSTONE_USER_INIT"
+        sys_init="$GOOGLE_KEYSTONE_SYS_INIT"
+        deadline="$GOOGLE_KEYSTONE_DEADLINE"
+    else
+        local wait_limit="${MAC_UPDATE_OMAHA_WAIT:-45}"
+        case "$wait_limit" in ''|*[!0-9]*) wait_limit=45 ;; esac
+        [ "$wait_limit" -lt 0 ] && wait_limit=0
+        [ "$wait_limit" -gt 180 ] && wait_limit=180
+        deadline=$(( $(date +%s) + wait_limit ))
+
+        [ -f "$user_log" ] && user_init=$(wc -c < "$user_log" 2>/dev/null | tr -d ' ' || echo 0)
+        [ -f "$sys_log" ] && sys_init=$(wc -c < "$sys_log" 2>/dev/null | tr -d ' ' || echo 0)
+
+        local triggered=0
+        local output=""
+
+        local user_updater="${MAC_UPDATE_GOOGLE_USER_UPDATER-$HOME/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater}"
+        local sys_updater="${MAC_UPDATE_GOOGLE_SYS_UPDATER-/Library/Application Support/Google/GoogleUpdater/Current/GoogleUpdater.app/Contents/MacOS/GoogleUpdater}"
+        local updater_timeout=60
+
+        if [ -x "$user_updater" ]; then
+            output=$(run_with_timeout "$updater_timeout" "$user_updater" --wake-all 2>&1)
+            GOOGLE_KEYSTONE_EXIT=$?
+            [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+        fi
+        # Google Drive (com.google.drivefs) is registered ONLY with the system-scope
+        # GoogleUpdater. Waking the user scope never re-checks it, and a binary run
+        # without --system acts in user scope even when it is the system install.
+        # On 2026-11-08 the last scheduled system check was 14 h old (the Mac slept),
+        # the user-scope wake produced nothing for Drive, and it was reported
+        # "updater triggered (no response)". Wake the system scope as well; it is the
+        # same --wake-all --system the vendor's own LaunchDaemon runs.
+        if [ -x "$sys_updater" ]; then
+            local sys_out sys_rc
+            sys_out=$(run_with_timeout "$updater_timeout" "$sys_updater" --wake-all --system 2>&1)
+            sys_rc=$?
+            command -v internet_diag_log >/dev/null 2>&1 && \
+                internet_diag_log "GoogleUpdater system-scope wake (--wake-all --system): exit=$sys_rc"
+            if [ "$triggered" -eq 0 ]; then
+                output="$sys_out"
+                GOOGLE_KEYSTONE_EXIT=$sys_rc
+                [ "$sys_rc" -eq 0 ] && triggered=1
+            fi
+        fi
+        if [ ! -x "$user_updater" ] && [ ! -x "$sys_updater" ]; then
+            if [ -n "$agent" ] && [ -f "$agent" ]; then
+                output=$(run_with_timeout "$updater_timeout" "$agent" --runMode ondemand 2>&1)
+                GOOGLE_KEYSTONE_EXIT=$?
+                [ "$GOOGLE_KEYSTONE_EXIT" -eq 0 ] && triggered=1
+            fi
+        fi
+
+        if [ "$triggered" -eq 0 ]; then
+            GOOGLE_KEYSTONE_RAN=1
+            internet_diag_log "ERROR: Google Keystone check failed (exit=$GOOGLE_KEYSTONE_EXIT)"
+            [ -n "$output" ] && printf '%s\n' "$output" | tail -n 20
+            return "$GOOGLE_KEYSTONE_EXIT"
+        fi
+
+        GOOGLE_KEYSTONE_RAN=1
+        GOOGLE_KEYSTONE_USER_INIT="$user_init"
+        GOOGLE_KEYSTONE_SYS_INIT="$sys_init"
+        GOOGLE_KEYSTONE_DEADLINE="$deadline"
+
+        if [ -n "$init_file" ]; then
+            printf '%s %s %s\n' "$user_init" "$sys_init" "$deadline" > "$init_file"
+        fi
+    fi
+
+    local combined_inc=""
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        local u_inc="" s_inc=""
+        u_inc=$(omaha_read_increment "$user_log" "$user_init")
+        s_inc=$(omaha_read_increment "$sys_log" "$sys_init")
+        combined_inc="${u_inc}${s_inc}"
+        if [ -n "$appid" ]; then
+            local omaha_st=""
+            omaha_st=$(printf '%s\n' "$combined_inc" | PYTHONPATH="$_LIB_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import omaha_last_status
+log = sys.stdin.read()
+appid = sys.argv[1]
+res = omaha_last_status(log, appid)
+print(res if res else "")
+' "$appid" 2>/dev/null || true)
+            if [ -n "$omaha_st" ]; then
+                break
+            fi
+        elif echo "$combined_inc" | grep -E -q '"updatecheck"\s*:\s*\{"status"' 2>/dev/null; then
+            break
+        fi
+        local now=$(date +%s)
+        [ "$now" -ge "$deadline" ] && break
+        local sleep_dur=3
+        [ $(( deadline - now )) -lt 3 ] && sleep_dur=$(( deadline - now ))
+        [ "$sleep_dur" -gt 0 ] && sleep "$sleep_dur"
+    done
+
+    local u_inc="" s_inc=""
+    u_inc=$(omaha_read_increment "$user_log" "$user_init")
+    s_inc=$(omaha_read_increment "$sys_log" "$sys_init")
+    GOOGLE_OMAHA_INC="${u_inc}${s_inc}"
+
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        printf '%s\n' "$GOOGLE_OMAHA_INC" >> "$MAC_UPDATE_SESSION_DIR/chromium_updater_log.txt"
+    fi
+
+    return 0
+}
+
+iu_google_chrome() {
+    print_header "🟡 Google Chrome"
+    if [ -d "/Applications/Google Chrome.app" ]; then
+        VER=$(app_version "/Applications/Google Chrome.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
+        local vh_json=""
+        vh_json="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 "$vh_url" 2>/dev/null || true)"
+        local pub_ver=""
+        if [ -n "$vh_json" ]; then
+            pub_ver="$(printf '%s\n' "$vh_json" | PYTHONPATH="$_LIB_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import version_history_public
+print(version_history_public(sys.stdin.read()) or "")
+' 2>/dev/null || true)"
+        fi
+        local vh_rel=""
+        [ -n "$pub_ver" ] && vh_rel="$(version_cmp "$VER" "$pub_ver")"
+        if [ "$vh_rel" = "equal" ] || [ "$vh_rel" = "newer" ]; then
+            STATUS_CHROME="$(printf "$L_INTERNET_STATUS_CURRENT_FMT" "$VER, Google VersionHistory")"
+            print_ok "${STATUS_CHROME#✅ }"
+            return 0
+        fi
+
+        KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
+        if google_keystone_check "$KEYSTONE_AGENT" "com.google.chrome"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Chrome")"
+            evaluate_omaha_status "Google Chrome" "/Applications/Google Chrome.app" "$GOOGLE_OMAHA_INC" "com.google.chrome"
+            STATUS_CHROME="$INTERNET_LAST_STATUS"
+        else
+            print_warn "$(printf "$L_INTERNET_KEYSTONE_CHECK_FAILED_FMT" "Chrome")"
+            STATUS_CHROME="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Chrome")"
+    fi
+
+    # ── 2. FIREFOX DEVELOPER EDITION ──────────────────────────────
+}
+
+iu_firefox_developer_edition() {
+    print_header "🦊 Firefox Developer Edition"
+    if [ -d "/Applications/Firefox Developer Edition.app" ]; then
+        VER=$(firefox_dev_version)
+        if [ "$VER" = "?" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Firefox Developer Edition version")"
+            STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            return 0
+        fi
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        LATEST_FF=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 2 \
+            "https://product-details.mozilla.org/1.0/firefox_versions.json" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('FIREFOX_DEVEDITION','?'))" \
+            2>/dev/null || echo "?")
+
+        # Normalizuj wersję API: usuń sufiks beta np. "150.0b5" → "150.0"
+        # CFBundleShortVersionString i application.ini przechowują wersję bazową bez sufiksu,
+        # a Mozilla API zwraca pełną wersję z sufiksem (np. "150.0b5").
+        # Porównujemy wersje bazowe, żeby uniknąć ciągłego pobierania tej samej wersji.
+        LATEST_FF_BASE=$(echo "$LATEST_FF" | sed 's/b[0-9]*$//')
+        FF_RELATION="$(internet_version_relation "$LATEST_FF_BASE" "$VER")"
+
+        if [ "$LATEST_FF" = "?" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "Mozilla API")"
+            if silent_launch_app "Firefox Developer Edition"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$L_INTERNET_HINT_FIREFOX")"
+                STATUS_FIREFOX="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_FIREFOX="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        elif [ "$FF_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Firefox Developer Edition version")"
+            STATUS_FIREFOX="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$FF_RELATION" = "current" ]; then
+            # Equal or local ahead (e.g. local=150.0.1, remote=150.0b5).
+            FF_VER_DISPLAY="$VER (kanał $LATEST_FF)"
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
+            STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$LATEST_FF")"
+        elif internet_defer_running_app "/Applications/Firefox Developer Edition.app" STATUS_FIREFOX "$VER" "$LATEST_FF"; then
+            :
+        else
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_FF" "$VER")"
+            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_APPLE_SILICON" "Firefox Developer Edition" "$LATEST_FF")"
+            FF_URL="https://download.mozilla.org/?product=firefox-devedition-latest&os=osx&lang=pl"
+            TEMP_DMG="$(make_temp_dmg Firefox_DevEd)"
+            if fetch_reviewed_artifact "$FF_URL" "$TEMP_DMG" 180 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
+                FF_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$FF_MOUNT" ]; then
+                    if [ -d "$FF_MOUNT/Firefox Developer Edition.app" ]; then
+                        FF_SOURCE_VER=$(app_version "$FF_MOUNT/Firefox Developer Edition.app")
+                        if [ "$(internet_version_relation "$FF_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer Firefox payload: $FF_SOURCE_VER (installed: $VER)"
+                            STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$FF_MOUNT/Firefox Developer Edition.app" "/Applications/Firefox Developer Edition.app" "${MAC_UPDATE_ACTION_ID:-}"; then
+                            NEW_VER=$(firefox_dev_version)
+                            FF_VER_DISPLAY="$NEW_VER (kanał $LATEST_FF)"
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Firefox Developer Edition" "$FF_VER_DISPLAY")"
+                            STATUS_FIREFOX="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                        else
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_FIREFOX="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_FF:-?}")"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_VERIFIED_FAILED" "Firefox Developer Edition")"
+                                STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
+                        fi
+                    else
+                        print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "Firefox Developer Edition")"
+                        STATUS_FIREFOX="$L_INTERNET_STATUS_INSTALL_ERROR"
+                    fi
+                    detach_verified_dmg "$FF_MOUNT" || true
+                else
+                    print_warn "$L_INTERNET_MOUNT_DMG_MANUAL"
+                    STATUS_FIREFOX="$L_INTERNET_STATUS_MOUNT_ERROR"
+                fi
+                rm -f "$TEMP_DMG"
+            else
+                print_warn "$L_INTERNET_DOWNLOAD_VERIFY_FAILED"
+                print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://www.mozilla.org/pl/firefox/developer/")"
+                STATUS_FIREFOX="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                rm -f "$TEMP_DMG" 2>/dev/null || true
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Firefox Developer Edition")"
+    fi
+
+    # ── 3. (Opera removed — no longer installed) ─────────────────
+
+
+    # ── 4. BRAVE BROWSER ──────────────────────────────────────────
+}
+
+iu_brave_browser() {
+    internet_dispatch_silent_launch "🦁 Brave Browser" "Brave Browser" "STATUS_BRAVE" "Brave Browser" "$L_INTERNET_HINT_BRAVE"
+}
+
+iu_chatgpt() {
+    print_header "🤖 ChatGPT / Codex (OpenAI)"
+    OPENAI_APP="$(internet_app_path "ChatGPT / Codex" 2>/dev/null || true)"
+    if [ -n "$OPENAI_APP" ] && [ -d "$OPENAI_APP" ]; then
+        internet_handler_vendor_truth "ChatGPT / Codex" "$OPENAI_APP" "$OPENAI_APP"
+        internet_handler_set_status STATUS_CHATGPT "$INTERNET_LAST_STATUS"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "ChatGPT / Codex (com.openai.codex)")"
+    fi
+
+    # ── 6. CLAUDE (aplikacja desktopowa) ──────────────────────────
+}
+
+iu_claude() {
+    internet_dispatch_silent_launch "🟣 Claude" "Claude" "STATUS_CLAUDE_APP" "Claude" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "Claude")"
+}
+
+# Comet is Perplexity's Chromium browser and ships its own updater — it is NOT
+# a Google product, so the Google Keystone agent it used to run could never
+# update it. That path still reported "✅ Checked via CLI", which hid a
+# genuinely unverified app. It now goes through the opportunistic
+# silent_launch path: verified when Comet exposes a feed, honestly
+# "⏳ Launched (unverified)" when it does not.
+iu_comet() {
+    print_header "☄️  Comet (Perplexity AI)"
+    local app_path="/Applications/Comet.app"
+    [ -d "$app_path" ] || app_path="$(capture_app_path "Comet")"
+    if [ -n "$app_path" ] && [ -d "$app_path" ]; then
+        local ver; ver="$(app_version "$app_path")"
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+        local bin="$HOME/Library/Application Support/Perplexity/CometUpdater/Current/CometUpdater.app/Contents/MacOS/CometUpdater"
+        local log="$HOME/Library/Application Support/Perplexity/CometUpdater/updater.log"
+        if [ -x "$bin" ]; then
+            internet_handler_chromium_updater "Comet" "$app_path" "$bin" "$log" "ai.perplexity.comet"
+            STATUS_COMET="$INTERNET_LAST_STATUS"
+        else
+            internet_dispatch_silent_launch "☄️  Comet (Perplexity AI)" "Comet" "STATUS_COMET" "Comet" "$L_INTERNET_HINT_COMET"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Comet")"
+    fi
+}
+
+iu_antigravity() {
+    internet_dispatch_silent_launch "🪐 Antigravity" "Antigravity" "STATUS_ANTIGRAVITY" "Antigravity" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity")"
+}
+
+iu_antigravity_ide() {
+    internet_dispatch_silent_launch "🪐 Antigravity IDE" "Antigravity IDE" "STATUS_ANTIGRAVITY_IDE" "Antigravity IDE" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Antigravity IDE")"
+}
+
+iu_gemini() {
+    print_header "✨ Gemini"
+    local app_path="/Applications/Gemini.app"
+    [ -d "$app_path" ] || app_path="$(capture_app_path "Gemini")"
+    if [ -n "$app_path" ] && [ -d "$app_path" ]; then
+        local ver; ver="$(app_version "$app_path")"
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+        # Check before action: a recent scheduled GoogleUpdater check for this
+        # exact build proves "current" without waking the updater.
+        if omaha_history_proof "com.google.geminimacos" "$app_path" "$(google_updater_logs | sed -n 1p)" "$(google_updater_logs | sed -n 2p)"; then
+            print_ok "${INTERNET_LAST_STATUS#✅ }"
+            STATUS_GEMINI="$INTERNET_LAST_STATUS"
+            return 0
+        fi
+        KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
+        if google_keystone_check "$KEYSTONE_AGENT" "com.google.geminimacos"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Gemini")"
+            evaluate_omaha_status "Gemini" "$app_path" "$GOOGLE_OMAHA_INC" "com.google.geminimacos"
+            STATUS_GEMINI="$INTERNET_LAST_STATUS"
+        else
+            print_warn "$(printf "$L_INTERNET_KEYSTONE_CHECK_FAILED_FMT" "Gemini")"
+            STATUS_GEMINI="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Gemini")"
+    fi
+}
+
+iu_lm_studio() {
+    internet_dispatch_silent_launch "🧠 LM Studio" "LM Studio" "STATUS_LMSTUDIO" "LM Studio" "LM Studio → menu → Check for updates"
+}
+
+    # ── 10. PERPLEXITY DESKTOP ────────────────────────────────────
+
+iu_perplexity_desktop() {
+    print_header "🔍 Perplexity Desktop"
+    # Perplexity Desktop — bezpośrednie pobranie z perplexity.ai (bundle: ai.perplexity.mac)
+    # Uwaga: wersja z App Store (mas) jest obsługiwana przez update_appstore.sh
+    if [ -d "/Applications/Perplexity.app" ]; then
+        VER=$(app_version "/Applications/Perplexity.app")
+        BUNDLE_ID=$(defaults read "/Applications/Perplexity.app/Contents/Info" CFBundleIdentifier 2>/dev/null || echo "?")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "bundle: $BUNDLE_ID")"
+        if echo "$BUNDLE_ID" | grep -q "perplexity"; then
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Perplexity")"
+            if silent_launch_app "Perplexity"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Perplexity → Perplexity → Check for updates")"
+                print_info "Strona pobierania: https://www.perplexity.ai/platforms"
+                STATUS_PERPLEXITY="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_PERPLEXITY="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        else
+            print_info "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Perplexity")"
+            STATUS_PERPLEXITY="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Perplexity Desktop")"
+        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://www.perplexity.ai/platforms (lub przez App Store)")"
+    fi
+
+    # ── 11b. OPENCODE DESKTOP (SST/opencode) ──────────────────────
+}
+
+iu_opencode_desktop() {
+    print_header "🤖 OpenCode Desktop"
+    # OpenCode — agent kodowania AI (SST), dostępny jako CLI (npm) i Desktop app
+    # Strona: https://opencode.ai | GitHub: sst/opencode
+    # Uwaga: npm package `opencode-ai` dostarcza CLI `opencode` (brak .app)
+    #        Desktop App: pobierz z https://opencode.ai/download
+    OPENCODE_APP_PATH="$(internet_app_path "OpenCode" 2>/dev/null || true)"
+    if [ -z "$OPENCODE_APP_PATH" ] || [ ! -d "$OPENCODE_APP_PATH" ]; then
+        OPENCODE_APP_PATH=""
+        for _oc_path in "/Applications/OpenCode.app" "${HOME}/Applications/OpenCode.app" \
+                        "/Applications/opencode.app" "${HOME}/Applications/opencode.app" \
+                        "/Applications/Opencode.app" "${HOME}/Applications/Opencode.app" \
+                        "/Applications/opencode Desktop.app" "${HOME}/Applications/opencode Desktop.app"; do
+            if [ -d "$_oc_path" ]; then
+                OPENCODE_APP_PATH="$_oc_path"
+                break
+            fi
+        done
+    fi
+    if [ -n "$OPENCODE_APP_PATH" ] && [ -d "$OPENCODE_APP_PATH" ]; then
+        VER=$(app_version "$OPENCODE_APP_PATH")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "$OPENCODE_APP_PATH")"
+        internet_handler_vendor_truth "OpenCode" "$OPENCODE_APP_PATH" "$OPENCODE_APP_PATH"
+        STATUS_OPENCODE="$INTERNET_LAST_STATUS"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED_AS_APP" "OpenCode Desktop")"
+        print_info "$(internet_msg "$L_INTERNET_CLI_MANAGED_SEPARATE" "opencode")"
+        print_info "Desktop App: pobierz z https://opencode.ai"
+        STATUS_OPENCODE="$L_INTERNET_STATUS_NO_DESKTOP_APP"
+    fi
+}
+
+    # ============================================================
+    # ██ SEKCJA 3: VPN I BEZPIECZEŃSTWO
+    # ============================================================
+
+    # ── 12. PROTONVPN ─────────────────────────────────────────────
+
+iu_protonvpn() {
+    internet_dispatch_silent_launch "🛡️  ProtonVPN" "ProtonVPN" "STATUS_PROTONVPN" "ProtonVPN" "ProtonVPN → Check for updates"
+}
+
+    # ── 13. KEEPASSXC (GitHub API + DMG arm64) ────────────────────
+
+# keepassxc_digest_ok FILE URL ASSET — the publisher's sha256 (<URL>.DIGEST)
+# must match the download; a missing or unparseable digest refuses the install.
+keepassxc_digest_ok() {
+    local file="$1" url="$2" asset="$3" digest_text expected actual
+    digest_text="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 2 "${url}.DIGEST" 2>/dev/null)" || digest_text=""
+    expected="$(printf '%s\n' "$digest_text" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import digest_for
+print(digest_for(sys.stdin.read(), sys.argv[1]) or "")
+' "$asset" 2>/dev/null)"
+    actual="$(shasum -a 256 "$file" 2>/dev/null | awk '{print $1}')"
+    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+        print_warn "$(internet_msg "$L_INTERNET_DIGEST_MISMATCH_FMT" "$asset")"
+        return 1
+    fi
+    return 0
+}
+
+iu_keepassxc() {
+    print_header "🔑 KeePassXC"
+    KPX_REBUILD=""
+    if [ -d "/Applications/KeePassXC.app" ]; then
+        VER=$(app_version "/Applications/KeePassXC.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        LATEST_KPX_TAG=$(github_latest_tag "keepassxreboot/keepassxc")
+        LATEST_KPX=$(echo "$LATEST_KPX_TAG" | sed 's/^v//')
+        [ "$LATEST_KPX" = "?" ] || github_lookup_record "KeePassXC" "$LATEST_KPX"
+        KPX_RELATION="$(internet_version_relation "$LATEST_KPX" "$VER")"
+        # Arch detection for DMG URL with safe fallback
+        KPX_UNAME="$(uname -m 2>/dev/null || echo "arm64")"
+        KPX_ARCH="x86_64"
+        [ "$KPX_UNAME" = "arm64" ] && KPX_ARCH="arm64"
+        if [ "$KPX_RELATION" = "current" ]; then
+            KPX_REBUILD="$(github_rebuild_asset "keepassxreboot/keepassxc" "$LATEST_KPX_TAG" "KeePassXC" "$LATEST_KPX" "$KPX_ARCH" "/Applications/KeePassXC.app")"
+        fi
+
+        if [ "$LATEST_KPX" = "?" ] && github_lookup_handled "KeePassXC" "$VER"; then
+            STATUS_KEEPASSXC="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_KPX" = "?" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
+            if silent_launch_app "KeePassXC"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "KeePassXC → Check for updates")"
+                STATUS_KEEPASSXC="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_KEEPASSXC="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        elif [ "$KPX_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "KeePassXC version")"
+            STATUS_KEEPASSXC="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$KPX_RELATION" = "current" ] && [ -z "$KPX_REBUILD" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "KeePassXC" "$VER (remote: $LATEST_KPX)")"
+            STATUS_KEEPASSXC="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/KeePassXC.app" STATUS_KEEPASSXC "$VER" "${LATEST_KPX}${KPX_REBUILD:+ (rebuild)}"; then
+            :
+        else
+            # Either a newer version, or a same-version rebuild published after
+            # this bundle was installed (2.8.0-1: Qt fix for the macOS 27.2
+            # unlock crash). The rebuild keeps the version, so only that case
+            # may install an equal version.
+            KPX_ASSET="KeePassXC-${LATEST_KPX}-${KPX_ARCH}.dmg"
+            KPX_TARGET_LABEL="$LATEST_KPX"
+            if [ "$KPX_RELATION" = "current" ] && [ -n "$KPX_REBUILD" ]; then
+                KPX_ASSET="$KPX_REBUILD"
+                KPX_TARGET_LABEL="${KPX_REBUILD#KeePassXC-}"
+                KPX_TARGET_LABEL="${KPX_TARGET_LABEL%-"$KPX_ARCH".dmg}"
+                print_warn "$(internet_msg "$L_INTERNET_KEEPASSXC_REBUILD_FMT" "$KPX_TARGET_LABEL" "$VER")"
+            else
+                print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_KPX" "$VER")"
+            fi
+            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "KeePassXC" "$KPX_TARGET_LABEL ($KPX_ARCH)")"
+            KPX_URL="https://github.com/keepassxreboot/keepassxc/releases/download/${LATEST_KPX_TAG}/${KPX_ASSET}"
+            TEMP_DMG="$(make_temp_dmg KeePassXC)"
+            if fetch_reviewed_artifact "$KPX_URL" "$TEMP_DMG" 180 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg \
+                && keepassxc_digest_ok "$TEMP_DMG" "$KPX_URL" "$KPX_ASSET"; then
+                KPX_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$KPX_MOUNT" ]; then
+                    if [ -d "$KPX_MOUNT/KeePassXC.app" ]; then
+                        KPX_SOURCE_VER=$(app_version "$KPX_MOUNT/KeePassXC.app")
+                        KPX_SOURCE_REL="$(internet_version_relation "$KPX_SOURCE_VER" "$VER")"
+                        KPX_ACCEPT=0
+                        [ "$KPX_SOURCE_REL" = "newer" ] && KPX_ACCEPT=1
+                        if [ -n "$KPX_REBUILD" ] && [ "$KPX_SOURCE_VER" = "$VER" ]; then
+                            KPX_ACCEPT=1
+                        fi
+                        if [ "$KPX_ACCEPT" -ne 1 ]; then
+                            print_warn "Refusing non-newer KeePassXC payload: $KPX_SOURCE_VER (installed: $VER)"
+                            STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$KPX_MOUNT/KeePassXC.app" "/Applications/KeePassXC.app" "${MAC_UPDATE_ACTION_ID:-}"; then
+                            print_ok "$(internet_msg "$L_INTERNET_APP_COPIED" "KeePassXC")"
+                            NEW_VER=$(app_version "/Applications/KeePassXC.app")
+                            KPX_REVISION="${KPX_ASSET#KeePassXC-"$KPX_SOURCE_VER"-}"
+                            KPX_REVISION="${KPX_REVISION%-"$KPX_ARCH".dmg}"
+                            case "$KPX_REVISION" in ''|*[!0-9]*) KPX_REVISION=0 ;; esac
+                            package_revision_record "KeePassXC" "$KPX_SOURCE_VER" "$KPX_REVISION" || true
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "KeePassXC" "$NEW_VER")"
+                            STATUS_KEEPASSXC="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                        else
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_KEEPASSXC="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_KPX:-?}")"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "KeePassXC")"
+                                STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
+                        fi
+                    else
+                        print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "KeePassXC")"
+                        STATUS_KEEPASSXC="$L_INTERNET_STATUS_INSTALL_ERROR"
+                    fi
+                    detach_verified_dmg "$KPX_MOUNT" || true
+                else
+                    print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
+                    STATUS_KEEPASSXC="$L_INTERNET_STATUS_MOUNT_ERROR"
+                fi
+                rm -f "$TEMP_DMG"
+            else
+                print_warn "$L_INTERNET_DOWNLOAD_VERIFY_FAILED"
+                print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://keepassxc.org/download/")"
+                STATUS_KEEPASSXC="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                rm -f "$TEMP_DMG" 2>/dev/null || true
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "KeePassXC")"
+    fi
+
+    # ============================================================
+    # ██ SEKCJA 4: POCZTA I KOMUNIKACJA
+    # ============================================================
+
+    # ── 14. PROTON MAIL ───────────────────────────────────────────
+}
+
+iu_proton_mail() {
+    internet_dispatch_silent_launch "📧 Proton Mail" "Proton Mail" "STATUS_PROTONMAIL" "Proton Mail" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Proton Mail")"
+}
+
+    # ── 15. ZOOM ──────────────────────────────────────────────────
+
+iu_zoom() {
+    print_header "📹 Zoom"
+    ZOOM_PATH=""
+    for p in "/Applications/zoom.us.app" "${HOME}/Applications/zoom.us.app"; do
+        if [ -d "$p" ]; then ZOOM_PATH="$p"; break; fi
+    done
+    if [ -n "$ZOOM_PATH" ]; then
+        VER=$(app_version "$ZOOM_PATH")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION_EXTRA" "$VER" "$ZOOM_PATH")"
+        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Zoom")"
+        if silent_launch_app "zoom.us" || silent_launch_app "$ZOOM_PATH"; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "zoom.us → Check for updates")"
+            STATUS_ZOOM="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            STATUS_ZOOM="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Zoom")"
+    fi
+
+    # ── 15b. (Signal removed — no longer installed) ──────────────
+
+
+    # ============================================================
+    # ██ SEKCJA 5: PRZECHOWYWANIE W CHMURZE
+    # ============================================================
+
+    # ── 16. GOOGLE DRIVE ──────────────────────────────────────────
+}
+
+iu_google_drive() {
+    print_header "🟢 Google Drive"
+    if [ -d "/Applications/Google Drive.app" ]; then
+        VER=$(app_version "/Applications/Google Drive.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        if omaha_history_proof "com.google.drivefs" "/Applications/Google Drive.app" "$(google_updater_logs | sed -n 1p)" "$(google_updater_logs | sed -n 2p)"; then
+            print_ok "${INTERNET_LAST_STATUS#✅ }"
+            STATUS_GOOGLEDRIVE="$INTERNET_LAST_STATUS"
+            return 0
+        fi
+        KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
+        print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
+        if google_keystone_check "$KEYSTONE_AGENT" "com.google.drivefs"; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "Google Drive")"
+            evaluate_omaha_status "Google Drive" "/Applications/Google Drive.app" "$GOOGLE_OMAHA_INC" "com.google.drivefs"
+            STATUS_GOOGLEDRIVE="$INTERNET_LAST_STATUS"
+        else
+            print_warn "$(printf "$L_INTERNET_KEYSTONE_CHECK_FAILED_FMT" "Google Drive")"
+            STATUS_GOOGLEDRIVE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Google Drive")"
+    fi
+
+    # ── 17. MEGASYNC ──────────────────────────────────────────────
+}
+
+iu_megasync() {
+    internet_dispatch_silent_launch "☁️  MEGAsync" "MEGAsync" "STATUS_MEGASYNC" "MEGAsync" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "MEGAsync")"
+}
+
+iu_proton_drive() {
+    internet_dispatch_sparkle_appcast "🔵 Proton Drive" "Proton Drive" "STATUS_PROTONDRIVE" "Proton Drive"
+}
+    # ============================================================
+    # ██ SEKCJA 6: MICROSOFT 365
+    # ============================================================
+
+# ── Microsoft AutoUpdate (msupdate) helpers ───────────────────
+# msupdate draws a carriage-return progress spinner with ANSI erase-line
+# codes, so its raw output is NOT line-oriented. Captured verbatim on this
+# Mac (cat -v) — three physical lines, the last one without a newline:
+#   ^M
+#   ^M^[[2K^MChecking for updates...^M^[[2K^MUpdate Assistant: Idle^M...^M^[[2K^MNo updates available^M
+#   ^M^[[2K^MUpdate Assistant: Idle
+# The old parser only dropped blank lines and lines containing "No updates",
+# so that trailing "Update Assistant: Idle" fragment was counted as one
+# pending update. That triggered a pointless msupdate --install which hung
+# until the timeout and failed the whole internet-apps step.
+
+# Microsoft product IDs documented for msupdate --apps. Used as a fast path so
+# that IDs without a digit (WDAVSHIM) are still recognised; every other ID
+# falls through to the generic shape check in mau_classify_output.
+MAU_KNOWN_PRODUCT_IDS="MSau04 MSWD2019 XCEL2019 PPT32019 OPIM2019 ONMC2019 TEAMS21 WDAVSHIM OLIC02"
+# The five Office DeferralDays entries left behind by the 2026-07-14 Office
+# Preview package-regression quarantine.
+MAU_OFFICE_DEFERRAL_IDS="MSWD2019 XCEL2019 PPT32019 OPIM2019 ONMC2019"
+# DeferralVersions pins the MAXIMUM version MAU will ever offer, so a pin at
+# the installed build blocks all future updates for that product.
+#
+# TEAMS21 is the one product where a pin AT the installed build is not a defect
+# but Microsoft AutoUpdate's own bookkeeping: Teams owns its update cadence and
+# MAU records the build it last saw. Ten consecutive runs (2026-07-28 .. 09-01)
+# released that pin and MAU re-created it within hours, so every run reported a
+# release it could not keep and a health warning it could not act on. A pin is
+# only released when it is STRICTLY OLDER than the installed build — that one is
+# genuinely stale and does block the product forever.
+MAU_STALE_DEFERRAL_VERSION_IDS="TEAMS21"
+
+# Turn raw msupdate output into clean logical lines: drop ANSI escape
+# sequences, translate carriage returns into newlines so the spinner's
+# overwritten segments become separate lines, trim each line, drop empties.
+mau_sanitize_output() {
+    local esc
+    esc="$(printf '\033')"
+    printf '%s\n' "$1" \
+        | tr '\r' '\n' \
+        | sed "s/${esc}\\[[0-9;?]*[0-9A-Za-z]//g" \
+        | tr -d '\001-\010\013\014\016-\037\177' \
+        | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d'
+}
+
+# Classify every sanitized line as "NOISE", "ID<tab><product-id>" or
+# "UNKNOWN<tab><line>". Requiring a positively identified product ID is the
+# whole point: the previous "anything that is not blank" filter is what caused
+# the false positive. A line we cannot identify is reported for diagnostics,
+# never counted as a pending update.
+mau_classify_output() {
+    mau_sanitize_output "$1" | awk -v known=" $MAU_KNOWN_PRODUCT_IDS " '
+        function is_product_id(tok) {
+            if (tok == "") return 0
+            if (index(known, " " tok " ") > 0) return 1
+            if (length(tok) < 5 || length(tok) > 8) return 0
+            if (tok !~ /^[A-Z]/) return 0
+            if (tok !~ /[0-9]/) return 0
+            if (tok ~ /^[A-Z][A-Z0-9]*$/) return 1
+            if (tok ~ /^[A-Z][A-Za-z]+[0-9]+$/) return 1
+            return 0
+        }
+        {
+            if ($0 ~ /^[Uu]pdate [Aa]ssistant:/ \
+                || $0 ~ /^Checking for updates/ \
+                || $0 ~ /^Detecting and downloading/ \
+                || $0 ~ /^Found the following/ \
+                || $0 ~ /[Nn]o updates available/) {
+                print "NOISE\t" $0
+                next
+            }
+            # Real entries carry the ID in parentheses, e.g. "Word (MSWD2019)".
+            rest = $0
+            while (match(rest, /\([A-Za-z0-9]+\)/)) {
+                tok = substr(rest, RSTART + 1, RLENGTH - 2)
+                if (is_product_id(tok)) { print "ID\t" tok; next }
+                rest = substr(rest, RSTART + RLENGTH)
+            }
+            n = split($0, parts, /[^A-Za-z0-9]+/)
+            for (i = 1; i <= n; i++) {
+                if (is_product_id(parts[i])) { print "ID\t" parts[i]; next }
+            }
+            print "UNKNOWN\t" $0
+        }
+    '
+}
+
+# "No updates available" is authoritative: when MAU prints it there are zero
+# pending updates no matter what spinner fragments trail behind it.
+mau_has_no_updates_sentinel() {
+    mau_sanitize_output "$1" | grep -qi '^[[:space:]]*no updates available'
+}
+
+# Genuine pending product IDs only, de-duplicated, one per line.
+mau_parse_pending() {
+    if mau_has_no_updates_sentinel "$1"; then
+        return 0
+    fi
+    mau_classify_output "$1" | awk -F'\t' '$1 == "ID" && !seen[$2]++ { print $2 }'
+}
+
+# Lines that survived the noise filter but carry no product ID — diagnostics
+# only, so an unexpected MAU message can be investigated without ever being
+# mistaken for a pending update.
+mau_parse_unrecognized() {
+    mau_classify_output "$1" | awk -F'\t' '$1 == "UNKNOWN" { print $2 }'
+}
+
+# Space-separated product IDs that may be passed to msupdate --install --apps.
+# TEAMS21 is excluded on purpose: Microsoft documents that Teams updates cannot
+# be managed through msupdate, so a TEAMS21 offer is informational only and
+# Teams keeps its own updater path (see iu_microsoft_teams).
+mau_installable_ids() {
+    printf '%s\n' "$1" \
+        | grep -v '^TEAMS21$' \
+        | grep -v '^[[:space:]]*$' \
+        | tr '\n' ' ' \
+        | sed 's/[[:space:]]*$//' || true
+}
+
+# Echo space-separated IDs that appear in both $1 and $2
+mau_intersect_ids() {
+    local candidates="$1"
+    local permitted="$2"
+    # shellcheck disable=SC2086
+    printf '%s\n' $candidates | awk -v perm=" $permitted " '
+        NF && index(perm, " " $1 " ") > 0 { print $1 }
+    ' | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+}
+
+# Detect interruption patterns in msupdate output regardless of exit code.
+mau_output_has_interruption() {
+    local clean
+    clean="$(mau_sanitize_output "$1")"
+    if printf '%s\n' "$clean" | grep -qE 'Update Assistant terminated|XPC Connection to updater invalidated|Connection to updater invalidated'; then
+        return 0
+    fi
+    return 1
+}
+
+# Verify msupdate --list output semantically:
+# Returns 0 if listing was successful (either valid empty queue sentinel or valid recognized IDs).
+# Returns 1 if exit != 0, output has interruption, sanitized output is empty, or output is unrecognized.
+mau_is_valid_listing() {
+    local exit_code="$1"
+    local output="$2"
+    if [ "$exit_code" -ne 0 ]; then
+        return 1
+    fi
+    if mau_output_has_interruption "$output"; then
+        return 1
+    fi
+    local clean
+    clean="$(mau_sanitize_output "$output")"
+    if [ -z "$clean" ]; then
+        return 1
+    fi
+    if mau_has_no_updates_sentinel "$output"; then
+        return 0
+    fi
+    local pending
+    pending="$(mau_parse_pending "$output")"
+    if [ -n "$pending" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# Specific interruption cause for diagnostics and logs.
+mau_interruption_reason() {
+    local clean
+    clean="$(mau_sanitize_output "$1")"
+    if printf '%s\n' "$clean" | grep -q 'Update Assistant terminated'; then
+        echo "Update Assistant terminated"
+    elif printf '%s\n' "$clean" | grep -q 'XPC Connection to updater invalidated'; then
+        echo "XPC Connection to updater invalidated"
+    elif printf '%s\n' "$clean" | grep -qE 'Connection.*invalidated'; then
+        echo "Connection to updater invalidated"
+    else
+        echo "Updater process interrupted"
+    fi
+}
+
+# Check for active Microsoft AutoUpdate / msupdate processes.
+mau_active_install_processes() {
+    if [ -n "${MAC_UPDATE_MOCK_ACTIVE_PROCESSES+x}" ]; then
+        printf '%s' "$MAC_UPDATE_MOCK_ACTIVE_PROCESSES"
+        return 0
+    fi
+    pgrep -f "Microsoft Update Assistant.app/Contents/MacOS/Microsoft Update Assistant|msupdate" 2>/dev/null || true
+}
+
+# Wait until active MAU installer processes finish or timeout expires.
+mau_wait_for_idle() {
+    local max_wait="${MAC_UPDATE_MAU_IDLE_TIMEOUT:-${1:-15}}" elapsed=0
+    while [ "$elapsed" -lt "$max_wait" ]; do
+        if [ -z "$(mau_active_install_processes)" ]; then
+            return 0
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    [ -z "$(mau_active_install_processes)" ]
+}
+
+# Record detailed diagnostics before and after msupdate runs.
+mau_log_listing_diagnostics() {
+    local phase="$1" exit_code="$2" output="$3"
+    local pending unrecognized count
+    pending="$(mau_parse_pending "$output")"
+    unrecognized="$(mau_parse_unrecognized "$output")"
+    count="$(mau_count_lines "$pending")"
+    internet_diag_log "MAU listing diagnostics ($phase): exit=$exit_code count=$count pending=[$(printf '%s' "$pending" | tr '\n' ' ' | sed 's/[[:space:]]*$//')]"
+    if [ -n "$unrecognized" ]; then
+        internet_diag_log "MAU listing diagnostics ($phase) unrecognized: $(printf '%s\n' "$unrecognized" | tr '\n' ';')"
+    fi
+}
+
+# One scoped msupdate --install pass over a space-separated ID list. Sets
+# MAU_INSTALL_CLEAN, MAU_INSTALL_INTERRUPTED, and MAU_INSTALL_INTERRUPT_REASON
+# for the caller and returns msupdate's exit status (or soft failure 10 if interrupted).
+mau_run_scoped_install() {
+    local ids="$1" out="" install_exit=0
+    MAU_INSTALL_INTERRUPTED=0
+    MAU_INSTALL_INTERRUPT_REASON=""
+    local timeout="${MAU_INSTALL_TIMEOUT:-$(( ${MAU_INSTALL_WAIT:-300} + 60 ))}"
+    local cli="${MAU_CLI:-msupdate}"
+    local wait_secs="${MAU_INSTALL_WAIT:-300}"
+    # shellcheck disable=SC2086  # deliberate word splitting: one argv per product ID
+    out=$(run_with_timeout "$timeout" "$cli" \
+        --install --wait "$wait_secs" --apps $ids 2>&1) || install_exit=$?
+    MAU_INSTALL_CLEAN="$(mau_sanitize_output "$out")"
+    [ -n "$MAU_INSTALL_CLEAN" ] && printf '%s\n' "$MAU_INSTALL_CLEAN" | tail -n 20
+    if mau_output_has_interruption "$out"; then
+        MAU_INSTALL_INTERRUPTED=1
+        MAU_INSTALL_INTERRUPT_REASON="$(mau_interruption_reason "$out")"
+        internet_diag_log "WARNING: msupdate --install interrupted ($MAU_INSTALL_INTERRUPT_REASON) despite exit=$install_exit"
+    fi
+    internet_diag_log "msupdate --install --apps $ids (exit=$install_exit, interrupted=$MAU_INSTALL_INTERRUPTED, sanitized):"
+    [ -n "$MAU_INSTALL_CLEAN" ] && internet_diag_log "$MAU_INSTALL_CLEAN"
+    if [ "$MAU_INSTALL_INTERRUPTED" -eq 1 ] && [ "$install_exit" -eq 0 ]; then
+        install_exit=10
+    fi
+    return "$install_exit"
+}
+
+
+# Strictly numeric count of non-blank lines, so the caller's -gt comparison
+# can never see whitespace or a multiline value.
+mau_count_lines() {
+    local value="$1" count=""
+    if [ -z "$value" ]; then
+        echo 0
+        return 0
+    fi
+    count="$(printf '%s\n' "$value" | grep -c '[^[:space:]]' 2>/dev/null || true)"
+    count="$(printf '%s' "$count" | tr -cd '0-9')"
+    [ -n "$count" ] || count=0
+    echo "$count"
+}
+
+# Positive-integer timeout or the documented default (same contract as
+# MAC_UPDATE_MAS_CHECK_TIMEOUT / MAC_UPDATE_MAS_UPGRADE_TIMEOUT).
+mau_timeout_value() {
+    local raw="$1" fallback="$2"
+    case "$raw" in
+        ''|*[!0-9]*) echo "$fallback"; return 0 ;;
+    esac
+    if [ "$raw" -gt 0 ]; then
+        echo "$raw"
+    else
+        echo "$fallback"
+    fi
+}
+
+# ── MAU deferral preferences ──────────────────────────────────
+# Every read and every mutation happens on an exported copy, so a partial
+# failure can never corrupt the live com.microsoft.autoupdate2 domain.
+mau_prefs_export() {
+    if [ -n "${MAC_UPDATE_MAU_PREFS_FILE:-}" ] && [ -f "$MAC_UPDATE_MAU_PREFS_FILE" ]; then
+        cp "$MAC_UPDATE_MAU_PREFS_FILE" "$1" >/dev/null 2>&1
+    else
+        defaults export com.microsoft.autoupdate2 "$1" >/dev/null 2>&1
+    fi
+}
+
+mau_plist_keys() {
+    plutil -extract "$2" xml1 -o - "$1" 2>/dev/null \
+        | sed -n 's|.*<key>\(.*\)</key>.*|\1|p'
+}
+
+mau_deferral_value() {
+    plutil -extract "OptionalUpdatesDeferrals.$2.$3" raw -o - "$1" 2>/dev/null
+}
+
+# "ID=value" for every entry of one deferral container.
+mau_deferral_entries() {
+    local plist="$1" container="$2" id value
+    for id in $(mau_plist_keys "$plist" "OptionalUpdatesDeferrals.$container"); do
+        value="$(mau_deferral_value "$plist" "$container" "$id")"
+        printf '%s=%s\n' "$id" "$value"
+    done
+}
+
+# "Container.ID=value" for the whole OptionalUpdatesDeferrals subtree.
+mau_deferral_state() {
+    local plist="$1" container entry
+    for container in DeferralDays DeferralVersions; do
+        mau_deferral_entries "$plist" "$container" | while IFS= read -r entry; do
+            [ -n "$entry" ] && printf '%s.%s\n' "$container" "$entry"
+        done
+    done
+}
+
+# Installed build for a Microsoft product ID, read the way MAU itself records
+# it. AppVersions is Microsoft AutoUpdate's own register of what is installed,
+# so it is the only like-for-like operand for a DeferralVersions pin MAU wrote;
+# the bundle key is the fallback for a product MAU has not registered yet.
+# (Same principle as preferring `brew info --json=v2 -> installed` over a bundle
+# version — never compare a value to one written on a different scale.)
+mau_installed_build_for_id() {
+    local id="$1" app build
+    app="$(mau_app_path_for_id "$id")"
+    [ -n "$app" ] || return 0
+    build="$(mau_prefs_read_app_version "$app")"
+    [ -n "$build" ] || build="$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null)"
+    printf '%s' "$build"
+}
+
+# One entry of Microsoft AutoUpdate's AppVersions register, by bundle path.
+mau_prefs_read_app_version() {
+    local cmd="defaults read com.microsoft.autoupdate2 AppVersions"
+    if [ -n "${MAC_UPDATE_MAU_PREFS_FILE:-}" ] && [ -f "$MAC_UPDATE_MAU_PREFS_FILE" ]; then
+        cmd="defaults read $MAC_UPDATE_MAU_PREFS_FILE AppVersions"
+    fi
+    $cmd 2>/dev/null \
+        | awk -v app="\"$1\"" '
+            index($0, app) == 0 { next }
+            {
+                line = $0
+                sub(/^[^=]*=[[:space:]]*/, "", line)
+                gsub(/[";]/, "", line)
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+                print line
+                exit
+            }'
+}
+
+# Deferral entries that actually hold a product back: every DeferralDays entry,
+# plus any DeferralVersions pin that is strictly older than the installed build.
+# A pin at the installed build is excluded — see mau_clean_stale_deferrals.
+mau_actionable_deferrals() {
+    local plist="$1" entry id value out=""
+    mau_deferral_entries "$plist" DeferralDays | while IFS= read -r entry; do
+        [ -n "$entry" ] && printf 'DeferralDays.%s\n' "$entry"
+    done
+    mau_deferral_entries "$plist" DeferralVersions | while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        id="${entry%%=*}"
+        value="${entry#*=}"
+        [ "$value" = "$(mau_installed_build_for_id "$id")" ] && continue
+        printf 'DeferralVersions.%s\n' "$entry"
+    done
+}
+
+# Permanent health check, not a one-off cleanup. Microsoft documents
+# DeferralDays as an integer in 1-28 and DeferralVersions as Major.Minor only;
+# anything else has undefined behaviour and silently blocks updates.
+mau_deferral_health_warnings() {
+    local plist="$1" entry id value
+    mau_deferral_entries "$plist" DeferralDays | while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        id="${entry%%=*}"
+        value="${entry#*=}"
+        case "$value" in
+            ''|*[!0-9]*)
+                echo "DeferralDays.$id=$value is not an integer"
+                continue
+                ;;
+        esac
+        if [ "$value" -lt 1 ] || [ "$value" -gt 28 ]; then
+            echo "DeferralDays.$id=$value is outside Microsoft's documented 1-28 range"
+        fi
+    done
+    mau_deferral_entries "$plist" DeferralVersions | while IFS= read -r entry; do
+        [ -n "$entry" ] || continue
+        id="${entry%%=*}"
+        value="${entry#*=}"
+        if printf '%s' "$value" | grep -q '^[0-9][0-9]*\.[0-9][0-9]*$'; then
+            continue
+        fi
+        # MAU writes the full installed build for products it only tracks
+        # (TEAMS21). That is MAU's own record, not a malformed policy value, and
+        # no amount of rewriting the domain changes it — so it is reported once
+        # as a fact, never as a warning the operator is expected to fix.
+        if [ "$value" = "$(mau_installed_build_for_id "$id")" ]; then
+            continue
+        fi
+        echo "DeferralVersions.$id=$value is not the documented Major.Minor form"
+    done
+}
+
+# Remove only the targeted stale entries from an exported copy and echo what
+# was removed. Every untargeted key is preserved; containers emptied by the
+# removals are dropped instead of being left behind as {}.
+# $2 is the explicit DeferralDays ID list to release — the caller decides which
+# products have earned their release, because a deferral is only stale once the
+# feed stops offering a downgrade for that product.
+mau_clean_stale_deferrals() {
+    local plist="$1" day_ids="$2" id container pin_value removed=""
+    for id in $day_ids; do
+        if [ -n "$(mau_deferral_value "$plist" DeferralDays "$id")" ] \
+            && plutil -remove "OptionalUpdatesDeferrals.DeferralDays.$id" "$plist" >/dev/null 2>&1; then
+            removed="$removed DeferralDays.$id"
+        fi
+    done
+    for id in $MAU_STALE_DEFERRAL_VERSION_IDS; do
+        pin_value="$(mau_deferral_value "$plist" DeferralVersions "$id")"
+        [ -n "$pin_value" ] || continue
+        # A pin equal to the installed build is MAU's bookkeeping for a product
+        # that self-updates; removing it is a write MAU undoes within hours.
+        [ "$pin_value" = "$(mau_installed_build_for_id "$id")" ] && continue
+        if plutil -remove "OptionalUpdatesDeferrals.DeferralVersions.$id" "$plist" >/dev/null 2>&1; then
+            removed="$removed DeferralVersions.$id"
+        fi
+    done
+    for container in DeferralDays DeferralVersions; do
+        if [ -z "$(mau_plist_keys "$plist" "OptionalUpdatesDeferrals.$container")" ]; then
+            plutil -remove "OptionalUpdatesDeferrals.$container" "$plist" >/dev/null 2>&1 || true
+        fi
+    done
+    if [ -z "$(mau_plist_keys "$plist" OptionalUpdatesDeferrals)" ]; then
+        plutil -remove OptionalUpdatesDeferrals "$plist" >/dev/null 2>&1 || true
+    fi
+    printf '%s\n' "${removed# }"
+}
+
+# Create the OptionalUpdatesDeferrals.DeferralDays container when it is absent.
+# plutil -extract with xml1 succeeds for dictionaries, unlike raw, so it is the
+# existence probe here as well as in mau_plist_keys.
+mau_plist_ensure_deferral_days() {
+    local plist="$1"
+    plutil -extract OptionalUpdatesDeferrals xml1 -o - "$plist" >/dev/null 2>&1 \
+        || plutil -insert OptionalUpdatesDeferrals -json '{}' "$plist" >/dev/null 2>&1 \
+        || return 1
+    plutil -extract OptionalUpdatesDeferrals.DeferralDays xml1 -o - "$plist" >/dev/null 2>&1 \
+        || plutil -insert OptionalUpdatesDeferrals.DeferralDays -json '{}' "$plist" >/dev/null 2>&1 \
+        || return 1
+    return 0
+}
+
+# Arm (or refresh) the documented per-app quarantine on an exported copy and
+# echo the IDs it set. Microsoft documents DeferralDays as an integer of 1-28
+# and states that critical updates bypass deferrals, so this never withholds a
+# security release — it only stops MAU's daemon from re-downloading a package
+# that provably cannot install.
+mau_arm_deferrals() {
+    local plist="$1" ids="$2" days="$3" id key armed=""
+    for id in $ids; do
+        [ -n "$id" ] || continue
+        [ "$(mau_deferral_value "$plist" DeferralDays "$id")" = "$days" ] && continue
+        mau_plist_ensure_deferral_days "$plist" || continue
+        key="OptionalUpdatesDeferrals.DeferralDays.$id"
+        if plutil -extract "$key" raw -o - "$plist" >/dev/null 2>&1; then
+            plutil -replace "$key" -integer "$days" "$plist" >/dev/null 2>&1 \
+                && armed="$armed $id"
+        else
+            plutil -insert "$key" -integer "$days" "$plist" >/dev/null 2>&1 \
+                && armed="$armed $id"
+        fi
+    done
+    printf '%s\n' "${armed# }"
+}
+
+# ── Office package-regression guard ───────────────────────────
+# Microsoft product ID → the installed bundle that product updates.
+# Bash 3.2 has no associative arrays, so this stays a case lookup.
+mau_app_path_for_id() {
+    local apps_dir="${MAC_UPDATE_APPS_DIR:-/Applications}"
+    case "$1" in
+        MSWD2019) echo "$apps_dir/Microsoft Word.app" ;;
+        XCEL2019) echo "$apps_dir/Microsoft Excel.app" ;;
+        PPT32019) echo "$apps_dir/Microsoft PowerPoint.app" ;;
+        OPIM2019) echo "$apps_dir/Microsoft Outlook.app" ;;
+        ONMC2019) echo "$apps_dir/Microsoft OneNote.app" ;;
+        TEAMS21)  echo "$apps_dir/Microsoft Teams.app" ;;
+    esac
+}
+
+# Short version the feed offers for one product ID, e.g. "16.111.1" out of
+# "MSWD2019  Microsoft Word Update 16.111.1 (26071913)". The parenthesised
+# trailing token is the build number on a different numbering scale, so only
+# dotted numeric tokens qualify and the scan runs right to left.
+mau_offered_version() {
+    mau_sanitize_output "$1" | awk -v id="$2" '
+        index($0, id) == 0 { next }
+        {
+            for (i = NF; i >= 1; i--) {
+                tok = $i
+                gsub(/[()]/, "", tok)
+                if (tok ~ /^[0-9]+(\.[0-9]+)+$/) { print tok; exit }
+            }
+        }'
+}
+
+# Installed short version read the way PackageKit reads it. app_version()
+# deliberately falls back to CFBundleVersion and mdls, which for Office are a
+# different numbering scale (16.111.26071215 vs 16.111.5), so mixing them here
+# would invert the comparison.
+mau_installed_short_version() {
+    defaults read "$1/Contents/Info" CFBundleShortVersionString 2>/dev/null
+}
+
+# "ID offered installed" for every pending product whose offered package
+# declares a short version that is NOT newer than the installed app.
+# PackageKit refuses such a component ("Skipping component ... because the
+# version ... is already installed") and the delta package then fails its
+# postinstall with PKInstallErrorDomain Code=112. Those installs cannot
+# succeed, so they are quarantined rather than re-downloaded every run.
+mau_regressed_entries() {
+    local list="$1" ids="$2" id app offered installed
+    for id in $ids; do
+        [ -n "$id" ] || continue
+        app="$(mau_app_path_for_id "$id")"
+        [ -n "$app" ] && [ -d "$app" ] || continue
+        offered="$(mau_offered_version "$list" "$id")"
+        [ -n "$offered" ] || continue
+        installed="$(mau_installed_short_version "$app")"
+        [ -n "$installed" ] || continue
+        # Strictly older only. Arguments are reversed on purpose:
+        # internet_version_relation folds "equal" into "current", and an equal
+        # short version with a newer build is a legitimate build-only update
+        # that PackageKit accepts. Quarantining that would block real updates.
+        if [ "$(internet_version_relation "$installed" "$offered")" = "newer" ]; then
+            printf '%s %s %s\n' "$id" "$offered" "$installed"
+        fi
+    done
+}
+
+# Drop the given space-separated IDs from a newline-separated ID list on stdin.
+mau_filter_out_ids() {
+    awk -v drop=" $1 " 'NF && index(drop, " " $0 " ") == 0'
+}
+
+# Office product IDs that currently carry a DeferralDays quarantine. Used to
+# explain an empty update list honestly instead of reporting "up to date".
+mau_active_office_deferrals() {
+    local plist ids="" id
+    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 0
+    if mau_prefs_export "$plist"; then
+        for id in $MAU_OFFICE_DEFERRAL_IDS; do
+            [ -n "$(mau_deferral_value "$plist" DeferralDays "$id")" ] && ids="$ids $id"
+        done
+    fi
+    rm -f "$plist" 2>/dev/null || true
+    printf '%s\n' "${ids# }"
+}
+
+# Preflight run before msupdate --list: report the deferral state, warn about
+# malformed entries, and clear stale DeferralVersions pins, which cap the
+# maximum version MAU will ever offer and therefore block a product forever.
+#
+# It deliberately does NOT touch the Office DeferralDays quarantine. Whether a
+# deferral is stale or still protective depends on what the feed is currently
+# offering, which is only known after msupdate --list, so that decision belongs
+# to mau_reconcile_deferrals. Clearing it here unconditionally is what made
+# every run re-download a package that provably could not install.
+mau_deferral_preflight() {
+    local plist before warnings
+    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
+    # defaults import replaces the whole domain, so stop MAU first — otherwise
+    # its daemon can race the rewrite and win.
+    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    fi
+    if ! mau_prefs_export "$plist"; then
+        rm -f "$plist" 2>/dev/null || true
+        internet_diag_log "WARN: could not export com.microsoft.autoupdate2 preferences"
+        return 1
+    fi
+
+    before="$(mau_deferral_state "$plist")"
+    if [ -z "$before" ]; then
+        internet_diag_log "MAU: no OptionalUpdatesDeferrals entries"
+        rm -f "$plist" 2>/dev/null || true
+        return 0
+    fi
+
+    # Split the report by what the operator can actually do about it. A
+    # DeferralDays quarantine, or a DeferralVersions pin strictly older than the
+    # installed build, holds a product back and deserves a warning. A pin AT the
+    # installed build is Microsoft AutoUpdate's own bookkeeping — MAU re-creates
+    # it within hours of every release, so reporting it as a warning produced a
+    # yellow line on every run that no one could ever clear.
+    if [ -n "$(mau_actionable_deferrals "$plist")" ]; then
+        print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_FOUND_FMT" "$(printf '%s\n' "$before" | tr '\n' ' ')")"
+    else
+        print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_FOUND_FMT" "$(printf '%s\n' "$before" | tr '\n' ' ')")"
+    fi
+    internet_diag_log "MAU deferrals before cleanup: $(printf '%s\n' "$before" | tr '\n' ' ')"
+    warnings="$(mau_deferral_health_warnings "$plist")"
+    if [ -n "$warnings" ]; then
+        printf '%s\n' "$warnings" | while IFS= read -r line; do
+            [ -n "$line" ] && print_warn "$line"
+        done
+        internet_diag_log "MAU deferral health: $(printf '%s\n' "$warnings" | tr '\n' ';')"
+    fi
+
+    # Read-only by design. Every deferral mutation happens exactly once per run,
+    # in mau_reconcile_deferrals after msupdate --list. Two export/import cycles
+    # in a single run raced each other: `killall cfprefsd` invalidates the
+    # preference daemon's cache, so the next `defaults export` could return
+    # pre-mutation (or empty) state, and re-importing that resurrected an entry
+    # the first pass had just removed while reporting it as gone.
+    rm -f "$plist" 2>/dev/null || true
+    return 0
+}
+
+# Quarantine window in days, clamped to Microsoft's documented 1-28 range.
+# 7 rather than the 28 maximum: an active deferral hides the product from
+# msupdate --list, so the window is also how long the toolkit stays blind to a
+# corrected package. A week keeps MAU's daemon quiet while still re-evaluating
+# the feed regularly; 28 would delay a genuine fix by up to a month.
+mau_deferral_days_value() {
+    local raw="${MAC_UPDATE_MAU_DEFERRAL_DAYS:-7}"
+    case "$raw" in
+        ''|*[!0-9]*) echo 7; return 0 ;;
+    esac
+    if [ "$raw" -lt 1 ] || [ "$raw" -gt 28 ]; then
+        echo 7
+    else
+        echo "$raw"
+    fi
+}
+
+# ── Quarantine expiry ─────────────────────────────────────────
+# An armed DeferralDays entry hides its product from `msupdate --list`, and the
+# release rule requires an offer that is newer than what is installed. Those two
+# facts form a deadlock: the quarantine suppresses the only evidence that could
+# release it. The code assumed the entry "lapses on its own after
+# MAC_UPDATE_MAU_DEFERRAL_DAYS" — it does not. DeferralDays is a per-update delay
+# that stays in the domain indefinitely, so the five Office entries armed on
+# 2026-07-14 were still there on 2026-09-01: 20 consecutive runs reported
+# "held by deferral", every run came back degraded, and the toolkit stayed blind
+# to Office while MAU's daemon shipped 16.112 -> 16.112.1 -> 16.112.2 behind its
+# back. Measured on 2026-09-02 with the quarantine lifted, the feed was offering
+# 16.112.3 against 16.112.2 installed — an upgrade, quarantined for seven weeks.
+#
+# The fix is an expiry the guard controls itself: a quarantine is released after
+# MAC_UPDATE_MAU_QUARANTINE_MAX_DAYS so the next run can see the feed again. If
+# the offer is still a downgrade, mau_regressed_entries re-arms it on that run.
+# Worst case is one re-evaluated download per product per fortnight; the previous
+# behaviour was a permanent blackout.
+mau_quarantine_state_file() {
+    printf '%s' "${MAC_UPDATE_MAU_STATE_FILE:-$HOME/.local/state/mac-update/mau_quarantine.tsv}"
+}
+
+mau_quarantine_max_days() {
+    local raw="${MAC_UPDATE_MAU_QUARANTINE_MAX_DAYS:-14}"
+    case "$raw" in
+        ''|*[!0-9]*) echo 14; return 0 ;;
+    esac
+    if [ "$raw" -lt 1 ] || [ "$raw" -gt 90 ]; then echo 14; else echo "$raw"; fi
+}
+
+# Record the arming time for IDs we have not seen before. An ID already on file
+# keeps its original timestamp — re-arming must not restart the clock, or the
+# quarantine would renew itself forever, which is the defect being fixed.
+mau_quarantine_note_armed() {
+    local ids="$1" file id now tmp
+    [ -n "$ids" ] || return 0
+    file="$(mau_quarantine_state_file)"
+    now="$(date +%s)"
+    mkdir -p "$(dirname "$file")" 2>/dev/null || return 0
+    [ -f "$file" ] || : > "$file"
+    for id in $ids; do
+        [ -n "$id" ] || continue
+        grep -q "^$id	" "$file" 2>/dev/null && continue
+        printf '%s\t%s\n' "$id" "$now" >> "$file"
+    done
+    return 0
+}
+
+# Drop IDs whose quarantine has been released, so a future re-arm starts a fresh
+# clock rather than inheriting an already-expired one.
+mau_quarantine_forget() {
+    local entries="$1" file ids id tmp
+    [ -n "$entries" ] || return 0
+    file="$(mau_quarantine_state_file)"
+    [ -f "$file" ] || return 0
+    ids=""
+    for id in $entries; do
+        case "$id" in
+            DeferralDays.*) ids="$ids ${id#DeferralDays.}" ;;
+        esac
+    done
+    [ -n "$ids" ] || return 0
+    tmp="$(mktemp "${TMPDIR:-/tmp}/mau-quar.XXXXXX")" || return 0
+    awk -v drop=" $ids " -F'\t' 'index(drop, " " $1 " ") == 0' "$file" > "$tmp" 2>/dev/null \
+        && mv "$tmp" "$file" 2>/dev/null
+    rm -f "$tmp" 2>/dev/null || true
+    return 0
+}
+
+# Office IDs whose live DeferralDays entry has outlived the expiry window.
+# An entry with no record at all is treated as expired: it predates this
+# bookkeeping, so it is by definition older than the window.
+#
+# DeferralVersions pins are deliberately NOT reported here. A pin at the
+# installed build is MAU's bookkeeping for a self-updating product (Teams):
+# mau_clean_stale_deferrals keeps it because MAU re-creates it within hours.
+# Listing it as "expired" (P2-11) printed "releasing: TEAMS21" on every run
+# while the reconcile correctly released nothing (2026-09-28 run log).
+mau_quarantine_expired_ids() {
+    local active file max cutoff now id armed out=""
+    active="$(mau_active_office_deferrals)"
+    if [ -n "$active" ]; then
+        file="$(mau_quarantine_state_file)"
+        max="$(mau_quarantine_max_days)"
+        now="$(date +%s)"
+        cutoff=$(( now - max * 86400 ))
+        for id in $active; do
+            armed=""
+            [ -f "$file" ] && armed="$(awk -F'\t' -v k="$id" '$1 == k { print $2; exit }' "$file" 2>/dev/null)"
+            case "$armed" in
+                ''|*[!0-9]*) out="$out $id"; continue ;;
+            esac
+            [ "$armed" -lt "$cutoff" ] && out="$out $id"
+        done
+    fi
+    printf '%s' "${out# }"
+}
+
+# Reconcile the Office quarantine with what the feed is actually offering:
+# arm the documented per-app deferral for every product stuck in a downgrade
+# loop, and release it for every product whose offer has since been corrected.
+# Runs after msupdate --list, because only the offer tells the two apart.
+mau_reconcile_deferrals() {
+    local regressed="$1"
+    local offered="${2:-$1}"
+    local plist backup release id armed removed days verify unverified=""
+    local container still_present="" verified_removed=""
+    release=""
+    for id in $MAU_OFFICE_DEFERRAL_IDS; do
+        case " $offered " in
+            *" $id "*)
+                case " $regressed " in
+                    *" $id "*) ;;
+                    *) release="$release $id" ;;
+                esac
+                ;;
+            *) ;;
+        esac
+    done
+    release="${release# }"
+
+    if [ "${MAC_UPDATE_MAU_KEEP_DEFERRALS:-0}" = "1" ]; then
+        print_info "$L_INTERNET_MS_DEFERRALS_KEPT"
+        return 0
+    fi
+    if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+        [ -n "$regressed" ] && print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_DRYRUN_FMT" "$regressed")"
+        return 0
+    fi
+
+    plist="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 1
+    # defaults import replaces the whole domain, so stop MAU first — otherwise
+    # its daemon can race the rewrite and win.
+    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    fi
+    if ! mau_prefs_export "$plist"; then
+        rm -f "$plist" 2>/dev/null || true
+        internet_diag_log "WARN: could not export com.microsoft.autoupdate2 for reconcile"
+        return 1
+    fi
+
+    # Back up the untouched export before mutating anything.
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        backup="$MAC_UPDATE_SESSION_DIR/mau_prefs_reconcile_backup.plist"
+    else
+        backup="$(mktemp "${TMPDIR:-/tmp}/mau-prefs-backup.XXXXXX")" || backup=""
+    fi
+    if [ -z "$backup" ] || ! cp "$plist" "$backup" 2>/dev/null; then
+        print_warn "Could not back up Microsoft AutoUpdate preferences — leaving deferrals untouched"
+        internet_diag_log "ERROR: MAU preference backup failed; skipped deferral reconcile"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+
+    days="$(mau_deferral_days_value)"
+    armed="$(mau_arm_deferrals "$plist" "$regressed" "$days")"
+    removed="$(mau_clean_stale_deferrals "$plist" "$release")"
+    if [ -z "$armed" ] && [ -z "$removed" ]; then
+        rm -f "$plist" 2>/dev/null || true
+        internet_diag_log "MAU deferrals already reconciled (armed: none, released: none)"
+        return 0
+    fi
+
+    # Validate the mutated copy before it is allowed to replace live prefs.
+    if ! plutil -lint "$plist" >/dev/null 2>&1; then
+        print_warn "Rewritten Microsoft AutoUpdate preferences failed plutil -lint — not imported"
+        internet_diag_log "ERROR: MAU reconcile rewrite failed lint; backup at $backup"
+        rm -f "$plist" 2>/dev/null || true
+        return 1
+    fi
+    if [ -n "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        if ! cp "$plist" "$MAC_UPDATE_MAU_PREFS_FILE" 2>/dev/null; then
+            print_warn "Could not import reconciled Microsoft AutoUpdate preferences"
+            internet_diag_log "ERROR: cp to MAC_UPDATE_MAU_PREFS_FILE failed during reconcile"
+            rm -f "$plist" 2>/dev/null || true
+            return 1
+        fi
+    else
+        if ! defaults import com.microsoft.autoupdate2 "$plist" >/dev/null 2>&1; then
+            print_warn "Could not import reconciled Microsoft AutoUpdate preferences"
+            print_info "Restore with: defaults import com.microsoft.autoupdate2 $backup"
+            internet_diag_log "ERROR: defaults import failed during reconcile; backup at $backup"
+            rm -f "$plist" 2>/dev/null || true
+            return 1
+        fi
+    fi
+    rm -f "$plist" 2>/dev/null || true
+    # Deliberately no `killall cfprefsd` here. defaults import hands the write
+    # to the preference daemon, which flushes it lazily; killing the daemon
+    # straight afterwards discards the write. That silently reverted every
+    # reconcile while still reporting success. Only MAU is restarted, so it
+    # re-reads the domain on its next launch.
+    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+    fi
+
+    # Never claim a change that did not land: re-read the live domain and
+    # report what it actually contains.
+    verify="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || return 0
+    if mau_prefs_export "$verify"; then
+        for id in $armed; do
+            if [ "$(mau_deferral_value "$verify" DeferralDays "$id")" != "$days" ]; then
+                unverified="$unverified $id"
+            fi
+        done
+        # Removals were reported as successful on the strength of `plutil
+        # -remove` exiting 0 against the exported copy. That says nothing about
+        # the live domain: Microsoft AutoUpdate re-creates a DeferralVersions
+        # pin it still considers its own, and the run reported the release as
+        # done anyway — three runs in a row claimed DeferralVersions.TEAMS21
+        # was cleared while it was still there. Measure the live domain and
+        # report only what it actually contains.
+        for entry in $removed; do
+            container="${entry%%.*}"
+            id="${entry#*.}"
+            if [ -n "$(mau_deferral_value "$verify" "$container" "$id")" ]; then
+                still_present="$still_present $entry"
+            else
+                verified_removed="$verified_removed $entry"
+            fi
+        done
+        if [ -n "$unverified" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_UNVERIFIED_FMT" "${unverified# }")"
+            internet_diag_log "ERROR: MAU deferral write did not persist for:${unverified}"
+            rm -f "$verify" 2>/dev/null || true
+            return 1
+        fi
+        removed="${verified_removed# }"
+    fi
+    rm -f "$verify" 2>/dev/null || true
+
+    if [ -n "$still_present" ]; then
+        print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_NOT_RELEASED_FMT" "${still_present# }")"
+        internet_diag_log "ERROR: MAU deferral release did not persist for:${still_present}"
+        SOFT_FAIL=1
+    fi
+
+    # Bookkeeping runs on the VERIFIED sets only: $armed and $removed have both
+    # been re-read from the live domain above, so the expiry clock can never be
+    # started or stopped by a write that did not land.
+    mau_quarantine_note_armed "$armed"
+    mau_quarantine_forget "$removed"
+
+    [ -n "$armed" ] && print_info "$(internet_msg "$L_INTERNET_MS_DEFERRALS_ARMED_FMT" "$armed" "$days")"
+    [ -n "$removed" ] && print_ok "$(internet_msg "$L_INTERNET_MS_DEFERRALS_CLEARED_FMT" "$removed")"
+    internet_diag_log "MAU deferrals reconciled (armed: ${armed:-none}, released: ${removed:-none}, days=$days)"
+    return 0
+}
+
+iu_microsoft_365() {
+    print_header "💼 Microsoft 365 (via Microsoft AutoUpdate)"
+
+    local apps_dir="${MAC_UPDATE_APPS_DIR:-/Applications}"
+    MAU_CLI="${MAC_UPDATE_MAU_CLI:-/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate}"
+    MAU_APP="${MAC_UPDATE_MAU_APP:-/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app}"
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+        printf '%s\n' unknown > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+    fi
+    MAU_TEAMS21_OFFERED=0
+    MAU_LISTED=0
+    MAU_CHECK_TIMEOUT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_CHECK_TIMEOUT:-120}" 120)"
+    # msupdate's own --wait returns the current install state instead of
+    # hanging, so it is the primary bound. run_with_timeout stays strictly
+    # above it as a hard backstop — a killed msupdate (124) tells us nothing,
+    # a --wait return is readable. Office full installers are multi-GB, hence
+    # the 1800s default rather than the old 300s.
+    MAU_INSTALL_WAIT="$(mau_timeout_value "${MAC_UPDATE_MSUPDATE_INSTALL_TIMEOUT:-1800}" 1800)"
+    MAU_INSTALL_TIMEOUT=$((MAU_INSTALL_WAIT + 60))
+
+    # Sprawdź czy zainstalowana jest jakakolwiek aplikacja Microsoft
+    MS_INSTALLED=0
+    for ms_app in "Microsoft Word" "Microsoft Excel" "Microsoft PowerPoint" \
+                   "Microsoft Outlook" "Microsoft OneNote"; do
+        if [ -d "${apps_dir}/${ms_app}.app" ]; then
+            VER=$(app_version "${apps_dir}/${ms_app}.app")
+            print_info "${ms_app}: $VER"
+            MS_INSTALLED=1
+        fi
+    done
+
+    if [ "$MS_INSTALLED" = "0" ]; then
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+            printf '0\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+            : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+        fi
+        print_info "$L_INTERNET_MS_NONE_INSTALLED"
+        return 0
+    fi
+
+    if [ -f "$MAU_CLI" ]; then
+        # Report the deferral state and clear version pins. The DeferralDays
+        # quarantine is reconciled after the list, once the offer is known.
+        mau_deferral_preflight || true
+
+        if [ "${MAC_UPDATE_MAU_CLEAR_DEFERRALS:-0}" = "1" ]; then
+            local _plist_def before_def _def_key _def_entry _after_def=""
+            _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
+            if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
+                before_def="$(mau_deferral_state "$_plist_def")"
+                rm -f "$_plist_def" 2>/dev/null || true
+                if [ -n "$before_def" ]; then
+                    print_step "MAC_UPDATE_MAU_CLEAR_DEFERRALS=1: Clearing detected MAU deferrals..."
+                    if [ -z "${MAC_UPDATE_MAU_PREFS_FILE:-}" ]; then
+                        killall "Microsoft AutoUpdate" "Microsoft Update Assistant" 2>/dev/null || true
+                        for _def_entry in $before_def; do
+                            [ -n "$_def_entry" ] || continue
+                            _def_key="${_def_entry%%=*}"
+                            defaults delete com.microsoft.autoupdate2 "OptionalUpdatesDeferrals.$_def_key" 2>/dev/null || true
+                        done
+                        defaults delete com.microsoft.autoupdate2 "OptionalUpdatesDeferrals" 2>/dev/null || true
+                    fi
+
+                    _plist_def="$(mktemp "${TMPDIR:-/tmp}/mau-prefs.XXXXXX")" || _plist_def=""
+                    if [ -n "$_plist_def" ] && mau_prefs_export "$_plist_def"; then
+                        _after_def="$(mau_deferral_state "$_plist_def")"
+                        rm -f "$_plist_def" 2>/dev/null || true
+                    fi
+                    print_ok "Cleared MAU deferrals (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
+                    internet_diag_log "MAU deferrals cleared by MAC_UPDATE_MAU_CLEAR_DEFERRALS=1 (before: $(printf '%s\n' "$before_def" | tr '\n' ' '), after: ${_after_def:-none})"
+                fi
+            fi
+        fi
+
+        # Krok 1: sprawdź dostępne aktualizacje z limitem czasu MAU_CHECK_TIMEOUT
+        print_step "$L_INTERNET_MS_CHECKING"
+        MAU_LIST_EXIT=0
+        MAU_LIST=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_LIST_EXIT=$?
+        mau_log_listing_diagnostics "initial" "$MAU_LIST_EXIT" "$MAU_LIST"
+
+        if ! mau_is_valid_listing "$MAU_LIST_EXIT" "$MAU_LIST"; then
+            print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_LIST_EXIT")"
+            MAU_LIST_CLEAN="$(mau_sanitize_output "$MAU_LIST")"
+            [ -n "$MAU_LIST_CLEAN" ] && printf '%s\n' "$MAU_LIST_CLEAN" | tail -n 20
+            internet_diag_log "ERROR: msupdate --list failed or invalid (exit=$MAU_LIST_EXIT)"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                printf 'unknown\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                rm -f "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt" 2>/dev/null || true
+                if mau_output_has_interruption "$MAU_LIST"; then
+                    printf '%s\n' "$(mau_interruption_reason "$MAU_LIST")" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                fi
+            fi
+            STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+        else
+            MAU_LISTED=1
+            # Only positively identified product IDs count as pending. The
+            # old "every non-blank line" filter counted spinner fragments.
+            MAU_PENDING="$(mau_parse_pending "$MAU_LIST")"
+            MAU_UNRECOGNIZED="$(mau_parse_unrecognized "$MAU_LIST")"
+            [ -n "$MAU_UNRECOGNIZED" ] && internet_diag_log \
+                "msupdate --list unrecognized lines: $(printf '%s\n' "$MAU_UNRECOGNIZED" | tr '\n' ';')"
+            if printf '%s\n' "$MAU_PENDING" | grep -q '^TEAMS21$'; then
+                MAU_TEAMS21_OFFERED=1
+            fi
+            MAU_COUNT="$(mau_count_lines "$MAU_PENDING")"
+
+            if [ "$MAU_COUNT" -gt 0 ]; then
+                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                    printf '%s\n' "$MAU_PENDING" > "$MAC_UPDATE_SESSION_DIR/mau_pending.txt"
+                fi
+                print_info "$(internet_msg "$L_INTERNET_MS_UPDATES_AVAILABLE" "$MAU_COUNT")"
+                printf '%s\n' "$MAU_PENDING" | while IFS= read -r line; do
+                    [ -n "$line" ] && print_info "  → $line"
+                done
+
+                # A package whose short version is not newer than the
+                # installed app can never install: PackageKit skips the
+                # component and the delta postinstall fails with 112.
+                # Quarantine those instead of downloading them again.
+                MAU_PENDING_IDS="$(printf '%s\n' "$MAU_PENDING" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                MAU_REGRESSED="$(mau_regressed_entries "$MAU_LIST" "$MAU_PENDING_IDS")"
+                MAU_REGRESSED_IDS="$(printf '%s\n' "$MAU_REGRESSED" \
+                    | awk 'NF { print $1 }' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                if [ -n "$MAU_REGRESSED_IDS" ]; then
+                    _mau_chan="$(mau_current_channel)"
+                    _mau_stale_limit="${MAC_UPDATE_STALE_DAYS:-45}"
+                    _mau_days_unchanged="$(internet_get_app_days_unchanged "Microsoft Word")"
+                    printf '%s\n' "$MAU_REGRESSED" | while read -r r_id r_offered r_installed; do
+                        [ -n "$r_id" ] || continue
+                        print_warn "$(internet_msg "$L_INTERNET_MS_REGRESSION_FMT" "$r_id" "$r_offered" "$r_installed")"
+                        print_warn "$(internet_msg "$L_INTERNET_MS_CHANNEL_DIAG_FMT" "$_mau_chan" "$r_installed" "$r_offered")"
+                    done
+                    if [ "$_mau_days_unchanged" -gt "$_mau_stale_limit" ]; then
+                        print_warn "$(internet_msg "$L_INTERNET_STALE_WARNING_FMT" "$_mau_days_unchanged" "$_mau_stale_limit")"
+                    else
+                        print_info "$L_INTERNET_MS_REGRESSION_NOTE"
+                    fi
+                    internet_diag_log "MAU upstream package regression (channel=$_mau_chan, offered <= installed): $(printf '%s\n' "$MAU_REGRESSED" | tr '\n' ';')"
+                fi
+                mau_reconcile_deferrals "$MAU_REGRESSED_IDS" "$MAU_PENDING_IDS" || true
+
+                # TEAMS21 is dropped by mau_installable_ids: Microsoft
+                # documents Teams as unmanageable through msupdate.
+                MAU_INSTALL_IDS="$(printf '%s\n' "$MAU_PENDING" \
+                    | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                MAU_INSTALL_IDS="$(mau_installable_ids "$MAU_INSTALL_IDS")"
+
+                if [ -z "$MAU_INSTALL_IDS" ]; then
+                    # Everything pending is quarantined or Teams-owned:
+                    # there is nothing msupdate can usefully install.
+                    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                        printf '0\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                        : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                    fi
+                    if [ -n "$MAU_REGRESSED_IDS" ]; then
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
+                    else
+                        print_ok "$L_INTERNET_MS_CURRENT"
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+                    fi
+                else
+                    # Snapshot pre-install versions of installable targets
+                    _mau_pre_versions=""
+                    for _mid in $MAU_INSTALL_IDS; do
+                        _mapp="$(mau_app_path_for_id "$_mid")"
+                        if [ -n "$_mapp" ] && [ -d "$_mapp" ]; then
+                            _mver="$(mau_installed_short_version "$_mapp")"
+                            _mau_pre_versions="${_mau_pre_versions} ${_mid}=${_mver}"
+                        fi
+                    done
+
+                    MAU_INSTALL_EXIT=0
+                    mau_run_scoped_install "$MAU_INSTALL_IDS" || MAU_INSTALL_EXIT=$?
+                    mau_wait_for_idle 15 || true
+
+                    MAU_LAST_EXIT="$MAU_INSTALL_EXIT"
+                    MAU_LAST_INTERRUPTED="${MAU_INSTALL_INTERRUPTED:-0}"
+                    MAU_LAST_REASON="${MAU_INSTALL_INTERRUPT_REASON:-}"
+
+                    MAU_VERIFY_EXIT=0
+                    MAU_VERIFY=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY_EXIT=$?
+                    mau_log_listing_diagnostics "post-install-1" "$MAU_VERIFY_EXIT" "$MAU_VERIFY"
+
+                    if ! mau_is_valid_listing "$MAU_VERIFY_EXIT" "$MAU_VERIFY"; then
+                        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                            printf 'unknown\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                            rm -f "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt" 2>/dev/null || true
+                            if mau_output_has_interruption "$MAU_VERIFY"; then
+                                printf '%s\n' "$(mau_interruption_reason "$MAU_VERIFY")" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                            elif [ -n "$MAU_LAST_REASON" ]; then
+                                printf '%s\n' "$MAU_LAST_REASON" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                            fi
+                        fi
+                        print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_EXIT")"
+                        internet_diag_log "ERROR: msupdate --list re-verification failed or invalid (exit=$MAU_VERIFY_EXIT)"
+                        print_info "$(internet_msg "$L_INTERNET_MS_MANUAL_ACTION_FMT" "msupdate --install --apps $MAU_INSTALL_IDS")"
+                        if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ] && [ -t 0 ] && [ -d "$MAU_APP" ]; then
+                            if open -a "$MAU_APP" 2>/dev/null; then
+                                print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                            fi
+                        fi
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                    else
+                        MAU_FRESH_PENDING="$(mau_parse_pending "$MAU_VERIFY")"
+
+                        # Intersect fresh pending with originally permitted MAU_INSTALL_IDS
+                        MAU_RETRY_CANDIDATES="$(mau_intersect_ids "$MAU_FRESH_PENDING" "$MAU_INSTALL_IDS")"
+
+                        # Re-check downgrade protection against fresh offer
+                        local _fresh_regressed _fresh_regressed_ids
+                        _fresh_regressed="$(mau_regressed_entries "$MAU_VERIFY" "$MAU_RETRY_CANDIDATES")"
+                        _fresh_regressed_ids="$(printf '%s\n' "$_fresh_regressed" | awk 'NF { print $1 }' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+                        MAU_RETRY_IDS="$(printf '%s\n' "$MAU_RETRY_CANDIDATES" | mau_filter_out_ids "$_fresh_regressed_ids" | mau_filter_out_ids "$MAU_REGRESSED_IDS")"
+                        MAU_RETRY_IDS="$(mau_installable_ids "$MAU_RETRY_IDS")"
+
+                        MAU_VERIFY_FINAL_EXIT=0
+                        MAU_VERIFY_FINAL=""
+
+                        # Limited recovery: at most ONE retry of still-pending permitted IDs,
+                        # only if previous installation process is not running.
+                        if [ -n "$MAU_RETRY_IDS" ]; then
+                            if [ -n "$(mau_active_install_processes)" ]; then
+                                internet_diag_log "MAU active install process still detected after waiting; skipping retry."
+                                print_warn "Active Microsoft installer process detected; skipping retry."
+                                MAU_VERIFY_FINAL_EXIT="$MAU_VERIFY_EXIT"
+                                MAU_VERIFY_FINAL="$MAU_VERIFY"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_MS_INTERRUPTED_RETRY" "$MAU_RETRY_IDS")"
+                                internet_diag_log "Retrying MAU install for still-pending apps: $MAU_RETRY_IDS"
+                                MAU_RETRY_EXIT=0
+                                mau_run_scoped_install "$MAU_RETRY_IDS" || MAU_RETRY_EXIT=$?
+                                mau_wait_for_idle 15 || true
+
+                                MAU_LAST_EXIT="$MAU_RETRY_EXIT"
+                                MAU_LAST_INTERRUPTED="${MAU_INSTALL_INTERRUPTED:-0}"
+                                MAU_LAST_REASON="${MAU_INSTALL_INTERRUPT_REASON:-}"
+
+                                MAU_VERIFY2_EXIT=0
+                                MAU_VERIFY2=$(run_with_timeout "$MAU_CHECK_TIMEOUT" "$MAU_CLI" --list 2>&1) || MAU_VERIFY2_EXIT=$?
+                                mau_log_listing_diagnostics "post-install-2" "$MAU_VERIFY2_EXIT" "$MAU_VERIFY2"
+
+                                MAU_VERIFY_FINAL_EXIT="$MAU_VERIFY2_EXIT"
+                                MAU_VERIFY_FINAL="$MAU_VERIFY2"
+                            fi
+                        else
+                            MAU_VERIFY_FINAL_EXIT="$MAU_VERIFY_EXIT"
+                            MAU_VERIFY_FINAL="$MAU_VERIFY"
+                        fi
+
+                        if ! mau_is_valid_listing "$MAU_VERIFY_FINAL_EXIT" "$MAU_VERIFY_FINAL"; then
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                printf 'unknown\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                                rm -f "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt" 2>/dev/null || true
+                                if mau_output_has_interruption "$MAU_VERIFY_FINAL"; then
+                                    printf '%s\n' "$(mau_interruption_reason "$MAU_VERIFY_FINAL")" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                                elif [ -n "$MAU_LAST_REASON" ]; then
+                                    printf '%s\n' "$MAU_LAST_REASON" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                                fi
+                            fi
+                            print_warn "$(internet_msg "$L_INTERNET_MS_CHECK_FAILED_FMT" "$MAU_VERIFY_FINAL_EXIT")"
+                            internet_diag_log "ERROR: msupdate --list final verification failed or invalid (exit=$MAU_VERIFY_FINAL_EXIT)"
+                            print_info "$(internet_msg "$L_INTERNET_MS_MANUAL_ACTION_FMT" "msupdate --install --apps ${MAU_RETRY_IDS:-$MAU_INSTALL_IDS}")"
+                            if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ] && [ -t 0 ] && [ -d "$MAU_APP" ]; then
+                                if open -a "$MAU_APP" 2>/dev/null; then
+                                    print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                                fi
+                            fi
+                            STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                        else
+                            MAU_FINAL_PENDING="$(mau_parse_pending "$MAU_VERIFY_FINAL")"
+                            MAU_REMAINING_IDS="$(printf '%s\n' "$MAU_FINAL_PENDING" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+
+                            local _mau_any_ver_changed=0 _mid _mapp _mver _oldver
+                            for _mid in $MAU_INSTALL_IDS; do
+                                _mapp="$(mau_app_path_for_id "$_mid")"
+                                if [ -n "$_mapp" ] && [ -d "$_mapp" ]; then
+                                    _mver="$(mau_installed_short_version "$_mapp")"
+                                    _oldver="$(printf '%s\n' "$_mau_pre_versions" | tr ' ' '\n' | grep "^${_mid}=" | head -n 1 | cut -d= -f2)"
+                                    if [ -n "$_oldver" ] && [ -n "$_mver" ] && [ "$_mver" != "$_oldver" ]; then
+                                        _mau_any_ver_changed=1
+                                        break
+                                    fi
+                                fi
+                            done
+
+                            local _rem_count
+                            _rem_count="$(mau_count_lines "$MAU_FINAL_PENDING")"
+
+                            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                                printf '%s\n' "$_rem_count" > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                                if [ "$_rem_count" -gt 0 ]; then
+                                    printf '%s\n' "$MAU_FINAL_PENDING" > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                                    if [ -n "$MAU_LAST_REASON" ]; then
+                                        printf '%s\n' "$MAU_LAST_REASON" > "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt"
+                                    fi
+                                else
+                                    : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                                    rm -f "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt" 2>/dev/null || true
+                                fi
+                            fi
+
+                            if [ "$_rem_count" -gt 0 ]; then
+                                if [ "$MAU_LAST_EXIT" = "124" ] || [ "$MAU_LAST_EXIT" = "137" ] || [ "$MAU_LAST_EXIT" = "143" ]; then
+                                    print_warn "$L_INTERNET_MS_TIMEOUT"
+                                elif [ "$MAU_LAST_INTERRUPTED" = "1" ]; then
+                                    print_warn "Microsoft update was interrupted (${MAU_LAST_REASON:-terminated})."
+                                elif [ "$MAU_LAST_EXIT" -ne 0 ]; then
+                                    print_warn "$(internet_msg "$L_INTERNET_MS_INSTALL_ERROR" "$MAU_LAST_EXIT")"
+                                else
+                                    print_warn "Microsoft updates still pending after installation: $MAU_REMAINING_IDS"
+                                fi
+                                print_info "$(internet_msg "$L_INTERNET_MS_MANUAL_ACTION_FMT" "msupdate --install --apps $MAU_REMAINING_IDS")"
+                                if [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ] && [ -t 0 ] && [ -d "$MAU_APP" ]; then
+                                    if open -a "$MAU_APP" 2>/dev/null; then
+                                        print_info "$L_INTERNET_MS_ACCEPT_IN_WINDOW"
+                                    fi
+                                fi
+                                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                            else
+                                if [ "$MAU_LAST_INTERRUPTED" = "1" ] && [ "$_mau_any_ver_changed" -eq 0 ]; then
+                                    print_warn "Microsoft update interrupted (${MAU_LAST_REASON:-terminated}) and no version changes observed."
+                                    STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+                                elif [ -n "$MAU_REGRESSED_IDS" ]; then
+                                    STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
+                                else
+                                    print_ok "$L_INTERNET_MS_UPDATED"
+                                    STATUS_MICROSOFT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "Microsoft apps")"
+                                    if [ "$MAU_TEAMS21_OFFERED" -eq 1 ]; then
+                                        MAU_TEAMS21_VERIFIED=1
+                                    fi
+                                fi
+                            fi
+                        fi
+                    fi
+                fi
+            else
+                if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+                        printf '0\n' > "$MAC_UPDATE_SESSION_DIR/pending_mau"
+                        : > "$MAC_UPDATE_SESSION_DIR/mau_remaining.txt"
+                        rm -f "$MAC_UPDATE_SESSION_DIR/mau_pending.txt" "$MAC_UPDATE_SESSION_DIR/mau_interrupt_reason.txt" 2>/dev/null || true
+                    fi
+                    # Nothing offered. A live quarantine could be the reason, so
+                    # say so instead of claiming everything is up to date.
+                    # An active DeferralDays entry suppresses the product from
+                    # msupdate --list entirely, so an empty list is NOT evidence
+                    # that the feed was corrected. Releasing here would arm and
+                    # release on alternating runs forever. The quarantine is
+                    # only ever released on positive evidence: an offer whose
+                    # short version is newer than what is installed. Until then
+                    # it lapses on its own after MAC_UPDATE_MAU_DEFERRAL_DAYS,
+                    # which is what makes the next re-evaluation possible.
+                    # Break the quarantine deadlock. A DeferralVersions pin
+                    # caps the MAXIMUM version MAU will ever offer, so a pin at
+                    # the installed build (TEAMS21=26213.1006.5011.1671 on the
+                    # 2026-08-19 machine) blocks that product forever — and it
+                    # can never clear itself, because mau_reconcile_deferrals
+                    # only ran when msupdate --list was non-empty, while an
+                    # active DeferralDays quarantine is exactly what makes the
+                    # list empty. Reconcile with an empty offer set: that
+                    # releases no Office DeferralDays entry (release stays
+                    # empty when nothing is offered) but does drop the stale
+                    # version pins, which are unconditionally wrong.
+                    #
+                    # The expired set is the second half of that deadlock fix.
+                    # "Nothing offered" while a quarantine is live is not evidence
+                    # of anything — the quarantine is what empties the list — so a
+                    # quarantine that has outlived its window is released here on
+                    # age alone. The next run sees the real feed; if it is still a
+                    # downgrade, mau_regressed_entries re-arms it then. Passed as
+                    # the offer set of the SAME reconcile call on purpose: two
+                    # export/import cycles in one run race each other through
+                    # cfprefsd, which is how an earlier fix resurrected the entry
+                    # it had just removed.
+                    MAU_EXPIRED="$(mau_quarantine_expired_ids)"
+                    if [ -n "$MAU_EXPIRED" ]; then
+                        print_info "$(internet_msg "$L_INTERNET_MS_QUARANTINE_EXPIRED_FMT" "$(mau_quarantine_max_days)" "$MAU_EXPIRED")"
+                        internet_diag_log "MAU quarantine expiry releasing: $MAU_EXPIRED"
+                    fi
+                    mau_reconcile_deferrals "" "$MAU_EXPIRED" || true
+
+                    MAU_HELD="$(mau_active_office_deferrals)"
+                    if [ -n "$MAU_HELD" ]; then
+                        MAU_CH="$(mau_current_channel)"
+                        print_warn "$(internet_msg "$L_INTERNET_MS_DEFERRALS_HOLDING_FMT" "$MAU_HELD")"
+                        print_info "$(internet_msg "$L_INTERNET_MAU_CHANNEL_FMT" "$MAU_CH")"
+                        print_info "$L_INTERNET_MAU_CHANNEL_HINT"
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_QUARANTINED"
+                    else
+                        print_ok "$L_INTERNET_MS_CURRENT"
+                        STATUS_MICROSOFT="$L_INTERNET_STATUS_CURRENT"
+                    fi
+                fi
+            fi
+        elif [ -d "$MAU_APP" ]; then
+            print_step "$L_INTERNET_MS_OPENING_GUI"
+            if open -a "$MAU_APP" 2>/dev/null; then
+                print_info "$L_INTERNET_MS_ACCEPT_GUI"
+                STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_OPENED"
+            else
+                print_warn "Could not launch Microsoft AutoUpdate"
+                STATUS_MICROSOFT="$L_INTERNET_STATUS_CHECK_MAU"
+            fi
+        else
+            print_warn "Microsoft AutoUpdate is not installed"
+            print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_FROM" "https://learn.microsoft.com/en-us/microsoft-365-apps/mac/update-office-for-mac-using-msupdate")"
+            STATUS_MICROSOFT="$L_INTERNET_STATUS_MAU_MISSING"
+        fi
+
+    # ============================================================
+    # ██ SEKCJA 7: NARZĘDZIA DEWELOPERSKIE
+    # ============================================================
+
+    # ── 18b. MICROSOFT TEAMS ─────────────────────────────────────
+    # Teams owns its normal update cadence. Microsoft documents TEAMS21 as an
+    # MAU fallback that may be offered when the Teams updater fails; the shared
+    # MAU handler above can therefore verify a fallback update in this run.
+}
+
+iu_microsoft_teams() {
+    print_header "💬 Microsoft Teams"
+    local teams_path="/Applications/Microsoft Teams.app"
+    [ -d "$teams_path" ] || teams_path="$(internet_app_path "Microsoft Teams" 2>/dev/null || true)"
+    if [ -n "$teams_path" ] && [ -d "$teams_path" ]; then
+        VER=$(app_version "$teams_path")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        if [ "$MAU_TEAMS21_VERIFIED" -eq 1 ]; then
+            print_ok "Microsoft Teams fallback update verified by MAU (TEAMS21): $VER"
+            STATUS_TEAMS="✅ MAU fallback verified ($VER)"
+            return 0
+        fi
+
+        local cask_ver="" cask_rel=""
+        if command -v brew_cask_latest_versions >/dev/null 2>&1; then
+            cask_ver="$(brew_cask_latest_versions "microsoft-teams" 2>/dev/null | awk -F'\t' '$1 == "microsoft-teams" {print $2; exit}')"
+        fi
+        if [ -n "$cask_ver" ]; then
+            cask_rel="$(version_cmp "$cask_ver" "$VER")"
+        fi
+
+        if [ "$cask_rel" = "equal" ] || [ "$cask_rel" = "older" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Microsoft Teams" "$VER (cask: $cask_ver)")"
+            STATUS_TEAMS="$L_INTERNET_STATUS_CASK_CURRENT"
+        elif [ "$cask_rel" = "newer" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$cask_ver" "$VER")"
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Microsoft Teams")"
+            if silent_launch_app "$teams_path"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Microsoft Teams → Check for updates")"
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        elif [ "${MAU_LISTED:-0}" -eq 1 ] && [ "${MAU_TEAMS21_OFFERED:-0}" -eq 0 ] && [ "${STATUS_MICROSOFT:-}" = "$L_INTERNET_STATUS_CURRENT" ]; then
+            print_ok "Microsoft Teams up to date (MAU verified): $VER"
+            STATUS_TEAMS="✅ MAU verified ($VER)"
+        else
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Microsoft Teams")"
+            if silent_launch_app "$teams_path"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "Microsoft Teams → Check for updates")"
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_TEAMS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Microsoft Teams")"
+    fi
+}
+
+    # ── 19. VISUAL STUDIO CODE ────────────────────────────────────
+
+iu_visual_studio_code() {
+    print_header "💻 Visual Studio Code"
+    if [ -d "/Applications/Visual Studio Code.app" ]; then
+        VER=$(app_version "/Applications/Visual Studio Code.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        VSCODE_JSON=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 30 --retry 3 --retry-delay 2 "https://update.code.visualstudio.com/api/update/darwin-arm64/stable/latest" 2>/dev/null || true)
+        LATEST_VSCODE=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('productVersion', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
+        VSCODE_URL=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('url', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
+        VSCODE_SHA256=$(python3 -c "import json, sys; data=json.loads(sys.stdin.read()); print(data.get('sha256hash', ''))" <<< "$VSCODE_JSON" 2>/dev/null || true)
+
+        if [ -z "$LATEST_VSCODE" ] || [ -z "$VSCODE_URL" ]; then
+            # Offline or API unreachable — launch app for built-in updater
+            print_warn "$L_INTERNET_STATUS_OFFLINE"
+            print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "Visual Studio Code")"
+            if silent_launch_app "Visual Studio Code"; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "VS Code → Help → Check for Updates")"
+                STATUS_VSCODE="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_VSCODE="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        else
+            VSCODE_RELATION="$(internet_version_relation "$LATEST_VSCODE" "$VER")"
+            if [ "$VSCODE_RELATION" = "unknown" ]; then
+                print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Visual Studio Code version")"
+                STATUS_VSCODE="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            elif [ "$VSCODE_RELATION" = "current" ]; then
+                print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "VS Code" "$VER (remote: $LATEST_VSCODE)")"
+                STATUS_VSCODE="$L_INTERNET_STATUS_CURRENT"
+            elif internet_defer_running_app "/Applications/Visual Studio Code.app" STATUS_VSCODE "$VER" "$LATEST_VSCODE"; then
+                :
+            else
+                print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_VSCODE" "$VER")"
+                print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "Visual Studio Code" "$LATEST_VSCODE")"
+                TEMP_ZIP="$(mktemp "$INTERNET_TEMP_ROOT/vscode.XXXXXX.zip")"
+                TEMP_DIR="$INTERNET_TEMP_ROOT/vscode_extracted"
+                rm -rf "$TEMP_DIR" 2>/dev/null || true
+                mkdir -p "$TEMP_DIR"
+
+                if fetch_reviewed_artifact "$VSCODE_URL" "$TEMP_ZIP" 300 4294967296 "${MAC_UPDATE_ACTION_ID:-}" zip; then
+                    if [ -n "$VSCODE_SHA256" ]; then
+                        if ! echo "$VSCODE_SHA256  $TEMP_ZIP" | shasum -a 256 -c >/dev/null 2>&1; then
+                            print_warn "$(printf "$L_INTERNET_VSCODE_CHECKSUM_MISMATCH" "$TEMP_ZIP")"
+                            STATUS_VSCODE="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                            rm -f "$TEMP_ZIP" 2>/dev/null || true
+                            rm -rf "$TEMP_DIR" 2>/dev/null || true
+                            return 0
+                        fi
+                    fi
+                    print_step "$(internet_msg "$L_INTERNET_EXTRACTING" "Visual Studio Code")"
+                    if ditto -x -k "$TEMP_ZIP" "$TEMP_DIR" 2>/dev/null; then
+                        if [ -d "$TEMP_DIR/Visual Studio Code.app" ]; then
+                            VSCODE_SOURCE_VER=$(app_version "$TEMP_DIR/Visual Studio Code.app")
+                            if [ "$(internet_version_relation "$VSCODE_SOURCE_VER" "$VER")" != "newer" ]; then
+                                print_warn "Refusing non-newer VS Code payload: $VSCODE_SOURCE_VER (installed: $VER)"
+                                STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            elif copy_verified_app "$TEMP_DIR/Visual Studio Code.app" "/Applications/Visual Studio Code.app" "${MAC_UPDATE_ACTION_ID:-}"; then
+                                NEW_VER=$(app_version "/Applications/Visual Studio Code.app")
+                                print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Visual Studio Code" "$NEW_VER")"
+                                STATUS_VSCODE="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                            else
+                                if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                    STATUS_VSCODE="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_VSCODE:-?}")"
+                                else
+                                    print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Visual Studio Code")"
+                                    STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                                fi
+                            fi
+                        else
+                            print_warn "$(internet_msg "$L_INTERNET_APP_NOT_IN_ARCHIVE" "Visual Studio Code")"
+                            STATUS_VSCODE="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        fi
+                    else
+                        print_warn "$L_INTERNET_STATUS_EXTRACT_ERROR"
+                        STATUS_VSCODE="$L_INTERNET_STATUS_EXTRACT_ERROR"
+                    fi
+                else
+                    print_warn "$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                    STATUS_VSCODE="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                fi
+                rm -f "$TEMP_ZIP" 2>/dev/null || true
+                rm -rf "$TEMP_DIR" 2>/dev/null || true
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Visual Studio Code")"
+    fi
+
+    # ── 20. CODEEDIT (GitHub API + DMG) ───────────────────────────
+}
+
+iu_codeedit() {
+    print_header "✏️  CodeEdit"
+    if [ -d "/Applications/CodeEdit.app" ]; then
+        VER=$(app_version "/Applications/CodeEdit.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        LATEST_CE_TAG=$(github_latest_tag "CodeEditApp/CodeEdit")
+        LATEST_CE=$(echo "$LATEST_CE_TAG" | sed 's/^v//')
+        [ "$LATEST_CE" = "?" ] || github_lookup_record "CodeEdit" "$LATEST_CE"
+        CE_RELATION="$(internet_version_relation "$LATEST_CE" "$VER")"
+
+        if [ "$LATEST_CE" = "?" ] && github_lookup_handled "CodeEdit" "$VER"; then
+            STATUS_CODEEDIT="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_CE" = "?" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
+            if silent_launch_app "CodeEdit"; then
+                STATUS_CODEEDIT="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+            else
+                STATUS_CODEEDIT="$L_INTERNET_STATUS_LAUNCH_FAILED"
+            fi
+        elif [ "$CE_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "CodeEdit version")"
+            STATUS_CODEEDIT="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$CE_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "CodeEdit" "$VER (remote: $LATEST_CE)")"
+            STATUS_CODEEDIT="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/CodeEdit.app" STATUS_CODEEDIT "$VER" "$LATEST_CE"; then
+            :
+        else
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_CE" "$VER")"
+            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "CodeEdit" "$LATEST_CE")"
+            # TODO(H5): Publisher digest is unverified for CodeEdit download
+            CE_URL="https://github.com/CodeEditApp/CodeEdit/releases/download/${LATEST_CE_TAG}/CodeEdit.dmg"
+            TEMP_DMG="$(make_temp_dmg CodeEdit)"
+            if fetch_reviewed_artifact "$CE_URL" "$TEMP_DMG" 180 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
+                CE_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$CE_MOUNT" ]; then
+                    if [ -d "$CE_MOUNT/CodeEdit.app" ]; then
+                        CE_SOURCE_VER=$(app_version "$CE_MOUNT/CodeEdit.app")
+                        if [ "$(internet_version_relation "$CE_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer CodeEdit payload: $CE_SOURCE_VER (installed: $VER)"
+                            STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$CE_MOUNT/CodeEdit.app" "/Applications/CodeEdit.app" "${MAC_UPDATE_ACTION_ID:-}"; then
+                            NEW_VER=$(app_version "/Applications/CodeEdit.app")
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "CodeEdit" "$NEW_VER")"
+                            STATUS_CODEEDIT="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                        else
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_CODEEDIT="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_CE:-?}")"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "CodeEdit")"
+                                STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
+                        fi
+                    else
+                        print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "CodeEdit")"
+                        STATUS_CODEEDIT="$L_INTERNET_STATUS_INSTALL_ERROR"
+                    fi
+                    detach_verified_dmg "$CE_MOUNT" || true
+                else
+                    print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
+                    STATUS_CODEEDIT="$L_INTERNET_STATUS_MOUNT_ERROR"
+                fi
+                rm -f "$TEMP_DMG"
+            else
+                print_warn "$L_INTERNET_DOWNLOAD_VERIFY_FAILED"
+                print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://github.com/CodeEditApp/CodeEdit/releases")"
+                STATUS_CODEEDIT="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                rm -f "$TEMP_DMG" 2>/dev/null || true
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "CodeEdit")"
+    fi
+
+    # ── 21. DOCKER DESKTOP ────────────────────────────────────────
+}
+
+iu_docker_desktop() {
+    print_header "🐳 Docker Desktop"
+    if [ -d "/Applications/Docker.app" ]; then
+        VER=$(app_version "/Applications/Docker.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        local feed_row
+        feed_row="$(vendor_feed_lookup "Docker Desktop" 2>/dev/null || true)"
+        if [ -z "$feed_row" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        local R URL CK CS ART HOST POLICY
+        IFS='|' read -r R URL CK CS ART HOST POLICY <<EOF_DOCKER_ROW
+$feed_row
+EOF_DOCKER_ROW
+        if [ -z "$R" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        local rel
+        rel="$(version_cmp "$R" "$VER")"
+        if [ "$rel" = "equal" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$VER")"
+            INTERNET_LAST_VERIFIED=1
+            print_ok "${STATUS_DOCKER#✅ }"
+            return 0
+        elif [ "$rel" = "older" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$VER")"
+            INTERNET_LAST_VERIFIED=0
+            print_warn "$(internet_status_body "$STATUS_DOCKER")"
+            return 0
+        elif [ "$rel" = "unknown" ]; then
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            STATUS_DOCKER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+            INTERNET_SOFT_FAIL=1
+            return 0
+        fi
+
+        # newer:
+        if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$(internet_status_body "$STATUS_DOCKER")"
+            return 0
+        fi
+
+        # Docker Desktop that is already running is the user's: applying an
+        # update restarts the engine and every container with it. Same rule as
+        # every other app (critical_rules §15): never quit, relaunch or replace
+        # what the user has open — report and move on.
+        local docker_running=0
+        if command -v internet_app_is_running >/dev/null 2>&1 \
+            && internet_app_is_running "com.docker.docker"; then
+            docker_running=1
+        elif command -v docker >/dev/null 2>&1 \
+            && run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+            docker_running=1
+        fi
+        if [ "$docker_running" -eq 1 ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_warn "$(internet_status_body "$STATUS_DOCKER")"
+            return 0
+        fi
+
+        # Idle Docker: install the verified DMG straight from the appcast.
+        # `docker desktop update` needs the engine started first (~20 s plus a
+        # stop) and on 2026-09-28 failed immediately with "install error:
+        # validating application: validating signature: <APP>: No such file or
+        # directory" — after which the old handler polled the unchanged bundle
+        # for 300 s. The DMG path verifies Gatekeeper, bundle ID and Team ID and
+        # rolls back on failure (vendor_direct_install / copy_verified_app).
+        if [ "$ART" != "-" ] && [ -n "$ART" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ] \
+            && command -v vendor_direct_install >/dev/null 2>&1; then
+            print_step "$(printf "$L_INTERNET_VENDOR_DIRECT_FMT" "Docker Desktop" "$R" "$HOST")"
+            vendor_direct_install "/Applications/Docker.app" "$URL" "$ART" "$CK" "$CS" "$HOST" "$R"
+            local vrc=$?
+            if [ "$vrc" -eq 0 ]; then
+                local vd_ver
+                vd_ver="$(app_version "/Applications/Docker.app")"
+                local vd_rel
+                vd_rel="$(version_cmp "$R" "$vd_ver")"
+                if [ "$vd_rel" = "equal" ] || [ "$vd_rel" = "older" ]; then
+                    STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$vd_ver")"
+                    INTERNET_LAST_VERIFIED=1
+                    print_ok "${STATUS_DOCKER#✅ }"
+                    return 0
+                fi
+            elif [ "$vrc" -eq 4 ]; then
+                STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${R:-?}")"
+                INTERNET_LAST_VERIFIED=0
+                print_warn "$(internet_status_body "$STATUS_DOCKER")"
+                return 0
+            elif [ "$vrc" -eq 3 ]; then
+                STATUS_DOCKER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                INTERNET_LAST_VERIFIED=0
+                INTERNET_HARD_FAIL=1
+                print_warn "$(internet_status_body "$STATUS_DOCKER")"
+                return 1
+            fi
+            internet_diag_log "Docker Desktop: vendor direct install rc=$vrc — falling back to docker desktop update"
+        fi
+
+        if ! command -v docker >/dev/null 2>&1; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_warn "$STATUS_DOCKER (docker CLI not found)"
+            return 0
+        fi
+
+        print_step "$L_INTERNET_DOCKER_STARTING"
+        run_with_timeout 180 docker desktop start >/dev/null 2>&1 || true
+        local started=0
+        local elapsed=0
+        while [ "$elapsed" -lt 120 ]; do
+            sleep 5
+            elapsed=$((elapsed + 5))
+            if run_with_timeout 15 docker desktop status >/dev/null 2>&1; then
+                started=1
+                break
+            fi
+        done
+        if [ "$started" -eq 0 ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$VER" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_warn "$L_INTERNET_DOCKER_START_FAILED"
+            return 0
+        fi
+
+        print_step "$L_INTERNET_DOCKER_UPDATING"
+        local upd_out upd_rc
+        upd_out="$(run_with_timeout 900 docker desktop update -q 2>&1)"
+        upd_rc=$?
+
+        local new_ver="$VER"
+        local check_rel
+        local updated=0
+        if [ "$upd_rc" -ne 0 ]; then
+            # The updater reported failure; the bundle will not change, so do
+            # not burn the 300 s poll waiting for it.
+            internet_diag_log "Docker Desktop: docker desktop update -q failed (exit=$upd_rc): $(printf '%s\n' "$upd_out" | grep -v '^Downloading' | tail -n 3 | tr '\n' ' ')"
+        else
+            elapsed=0
+            while [ "$elapsed" -lt 300 ]; do
+                new_ver="$(app_version "/Applications/Docker.app")"
+                check_rel="$(version_cmp "$R" "$new_ver")"
+                if [ "$check_rel" = "equal" ] || [ "$check_rel" = "older" ]; then
+                    updated=1
+                    break
+                fi
+                sleep 10
+                elapsed=$((elapsed + 10))
+            done
+        fi
+
+        # Only ever stop what this handler started (it always started it here:
+        # a running Docker returned NEEDS_RESTART above).
+        run_with_timeout 120 docker desktop stop >/dev/null 2>&1 || true
+
+        if [ "$updated" -eq 1 ]; then
+            STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$new_ver")"
+            INTERNET_LAST_VERIFIED=1
+            print_ok "${STATUS_DOCKER#✅ }"
+            return 0
+        fi
+
+        STATUS_DOCKER="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$new_ver" "$R")"
+        INTERNET_LAST_VERIFIED=1
+        print_warn "$(internet_status_body "$STATUS_DOCKER")"
+        return 0
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Docker Desktop")"
+    fi
+}
+    # ── 22. WARP ──────────────────────────────────────────────────
+
+
+iu_warp() {
+    internet_dispatch_silent_launch "⚡ Warp" "Warp" "STATUS_WARP" "Warp" "Warp → Warp → O Warp / Check for Updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Warp")"
+}
+
+iu_cursor() {
+    internet_dispatch_silent_launch "⚡ Cursor" "Cursor" "STATUS_CURSOR" "Cursor" "Cursor → Cursor → Check for updates" "$(internet_msg "$L_INTERNET_WEEKLY_AUTO_UPDATES" "Cursor")"
+}
+
+# Open Design, HyperFrames, Superset: the vendor feed (config/vendor_feeds.txt)
+# decides, and none of them is ever launched (config/vendor_launch_policy.txt).
+# HyperFrames and Superset (upstream project now "paradev", bundle still
+# Superset.app) install direct-only from their checksummed arm64 zip through
+# vendor_direct_install. Open Design is verify-only: behind -> "open the app to
+# update". Open Design's version is the active launcher payload and HyperFrames'
+# is its build label (lib/python/inventory.py vendor_installed_version).
+iu_opendesign() {
+    internet_dispatch_silent_launch "🎨 Open Design" "Open Design" "STATUS_OPENDESIGN" "Open Design" "Open Design → Check for Updates" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Open Design")"
+}
+
+iu_hyperframes() {
+    internet_dispatch_silent_launch "🎞️  HyperFrames" "HyperFrames" "STATUS_HYPERFRAMES" "HyperFrames" "HyperFrames → Check for Updates" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "HyperFrames")"
+}
+
+iu_superset() {
+    internet_dispatch_silent_launch "🧩 Superset" "Superset" "STATUS_SUPERSET" "Superset" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Superset")"
+}
+
+# DeepSeek Harness (Electron + Squirrel, own electron-updater feed) and Grok Bot
+# (Cursor "sand" product, Squirrel.Mac JSON feed): verify-only vendor feeds
+# (config/vendor_feeds.txt); only a behind app is launched so its own updater
+# installs. A launch alone never counts as verified (critical_rules.md 6b).
+iu_deepseek_harness() {
+    internet_dispatch_silent_launch "🐋 DeepSeek Harness" "DeepSeek Harness" "STATUS_DEEPSEEK" "DeepSeek Harness" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "DeepSeek Harness")"
+}
+
+iu_grok_bot() {
+    internet_dispatch_silent_launch "🤖 Grok Bot" "Grok Bot" "STATUS_GROKBOT" "Grok Bot" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Grok Bot")"
+}
+
+iu_appcleaner() {
+    internet_dispatch_silent_launch "🧹 AppCleaner" "AppCleaner" "STATUS_APPCLEANER" "AppCleaner" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES_SPARKLE" "AppCleaner")"
+}
+
+iu_obsidian() {
+    internet_dispatch_silent_launch "📝 Obsidian" "Obsidian" "STATUS_OBSIDIAN" "Obsidian" "" "$(internet_msg "$L_INTERNET_AUTO_UPDATES" "Obsidian")"
+}
+
+iu_spotify() {
+    internet_dispatch_silent_launch "🎵 Spotify" "Spotify" "STATUS_SPOTIFY" "Spotify" "Spotify → Spotify → O Spotify" "$L_INTERNET_SPOTIFY_PROFILE_DOT"
+}
+
+iu_capcut() {
+    internet_dispatch_silent_launch "🎬 CapCut" "CapCut" "STATUS_CAPCUT" "CapCut" "CapCut → CapCut → Check for Updates"
+}
+
+iu_ledger() {
+    print_header "🔐 Ledger Wallet / Ledger Live"
+    LEDGER_APP=""
+    LEDGER_NAME=""
+    for lapp in "Ledger Wallet" "Ledger Live"; do
+        if [ -d "/Applications/${lapp}.app" ]; then
+            LEDGER_APP="/Applications/${lapp}.app"
+            LEDGER_NAME="$lapp"
+            break
+        fi
+    done
+
+    if [ -n "$LEDGER_APP" ]; then
+        VER=$(app_version "$LEDGER_APP")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_APP" "$LEDGER_NAME" "$VER")"
+
+        LEDGER_YML=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 20 --retry 3 --retry-delay 2 "https://download.live.ledger.com/latest-mac.yml")
+        LATEST_LEDGER=$(echo "$LEDGER_YML" | grep "^version:" | cut -d' ' -f2 | tr -d '[:space:]')
+        # electron-builder's latest-mac.yml lists the .zip first and repeats
+        # that entry's digest as the top-level `sha512:`. Taking the first
+        # sha512 in the document therefore paired the ZIP's digest with the DMG
+        # this handler downloads, so verification could never succeed and
+        # Ledger was blocked from updating on every run. Resolve the DMG url
+        # and its own digest together, from the same list entry.
+        LEDGER_ASSET=$(python3 -c "
+import sys, re
+yml = sys.stdin.read()
+entries = re.findall(r'-\s+url:\s*(\S+)\s*\n\s+sha512:\s*(\S+)', yml)
+for url, digest in entries:
+    if url.endswith('.dmg'):
+        print(url.strip() + '|' + digest.strip())
+        break
+" <<< "$LEDGER_YML" 2>/dev/null || true)
+        LEDGER_DMG_FILE=$(printf '%s' "$LEDGER_ASSET" | cut -d'|' -f1)
+        LEDGER_SHA512=$(printf '%s' "$LEDGER_ASSET" | cut -d'|' -f2)
+        LEDGER_RELATION="$(internet_version_relation "$LATEST_LEDGER" "$VER")"
+
+        if [ -z "$LATEST_LEDGER" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "download.live.ledger.com")"
+            STATUS_LEDGER="$L_INTERNET_STATUS_OFFLINE"
+        elif [ "$LEDGER_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Ledger version")"
+            STATUS_LEDGER="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$LEDGER_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "$LEDGER_NAME" "$VER (remote: $LATEST_LEDGER)")"
+            STATUS_LEDGER="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "$LEDGER_APP" STATUS_LEDGER "$VER" "$LATEST_LEDGER"; then
+            :
+        else
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_LEDGER" "$VER")"
+            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING" "$LEDGER_NAME" "$LATEST_LEDGER")"
+            # LEDGER_DMG_FILE and LEDGER_SHA512 come from the same manifest
+            # entry above. Falling back to a guessed filename means there is no
+            # digest to check it against, so the checksum step is skipped
+            # rather than run against a mismatched digest.
+            if [ -z "$LEDGER_DMG_FILE" ]; then
+                LEDGER_DMG_FILE="ledger-live-desktop-${LATEST_LEDGER}-mac.dmg"
+                LEDGER_SHA512=""
+                print_info "$(internet_msg "$L_INTERNET_FEED_NOT_MACHINE_READABLE_FMT" "Ledger Live")"
+            fi
+            LEDGER_URL="https://download.live.ledger.com/${LEDGER_DMG_FILE}"
+            TEMP_DMG="$(make_temp_dmg LedgerWallet)"
+            if fetch_reviewed_artifact "$LEDGER_URL" "$TEMP_DMG" 300 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
+                if [ -n "$LEDGER_SHA512" ]; then
+                    ACTUAL_SHA512=$(shasum -a 512 "$TEMP_DMG" | awk '{print $1}')
+                    if ! python3 -c "
+import sys, base64, binascii
+exp = sys.argv[1].strip()
+act = sys.argv[2].strip().lower()
+if len(exp) == 128:
+    exp_hex = exp.lower()
+else:
+    try:
+        exp_hex = binascii.hexlify(base64.b64decode(exp)).decode('ascii').lower()
+    except Exception:
+        exp_hex = ''
+sys.exit(0 if exp_hex and exp_hex == act else 1)
+" "$LEDGER_SHA512" "$ACTUAL_SHA512"; then
+                        print_warn "$(printf "$L_INTERNET_LEDGER_CHECKSUM_MISMATCH" "$TEMP_DMG")"
+                        STATUS_LEDGER="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                        rm -f "$TEMP_DMG" 2>/dev/null || true
+                        return 0
+                    fi
+                fi
+                LEDGER_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$LEDGER_MOUNT" ]; then
+                    if [ -d "$LEDGER_MOUNT/Ledger Live.app" ] || [ -d "$LEDGER_MOUNT/Ledger Wallet.app" ]; then
+                        SRC_APP=""
+                        if [ -d "$LEDGER_MOUNT/Ledger Wallet.app" ]; then
+                            SRC_APP="Ledger Wallet.app"
+                        else
+                            SRC_APP="Ledger Live.app"
+                        fi
+
+                        LEDGER_SOURCE_VER=$(app_version "$LEDGER_MOUNT/$SRC_APP")
+                        if [ "$(internet_version_relation "$LEDGER_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer Ledger payload: $LEDGER_SOURCE_VER (installed: $VER)"
+                            STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$LEDGER_MOUNT/$SRC_APP" "/Applications/$LEDGER_NAME.app" "${MAC_UPDATE_ACTION_ID:-}"; then
+                            NEW_VER=$(app_version "/Applications/$LEDGER_NAME.app")
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "$LEDGER_NAME" "$NEW_VER")"
+                            STATUS_LEDGER="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                        else
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_LEDGER="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_LEDGER:-?}")"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "$SRC_APP")"
+                                STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
+                        fi
+                    else
+                        print_warn "$L_INTERNET_APP_NOT_ON_VOLUME"
+                        STATUS_LEDGER="$L_INTERNET_STATUS_INSTALL_ERROR"
+                    fi
+                    detach_verified_dmg "$LEDGER_MOUNT" || true
+                else
+                    print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
+                    STATUS_LEDGER="$L_INTERNET_STATUS_MOUNT_ERROR"
+                fi
+                rm -f "$TEMP_DMG"
+            else
+                print_warn "$L_INTERNET_DOWNLOAD_VERIFY_FAILED"
+                STATUS_LEDGER="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                rm -f "$TEMP_DMG" 2>/dev/null || true
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Ledger Live / Ledger Wallet")"
+    fi
+
+    # ── 31. TREZOR SUITE (GitHub API + DMG arm64) ─────────────────
+}
+
+iu_trezor_suite() {
+    print_header "🔒 Trezor Suite"
+    if [ -d "/Applications/Trezor Suite.app" ]; then
+        VER=$(app_version "/Applications/Trezor Suite.app")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+
+        # Monorepo: trezor-suite publishes both suite (desktop) and connect (library)
+        # releases. /releases/latest may return a connect release. Filter to desktop-only
+        # tags matching v?NN.N.N (no slashes, no connect prefix).
+        LATEST_TS_TAG="?"
+        TS_BODY="$(mktemp "${TMPDIR:-/tmp}/ghapi.XXXXXX")" || TS_BODY=""
+        if [ -n "$TS_BODY" ] && github_api_fetch "trezor/trezor-suite" "https://api.github.com/repos/trezor/trezor-suite/releases?per_page=20" "$TS_BODY"; then
+            LATEST_TS_TAG=$(python3 -c 'import json,sys,re
+try:
+    releases=json.load(open(sys.argv[1]))
+    for r in releases:
+        tag=r.get("tag_name","")
+        if not r.get("prerelease") and re.match(r"^v?\d{2}\.\d+\.\d+$", tag):
+            print(tag); break
+    else:
+        print("?")
+except Exception:
+    print("?")' "$TS_BODY" 2>/dev/null)
+        fi
+        [ -n "$TS_BODY" ] && rm -f "$TS_BODY"
+        LATEST_TS=$(echo "$LATEST_TS_TAG" | sed 's/^v//')
+        [ "$LATEST_TS" = "?" ] || github_lookup_record "Trezor Suite" "$LATEST_TS"
+        TS_RELATION="$(internet_version_relation "$LATEST_TS" "$VER")"
+
+        if [ "$LATEST_TS" = "?" ] && github_lookup_handled "Trezor Suite" "$VER"; then
+            STATUS_TREZOR="$GITHUB_UNAVAILABLE_STATUS"
+        elif [ "$LATEST_TS" = "?" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_OFFLINE" "GitHub")"
+            STATUS_TREZOR="$L_INTERNET_STATUS_OFFLINE"
+        elif [ "$TS_RELATION" = "unknown" ]; then
+            print_warn "$(internet_msg "$L_INTERNET_UNKNOWN_DETECTED" "Trezor Suite version")"
+            STATUS_TREZOR="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        elif [ "$TS_RELATION" = "current" ]; then
+            print_ok "$(internet_msg "$L_INTERNET_APP_CURRENT" "Trezor Suite" "$VER (remote: $LATEST_TS)")"
+            STATUS_TREZOR="$L_INTERNET_STATUS_CURRENT"
+        elif internet_defer_running_app "/Applications/Trezor Suite.app" STATUS_TREZOR "$VER" "$LATEST_TS"; then
+            :
+        else
+            print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$LATEST_TS" "$VER")"
+            print_step "$(internet_msg "$L_INTERNET_DOWNLOADING_ARM" "Trezor Suite" "$LATEST_TS")"
+            # TODO(H5): Publisher digest is unverified for Trezor Suite download
+            TS_URL="https://github.com/trezor/trezor-suite/releases/download/${LATEST_TS_TAG}/Trezor-Suite-${LATEST_TS}-mac-arm64.dmg"
+            TEMP_DMG="$(make_temp_dmg TrezorSuite)"
+            if fetch_reviewed_artifact "$TS_URL" "$TEMP_DMG" 300 4294967296 "${MAC_UPDATE_ACTION_ID:-}" dmg; then
+                TS_MOUNT="$(mount_verified_dmg "$TEMP_DMG")"
+                if [ -n "$TS_MOUNT" ]; then
+                    if [ -d "$TS_MOUNT/Trezor Suite.app" ]; then
+                        TS_SOURCE_VER=$(app_version "$TS_MOUNT/Trezor Suite.app")
+                        if [ "$(internet_version_relation "$TS_SOURCE_VER" "$VER")" != "newer" ]; then
+                            print_warn "Refusing non-newer Trezor Suite payload: $TS_SOURCE_VER (installed: $VER)"
+                            STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
+                        elif copy_verified_app "$TS_MOUNT/Trezor Suite.app" "/Applications/Trezor Suite.app" "${MAC_UPDATE_ACTION_ID:-}"; then
+                            NEW_VER=$(app_version "/Applications/Trezor Suite.app")
+                            print_ok "$(internet_msg "$L_INTERNET_APP_UPDATED" "Trezor Suite" "$NEW_VER")"
+                            STATUS_TREZOR="$(internet_msg "$L_INTERNET_STATUS_UPDATED_FMT" "$NEW_VER")"
+                        else
+                            if [ "${INTERNET_COPY_DEFERRED:-0}" = "1" ]; then
+                                STATUS_TREZOR="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$VER" "${LATEST_TS:-?}")"
+                            else
+                                print_warn "$(internet_msg "$L_INTERNET_COPY_ERROR" "Trezor Suite.app")"
+                                STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
+                            fi
+                        fi
+                    else
+                        print_warn "$(internet_msg "$L_INTERNET_APP_NOT_FOUND_VOLUME" "Trezor Suite")"
+                        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://trezor.io/trezor-suite")"
+                        STATUS_TREZOR="$L_INTERNET_STATUS_INSTALL_ERROR"
+                    fi
+                    detach_verified_dmg "$TS_MOUNT" || true
+                else
+                    print_warn "$L_INTERNET_MOUNT_DMG_FAILED"
+                    STATUS_TREZOR="$L_INTERNET_STATUS_MOUNT_ERROR"
+                fi
+                rm -f "$TEMP_DMG"
+            else
+                print_warn "$L_INTERNET_DOWNLOAD_VERIFY_FAILED"
+                print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_MANUALLY" "https://github.com/trezor/trezor-suite/releases")"
+                STATUS_TREZOR="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                rm -f "$TEMP_DMG" 2>/dev/null || true
+            fi
+        fi
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "Trezor Suite")"
+    fi
+
+    # ============================================================
+    # ██ SEKCJA 11: SIEĆ I INFRASTRUKTURA IT
+    # ============================================================
+
+    # ── 32. REMOTE DESKTOP MANAGER (Devolutions) ──────────────────
+}
+
+iu_remote_desktop_manager() {
+    internet_dispatch_silent_launch "🖥️  Remote Desktop Manager" "Remote Desktop Manager" "STATUS_RDMANAGER" "Remote Desktop Manager"
+}
+
+    # ── 34. IPMIVIEW (Supermicro) ────────────────────────────────
+
+iu_ipmiview() {
+    print_header "🔧 IPMIView (Supermicro)"
+    IPMI_PATH=""
+    for ipath in "/Applications/IPMIView.app" "/Applications/IPMI View.app"; do
+        [ -d "$ipath" ] && IPMI_PATH="$ipath" && break
+    done
+    if [ -n "$IPMI_PATH" ]; then
+        if command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$IPMI_PATH"; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            STATUS_IPMIVIEW="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            return 0
+        fi
+        VER=$(app_version "$IPMI_PATH")
+        print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$VER")"
+        # A vendor that ships no auto-updater is a permanent fact about that vendor, not
+        # a fault in this run. Reported as information for the same reason Antigravity's
+        # 404 feed was demoted on 2026-08-26: a warning the operator can never clear
+        # trains them to ignore warnings that matter. The manual-update line below still
+        # tells them exactly what to do.
+        print_info "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "IPMIView")"
+        print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "https://www.supermicro.com/en/solutions/management-software/ipmi-utilities")"
+        STATUS_IPMIVIEW="$L_INTERNET_STATUS_MANUAL_UPDATE"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "IPMIView")"
+    fi
+}

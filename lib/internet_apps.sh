@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+# lib/internet_apps.sh — canonical internet-app inventory helpers (Bash 3.2+)
+# Requires: SCRIPT_DIR set by caller; config/internet_apps.txt in repo root.
+
+_internet_apps_config_path() {
+    echo "${SCRIPT_DIR}/config/internet_apps.txt"
+}
+
+internet_apps_load_config() {
+    local cfg line
+    INTERNET_APPS_LIST=()
+    cfg="$(_internet_apps_config_path)"
+    if [ ! -f "$cfg" ]; then
+        return 1
+    fi
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        [ -n "$line" ] || continue
+        INTERNET_APPS_LIST+=("$line")
+    done < "$cfg"
+    return 0
+}
+
+internet_cask_name_for_app() {
+    local app="$1"
+    case "$app" in
+        "Brave Browser")          echo "brave-browser" ;;
+        "Claude")                 echo "claude" ;;
+        "Comet")                  echo "comet" ;;
+        "Perplexity")             echo "perplexity" ;;
+        "Antigravity")            echo "antigravity" ;;
+        "Antigravity IDE")        echo "antigravity-ide" ;;
+        "LM Studio")              echo "lm-studio" ;;
+        "Cursor")                 echo "cursor" ;;
+        "Obsidian")               echo "obsidian" ;;
+        "ProtonVPN")              echo "protonvpn" ;;
+        "Proton Mail")            echo "proton-mail" ;;
+        "zoom.us")                echo "zoom" ;;
+        "MEGAsync")               echo "megasync" ;;
+        "Proton Drive")           echo "proton-drive" ;;
+        "Warp")                   echo "warp" ;;
+        "AppCleaner")             echo "appcleaner" ;;
+        "Spotify")                echo "spotify" ;;
+        "CapCut")                 echo "capcut" ;;
+        "Inkscape")               echo "inkscape" ;;
+        *)                        echo "$app" | tr '[:upper:] ' '[:lower:]-' | sed 's/[^a-z0-9-]//g' ;;
+    esac
+}
+
+internet_get_app_days_unchanged() {
+    local app_name="$1"
+    local history_file="${SCRIPT_DIR}/logs/version_history.tsv"
+    [ -f "$history_file" ] || { echo "0"; return; }
+
+    python3 - "$app_name" "$history_file" <<'PYEOF'
+import sys, datetime
+
+app_target = sys.argv[1]
+tsv_path = sys.argv[2]
+
+entries = []
+try:
+    with open(tsv_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            parts = line.strip().split('\t')
+            if len(parts) >= 3 and parts[1] == app_target:
+                try:
+                    dt = datetime.datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S")
+                    entries.append((dt, parts[2]))
+                except ValueError:
+                    pass
+except Exception:
+    print("0")
+    sys.exit(0)
+
+if not entries:
+    print("0")
+    sys.exit(0)
+
+entries.sort(key=lambda x: x[0])
+latest_ver = entries[-1][1]
+start_dt = entries[-1][0]
+for dt, ver in reversed(entries):
+    if ver == latest_ver:
+        start_dt = dt
+    else:
+        break
+
+now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+days = (now - start_dt).days
+print(max(0, days))
+PYEOF
+}
+
+internet_rotate_version_history() {
+    local history_file="${SCRIPT_DIR}/logs/version_history.tsv"
+    [ -f "$history_file" ] || return 0
+
+    python3 - "$history_file" <<'PYEOF'
+import sys, datetime
+
+tsv_path = sys.argv[1]
+cutoff = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=365)
+keep = []
+
+try:
+    with open(tsv_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            parts = line.strip().split('\t')
+            if len(parts) >= 1:
+                try:
+                    dt = datetime.datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S")
+                    if dt >= cutoff:
+                        keep.append(line)
+                except ValueError:
+                    keep.append(line)
+    if len(keep) > 5000:
+        keep = keep[-5000:]
+    with open(tsv_path, 'w', encoding='utf-8') as f:
+        f.writelines(keep)
+except Exception:
+    pass
+PYEOF
+}
+
+# ── Intel-only (x86_64-only) apps: generic, registry-driven, app-agnostic ──
+# Both helpers walk a methods registry (config/internet_app_methods.txt format)
+# and act on any installed app whose executable is x86_64-only, whatever its
+# update method. Needs lib/platform.sh, lib/ui.sh and the L_INTERNET_ROSETTA_* strings.
+
+# Before dispatch: reset the session's rosetta_missing_apps.txt; when an Intel-only
+# app is present and Rosetta is not, install it only on explicit opt-in
+# (MAC_UPDATE_INSTALL_ROSETTA=1). Never installs by default.
+internet_rosetta_preflight() {
+    local registry="$1" name method status_var rest path has_x86=0
+    [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && rm -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null
+    while IFS='|' read -r name method status_var rest; do
+        case "$name" in '#'*|'') continue ;; esac
+        path="$(internet_app_path "$name")"
+        if [ -d "$path" ] && [ "$(mac_update_app_architecture "$path")" = "x86_64-only" ]; then
+            has_x86=1
+            break
+        fi
+    done < "$registry"
+    if [ "$has_x86" -eq 1 ] && ! mac_update_rosetta_installed \
+        && [ "${MAC_UPDATE_INSTALL_ROSETTA:-0}" = "1" ]; then
+        print_step "Installing Rosetta via softwareupdate..."
+        softwareupdate --install-rosetta --agree-to-license
+        if mac_update_rosetta_installed; then
+            print_ok "Rosetta installed successfully"
+        else
+            print_warn "Rosetta installation could not be verified"
+        fi
+    fi
+    return 0
+}
+
+# After dispatch: every installed x86_64-only app reports the Rosetta requirement as
+# its final status (overriding the handler's), and is listed in
+# rosetta_missing_apps.txt when Rosetta is absent.
+internet_rosetta_finalize() {
+    local registry="$1" name method status_var rest path
+    while IFS='|' read -r name method status_var rest; do
+        case "$name" in '#'*|'') continue ;; esac
+        status_var="$(echo "$status_var" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        path="$(internet_app_path "$name")"
+        [ -d "$path" ] || continue
+        [ "$(mac_update_app_architecture "$path")" = "x86_64-only" ] || continue
+        if mac_update_rosetta_installed; then
+            eval "$status_var=\"\$L_INTERNET_ROSETTA_REQUIRED; \$L_INTERNET_ROSETTA_EOL\""
+        else
+            eval "$status_var=\"\$L_INTERNET_ROSETTA_REQUIRED \$L_INTERNET_ROSETTA_NOT_INSTALLED; \$L_INTERNET_ROSETTA_EOL\""
+            [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && echo "$name" >> "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt"
+        fi
+    done < "$registry"
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" ]; then
+        sort -u "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" -o "$MAC_UPDATE_SESSION_DIR/rosetta_missing_apps.txt" 2>/dev/null || true
+    fi
+    return 0
+}
+
+internet_app_path() {
+    local app_name="$1" candidate bundle_id
+    case "$app_name" in
+        "ChatGPT / Codex")
+            # OpenAI renamed the Codex desktop bundle to ChatGPT.app while
+            # retaining com.openai.codex.  Match the bundle ID so the legacy
+            # com.openai.chat (ChatGPT Classic) is never treated as this target.
+            for candidate in \
+                "/Applications/ChatGPT.app" \
+                "${HOME}/Applications/ChatGPT.app" \
+                "/Applications/Codex.app" \
+                "${HOME}/Applications/Codex.app"
+            do
+                [ -d "$candidate" ] || continue
+                bundle_id=$(defaults read "$candidate/Contents/Info" CFBundleIdentifier 2>/dev/null \
+                    || mdls -raw -name kMDItemCFBundleIdentifier "$candidate" 2>/dev/null \
+                    || true)
+                if [ "$bundle_id" = "com.openai.codex" ]; then
+                    echo "$candidate"
+                    return 0
+                fi
+            done
+            return 1
+            ;;
+        "OpenCode")
+            for candidate in \
+                "/Applications/OpenCode.app" \
+                "${HOME}/Applications/OpenCode.app" \
+                "/Applications/opencode.app" \
+                "${HOME}/Applications/opencode.app" \
+                "/Applications/Opencode.app" \
+                "${HOME}/Applications/Opencode.app" \
+                "/Applications/opencode Desktop.app" \
+                "${HOME}/Applications/opencode Desktop.app"
+            do
+                [ -d "$candidate" ] && echo "$candidate" && return 0
+            done
+            ;;
+        "Ledger Live")
+            [ -d "/Applications/Ledger Live.app" ] && echo "/Applications/Ledger Live.app" && return 0
+            [ -d "/Applications/Ledger Wallet.app" ] && echo "/Applications/Ledger Wallet.app" && return 0
+            [ -d "${HOME}/Applications/Ledger Live.app" ] && echo "${HOME}/Applications/Ledger Live.app" && return 0
+            [ -d "${HOME}/Applications/Ledger Wallet.app" ] && echo "${HOME}/Applications/Ledger Wallet.app" && return 0
+            ;;
+        "Docker Desktop")
+            [ -d "/Applications/Docker.app" ] && echo "/Applications/Docker.app" && return 0
+            [ -d "${HOME}/Applications/Docker.app" ] && echo "${HOME}/Applications/Docker.app" && return 0
+            ;;
+    esac
+    for candidate in "/Applications/${app_name}.app" "${HOME}/Applications/${app_name}.app"; do
+        [ -d "$candidate" ] && echo "$candidate" && return 0
+    done
+    echo "/Applications/${app_name}.app"
+}
+
+internet_app_snapshot_version() {
+    local app_path="$1" ver
+    # Same reader as the handlers (lib/version.sh), so snapshots see the version
+    # a native updater ships (Open Design payload, HyperFrames build label).
+    if command -v app_version >/dev/null 2>&1; then
+        ver="$(app_version "$app_path")"
+        case "$ver" in ''|"${L_INTERNET_VERSION_UNKNOWN:-unknown}") ver="?" ;; esac
+        echo "$ver"
+        return 0
+    fi
+    ver=$(defaults read "$app_path/Contents/Info" CFBundleShortVersionString 2>/dev/null \
+        || defaults read "$app_path/Contents/Info" CFBundleVersion 2>/dev/null \
+        || true)
+    if [ -z "$ver" ]; then
+        # iOS/iPadOS apps on Apple Silicon can be wrapped without a
+        # Contents/Info plist. Spotlight still exposes their version.
+        ver=$(mdls -raw -name kMDItemVersion "$app_path" 2>/dev/null || true)
+        [ "$ver" = "(null)" ] && ver=""
+    fi
+    [ -n "$ver" ] && echo "$ver" || echo "?"
+}
+
+internet_firefox_snapshot_version() {
+    local ini="/Applications/Firefox Developer Edition.app/Contents/Resources/application.ini"
+    if [ -f "$ini" ]; then
+        grep "^Version=" "$ini" 2>/dev/null | head -1 | cut -d= -f2
+    else
+        internet_app_snapshot_version "/Applications/Firefox Developer Edition.app"
+    fi
+}
+
+internet_capture_versions() {
+    local outfile="$1"
+    local app_name app_path ver
+    : > "$outfile"
+    internet_apps_load_config || return 1
+    for app_name in "${INTERNET_APPS_LIST[@]}"; do
+        app_path="$(internet_app_path "$app_name")"
+        if [ -d "$app_path" ]; then
+            if [ "$app_name" = "Firefox Developer Edition" ]; then
+                ver="$(internet_firefox_snapshot_version)"
+            else
+                ver="$(internet_app_snapshot_version "$app_path")"
+            fi
+            echo "${app_name}|${ver}" >> "$outfile"
+        fi
+    done
+}
+
+mau_current_channel() {
+    local ch=""
+    ch="$(defaults read /Library/Preferences/com.microsoft.autoupdate2 ChannelName 2>/dev/null)"
+    [ -z "$ch" ] && ch="$(defaults read com.microsoft.autoupdate2 ChannelName 2>/dev/null)"
+    [ -z "$ch" ] && ch="$("/Library/Application Support/Microsoft/MAU2.0/Microsoft AutoUpdate.app/Contents/MacOS/msupdate" --config 2>/dev/null | awk -F': *' '/ChannelName/{print $2; exit}')"
+    printf '%s' "${ch:-unknown}"
+}

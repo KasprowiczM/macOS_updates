@@ -1,0 +1,22 @@
+# ============================================================
+# config/cask_oracles.txt — Cask oracles for unverified apps
+# ============================================================
+# Homebrew casks are a free, read-only oracle used to verify installed
+# bundle versions for silent_launch and unverified apps.
+# Format: App Name|cask_token (one per line, # comments allowed)
+# ============================================================
+ChatGPT / Codex|chatgpt
+Claude|claude
+Claude Desktop|claude
+# 2026-09-24: Removed Gemini (cask 'gemini' is MacPaw Gemini com.macpaw.site.Gemini2)
+# and Comet (cask is stale: 145.x vs 152.x). Both have vendor feeds in v1.5.0.
+Antigravity|antigravity
+Antigravity IDE|antigravity-ide
+OpenCode|opencode-desktop
+OpenCode Desktop|opencode-desktop
+Cursor|cursor
+Proton Mail|proton-mail
+Warp|warp
+Microsoft Teams|microsoft-teams
+Microsoft Teams (hybrid)|microsoft-teams
+Docker Desktop|docker

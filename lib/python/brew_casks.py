@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+"""lib/python/brew_casks.py — Pure helpers for Homebrew casks (v1.5.0).
+
+Functions for parsing app targets, detecting orphaned casks, and identifying
+casks requiring administrator / sudo privileges.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from typing import Callable
+
+
+def installed_inventory_source(prefix: str) -> dict:
+    """Static installed receipts for the shadow model; no brew execution."""
+    from inventory_providers import read_brew_receipts
+    return read_brew_receipts(prefix)
+
+
+def cask_guard_facts(text: str) -> str:
+    """'version|installed|A.app;B.app' from `brew info --json=v2 --cask <t>`; '' on any parse error."""
+    try:
+        cask = json.loads(text)["casks"][0]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return ""
+    version = str(cask.get("version") or "")
+    installed = str(cask.get("installed") or "")
+    targets = app_targets(cask) or pkg_app_hints(cask)
+    return "|".join((version, installed, ";".join(targets)))
+
+
+def pkg_app_hints(cask: dict) -> list[str]:
+    """Basenames from uninstall[].delete matching ^/Applications/[^/]+\\.app$."""
+    hints: list[str] = []
+    for art in cask.get("artifacts", []):
+        if not isinstance(art, dict):
+            continue
+        uninst = art.get("uninstall")
+        if uninst is None:
+            continue
+        if isinstance(uninst, dict):
+            uninst = [uninst]
+        if isinstance(uninst, list):
+            for entry in uninst:
+                if isinstance(entry, dict):
+                    deletes = entry.get("delete", [])
+                    if isinstance(deletes, str):
+                        deletes = [deletes]
+                    if isinstance(deletes, list):
+                        for d in deletes:
+                            if isinstance(d, str) and re.match(r"^/Applications/[^/]+\.app$", d):
+                                name = os.path.basename(d)
+                                if name and name not in hints:
+                                    hints.append(name)
+    return hints
+
+
+def quit_bundle_ids(cask: dict) -> list[str]:
+    """Bundle IDs a cask declares under uninstall -> quit, plus the bundle ID of
+    each uninstall -> signal target (``[["TERM", "com.x"]]`` or ``{"TERM": ...}``).
+    Order-preserving, de-duplicated; no declaration -> []."""
+    ids: list[str] = []
+
+    def add(value: object) -> None:
+        if isinstance(value, str) and value and value not in ids:
+            ids.append(value)
+
+    for art in cask.get("artifacts", []):
+        if not isinstance(art, dict):
+            continue
+        uninst = art.get("uninstall")
+        if isinstance(uninst, dict):
+            uninst = [uninst]
+        if not isinstance(uninst, list):
+            continue
+        for entry in uninst:
+            if not isinstance(entry, dict):
+                continue
+            quits = entry.get("quit", [])
+            if isinstance(quits, str):
+                quits = [quits]
+            if isinstance(quits, list):
+                for q in quits:
+                    add(q)
+            sigs = entry.get("signal", [])
+            if isinstance(sigs, dict):
+                sigs = list(sigs.items())
+            if isinstance(sigs, list):
+                if len(sigs) == 2 and all(isinstance(x, str) for x in sigs):
+                    sigs = [sigs]  # a single ["TERM", "id"] pair
+                for sig in sigs:
+                    if isinstance(sig, (list, tuple)) and len(sig) >= 2:
+                        add(sig[1])
+    return ids
+
+
+def cask_quit_ids_facts(text: str) -> str:
+    """';'-joined quit/signal bundle IDs from `brew info --json=v2 --cask <t>`
+    (empty string when none are declared); 'UNREADABLE' when the JSON cannot be read."""
+    try:
+        cask = json.loads(text)["casks"][0]
+        if not isinstance(cask, dict):
+            raise TypeError
+    except (ValueError, KeyError, IndexError, TypeError):
+        return "UNREADABLE"
+    return ";".join(quit_bundle_ids(cask))
+
+
+def cask_primary_app(text: str) -> str:
+    """First app target name ('X.app') or ''."""
+    try:
+        targets = app_targets(json.loads(text)["casks"][0])
+    except (ValueError, KeyError, IndexError, TypeError):
+        return ""
+    return targets[0] if targets else ""
+
+
+def app_targets(cask: dict) -> list[str]:
+    """From artifacts {"app": [...]}; string -> basename; dict -> target basename."""
+    targets: list[str] = []
+    for art in cask.get("artifacts", []):
+        if isinstance(art, dict) and "app" in art:
+            items = art["app"]
+            if isinstance(items, (str, dict)):
+                items = [items]
+            for item in items:
+                if isinstance(item, str):
+                    name = os.path.basename(item)
+                    if name:
+                        targets.append(name)
+                elif isinstance(item, dict) and "target" in item:
+                    name = os.path.basename(item["target"])
+                    if name:
+                        targets.append(name)
+    return targets
+
+
+def find_orphan_casks(
+    info_json: dict,
+    app_dirs: list[str],
+    exists: Callable[[str], bool] = os.path.exists,
+) -> list[str]:
+    """Cask has >= 1 app target and NONE exist in any of app_dirs."""
+    orphans: list[str] = []
+    for cask in info_json.get("casks", []):
+        targets = app_targets(cask)
+        if not targets:
+            continue
+        found = False
+        for target in targets:
+            for app_dir in app_dirs:
+                if exists(os.path.join(app_dir, target)):
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            token = cask.get("token")
+            if token:
+                orphans.append(token)
+    return orphans
+
+
+def cask_requires_sudo(cask: dict) -> bool:
+    """Artifacts contain key 'pkg' or 'installer', or uninstall stanza contains 'pkgutil', 'launchctl' or 'kext'."""
+    for art in cask.get("artifacts", []):
+        if not isinstance(art, dict):
+            continue
+        if "pkg" in art or "installer" in art:
+            return True
+        if "uninstall" in art:
+            uninst = art["uninstall"]
+            if isinstance(uninst, dict):
+                uninst = [uninst]
+            if isinstance(uninst, list):
+                for item in uninst:
+                    if isinstance(item, dict):
+                        for k in ("pkgutil", "launchctl", "kext"):
+                            if k in item:
+                                return True
+    return False
+
+
+_SECURITY_RE = re.compile(
+    r"certificate|\bTLS\b|\bSSL\b|compromised|forged|\btrusts?\b", re.IGNORECASE
+)
+_SKIP_NAME_PREFIXES = ("sudo ", "http://", "https://", "/", "brew ", "run ", "`")
+
+
+def doctor_advisories(text: str, max_len: int = 240, max_names: int = 6) -> list[str]:
+    """Parse (already filtered) `brew doctor` output into 'brew_doctor|severity|text' lines.
+
+    One advisory per 'Warning:' block. severity is 'security' when the block
+    mentions certificates / TLS / trust / compromised roots, else 'info'.
+    text = the warning's first line plus the affected names (indented lines that
+    are not commands, paths or URLs), single line, no '|', capped at max_len.
+    """
+    blocks: list[list[str]] = []
+    for line in text.splitlines():
+        if line.startswith("Warning:"):
+            blocks.append([line])
+        elif line.startswith("Error:"):
+            blocks.append([])  # errors are reported elsewhere; close the block
+        elif blocks and blocks[-1] is not None and blocks[-1]:
+            blocks[-1].append(line)
+    out: list[str] = []
+    for block in blocks:
+        if not block:
+            continue
+        head = block[0][len("Warning:"):].strip()
+        names: list[str] = []
+        for body in block[1:]:
+            if body[:1] not in (" ", "\t"):
+                continue
+            name = body.strip()
+            if not name or name.lower().startswith(_SKIP_NAME_PREFIXES):
+                continue
+            if name not in names:
+                names.append(name)
+        severity = "security" if _SECURITY_RE.search(" ".join(block)) else "info"
+        msg = head
+        if names:
+            shown = names[:max_names]
+            if len(names) > max_names:
+                shown.append("+%d more" % (len(names) - max_names))
+            msg = "%s (%s)" % (head, ", ".join(shown))
+        msg = " ".join(msg.replace("|", "/").split())
+        if len(msg) > max_len:
+            msg = msg[: max_len - 3].rstrip() + "..."
+        out.append("brew_doctor|%s|%s" % (severity, msg))
+    return out

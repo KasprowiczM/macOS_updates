@@ -1,0 +1,20 @@
+# Local inventory
+
+This private report is generated from local observations by `bash build_inventory.sh`.
+An empty successful scan means no current members in its covered scope.
+An incomplete scan keeps earlier observations stale and cannot authorize updates.
+
+Existing reports and handwritten notes require an explicit migration preview:
+
+```bash
+bash build_inventory.sh --migration --preview
+bash build_inventory.sh --migration --accept PROPOSAL_ID
+```
+
+The original bytes and their SHA-256 are backed up in private local state.
+Legacy text is retained as orphan notes, separate from current installations.
+Old tables, preferences and notes grant no update permission.
+
+`bash build_inventory.sh --rebuild` collects again and preserves local notes and
+identity-bound policy choices. A manual report edit blocks automatic replacement
+until a new notes import preview is accepted.

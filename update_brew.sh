@@ -1,0 +1,809 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2329  # cleanup_brew is invoked through trap.
+# ============================================================
+# SKRYPT 4: Aktualizacja pakietów Homebrew
+# ============================================================
+# Autor: mk
+# Data:  2026-03-18 (zaktualizowano)
+set -o pipefail
+# Homebrew can remove /opt/homebrew/bin/python3 (or any other symlink) while
+# this process is running. Without checkhash, bash keeps calling the stale
+# hashed path ("No such file or directory") instead of re-searching PATH.
+shopt -s checkhash
+
+# Kompatybilność: bash 3.2+ (macOS domyślny shell)
+# Opis:  Aktualizuje wszystkie pakiety (formulae) i aplikacje
+#        (casks) zainstalowane przez Homebrew.
+#        Jeśli MAC_UPDATE_SESSION_DIR jest ustawiony, zapisuje
+#        snapshoty wersji przed i po aktualizacji.
+# ============================================================
+
+# Kolory
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Katalog z skryptami
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Every standalone execution uses the same scoped plan and live guard.
+. "$SCRIPT_DIR/lib/platform.sh"
+. "$SCRIPT_DIR/lib/update_policy.sh"
+mac_update_policy_run_adapter homebrew
+exit $?
+
+
+. "$SCRIPT_DIR/lib/platform.sh"
+mac_update_require_supported_platform || exit 1
+
+# ── i18n: load language strings ──────────────────────────────
+. "$SCRIPT_DIR/lib/cli.sh"
+. "$SCRIPT_DIR/lib/ui.sh"
+. "$SCRIPT_DIR/i18n/loader.sh"
+. "$SCRIPT_DIR/lib/severity.sh"
+. "$SCRIPT_DIR/lib/internet_apps.sh"
+. "$SCRIPT_DIR/lib/brew.sh"
+. "$SCRIPT_DIR/lib/vendor_direct.sh"
+. "$SCRIPT_DIR/lib/version.sh"
+. "$SCRIPT_DIR/lib/internet_i18n.sh"
+mac_update_severity_init
+
+cleanup_brew() {
+    [ -f "${BREW_UPGRADE_LOG:-}" ] && rm -f "$BREW_UPGRADE_LOG" 2>/dev/null || true
+}
+trap cleanup_brew EXIT
+trap 'cleanup_brew; exit 130' INT TERM
+
+strip_ansi() {
+    sed $'s/\033\\[[0-9;]*[a-zA-Z]//g'
+}
+
+print_header() { ui_print_header "$1"; }
+
+# brew_cask_running_app <targets "A.app;B.app">
+#   Prints the name of the first installed target app that is open or whose
+#   running state cannot be proven closed; prints nothing when every installed
+#   target is verifiably not running. Tri-state via internet_app_running_state:
+#   only an explicit "false" lets the cask upgrade proceed.
+brew_cask_running_app() {
+    local targets="$1" t_name dir path bid state
+    while IFS= read -r t_name; do
+        [ -n "$t_name" ] || continue
+        for dir in "/Applications" "$HOME/Applications"; do
+            path="$dir/$t_name"
+            [ -d "$path" ] || continue
+            bid="$(internet_app_bundle_id "$path" 2>/dev/null || true)"
+            state="$(internet_app_running_state "$bid")"
+            if [ "$state" != "false" ]; then
+                printf '%s\n' "$t_name"
+                return 0
+            fi
+        done
+    done <<EOF_RUNNING_TARGETS
+$(printf '%s' "$targets" | tr ';' '\n')
+EOF_RUNNING_TARGETS
+    return 0
+}
+
+
+
+# brew_cask_running_quit_id <ids "a.b.c;d.e.f"|UNREADABLE>
+#   For casks without an app target: prints the first declared quit/signal bundle
+#   ID that is running or of unknown state (or UNREADABLE when the cask JSON could
+#   not be read, which defers); nothing when none is declared or all are closed.
+brew_cask_running_quit_id() {
+    local ids="$1" bid state
+    if [ "$ids" = "UNREADABLE" ]; then
+        printf '%s\n' "UNREADABLE"
+        return 0
+    fi
+    while IFS= read -r bid; do
+        [ -n "$bid" ] || continue
+        state="$(internet_app_running_state "$bid")"
+        if [ "$state" != "false" ]; then
+            printf '%s\n' "$bid"
+            return 0
+        fi
+    done <<EOF_QUIT_IDS
+$(printf '%s' "$ids" | tr ';' '\n')
+EOF_QUIT_IDS
+    return 0
+}
+
+# ============================================================
+print_header "$L_BREW_TITLE"
+if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+    print_warn "$L_BREW_DRYRUN_MODE"
+fi
+
+# ============================================================
+# Check if Homebrew is installed
+# ============================================================
+if ! command -v brew &> /dev/null; then
+    print_error "$L_BREW_NOT_INSTALLED"
+    print_info "Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+    exit 1
+fi
+
+BREW_VERSION=$(brew --version | head -1)
+print_ok "$BREW_VERSION"
+print_info "$L_BREW_LOCATION $(command -v brew)"
+
+# CLT status check (one-line info if stale or orphan)
+CLT_STATUS="$(mac_update_clt_status)"
+if [ "$CLT_STATUS" = "stale" ] || [ "$CLT_STATUS" = "orphan" ]; then
+    print_info "Command Line Tools ($CLT_STATUS) — Homebrew recommendation: sudo rm -rf /Library/Developer/CommandLineTools && sudo xcode-select --install"
+fi
+
+# ============================================================
+# Check Xcode license agreement (preflight)
+# ============================================================
+if ! brew_xcode_license_ok; then
+    XCODE_INFO=""
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -f "$MAC_UPDATE_SESSION_DIR/xcode_changed.txt" ]; then
+        raw_xc="$(cat "$MAC_UPDATE_SESSION_DIR/xcode_changed.txt" 2>/dev/null)"
+        xc_change="${raw_xc#xcode_changed=}"
+        [ -n "$xc_change" ] && XCODE_INFO=" (Xcode $xc_change)"
+    fi
+    print_warn "$(printf "$L_BREW_XCODE_LICENSE_NOTICE" "$XCODE_INFO")"
+
+    LICENSE_ACCEPTED=0
+    if [ -t 0 ] && [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ]; then
+        if mac_update_prompt_yn "$L_BREW_XCODE_LICENSE_PROMPT" n y; then
+            print_info "Running: sudo xcodebuild -license accept..."
+            if sudo xcodebuild -license accept 2>/dev/null && brew_xcode_license_ok; then
+                LICENSE_ACCEPTED=1
+                print_ok "Xcode license accepted successfully."
+            fi
+        fi
+    fi
+
+    if [ "$LICENSE_ACCEPTED" -ne 1 ]; then
+        print_warn "$L_BREW_XCODE_LICENSE_MANUAL"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+            echo "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_brew_formulae"
+            echo "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_brew_casks"
+            echo "xcode_license" > "$MAC_UPDATE_SESSION_DIR/pending_brew_reason"
+        fi
+        exit 10
+    fi
+fi
+
+# ── Snapshot of installed packages before update ──
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    print_info "$L_BREW_SAVING_BEFORE"
+    if ! brew list --formula --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_formulae_before.txt"; then
+        print_warn "Could not save the pre-update formula snapshot."
+        SOFT_FAIL=1
+    fi
+    if ! brew_cask_versions | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_before.txt"; then
+        print_warn "Could not save the pre-update cask snapshot."
+        SOFT_FAIL=1
+    fi
+fi
+
+# Determine greedy tokens from config/internet_app_methods.txt
+# (apps using brew_cask method, filtered to installed casks)
+brew_greedy_tokens() {
+    local app meth rest tok installed greedy
+    installed="$(brew list --cask 2>/dev/null || true)"
+    [ -n "$installed" ] || return 0
+
+    greedy=""
+    if [ -f "$SCRIPT_DIR/config/internet_app_methods.txt" ]; then
+        while IFS='|' read -r app meth rest; do
+            case "$app" in '#'*|'') continue ;; esac
+            if [ "$meth" = "brew_cask" ]; then
+                tok="$(internet_cask_name_for_app "$app" 2>/dev/null || true)"
+                [ -n "$tok" ] || tok="$(echo "$app" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-')"
+                if echo "$installed" | grep -qw "$tok"; then
+                    greedy="$greedy $tok"
+                fi
+            fi
+        done < "$SCRIPT_DIR/config/internet_app_methods.txt"
+    fi
+    echo "$greedy" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+# ============================================================
+# DRY-RUN: list outdated only — do not mutate brew refs
+# ============================================================
+if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+    print_header "$L_BREW_OUTDATED"
+    echo -e "${CYAN}$L_BREW_OUTDATED_LIST${NC}"
+    HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula || true
+    echo ""
+    echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
+    GREEDY_TOKENS="$(brew_greedy_tokens)"
+    # shellcheck disable=SC2086
+    brew_outdated_casks $GREEDY_TOKENS || true
+    print_info "$L_BREW_DRYRUN_WOULD_RUN_FULL"
+    exit 0
+fi
+
+# ============================================================
+# STEP 1: Update Homebrew itself
+# ============================================================
+print_header "$L_BREW_UPDATE"
+
+if brew update; then
+    print_ok "$L_BREW_UPDATED"
+else
+    print_warn "brew update failed; refusing to use potentially stale metadata."
+    SOFT_FAIL=1
+    exit "$(mac_update_severity_exit_code)"
+fi
+
+# ============================================================
+# STEP 2: Check outdated packages
+# ============================================================
+print_header "$L_BREW_OUTDATED"
+
+echo -e "${CYAN}$L_BREW_OUTDATED_LIST${NC}"
+if ! OUTDATED_FORMULAE=$(brew_outdated_formulae); then
+    print_warn "brew outdated --formula failed; update state is unknown."
+    [ -n "$OUTDATED_FORMULAE" ] && printf '%s\n' "$OUTDATED_FORMULAE"
+    SOFT_FAIL=1
+    exit "$(mac_update_severity_exit_code)"
+fi
+if [ -z "$OUTDATED_FORMULAE" ]; then
+    print_ok "All formulae are up to date!"
+else
+    echo "$OUTDATED_FORMULAE"
+fi
+
+echo ""
+echo -e "${CYAN}$L_BREW_CASKS_OUTDATED${NC}"
+GREEDY_TOKENS="$(brew_greedy_tokens)"
+# shellcheck disable=SC2086
+if ! OUTDATED_CASKS=$(brew_outdated_casks $GREEDY_TOKENS); then
+    print_warn "brew outdated --cask failed; update state is unknown."
+    [ -n "$OUTDATED_CASKS" ] && printf '%s\n' "$OUTDATED_CASKS"
+    SOFT_FAIL=1
+    exit "$(mac_update_severity_exit_code)"
+fi
+
+# Check for orphan casks (installed cask whose app target is missing)
+ORPHAN_CASKS="$(brew_orphan_casks 2>/dev/null || true)"
+if [ -n "$ORPHAN_CASKS" ]; then
+    for orph in $ORPHAN_CASKS; do
+        [ -n "$orph" ] || continue
+        expected_app="$(brew info --json=v2 --cask "$orph" 2>/dev/null | brew_cask_primary_app || true)"
+        [ -n "$expected_app" ] || expected_app="${orph}.app"
+
+        print_info "$(printf "$L_BREW_ORPHAN_CASK_FMT" "$orph" "$expected_app" "$orph")"
+
+        if [ -n "$OUTDATED_CASKS" ]; then
+            OUTDATED_CASKS="$(echo "$OUTDATED_CASKS" | awk -v o="$orph" '$1 != o')"
+        fi
+
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+            echo "$orph" >> "$MAC_UPDATE_SESSION_DIR/brew_orphan_casks.txt"
+        fi
+
+        if [ -t 0 ] && [ "${MAC_UPDATE_YES:-0}" != "1" ] && [ "${MAC_UPDATE_NONINTERACTIVE:-0}" != "1" ]; then
+            # shellcheck disable=SC2059
+            if mac_update_prompt_yn "$(printf "$L_BREW_ORPHAN_CASK_PROMPT_FMT" "$orph")" n n; then
+                brew uninstall --cask --force "$orph" || true
+            fi
+        fi
+    done
+fi
+
+if [ -z "$OUTDATED_CASKS" ]; then
+    print_ok "All casks are up to date!"
+else
+    echo "$OUTDATED_CASKS"
+fi
+
+BREW_HAS_OUTDATED=1
+if [ -z "$OUTDATED_FORMULAE" ] && [ -z "$OUTDATED_CASKS" ]; then
+    BREW_HAS_OUTDATED=0
+    echo ""
+    print_ok "$L_BREW_SUMMARY"
+fi
+
+# ============================================================
+# POTWIERDZENIE
+# ============================================================
+if [ "$BREW_HAS_OUTDATED" -eq 1 ]; then
+echo ""
+if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ]; then
+    print_info "$L_BREW_DRYRUN_WOULD_RUN_UPGRADE"
+    exit 0
+fi
+print_warn "$L_BREW_PACKAGES_FOUND"
+# update_all.sh exports MAC_UPDATE_PARENT_CONFIRMED=1 after its own
+# confirmation: asking again only stalls the run (2026-11-04: ~51 minutes).
+if [ "${MAC_UPDATE_YES:-0}" != "1" ] && [ "${MAC_UPDATE_PARENT_CONFIRMED:-0}" != "1" ]; then
+    if ! mac_update_prompt_yn "$L_BREW_CONFIRM_UPDATE " n y; then
+        if [ "${MAC_UPDATE_PROMPT_TIMED_OUT:-0}" = "1" ]; then
+            # Nobody answered: skip the upgrades, softly, and say why.
+            print_warn "$L_BREW_UPDATE_TIMEOUT_SKIPPED"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+                printf '%s\n' "$(printf '%s\n' "$OUTDATED_FORMULAE" | grep -c . || true)" > "$MAC_UPDATE_SESSION_DIR/pending_brew_formulae"
+                printf '%s\n' "$(printf '%s\n' "$OUTDATED_CASKS" | grep -c . || true)" > "$MAC_UPDATE_SESSION_DIR/pending_brew_casks"
+            fi
+            exit 10
+        fi
+        print_info "$L_BREW_UPDATE_CANCELED"
+        exit 0
+    fi
+fi
+
+# ============================================================
+# KROK 3: AKTUALIZACJA FORMULAE
+# ============================================================
+print_header "$L_BREW_UPGRADE_FORMULAE"
+FORMULA_UPGRADE_FAILED=0
+
+# Capture output so we can detect recoverable link conflicts
+BREW_UPGRADE_LOG=$(mktemp "${TMPDIR:-/tmp}/brew_upgrade.XXXXXX") || {
+    print_error "Could not create the Homebrew upgrade diagnostic log."
+    exit 1
+}
+if brew upgrade --formula 2>&1 | tee "$BREW_UPGRADE_LOG"; then
+    print_ok "$L_BREW_FORMULAE_OK"
+else
+    print_warn "$L_BREW_FORMULAE_WARN"
+    HARD_FAIL=1
+    FORMULA_UPGRADE_FAILED=1
+fi
+
+# ============================================================
+# KROK 3.5: OPT-IN RECOVERY DLA "BREW LINK DID NOT COMPLETE"
+# ============================================================
+LINK_FAILED_KEGS=$(awk '
+    /^==> Upgrading / {
+        if ($0 !~ /outdated package/) { kegname = $3 }
+        next
+    }
+    /Error: The .brew link. step did not complete successfully/ {
+        if (kegname != "") { print kegname; kegname = "" }
+    }
+' "$BREW_UPGRADE_LOG" 2>/dev/null | sort -u)
+rm -f "$BREW_UPGRADE_LOG" 2>/dev/null || true
+
+if [ -n "$LINK_FAILED_KEGS" ] && [ "${MAC_UPDATE_BREW_LINK_OVERWRITE:-0}" != "1" ]; then
+    print_warn "Homebrew reported unlinked kegs. Automatic 'brew link --overwrite' is disabled."
+    print_info "Inspect the conflicting files first; set MAC_UPDATE_BREW_LINK_OVERWRITE=1 only for an explicit recovery run."
+elif [ -n "$LINK_FAILED_KEGS" ]; then
+    print_warn "$L_BREW_LINK_RECOVERY_DETECTED"
+    RELINKED=0
+    RELINK_FAILED=0
+    while IFS= read -r keg; do
+        keg=$(echo "$keg" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [ -z "$keg" ] && continue
+        case "$keg" in
+            ""|*[!a-zA-Z0-9@+_./-]*) continue ;;
+        esac
+        echo -e "  ${CYAN}→ brew link --overwrite $keg${NC}"
+        if brew link --overwrite "$keg" >/dev/null 2>&1; then
+            print_ok "$L_BREW_LINK_RECOVERED $keg"
+            RELINKED=$((RELINKED + 1))
+        else
+            print_warn "$L_BREW_LINK_FAILED $keg"
+            RELINK_FAILED=$((RELINK_FAILED + 1))
+        fi
+    done <<EOF
+$LINK_FAILED_KEGS
+EOF
+    if [ "$RELINKED" -gt 0 ] && [ "$RELINK_FAILED" -eq 0 ]; then
+        if [ "$FORMULA_UPGRADE_FAILED" -eq 1 ]; then
+            HARD_FAIL=0
+        fi
+        print_ok "$L_BREW_LINK_RECOVERY_OK"
+    elif [ "$RELINK_FAILED" -gt 0 ]; then
+        SOFT_FAIL=1
+    fi
+fi
+
+# Guard against cask downgrades (when cask formula version < installed app version)
+UPGRADEABLE_CASKS=""
+DEFERRED_RUNNING_CASKS=""
+if [ -n "$OUTDATED_CASKS" ]; then
+    for cask in $(echo "$OUTDATED_CASKS" | awk '{print $1}'); do
+        cask_json=$(brew info --json=v2 --cask "$cask" 2>/dev/null || true)
+        cask_ver=""
+        cask_app_name=""
+        cask_recorded_ver=""
+        targets_str=""
+        if [ -n "$cask_json" ]; then
+            parsed="$(printf '%s' "$cask_json" | brew_cask_guard_facts || true)"
+            cask_ver=$(echo "$parsed" | cut -d'|' -f1)
+            cask_recorded_ver=$(echo "$parsed" | cut -d'|' -f2)
+            targets_str=$(echo "$parsed" | cut -d'|' -f3)
+        fi
+
+        # Homebrew's own record of what it installed is the only like-for-like
+        # operand for the cask version. Prefer it; the bundle version is a
+        # fallback and may use a different scheme entirely.
+        if [ -n "$cask_recorded_ver" ] && [ -n "$cask_ver" ]; then
+            if [ "$(internet_version_relation "$cask_recorded_ver" "$cask_ver")" = "newer" ]; then
+                print_warn "$(internet_msg "$L_BREW_CASK_WOULD_DOWNGRADE_FMT" "$cask" "$cask_ver" "$cask_recorded_ver")"
+                SOFT_FAIL=1
+                continue
+            fi
+        fi
+
+        cask_app_path=""
+        if [ -n "$targets_str" ]; then
+            while IFS= read -r t_name; do
+                [ -n "$t_name" ] || continue
+                for dir in "/Applications" "$HOME/Applications"; do
+                    if [ -d "$dir/$t_name" ]; then
+                        cask_app_path="$dir/$t_name"
+                        break 2
+                    fi
+                done
+            done <<EOF_TARGETS
+$(echo "$targets_str" | tr ';' '\n')
+EOF_TARGETS
+            if [ -z "$cask_app_path" ]; then
+                # Cask declares app targets, but none exist on disk -> skip
+                continue
+            fi
+        else
+            # Only casks without app targets use Caskroom fallback
+            prefix="$(brew --prefix 2>/dev/null || echo "/opt/homebrew")"
+            cask_app_path=$(find "$prefix/Caskroom/$cask" -maxdepth 3 -name "*.app" 2>/dev/null | head -1)
+        fi
+
+        if [ -n "$cask_app_path" ] && [ -d "$cask_app_path" ]; then
+            installed_ver=$(app_version "$cask_app_path")
+            if [ -n "$installed_ver" ] && [ -n "$cask_ver" ]; then
+                # Scheme-aware: a bundle version such as Brave's
+                # "151.1.93.138" carries the Chromium major in front of the
+                # cask's own "1.93.138.0". Comparing them digit by digit read
+                # the app as newer and skipped the upgrade on every run.
+                rel=$(app_vs_package_version_relation "$installed_ver" "$cask_ver" 2>/dev/null || echo "unknown")
+                if [ "$rel" = "newer" ]; then
+                    print_warn "$(internet_msg "$L_BREW_CASK_WOULD_DOWNGRADE_FMT" "$cask" "$cask_ver" "$installed_ver")"
+                    SOFT_FAIL=1
+                    continue
+                fi
+                if [ "$rel" = "unknown" ]; then
+                    print_info "$(internet_msg "$L_BREW_CASK_VERSION_SCHEME_INFO_FMT" "$cask" "$installed_ver" "$cask_ver")"
+                fi
+            fi
+        fi
+        # An app that is open is never replaced (critical_rules 15). Unknown
+        # running state defers too, exactly like the app-copy transaction.
+        deferred_app=""
+        if [ -n "$targets_str" ]; then
+            deferred_app="$(brew_cask_running_app "$targets_str")"
+        elif [ -z "$cask_json" ]; then
+            deferred_app="UNREADABLE"
+        else
+            # No app target (pkg casks): honour the quit/signal bundle IDs the
+            # cask itself declares; none declared (fonts, drivers, CLIs) -> upgrade.
+            deferred_app="$(printf '%s' "$cask_json" | brew_cask_quit_ids)"
+            deferred_app="$(brew_cask_running_quit_id "$deferred_app")"
+        fi
+        if [ -n "$deferred_app" ]; then
+            print_warn "$(internet_msg "$L_BREW_CASK_RUNNING_FMT" "$cask" "${cask_recorded_ver:-?}" "${cask_ver:-?}" "$deferred_app")"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+                echo "$cask|$deferred_app" >> "$MAC_UPDATE_SESSION_DIR/brew_deferred_running.txt"
+            fi
+            DEFERRED_RUNNING_CASKS="$DEFERRED_RUNNING_CASKS $cask"
+            SOFT_FAIL=1
+            continue
+        fi
+        UPGRADEABLE_CASKS="$UPGRADEABLE_CASKS $cask"
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+            if [ -n "$targets_str" ]; then
+                while IFS= read -r t_target; do
+                    [ -n "$t_target" ] || continue
+                    echo "$cask|$t_target" >> "$MAC_UPDATE_SESSION_DIR/brew_cask_targets.txt"
+                done <<EOF_SESSION_TARGETS
+$(echo "$targets_str" | tr ';' '\n')
+EOF_SESSION_TARGETS
+            fi
+        fi
+    done
+fi
+
+if [ -n "$UPGRADEABLE_CASKS" ] && [ "${MAC_UPDATE_NO_SUDO:-0}" = "1" ]; then
+    # shellcheck disable=SC2086
+    SUDO_CASKS="$(brew_casks_requiring_sudo $UPGRADEABLE_CASKS 2>/dev/null || true)"
+    if [ -n "$SUDO_CASKS" ]; then
+        for scask in $SUDO_CASKS; do
+            [ -n "$scask" ] || continue
+            print_warn "$(printf "$L_BREW_CASK_NEEDS_INTERACTIVE_FMT" "$scask")"
+            if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+                echo "$scask" >> "$MAC_UPDATE_SESSION_DIR/brew_needs_interactive.txt"
+            fi
+            SOFT_FAIL=1
+            UPGRADEABLE_CASKS="$(echo "$UPGRADEABLE_CASKS" | tr ' ' '\n' | awk -v s="$scask" '$1 != s' | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        done
+    fi
+fi
+
+if [ -n "$UPGRADEABLE_CASKS" ]; then
+    # shellcheck disable=SC2086
+    if brew upgrade --cask $UPGRADEABLE_CASKS; then
+        print_ok "$L_BREW_CASKS_OK"
+    else
+        print_warn "$L_BREW_CASKS_WARN"
+        HARD_FAIL=1
+    fi
+elif [ -z "$DEFERRED_RUNNING_CASKS" ]; then
+    print_ok "$L_BREW_CASKS_OK"
+fi
+fi
+
+# A successful upgrade is not enough: query Homebrew again and fail if any
+# formula or greedy cask remains outdated, or if verification itself fails.
+print_header "$L_BREW_OUTDATED"
+if ! REMAINING_FORMULAE=$(brew_outdated_formulae | strip_ansi); then
+    print_warn "Final brew outdated --formula verification failed."
+    [ -n "$REMAINING_FORMULAE" ] && printf '%s\n' "$REMAINING_FORMULAE"
+    SOFT_FAIL=1
+elif [ -n "$REMAINING_FORMULAE" ]; then
+    print_error "Formulae still outdated after upgrade:"
+    printf '%s\n' "$REMAINING_FORMULAE"
+    HARD_FAIL=1
+fi
+# shellcheck disable=SC2086
+if ! REMAINING_CASKS=$(brew_outdated_casks $GREEDY_TOKENS | strip_ansi); then
+    print_warn "Final brew outdated --cask --greedy-auto-updates verification failed."
+    [ -n "$REMAINING_CASKS" ] && printf '%s\n' "$REMAINING_CASKS"
+    SOFT_FAIL=1
+else
+    # Casks deferred because their app is open were already reported (and
+    # recorded in brew_deferred_running.txt); do not report them a second time.
+    for dcask in $DEFERRED_RUNNING_CASKS; do
+        REMAINING_CASKS="$(printf '%s\n' "$REMAINING_CASKS" | awk -v c="$dcask" '$1 != c')"
+    done
+    REMAINING_CASKS="$(printf '%s\n' "$REMAINING_CASKS" | grep -v '^[[:space:]]*$' || true)"
+fi
+if [ -n "$REMAINING_CASKS" ]; then
+    print_info "Casks listed in greedy outdated check (informational only):"
+    printf '%s\n' "$REMAINING_CASKS"
+fi
+if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ]; then
+    PENDING_BREW_FORMULAE="$(printf '%s\n' "$REMAINING_FORMULAE" | wc -l | tr -d ' ')"
+    PENDING_BREW_CASKS="$(printf '%s\n' "$REMAINING_CASKS" | wc -l | tr -d ' ')"
+    [ -n "$REMAINING_FORMULAE" ] || PENDING_BREW_FORMULAE=0
+    [ -n "$REMAINING_CASKS" ] || PENDING_BREW_CASKS=0
+    # Deferred (app open) casks are still pending: count them, the run summary
+    # lists each one from brew_deferred_running.txt.
+    DEFERRED_COUNT=0
+    for dcask in $DEFERRED_RUNNING_CASKS; do DEFERRED_COUNT=$((DEFERRED_COUNT + 1)); done
+    PENDING_BREW_CASKS=$((PENDING_BREW_CASKS + DEFERRED_COUNT))
+    printf '%s\n' "$PENDING_BREW_FORMULAE" > "$MAC_UPDATE_SESSION_DIR/pending_brew_formulae"
+    printf '%s\n' "$PENDING_BREW_CASKS" > "$MAC_UPDATE_SESSION_DIR/pending_brew_casks"
+fi
+if [ "$HARD_FAIL" -eq 0 ] && [ "$SOFT_FAIL" -eq 0 ]; then
+    print_ok "$L_BREW_SUMMARY"
+fi
+
+# ============================================================
+# KROK 5: SPRAWDZENIE PROBLEMÓW
+# ============================================================
+if [ "${MAC_UPDATE_SKIP_DOCTOR:-0}" = "1" ]; then
+    print_info "$L_BREW_DOCTOR_SKIPPED"
+else
+print_header "$L_BREW_HEALTH_CHECKING"
+
+DOCTOR_OUT=$(brew doctor 2>&1 | strip_ansi)
+DOCTOR_EXIT=$?
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    printf '%s\n' "$DOCTOR_OUT" > "$MAC_UPDATE_SESSION_DIR/brew_doctor.txt"
+fi
+
+UNLINKED_KEGS=$(echo "$DOCTOR_OUT" | awk '
+    /You have unlinked kegs in your Cellar/ { in_block = 1; next }
+    in_block && /^$/ { in_block = 0; next }
+    in_block && /^Leaving kegs unlinked/ { next }
+    in_block && /^Run .brew link./ { next }
+    in_block && /^  [a-zA-Z]/ { gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print }
+')
+if [ -n "$UNLINKED_KEGS" ] && [ "${MAC_UPDATE_BREW_LINK_OVERWRITE:-0}" != "1" ]; then
+    print_warn "brew doctor found unlinked kegs; automatic overwrite recovery is disabled."
+    print_info "Set MAC_UPDATE_BREW_LINK_OVERWRITE=1 only after reviewing the conflicts."
+elif [ -n "$UNLINKED_KEGS" ]; then
+    print_info "$L_BREW_DOCTOR_UNLINKED_FOUND"
+    RELINKED2=0
+    while IFS= read -r keg; do
+        [ -z "$keg" ] && continue
+        case "$keg" in
+            ""|*[!a-zA-Z0-9@+_./-]*) continue ;;
+        esac
+        if brew link --overwrite "$keg" >/dev/null 2>&1; then
+            print_ok "$L_BREW_LINK_RECOVERED $keg"
+            RELINKED2=$((RELINKED2 + 1))
+        fi
+    done <<EOF
+$UNLINKED_KEGS
+EOF
+    if [ "$RELINKED2" -gt 0 ]; then
+        DOCTOR_OUT=$(brew doctor 2>&1 | strip_ansi)
+        DOCTOR_EXIT=$?
+        if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+            printf '%s\n' "$DOCTOR_OUT" > "$MAC_UPDATE_SESSION_DIR/brew_doctor.txt"
+        fi
+    fi
+fi
+
+DOCTOR_FILTERED=$(printf '%s\n' "$DOCTOR_OUT" | awk '
+    function emit_dylib_block() {
+        if (!(dylib_paths == 1 && asaf_paths == 1)) {
+            printf "%s", dylib_block
+        }
+        in_dylib_block = 0
+        dylib_block = ""
+        dylib_paths = 0
+        asaf_paths = 0
+    }
+    function emit_clt_block() {
+        if (!clt_emitted) {
+            printf "Warning: Command Line Tools (CLT) requires update/reinstall (details in brew_doctor.txt)\n"
+            clt_emitted = 1
+        }
+        in_clt_block = 0
+    }
+    in_clt_block && /^(Warning:|Error:)/ {
+        emit_clt_block()
+        if ($0 ~ /^Warning: .*Command Line Tools/) {
+            in_clt_block = 1
+            next
+        }
+    }
+    in_clt_block {
+        next
+    }
+    /^Warning: .*Command Line Tools/ {
+        if (in_dylib_block) emit_dylib_block()
+        in_clt_block = 1
+        next
+    }
+    /^Warning: Unbrewed dylibs were found in \/usr\/local\/lib/ {
+        in_dylib_block = 1
+        dylib_block = $0 ORS
+        next
+    }
+    in_dylib_block && /^(Warning:|Error:)/ {
+        emit_dylib_block()
+        print
+        next
+    }
+    in_dylib_block {
+        dylib_block = dylib_block $0 ORS
+        if ($0 ~ /^[[:space:]]+\/usr\/local\/lib\//) {
+            dylib_path = $0
+            sub(/^[[:space:]]+/, "", dylib_path)
+            dylib_paths++
+            if (dylib_path == "/usr/local/lib/libASAF.dylib") asaf_paths++
+        }
+        next
+    }
+    { print }
+    END {
+        if (in_dylib_block) emit_dylib_block()
+        if (in_clt_block) emit_clt_block()
+    }
+')
+
+# Keep libASAF dylib filter in place for now.
+# TODO(C2): libASAF dylib filter can be removed once severity is corrected across scripts.
+ASAF_ONLY_FILTERED=0
+if [ "$DOCTOR_FILTERED" != "$DOCTOR_OUT" ]; then
+    ASAF_ONLY_FILTERED=1
+fi
+REAL_WARNINGS=$(printf '%s\n' "$DOCTOR_FILTERED" | grep '^Warning:' 2>/dev/null || true)
+DOCTOR_ERRORS=$(printf '%s\n' "$DOCTOR_FILTERED" | grep '^Error:' 2>/dev/null || true)
+
+if [ -n "$DOCTOR_ERRORS" ]; then
+    [ -n "$DOCTOR_FILTERED" ] && printf '%s\n' "$DOCTOR_FILTERED"
+    print_warn "$L_BREW_HEALTH_WARN"
+    SOFT_FAIL=1
+elif [ -n "$REAL_WARNINGS" ]; then
+    [ -n "$DOCTOR_FILTERED" ] && printf '%s\n' "$DOCTOR_FILTERED"
+    # Advisories are recorded for the run summary (source|severity|text) and
+    # shown instead of the unconditional "good condition" line. They stay
+    # non-blocking: surfacing, not soft-failing every run.
+    DOCTOR_ADVISORIES="$(printf '%s\n' "$DOCTOR_FILTERED" | brew_doctor_advisories)"
+    if [ -n "$DOCTOR_ADVISORIES" ]; then
+        if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+            printf '%s\n' "$DOCTOR_ADVISORIES" >> "$MAC_UPDATE_SESSION_DIR/advisories.txt"
+        fi
+        ADVISORY_COUNT="$(printf '%s\n' "$DOCTOR_ADVISORIES" | grep -c . || true)"
+    else
+        ADVISORY_COUNT="$(printf '%s\n' "$REAL_WARNINGS" | grep -c . || true)"
+    fi
+    # shellcheck disable=SC2059
+    print_info "$(printf "$L_BREW_DOCTOR_ADVISORIES_FMT" "$ADVISORY_COUNT")"
+    printf '%s\n' "$DOCTOR_ADVISORIES" | while IFS='|' read -r _src sev text; do
+        [ "$sev" = "security" ] || continue
+        print_warn "$(internet_msg "$L_BREW_DOCTOR_SECURITY_FMT" "$text")"
+    done
+else
+    print_ok "$L_BREW_HEALTH_OK"
+    if [ "$ASAF_ONLY_FILTERED" -eq 1 ]; then
+        print_info "$L_BREW_DYLIB_FILTERED_INFO"
+        print_info "$L_BREW_DYLIB_INFO"
+    fi
+fi
+fi
+
+# ============================================================
+# KROK 6: CZYSZCZENIE
+# ============================================================
+print_header "$L_BREW_CACHE_CLEANING"
+
+CACHE_DIR=$(brew --cache 2>/dev/null || echo "")
+CLEANUP_OUT=$(brew cleanup --prune=all 2>&1 | strip_ansi)
+CLEANUP_EXIT=$?
+if [ -n "$MAC_UPDATE_SESSION_DIR" ] && [ -n "$CLEANUP_OUT" ]; then
+    echo "$CLEANUP_OUT" >> "$MAC_UPDATE_SESSION_DIR/brew_cleanup.log"
+fi
+if [ "$CLEANUP_EXIT" -eq 0 ]; then
+    if echo "$CLEANUP_OUT" | grep -qi "warning"; then
+        print_warn "Homebrew cleanup completed with warnings."
+    elif [ -z "$CLEANUP_OUT" ] || echo "$CLEANUP_OUT" | grep -qi "Nothing to remove"; then
+        print_info "Homebrew cleanup: no obsolete cache to clean."
+    else
+        if [ -n "$CACHE_DIR" ] && [ -d "$CACHE_DIR" ]; then
+            CACHE_SIZE=$(du -sh "$CACHE_DIR" 2>/dev/null | awk '{print $1}' || echo "?")
+            print_ok "$L_BREW_CACHE_CLEANED (~$CACHE_SIZE)"
+        else
+            print_ok "$L_BREW_CACHE_CLEANED"
+        fi
+    fi
+else
+    print_warn "Homebrew cleanup failed."
+    SOFT_FAIL=1
+fi
+
+# ============================================================
+# PODSUMOWANIE
+# ============================================================
+print_header "$L_BREW_INSTALLED_TITLE"
+
+echo -e "${CYAN}Formulae:${NC}"
+brew list --formula --versions 2>/dev/null | column -t || brew list --formula --versions
+
+echo ""
+echo -e "${CYAN}Casks:${NC}"
+brew_cask_versions | column -t || brew_cask_versions
+
+# ── Snapshot wersji zainstalowanych pakietów PO aktualizacji ──
+if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
+    print_info "$L_BREW_SAVING_SNAPSHOT"
+    BREW_SNAPSHOT_OK=1
+    if ! brew list --formula --versions 2>/dev/null | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_formulae_after.txt"; then
+        print_warn "Could not save the post-update formula snapshot."
+        BREW_SNAPSHOT_OK=0
+        SOFT_FAIL=1
+    fi
+    if ! brew_cask_versions | strip_ansi > "$MAC_UPDATE_SESSION_DIR/brew_casks_after.txt"; then
+        print_warn "Could not save the post-update cask snapshot."
+        BREW_SNAPSHOT_OK=0
+        SOFT_FAIL=1
+    fi
+    if [ "$BREW_SNAPSHOT_OK" -eq 1 ]; then
+        print_ok "$L_BREW_SNAPSHOTS_SAVED_TO $MAC_UPDATE_SESSION_DIR"
+    fi
+fi
+
+BREW_FINAL_EXIT="$(mac_update_severity_exit_code)"
+if [ "$BREW_FINAL_EXIT" -eq 0 ]; then
+    print_header "$L_BREW_SCRIPT_DONE"
+    echo -e "  ${GREEN}$L_BREW_ALL_DONE${NC}"
+else
+    # Never print the "COMPLETED SUCCESSFULLY" banner above a non-zero exit —
+    # the 2026-08-19 run log showed "SKRYPT 4 ZAKOŃCZONY POMYŚLNIE" directly
+    # above "Homebrew finished with errors", which sends the reader hunting in
+    # the wrong place.
+    print_header "🍺 Homebrew"
+    if [ "$BREW_FINAL_EXIT" -eq "$MAC_UPDATE_SOFT_EXIT" ]; then
+        print_warn "Homebrew finished with soft warnings (non-blocking). Review output above."
+    else
+        print_error "Homebrew finished with errors. Review output above."
+    fi
+fi
+echo ""
+exit "$BREW_FINAL_EXIT"

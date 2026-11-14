@@ -1,0 +1,41 @@
+iu_google_chrome
+iu_firefox_developer_edition
+# Brave Browser — migrated to Homebrew cask 2026-08-05
+# ChatGPT Atlas — uninstalled by the user 2026-08-19 (browser discontinued); removed from the pipeline
+iu_chatgpt
+iu_claude
+iu_comet
+iu_antigravity
+iu_antigravity_ide
+iu_gemini
+# LM Studio — migrated to Homebrew cask 2026-08-05
+# Perplexity — migrated to Homebrew cask 2026-08-05
+iu_opencode_desktop
+# ProtonVPN — migrated to Homebrew cask 2026-08-05
+iu_keepassxc
+iu_proton_mail
+# zoom.us — migrated to Homebrew cask 2026-08-05
+iu_google_drive
+# MEGAsync — migrated to Homebrew cask 2026-08-05
+iu_proton_drive
+iu_microsoft_365
+iu_microsoft_teams
+iu_visual_studio_code
+iu_codeedit
+iu_docker_desktop
+iu_warp
+iu_cursor
+iu_opendesign
+iu_hyperframes
+iu_superset
+iu_deepseek_harness
+iu_grok_bot
+# Ascendo — removed from the update pipeline 2026-08-14 (user request)
+# AppCleaner — migrated to Homebrew cask 2026-08-05
+# Obsidian — migrated to Homebrew cask 2026-08-05
+# Spotify — migrated to Homebrew cask 2026-08-05
+# CapCut — migrated to Homebrew cask 2026-08-05
+iu_ledger
+iu_trezor_suite
+iu_remote_desktop_manager
+iu_ipmiview

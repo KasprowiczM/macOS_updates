@@ -1,0 +1,369 @@
+#!/usr/bin/env bash
+# lib/vendor_direct.sh — Direct vendor download and installation (Bash 3.2+)
+#
+# Implements "vendor truth" direct verification and installation path for
+# apps where vendor feeds specify an installable artifact.
+#
+# Requires: lib/fetch.sh, lib/proc.sh, copy_verified_app (when installing)
+
+_VENDOR_DIRECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/fetch.sh
+[ -f "$_VENDOR_DIRECT_DIR/fetch.sh" ] && . "$_VENDOR_DIRECT_DIR/fetch.sh"
+# shellcheck source=lib/proc.sh
+[ -f "$_VENDOR_DIRECT_DIR/proc.sh" ] && . "$_VENDOR_DIRECT_DIR/proc.sh"
+
+_vd_diag() {
+    command -v internet_diag_log >/dev/null 2>&1 && internet_diag_log "$@"
+    return 0
+}
+
+_vd_valid_bundle_id() {
+    case "$1" in
+        ''|*[!A-Za-z0-9._-]*) return 1 ;;
+    esac
+    return 0
+}
+
+internet_app_bundle_id() {
+    local app_path="$1"
+    [ -n "$app_path" ] && [ -e "$app_path" ] || return 1
+    local bid=""
+    bid="$(defaults read "$app_path/Contents/Info" CFBundleIdentifier 2>/dev/null || true)"
+    if [ -z "$bid" ] && command -v codesign >/dev/null 2>&1; then
+        bid="$(codesign -dv "$app_path" 2>&1 | sed -n 's/^Identifier=//p' | head -n 1)"
+    fi
+    printf '%s\n' "$bid"
+}
+
+# Return a tri-state observation. Only a successful explicit false response
+# proves that the toolkit may claim ownership of a subsequent launch.
+internet_app_running_state() {
+    local bid="$1" out=""
+    if ! _vd_valid_bundle_id "$bid"; then
+        printf 'unknown\n'
+        return 0
+    fi
+    if ! out="$(run_with_timeout 10 osascript -e "application id \"$bid\" is running" 2>/dev/null)"; then
+        printf 'unknown\n'
+        return 0
+    fi
+    case "$out" in
+        true|false) printf '%s\n' "$out" ;;
+        *) printf 'unknown\n' ;;
+    esac
+}
+
+internet_app_is_running() {
+    [ "$(internet_app_running_state "$1")" = "true" ]
+}
+
+# Clamp an integer setting: _vd_clamp_int <value> <default> <min> <max>.
+_vd_clamp_int() {
+    local val="$1" def="$2" min="$3" max="$4"
+    case "$val" in
+        ''|*[!0-9]*) val="$def" ;;
+    esac
+    [ "$val" -lt "$min" ] && val="$min"
+    [ "$val" -gt "$max" ] && val="$max"
+    printf '%s\n' "$val"
+}
+
+# Seconds a toolkit-launched app gets to exit (MAC_UPDATE_QUIT_WAIT, 0-300).
+internet_quit_wait_seconds() {
+    _vd_clamp_int "${MAC_UPDATE_QUIT_WAIT:-60}" 60 0 300
+}
+
+# Minimum seconds between the toolkit launching an app and the toolkit asking
+# it to quit (MAC_UPDATE_QUIT_MIN_AGE, default 30, 0-300).
+internet_quit_min_age_seconds() {
+    _vd_clamp_int "${MAC_UPDATE_QUIT_MIN_AGE:-30}" 30 0 300
+}
+
+# internet_wait_launch_min_age <bundle id>
+# silent_launch_app records "bundle_id|epoch" in toolkit_launched_at.txt. If the
+# app was launched less than MAC_UPDATE_QUIT_MIN_AGE seconds ago, wait out the
+# remainder. Before 2026-11-10 an app launched shortly before the end-of-step
+# settle could receive its quit a few seconds after launch, while its vendor
+# launcher was still starting. No record (or an unparseable one) means no wait.
+internet_wait_launch_min_age() {
+    local bid="$1" f launched now min age
+    [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] || return 0
+    f="$MAC_UPDATE_SESSION_DIR/toolkit_launched_at.txt"
+    [ -f "$f" ] || return 0
+    launched="$(awk -F'|' -v b="$bid" '$1 == b { t = $2 } END { print t }' "$f" 2>/dev/null)"
+    case "$launched" in ''|*[!0-9]*) return 0 ;; esac
+    min="$(internet_quit_min_age_seconds)"
+    now="$(date +%s 2>/dev/null)"
+    case "$now" in ''|*[!0-9]*) return 0 ;; esac
+    age=$((now - launched))
+    [ "$age" -lt 0 ] && age=0
+    if [ "$age" -lt "$min" ]; then
+        _vd_diag "Quit of $bid deferred $((min - age))s: launched ${age}s ago (minimum ${min}s)"
+        sleep $((min - age))
+    fi
+    return 0
+}
+
+# Ask a toolkit-launched app to quit, politely and repeatedly.
+#
+# Only ever called for apps the toolkit itself launched (toolkit_launched.txt).
+# A vendor updater often relaunches the app it just updated, so the first
+# `quit` can hit an instance that is already gone while a fresh one keeps
+# running; the graceful quit is therefore re-sent every
+# MAC_UPDATE_QUIT_RESEND seconds (default 10, 1-60) inside the wait window.
+# Never force-kills: if the app is still up when the window closes the
+# function returns 1 and the caller leaves it running.
+internet_app_quit_gracefully() {
+    local bid="$1"
+    _vd_valid_bundle_id "$bid" || return 1
+    if ! internet_app_is_running "$bid"; then
+        return 0
+    fi
+    # Never ask an app to quit while it may still be starting: a quit that
+    # lands mid-start can interrupt the vendor's launch/update handoff.
+    internet_wait_launch_min_age "$bid"
+    if ! internet_app_is_running "$bid"; then
+        return 0
+    fi
+    local wait_s resend_s elapsed=0 since_quit=0
+    wait_s="$(internet_quit_wait_seconds)"
+    resend_s="$(_vd_clamp_int "${MAC_UPDATE_QUIT_RESEND:-10}" 10 1 60)"
+    run_with_timeout 20 osascript -e "tell application id \"$bid\" to quit" 2>/dev/null || true
+    while [ "$elapsed" -lt "$wait_s" ]; do
+        if ! internet_app_is_running "$bid"; then
+            return 0
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+        since_quit=$((since_quit + 2))
+        if [ "$since_quit" -ge "$resend_s" ]; then
+            since_quit=0
+            if internet_app_is_running "$bid"; then
+                run_with_timeout 20 osascript -e "tell application id \"$bid\" to quit" 2>/dev/null || true
+            fi
+        fi
+    done
+    # Final observation: the app may have exited during the last interval.
+    ! internet_app_is_running "$bid"
+}
+
+vendor_direct_host_allowed() {
+    PYTHONPATH="$_VENDOR_DIRECT_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 - "$1" "$2" <<'PY_HOST'
+import sys
+from download_policy import validate_download_url
+try:
+    validate_download_url(sys.argv[1],[sys.argv[2]])
+except ValueError:
+    sys.exit(1)
+PY_HOST
+}
+
+vendor_direct_verify_checksum() {
+    local file="$1" kind="$2" val="$3"
+    [ -f "$file" ] || return 1
+    case "$kind" in
+        ''|'-') return 0 ;;
+    esac
+    case "$val" in
+        ''|'-') return 0 ;;
+    esac
+
+    case "$kind" in
+        sha256hex)
+            local actual
+            actual="$(shasum -a 256 "$file" 2>/dev/null | awk '{print $1}')"
+            python3 -c "import sys; sys.exit(0 if sys.argv[1].lower() == sys.argv[2].lower() else 1)" "$actual" "$val"
+            ;;
+        sha512hex)
+            local actual
+            actual="$(shasum -a 512 "$file" 2>/dev/null | awk '{print $1}')"
+            python3 -c "import sys; sys.exit(0 if sys.argv[1].lower() == sys.argv[2].lower() else 1)" "$actual" "$val"
+            ;;
+        sha512b64)
+            # Stream in 1 MiB chunks: artifacts are 150-250 MB and reading them
+            # whole into memory for one digest is needless (P2-6).
+            python3 -c '
+import base64, hashlib, hmac, sys
+h = hashlib.sha512()
+with open(sys.argv[1], "rb") as fh:
+    for chunk in iter(lambda: fh.read(1048576), b""):
+        h.update(chunk)
+got = base64.b64encode(h.digest()).decode("ascii")
+sys.exit(0 if hmac.compare_digest(got, sys.argv[2]) else 1)
+' "$file" "$val"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+vendor_direct_install() {
+    local installed_app_path="$1" url="$2" artifact="$3" checksum_kind="$4" checksum="$5" host="$6" expected_version="${7:-}"
+
+    # 1. DRY RUN / VERIFY ONLY
+    if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
+        print_info "[DRY-RUN] vendor_direct_install $installed_app_path" 2>/dev/null || true
+        return 2
+    fi
+
+    # The plan binds the canonical existing destination and direct-update scope.
+    [ -n "${MAC_UPDATE_ACTION_ID:-}" ] && [ -n "${MAC_UPDATE_PLAN_PATH:-}" ] || return 4
+    case "$installed_app_path" in
+        /Applications/*|"$HOME"/Applications/*) ;;
+        *) return 4 ;;
+    esac
+    [ -d "$installed_app_path" ] && [ ! -L "$installed_app_path" ] || return 4
+    command -v mac_update_authorize_action >/dev/null 2>&1 || return 4
+    mac_update_authorize_action "$MAC_UPDATE_PLAN_PATH" "$MAC_UPDATE_ACTION_ID" >/dev/null || return 4
+
+    # 3. Host allowlist
+    if ! vendor_direct_host_allowed "$url" "$host"; then
+        print_warn "Vendor download host rejected" 2>/dev/null || true
+        _vd_diag "ERROR: vendor direct host rejected"
+        return 1
+    fi
+
+    # 4. App must not be running
+    local bid
+    bid="$(internet_app_bundle_id "$installed_app_path")"
+    if [ "$(internet_app_running_state "$bid")" != "false" ]; then
+        _vd_diag "ERROR: app $bid is currently running"
+        return 4
+    fi
+
+    # 5. Fetch to file
+    local ext="bin"
+    case "$artifact" in
+        zip) ext="zip" ;;
+        dmg) ext="dmg" ;;
+        tar.gz) ext="tar.gz" ;;
+    esac
+    local tmp_root="${INTERNET_TEMP_ROOT:-${TMPDIR:-/tmp}}"
+    local dl_file
+    dl_file="$(mktemp "$tmp_root/vd.XXXXXX.${ext}")" || return 1
+    if ! fetch_reviewed_artifact "$url" "$dl_file" 1800 4294967296 "$MAC_UPDATE_ACTION_ID" "$artifact"; then
+        _vd_diag "ERROR: reviewed artifact fetch deferred"
+        rm -f "$dl_file"
+        return 1
+    fi
+
+    # 6. Checksum
+    if ! vendor_direct_verify_checksum "$dl_file" "$checksum_kind" "$checksum"; then
+        print_warn "$(printf "${L_INTERNET_CHECKSUM_MISMATCH_FMT:-Checksum mismatch: expected %s, got %s}" "$checksum" "mismatch")" 2>/dev/null || true
+        _vd_diag "ERROR: checksum mismatch for $dl_file"
+        rm -f "$dl_file"
+        return 1
+    fi
+
+    # 7. Extract
+    local extract_dir
+    extract_dir="$(mktemp -d "$tmp_root/vd_x.XXXXXX")" || { rm -f "$dl_file"; return 1; }
+    case "$artifact" in
+        zip)
+            if ! ditto -x -k "$dl_file" "$extract_dir" 2>/dev/null; then
+                _vd_diag "ERROR: ditto extract failed for $dl_file"
+                rm -rf "$extract_dir" "$dl_file"
+                return 1
+            fi
+            ;;
+        tar.gz)
+            if ! tar -xzf "$dl_file" -C "$extract_dir" 2>/dev/null; then
+                _vd_diag "ERROR: tar extract failed for $dl_file"
+                rm -rf "$extract_dir" "$dl_file"
+                return 1
+            fi
+            ;;
+        dmg)
+            local mnt
+            mnt="$(mount_verified_dmg "$dl_file")" || {
+                _vd_diag "ERROR: mount_verified_dmg failed for $dl_file"
+                rm -rf "$extract_dir" "$dl_file"
+                return 1
+            }
+            local dmg_copy_ok=1
+            while IFS= read -r dmg_app; do
+                [ -n "$dmg_app" ] || continue
+                if ! ditto "$dmg_app" "$extract_dir/$(basename "$dmg_app")" 2>/dev/null; then
+                    _vd_diag "ERROR: ditto failed for $dmg_app from dmg"
+                    dmg_copy_ok=0
+                    break
+                fi
+            done <<EOF_DMG_APPS
+$(find "$mnt" -maxdepth 3 -type d -name '*.app' -prune 2>/dev/null)
+EOF_DMG_APPS
+            detach_verified_dmg "$mnt" 2>/dev/null || true
+            if [ "$dmg_copy_ok" -eq 0 ]; then
+                rm -rf "$extract_dir" "$dl_file"
+                return 1
+            fi
+            ;;
+        *)
+            rm -rf "$extract_dir" "$dl_file"
+            return 1
+            ;;
+    esac
+    rm -f "$dl_file"
+
+    # 8. Exactly one *.app matching bundle ID
+    local target_bid="$bid"
+    local found=""
+    local match_count=0
+    local candidate
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        local c_bid
+        c_bid="$(internet_app_bundle_id "$candidate")"
+        if [ -n "$target_bid" ] && [ "$c_bid" = "$target_bid" ]; then
+            match_count=$((match_count + 1))
+            found="$candidate"
+        fi
+    done <<EOF
+$(find "$extract_dir" -maxdepth 3 -type d -name '*.app' -prune 2>/dev/null)
+EOF
+
+    if [ "$match_count" -ne 1 ] || [ -z "$found" ]; then
+        _vd_diag "ERROR: expected 1 app bundle with id $target_bid, found $match_count"
+        rm -rf "$extract_dir"
+        return 1
+    fi
+
+    # 8b. Version pre-check before copy
+    if [ -n "$expected_version" ]; then
+        local cand_ver
+        cand_ver="$(app_version "$found")"
+        local installed_ver
+        installed_ver="$(app_version "$installed_app_path")"
+        local exp_rel
+        exp_rel="$(version_cmp "$expected_version" "$cand_ver")"
+        local cur_rel
+        cur_rel="$(version_cmp "$cand_ver" "$installed_ver")"
+        if [ "$exp_rel" != "equal" ] && [ "$exp_rel" != "older" ]; then
+            _vd_diag "ERROR: downloaded bundle version $cand_ver does not satisfy expected $expected_version"
+            rm -rf "$extract_dir"
+            return 1
+        fi
+        if [ "$cur_rel" != "newer" ]; then
+            _vd_diag "ERROR: downloaded bundle version $cand_ver is not newer than installed $installed_ver"
+            rm -rf "$extract_dir"
+            return 1
+        fi
+    fi
+
+    # 9. copy_verified_app
+    local dest_label
+    dest_label="$(basename "$installed_app_path")"
+    local copy_rc=0
+    copy_verified_app "$found" "$installed_app_path" "$MAC_UPDATE_ACTION_ID" || copy_rc=$?
+    if [ "$copy_rc" -ne 0 ]; then
+        _vd_diag "ERROR: copy_verified_app failed for $found -> $dest_label (code $copy_rc)"
+        rm -rf "$extract_dir"
+        # The app may have been opened while the download was in flight.
+        # Deferral is a safe, retryable outcome; only copy/validation is hard.
+        [ "$copy_rc" -eq 2 ] && return 4
+        return 3
+    fi
+
+    rm -rf "$extract_dir"
+    return 0
+}

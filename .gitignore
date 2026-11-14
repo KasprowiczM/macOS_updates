@@ -1,0 +1,11 @@
+/.DS_Store
+/.env
+/.env.*
+/APPLICATIONS.md
+/UPDATES.md
+/.mac_update_prefs
+/.mac-update.lock
+/logs/
+/data/
+__pycache__/
+*.pyc

@@ -1,0 +1,1587 @@
+#!/usr/bin/env python3
+"""lib/python/run_summary.py — Machine-readable run summary generator (JSON).
+
+Composes and writes logs/run_summary_<timestamp>.json for automation & monitoring.
+"""
+
+from __future__ import annotations
+
+import datetime
+import json
+import os
+import re
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Any
+from operation_receipts import evidence_freshness, read_phase_events, read_provenance, read_source_diagnostics
+
+
+FORMAT_VERSION = 4
+
+PENDING_FILES = (
+    ("pending_after_run_appstore", "pending_appstore"),
+    ("pending_after_run_brew_formulae", "pending_brew_formulae"),
+    ("pending_after_run_brew_casks", "pending_brew_casks"),
+    ("pending_after_run_mau", "pending_mau"),
+    ("pending_after_run_system", "pending_system"),
+)
+
+MAU_PRODUCT_NAMES = {
+    "MSWD2019": "Microsoft Word",
+    "XCEL2019": "Microsoft Excel",
+    "PPT32019": "Microsoft PowerPoint",
+    "ONMC2019": "Microsoft OneNote",
+    "OPIM2019": "Microsoft Outlook",
+    "MAU01": "Microsoft AutoUpdate",
+}
+
+SUMMARY_I18N = {
+    "en": {
+        "updated_title": "Updated",
+        "pending_title": "Still pending / failed",
+        "unconfirmed_title": "Unconfirmed operations",
+        "warning_title": "Manufacturer warnings",
+        "feed_warning": "Vendor feed %s is older than installed %s.",
+        "inventory_changes": "Inventory version fields changed: %s",
+        "advisories_title": "Advisories",
+        "advisory_security": "SECURITY",
+        "inventory_apps": "Inventory entries added: %s, removed: %s",
+        "none": "(none)",
+    },
+    "pl": {
+        "updated_title": "Zaktualizowano",
+        "pending_title": "Nadal oczekuje / niepowodzenie",
+        "unconfirmed_title": "Niepotwierdzone operacje",
+        "warning_title": "Ostrzeżenia producenta",
+        "feed_warning": "Feed producenta %s jest starszy niż zainstalowana wersja %s.",
+        "inventory_changes": "Zmieniono pól wersji w inventory: %s",
+        "advisories_title": "Zalecenia",
+        "advisory_security": "BEZPIECZEŃSTWO",
+        "inventory_apps": "Wpisy inwentarza dodane: %s, usunięte: %s",
+        "none": "(brak)",
+    },
+    "de": {
+        "updated_title": "Aktualisiert",
+        "pending_title": "Noch ausstehend / fehlgeschlagen",
+        "unconfirmed_title": "Unbestätigte Vorgänge",
+        "warning_title": "Herstellerwarnungen",
+        "feed_warning": "Herstellerfeed %s ist älter als die installierte Version %s.",
+        "inventory_changes": "Inventar-Versionsfelder geändert: %s",
+        "advisories_title": "Hinweise",
+        "advisory_security": "SICHERHEIT",
+        "inventory_apps": "Inventar-Einträge hinzugefügt: %s, entfernt: %s",
+        "none": "(keine)",
+    },
+    "es": {
+        "updated_title": "Actualizado",
+        "pending_title": "Aún pendiente / fallido",
+        "unconfirmed_title": "Operaciones sin confirmar",
+        "warning_title": "Advertencias del fabricante",
+        "feed_warning": "El feed del fabricante %s es anterior a la versión instalada %s.",
+        "inventory_changes": "Campos de versión de inventario cambiados: %s",
+        "advisories_title": "Avisos",
+        "advisory_security": "SEGURIDAD",
+        "inventory_apps": "Entradas de inventario añadidas: %s, eliminadas: %s",
+        "none": "(ninguno)",
+    },
+    "fr": {
+        "updated_title": "Mis à jour",
+        "pending_title": "Toujours en attente / échoué",
+        "unconfirmed_title": "Opérations non confirmées",
+        "warning_title": "Avertissements du fabricant",
+        "feed_warning": "Le flux du fabricant %s est antérieur à la version installée %s.",
+        "inventory_changes": "Champs de version de l'inventaire modifiés : %s",
+        "advisories_title": "Avis",
+        "advisory_security": "SÉCURITÉ",
+        "inventory_apps": "Entrées d'inventaire ajoutées : %s, supprimées : %s",
+        "none": "(aucun)",
+    },
+    "it": {
+        "updated_title": "Aggiornato",
+        "pending_title": "Ancora in sospeso / non riuscito",
+        "unconfirmed_title": "Operazioni non confermate",
+        "warning_title": "Avvisi del produttore",
+        "feed_warning": "Il feed del produttore %s è precedente alla versione installata %s.",
+        "inventory_changes": "Campi versione inventario modificati: %s",
+        "advisories_title": "Avvisi",
+        "advisory_security": "SICUREZZA",
+        "inventory_apps": "Voci di inventario aggiunte: %s, rimosse: %s",
+        "none": "(nessuno)",
+    },
+    "pt": {
+        "updated_title": "Atualizado",
+        "pending_title": "Ainda pendente / falhou",
+        "unconfirmed_title": "Operações não confirmadas",
+        "warning_title": "Avisos do fabricante",
+        "feed_warning": "O feed do fabricante %s é anterior à versão instalada %s.",
+        "inventory_changes": "Campos de versão do inventário alterados: %s",
+        "advisories_title": "Avisos",
+        "advisory_security": "SEGURANÇA",
+        "inventory_apps": "Entradas de inventário adicionadas: %s, removidas: %s",
+        "none": "(nenhum)",
+    },
+}
+
+
+INVALID_VERSIONS = {
+    "?",
+    "unknown",
+    "null",
+    "none",
+    "n/a",
+    "not installed",
+    "niezainstalowane",
+    "(none)",
+    "(brak)",
+    "",
+}
+
+
+ADVISORY_SEVERITIES = ("security", "info")
+MAX_ADVISORIES = 50
+MAX_ADVISORY_TEXT = 500
+
+
+
+def _detail(key: str, default: str, *args: object) -> str:
+    """Item detail text: the localized L_* string from the environment (exported by
+    i18n/loader.sh) with the English default; a malformed override falls back."""
+    fmt = os.environ.get(key) or default
+    try:
+        return fmt % args if args else fmt
+    except (TypeError, ValueError):
+        return default % args if args else default
+
+def read_advisories(session_dir: str | Path | None) -> list[dict[str, str]]:
+    """Advisories the child steps appended to $SESSION_DIR/advisories.txt.
+
+    One per line, ``source|severity|text`` (severity ``security`` or ``info``;
+    text may itself contain ``|``). Missing file, blank lines, comments and
+    malformed lines are tolerated; an unknown severity degrades to ``info``;
+    exact duplicates are dropped. Advisories never change exit codes.
+    """
+    if not session_dir:
+        return []
+    path = Path(session_dir) / "advisories.txt"
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    found: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("|", 2)
+        if len(parts) != 3:
+            continue
+        source, severity, text = (p.strip() for p in parts)
+        text = text[:MAX_ADVISORY_TEXT]
+        if not source or not text:
+            continue
+        if severity not in ADVISORY_SEVERITIES:
+            severity = "info"
+        key = (source, severity, text)
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append({"source": source, "severity": severity, "text": text})
+        if len(found) >= MAX_ADVISORIES:
+            break
+    return found
+
+
+def read_step_durations(session_dir: str | Path | None) -> dict[str, int]:
+    """Per-step wall-clock seconds from $SESSION_DIR/step_durations.txt (``key=seconds``)."""
+    if not session_dir:
+        return {}
+    try:
+        raw = (Path(session_dir) / "step_durations.txt").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    durations: dict[str, int] = {}
+    for line in raw.splitlines():
+        key, sep, val = line.strip().partition("=")
+        if not sep or not key:
+            continue
+        try:
+            durations[key.strip()] = max(0, int(val.strip()))
+        except ValueError:
+            continue
+    return durations
+
+
+def is_valid_version(v: Any) -> bool:
+    """Return True if v is a non-empty, recognized version string."""
+    if v is None:
+        return False
+    s = str(v).strip()
+    return bool(s) and s.lower() not in INVALID_VERSIONS
+
+
+def normalize_app_key(name: str) -> str:
+    """Normalize application name for cross-subsystem deduplication."""
+    s = str(name).strip().lower()
+    if s.endswith(".app"):
+        s = s[:-4].strip()
+    s = s.replace("_", " ").replace("-", " ")
+    return " ".join(s.split())
+
+
+def classify_step_status(val: Any) -> str:
+    """Classify localized or English step message into a stable status code:
+
+    'ok', 'warn', 'error', 'skipped', 'skipped_by_user', or 'unconfirmed'.
+    """
+    if val is None:
+        return "unconfirmed"
+    if isinstance(val, dict):
+        if "code" in val and val["code"]:
+            return str(val["code"])
+        val = val.get("text", "")
+    s = str(val).strip().lower()
+    if not s:
+        return "unconfirmed"
+
+    if s in ("ok", "warn", "error", "skipped", "skipped_by_user", "unconfirmed"):
+        return s
+
+    error_tokens = ("error", "błąd", "blad", "fehler", "erreur", "fallo", "errore", "erro", "failed")
+    if any(tok in s for tok in error_tokens):
+        return "error"
+
+    if "pominięte przez użytkownika" in s or "skipped by user" in s:
+        return "skipped_by_user"
+
+    warn_tokens = (
+        "warn", "ostrzeż", "ostrzez", "warnung", "avertissement", "advertencia", "avviso", "avvis", "aviso",
+        "unverified", "niezweryfikowan", "degraded", "unknown", "nieznan", "zastrzeż",
+    )
+    if any(tok in s for tok in warn_tokens):
+        return "warn"
+
+    skip_tokens = ("skip", "pominięt", "pominiet", "übersprungen", "ignoré", "omitido", "saltato")
+    if any(tok in s for tok in skip_tokens):
+        return "skipped"
+
+    ok_tokens = (
+        "ok", "zakończon", "zakonczon", "completed", "erfolgreich", "terminé", "completado",
+        "completato", "concluído", "aktualn", "current",
+    )
+    if any(tok in s for tok in ok_tokens):
+        return "ok"
+
+    return "unconfirmed"
+
+
+def read_mas_versions(filepath: str | Path) -> dict[str, str]:
+    """Parse `mas list` snapshot format: `<id> <name> (<version>)`."""
+    versions: dict[str, str] = {}
+    path = Path(filepath)
+    if not path.is_file():
+        return versions
+    import re
+    pattern = re.compile(r"^\s*(\d+)\s+(.+?)\s+\(([^)]+)\)\s*$")
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        m = pattern.match(line)
+        if m:
+            name = m.group(2).strip()
+            ver = m.group(3).strip()
+            versions[name] = ver
+    return versions
+
+
+def read_mas_details(filepath: str | Path) -> dict[str, dict[str, str]]:
+    """Parse `mas list` snapshot into name -> {'id': id, 'version': ver}."""
+    details: dict[str, dict[str, str]] = {}
+    path = Path(filepath)
+    if not path.is_file():
+        return details
+    import re
+    pattern = re.compile(r"^\s*(\d+)\s+(.+?)\s+\(([^)]+)\)\s*$")
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        m = pattern.match(line)
+        if m:
+            app_id = m.group(1).strip()
+            name = m.group(2).strip()
+            ver = m.group(3).strip()
+            details[name] = {"id": app_id, "version": ver}
+    return details
+
+
+def read_kv_versions(filepath: str | Path, sep: str | None = None) -> dict[str, str]:
+    """Read whitespace- or delimiter-separated key-value snapshot file."""
+    versions: dict[str, str] = {}
+    path = Path(filepath)
+    if not path.is_file():
+        return versions
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if sep:
+            parts = line.split(sep, 1)
+            if len(parts) == 2:
+                versions[parts[0].strip()] = parts[1].strip()
+        else:
+            parts = line.split()
+            if len(parts) >= 2:
+                versions[parts[0]] = parts[1]
+    return versions
+
+
+def read_npm_cli_snapshot(filepath: str | Path) -> dict[str, str]:
+    """Read npm_cli snapshot file (`name|package|version|bin|path`)."""
+    versions: dict[str, str] = {}
+    path = Path(filepath)
+    if not path.is_file():
+        return versions
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        parts = line.strip().split("|")
+        if len(parts) >= 3:
+            versions[parts[0].strip()] = parts[2].strip()
+    return versions
+
+
+def read_npm_cli_details(filepath: str | Path) -> dict[str, dict[str, str]]:
+    """Read npm_cli snapshot file (`name|package|version|bin|path`) with id."""
+    details: dict[str, dict[str, str]] = {}
+    path = Path(filepath)
+    if not path.is_file():
+        return details
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        parts = line.strip().split("|")
+        if len(parts) >= 3:
+            name = parts[0].strip()
+            pkg = parts[1].strip()
+            ver = parts[2].strip()
+            details[name] = {"id": pkg or name, "version": ver}
+    return details
+
+
+def read_deferred_running(session_dir: str | Path) -> list[tuple[str, str]]:
+    """(cask, app) pairs from $SESSION_DIR/brew_deferred_running.txt (`cask|App.app`)."""
+    path = Path(session_dir) / "brew_deferred_running.txt"
+    out: list[tuple[str, str]] = []
+    if not path.is_file():
+        return out
+    seen: set[str] = set()
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        cask, _, app = line.partition("|")
+        cask = cask.strip()
+        if cask and cask not in seen:
+            seen.add(cask)
+            out.append((cask, app.strip()))
+    return out
+
+
+def read_action_results(session_dir):
+    """Read bounded, local typed evidence; malformed lines cannot assert success."""
+    if not session_dir:
+        return []
+    path = Path(session_dir) / 'action-results.jsonl'
+    try:
+        if path.is_symlink() or path.stat().st_size > 16 * 1024 * 1024:
+            return []
+        raw = path.read_text(encoding='utf-8')
+    except OSError:
+        return []
+    results = {}
+    for line in raw.splitlines()[:20000]:
+        try:
+            value = json.loads(line)
+            if not isinstance(value, dict) or not isinstance(value.get('target'), dict):
+                continue
+            ref = value['target']
+            if ref.get('kind') not in ('app', 'package') or not isinstance(ref.get('id'), str):
+                continue
+            results[(ref['kind'], ref['id'])] = value
+        except (ValueError, TypeError):
+            continue
+    return list(results.values())
+
+
+def action_result_items(results):
+    items = []
+    for result in results:
+        state = result.get('status')
+        status = 'unconfirmed'
+        if state in ('manual_by_policy', 'ignored_by_policy', 'deferred_by_user'):
+            status = 'skipped'
+        elif state == 'scan_partial':
+            status = 'scan_advisory'
+        elif state in ('update_failed', 'recovery_required', 'source_conflict'):
+            status = 'pending'
+        elif state == 'current_verified' and result.get('verified') is True:
+            status = 'updated' if (result.get('reason_code') == 'updated_verified' and
+                                  is_valid_version(result.get('before')) and
+                                  is_valid_version(result.get('after')) and
+                                  result['before'] != result['after']) else 'current'
+        items.append(dict(name=result.get('name') or result['target']['id'], source='action_plan',
+                          status=status, action_status=state, target=result['target'],
+                          before=result.get('before'), after=result.get('after'),
+                          details=result.get('reason_code', ''), old_version=result.get('before'),
+                          new_version=result.get('after'), verified=result.get('verified') is True,
+                          evidence_type=result.get('evidence_type', 'unknown'),
+                          evidence_freshness=evidence_freshness(result.get('evidence_type'))))
+    return items
+
+
+def collect_run_items(
+    session_dir: str | Path,
+    step_results: dict[str, str] | None = None,
+    inventory_updated_count: int = 0,
+) -> list[dict[str, Any]]:
+    """Collect unified per-item records across all update subsystems."""
+    sdir = Path(session_dir)
+    action_results = read_action_results(sdir)
+    if action_results:
+        return action_result_items(action_results)
+    items: list[dict[str, Any]] = []
+    seen_updated_apps: set[str] = set()
+
+    def get_alias_keys(app_name: str) -> set[str]:
+        keys = {normalize_app_key(app_name)}
+        try:
+            from inventory import APP_ALIASES
+            norm = normalize_app_key(app_name)
+            for k, aliases in APP_ALIASES.items():
+                if normalize_app_key(k) == norm or app_name.lower() in [a.lower() for a in aliases]:
+                    keys.add(normalize_app_key(k))
+                    for a in aliases:
+                        keys.add(normalize_app_key(a))
+        except Exception:
+            pass
+        return keys
+
+    def is_seen_updated(app_name: str) -> bool:
+        return bool(get_alias_keys(app_name) & seen_updated_apps)
+
+    def mark_seen_updated(app_name: str) -> None:
+        seen_updated_apps.update(get_alias_keys(app_name))
+
+    # 1. App Store (only if both before and after snapshots exist)
+    mas_before_file = sdir / "mas_before.txt"
+    mas_after_file = sdir / "mas_after.txt"
+    if mas_before_file.is_file() and mas_after_file.is_file():
+        mas_before = read_mas_details(mas_before_file)
+        mas_after = read_mas_details(mas_after_file)
+        for name, data in mas_after.items():
+            new_ver = data.get("version", "")
+            old_data = mas_before.get(name)
+            old_ver = old_data.get("version") if old_data else None
+            app_id = data.get("id") or (old_data.get("id") if old_data else name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": app_id,
+                        "category": "appstore",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": None,
+                    })
+
+    # 2. Homebrew Formulae (only if both snapshots exist)
+    brew_form_before_file = sdir / "brew_formulae_before.txt"
+    brew_form_after_file = sdir / "brew_formulae_after.txt"
+    if brew_form_before_file.is_file() and brew_form_after_file.is_file():
+        brew_form_before = read_kv_versions(brew_form_before_file)
+        brew_form_after = read_kv_versions(brew_form_after_file)
+        for name, new_ver in brew_form_after.items():
+            old_ver = brew_form_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "brew_formula",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": None,
+                    })
+
+    # 3. Homebrew Casks (only if both snapshots exist)
+    brew_cask_before_file = sdir / "brew_casks_before.txt"
+    brew_cask_after_file = sdir / "brew_casks_after.txt"
+    cask_targets_file = sdir / "brew_cask_targets.txt"
+    cask_app_targets: dict[str, list[str]] = {}
+    if cask_targets_file.is_file():
+        for line in cask_targets_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or "|" not in line:
+                continue
+            cask_token, target_app = line.split("|", 1)
+            target_clean = target_app.strip()
+            if target_clean.endswith(".app"):
+                target_clean = target_clean[:-4]
+            cask_app_targets.setdefault(cask_token.strip(), []).append(target_clean)
+
+    if brew_cask_before_file.is_file() and brew_cask_after_file.is_file():
+        brew_cask_before = read_kv_versions(brew_cask_before_file)
+        brew_cask_after = read_kv_versions(brew_cask_after_file)
+        for name, new_ver in brew_cask_after.items():
+            old_ver = brew_cask_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    for target_app in cask_app_targets.get(name, []):
+                        mark_seen_updated(target_app)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "brew_cask",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": None,
+                    })
+
+    # 4. Native CLI + npm (only if both snapshots exist)
+    npm_cli_before_file = sdir / "npm_cli_before.txt"
+    npm_cli_after_file = sdir / "npm_cli_after.txt"
+    if npm_cli_before_file.is_file() and npm_cli_after_file.is_file():
+        npm_cli_before = read_npm_cli_details(npm_cli_before_file)
+        npm_cli_after = read_npm_cli_details(npm_cli_after_file)
+        for name, data in npm_cli_after.items():
+            new_ver = data.get("version", "")
+            old_data = npm_cli_before.get(name)
+            old_ver = old_data.get("version") if old_data else None
+            cli_id = data.get("id") or (old_data.get("id") if old_data else name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": cli_id,
+                        "category": "npm_cli",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": None,
+                    })
+
+    # 5. Internet Apps (only if both snapshots exist)
+    inet_before_file = sdir / "internet_before.txt"
+    inet_after_file = sdir / "internet_after.txt"
+    if inet_before_file.is_file() and inet_after_file.is_file():
+        inet_before = read_kv_versions(inet_before_file, sep="|")
+        inet_after = read_kv_versions(inet_after_file, sep="|")
+        for name, new_ver in inet_after.items():
+            old_ver = inet_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "internet",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": None,
+                    })
+
+    # 6. macOS System update
+    sys_upgrade_path = sdir / "system_upgrade.txt"
+    sys_before_path = sdir / "system_before.txt"
+    sys_after_path = sdir / "system_after.txt"
+    if sys_upgrade_path.is_file():
+        txt = sys_upgrade_path.read_text(encoding="utf-8", errors="replace").strip()
+        if txt and is_valid_version(txt):
+            old_s = None
+            new_s = txt
+            if "->" in txt:
+                p = txt.split("->", 1)
+                old_s = p[0].strip()
+                new_s = p[1].strip()
+            elif "|" in txt:
+                p = txt.split("|", 1)
+                old_s = p[0].strip()
+                new_s = p[1].strip()
+            if is_valid_version(new_s) and (old_s is None or (is_valid_version(old_s) and old_s != new_s)):
+                if not is_seen_updated("macOS"):
+                    mark_seen_updated("macOS")
+                    items.append({
+                        "name": "macOS",
+                        "id": "macos",
+                        "category": "system",
+                        "old_version": old_s,
+                        "new_version": new_s,
+                        "status": "updated",
+                        "details": None,
+                    })
+    elif sys_before_path.is_file() and sys_after_path.is_file():
+        old_sys = sys_before_path.read_text(encoding="utf-8", errors="replace").strip()
+        new_sys = sys_after_path.read_text(encoding="utf-8", errors="replace").strip()
+        if is_valid_version(old_sys) and is_valid_version(new_sys) and old_sys != new_sys:
+            if not is_seen_updated("macOS"):
+                mark_seen_updated("macOS")
+                items.append({
+                    "name": "macOS",
+                    "id": "macos",
+                    "category": "system",
+                    "old_version": old_sys,
+                    "new_version": new_sys,
+                    "status": "updated",
+                    "details": None,
+                })
+
+    # 6a. App Store (iPad) — Track 2
+    ios_before_file = sdir / "appstore_ios_before.txt"
+    ios_after_file = sdir / "appstore_ios_after.txt"
+    if ios_before_file.is_file() and ios_after_file.is_file():
+        ios_before = read_kv_versions(ios_before_file, sep="|")
+        ios_after = read_kv_versions(ios_after_file, sep="|")
+        for name, new_ver in ios_after.items():
+            old_ver = ios_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "appstore",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": "App Store (iPad) — Track 2",
+                    })
+
+    # 6b. Background updates (detected between steps or outside toolkit steps)
+    bg_scan_file = sdir / "installed_apps_scan.txt"
+    bg_after_file = sdir / "installed_apps_after.txt"
+    if bg_scan_file.is_file() and bg_after_file.is_file():
+        bg_before = read_kv_versions(bg_scan_file, sep="|")
+        bg_after = read_kv_versions(bg_after_file, sep="|")
+        for name, new_ver in bg_after.items():
+            old_ver = bg_before.get(name)
+            if old_ver is not None and is_valid_version(old_ver) and is_valid_version(new_ver) and old_ver != new_ver:
+                if not is_seen_updated(name):
+                    mark_seen_updated(name)
+                    items.append({
+                        "name": name,
+                        "id": name,
+                        "category": "background",
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                        "status": "updated",
+                        "details": "updated outside toolkit steps (vendor updater / App Store)",
+                    })
+
+    # 7. Pending / Remaining items
+    mau_reason = None
+    reason_path = sdir / "mau_interrupt_reason.txt"
+    if reason_path.is_file():
+        mau_reason = reason_path.read_text(encoding="utf-8", errors="replace").strip()
+
+    pending_mau_file = sdir / "pending_mau"
+    pending_mau_val = None
+    if pending_mau_file.is_file():
+        pending_mau_val = pending_mau_file.read_text(encoding="utf-8", errors="replace").strip()
+
+    if pending_mau_val == "unknown":
+        items.append({
+            "name": "Microsoft AutoUpdate",
+            "id": "MAU",
+            "category": "internet",
+            "old_version": None,
+            "new_version": None,
+            "status": "unconfirmed",
+            "details": mau_reason or "Listing check failed (unknown status)",
+        })
+    elif pending_mau_val == "0":
+        # Verified 0 pending MAU updates. Do not show initial IDs.
+        pass
+    else:
+        # Strictly read mau_remaining.txt, NEVER fall back to mau_pending.txt
+        remaining_path = sdir / "mau_remaining.txt"
+        if remaining_path.is_file():
+            rem_text = remaining_path.read_text(encoding="utf-8", errors="replace").strip()
+            if rem_text:
+                for pid in rem_text.split():
+                    clean_pid = pid.strip()
+                    if not clean_pid:
+                        continue
+                    human_name = MAU_PRODUCT_NAMES.get(clean_pid, clean_pid)
+                    display_name = f"{human_name} ({clean_pid})" if clean_pid in MAU_PRODUCT_NAMES else clean_pid
+                    items.append({
+                        "name": display_name,
+                        "id": clean_pid,
+                        "category": "internet",
+                        "old_version": None,
+                        "new_version": None,
+                        "status": "pending",
+                        "details": mau_reason or "Microsoft AutoUpdate pending",
+                    })
+        elif pending_mau_val and pending_mau_val.isdigit() and int(pending_mau_val) > 0:
+            items.append({
+                "name": "Microsoft AutoUpdate",
+                "id": "MAU",
+                "category": "internet",
+                "old_version": None,
+                "new_version": None,
+                "status": "pending",
+                "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", pending_mau_val),
+            })
+
+    # Homebrew Formulae pending queue
+    pbf_file = sdir / "pending_brew_formulae"
+    if pbf_file.is_file():
+        pbf_val = pbf_file.read_text(encoding="utf-8", errors="replace").strip()
+        if pbf_val == "unknown":
+            items.append({
+                "name": "Homebrew Formulae",
+                "id": "brew_formulae",
+                "category": "brew_formula",
+                "old_version": None,
+                "new_version": None,
+                "status": "unconfirmed",
+                "details": "Formulae check/update unconfirmed",
+            })
+        elif pbf_val.isdigit() and int(pbf_val) > 0:
+            items.append({
+                "name": "Homebrew Formulae pending queue",
+                "id": "brew_formulae",
+                "category": "brew_formula",
+                "old_version": None,
+                "new_version": None,
+                "status": "pending",
+                "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", pbf_val),
+            })
+
+    # Homebrew Casks pending queue
+    pbc_file = sdir / "pending_brew_casks"
+    if pbc_file.is_file():
+        pbc_val = pbc_file.read_text(encoding="utf-8", errors="replace").strip()
+        if pbc_val == "unknown":
+            items.append({
+                "name": "Homebrew Casks",
+                "id": "brew_casks",
+                "category": "brew_cask",
+                "old_version": None,
+                "new_version": None,
+                "status": "unconfirmed",
+                "details": "Casks check/update unconfirmed",
+            })
+        elif pbc_val.isdigit() and int(pbc_val) > 0:
+            # Casks deferred because their app is open are listed one by one
+            # below; the generic queue item covers only the remainder.
+            deferred_items = read_deferred_running(sdir)
+            rest = int(pbc_val) - len(deferred_items)
+            if rest > 0:
+                items.append({
+                    "name": "Homebrew Casks pending queue",
+                    "id": "brew_casks",
+                    "category": "brew_cask",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", rest),
+                })
+
+    # Homebrew casks deferred because their app (or declared quit target) is open
+    deferred_detail = os.environ.get(
+        "L_BREW_CASK_DEFERRED_DETAIL", "app is open — quit it and re-run")
+    for cask_tok, app_name in read_deferred_running(sdir):
+        items.append({
+            "name": cask_tok,
+            "id": cask_tok,
+            "category": "brew_cask",
+            "old_version": None,
+            "new_version": None,
+            "status": "pending",
+            "details": f"{app_name}: {deferred_detail}" if app_name else deferred_detail,
+        })
+
+    # Homebrew orphan casks
+    orphan_file = sdir / "brew_orphan_casks.txt"
+    if orphan_file.is_file():
+        for line in orphan_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            tok = line.strip()
+            if tok and not tok.startswith("#"):
+                items.append({
+                    "name": tok,
+                    "id": tok,
+                    "category": "brew_cask",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": f"app removed manually; remove the Homebrew record: brew uninstall --cask --force {tok}",
+                })
+
+    # Homebrew casks needing interactive run
+    sudo_file = sdir / "brew_needs_interactive.txt"
+    if sudo_file.is_file():
+        for line in sudo_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            tok = line.strip()
+            if tok and not tok.startswith("#"):
+                items.append({
+                    "name": tok,
+                    "id": tok,
+                    "category": "brew_cask",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": "needs an interactive run (administrator rights)",
+                })
+
+    # App Store pending queue
+    pas_file = sdir / "pending_appstore"
+    if pas_file.is_file():
+        pas_val = pas_file.read_text(encoding="utf-8", errors="replace").strip()
+        if pas_val == "unknown":
+            items.append({
+                "name": "App Store",
+                "id": "appstore",
+                "category": "appstore",
+                "old_version": None,
+                "new_version": None,
+                "status": "unconfirmed",
+                "details": "App Store check/update unconfirmed",
+            })
+        elif pas_val.isdigit() and int(pas_val) > 0:
+            items.append({
+                "name": "App Store pending queue",
+                "id": "appstore",
+                "category": "appstore",
+                "old_version": None,
+                "new_version": None,
+                "status": "pending",
+                "details": _detail("L_SUMMARY_DETAIL_UPDATES_PENDING_FMT", "%s updates pending", pas_val),
+            })
+
+    # System updates installed in this run
+    installed_sys_labels = set()
+    sys_inst_file = sdir / "system_installed_labels.txt"
+    if sys_inst_file.is_file():
+        for line in sys_inst_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            lbl = line.strip()
+            if not lbl:
+                continue
+            installed_sys_labels.add(lbl)
+            if "-" in lbl:
+                name_part, ver_part = lbl.rsplit("-", 1)
+            else:
+                name_part, ver_part = lbl, None
+            installed_sys_labels.add(name_part)
+            items.append({
+                "name": name_part,
+                "id": lbl,
+                "category": "system",
+                "old_version": None,
+                "new_version": ver_part,
+                "status": "updated",
+                "details": f"System update installed: {lbl}",
+            })
+
+    # macOS System pending updates from system_available.txt
+    pending_sys_file = sdir / "pending_system"
+    sys_avail_file = sdir / "system_available.txt"
+    pending_sys_val = None
+    if pending_sys_file.is_file():
+        pending_sys_val = pending_sys_file.read_text(encoding="utf-8", errors="replace").strip()
+
+    if pending_sys_val != "0" and sys_avail_file.is_file():
+        from system_updates import parse_softwareupdate_list
+        raw_sys = sys_avail_file.read_text(encoding="utf-8", errors="replace")
+        sys_items = parse_softwareupdate_list(raw_sys)
+        for s_it in sys_items:
+            s_lbl = s_it.get("label")
+            s_title = s_it.get("title")
+            if (s_lbl and s_lbl in installed_sys_labels) or (s_title and s_title in installed_sys_labels):
+                continue
+            items.append({
+                "name": s_title or s_lbl or "macOS update",
+                "id": s_lbl or "system",
+                "category": "system",
+                "old_version": None,
+                "new_version": s_it.get("version") or None,
+                "status": "pending",
+                "details": f"Label: {s_lbl}" if s_lbl else None,
+            })
+
+    # Intel-only apps missing Rosetta
+    rosetta_file = sdir / "rosetta_missing_apps.txt"
+    if rosetta_file.is_file():
+        for line in rosetta_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            app_name = line.strip()
+            if app_name:
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "pending",
+                    "details": "Intel-only; Rosetta missing; EOL macOS 28",
+                })
+
+    # Internet apps behind cask oracle
+    seen_internet_keys: set[str] = set()
+
+    def get_all_alias_keys(name: str) -> set[str]:
+        keys = {normalize_app_key(name)}
+        try:
+            from inventory import APP_ALIASES
+            for k, aliases in APP_ALIASES.items():
+                if normalize_app_key(k) == normalize_app_key(name) or name.lower() in [a.lower() for a in aliases]:
+                    keys.add(normalize_app_key(k))
+                    for a in aliases:
+                        keys.add(normalize_app_key(a))
+        except Exception:
+            pass
+        return keys
+
+    inet_behind_file = sdir / "internet_behind_apps.txt"
+    if inet_behind_file.is_file():
+        for line in inet_behind_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|")
+            if len(parts) >= 3:
+                b_name, b_old, b_new = parts[0].strip(), parts[1].strip(), parts[2].strip()
+                seen_internet_keys.update(get_all_alias_keys(b_name))
+                items.append({
+                    "name": b_name,
+                    "id": b_name,
+                    "category": "internet",
+                    "old_version": b_old or None,
+                    "new_version": b_new or None,
+                    "status": "pending",
+                    "details": f"Behind cask ({b_old} < {b_new})",
+                })
+
+    # Internet status codes (v1.5.0)
+    internet_unconfirmed_apps = 0
+    internet_explained_warnings = 0
+    internet_unexplained_status = False
+    inet_codes_file = sdir / "internet_status_codes.txt"
+    if inet_codes_file.is_file():
+        for line in inet_codes_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|", 2)
+            if len(parts) < 3:
+                internet_unexplained_status = True
+                continue
+            app_name, code, text = parts[0].strip(), parts[1].strip(), parts[2].strip()
+            if code not in ("unverified", "error_soft", "error_hard", "feed_stale",
+                            "behind", "needs_restart", "update_available", "rollout_hold",
+                            "updated", "current_verified", "current_vendor", "current_cask_only",
+                            "managed_brew", "managed_appstore", "manual", "skipped",
+                            "source_unavailable", "source_unmanaged",
+                            "feed_unreachable", "current_cached", "current_feed_regressed"):
+                internet_unexplained_status = True
+            app_keys = get_all_alias_keys(app_name)
+            if app_keys & seen_internet_keys:
+                continue
+
+            # feed_unreachable: the vendor feed failed and the app's updater was
+            # launched without proof — unconfirmed, like "unverified". The two
+            # current_* codes from feed state are informational and add no item.
+            if code in ("unverified", "error_soft", "error_hard", "feed_unreachable", "source_unavailable", "source_unmanaged"):
+                # Name the app, not just the step: "Step: Internet apps" told
+                # the user nothing about WHICH updater went unconfirmed.
+                seen_internet_keys.update(app_keys)
+                internet_unconfirmed_apps += 1
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "unconfirmed",
+                    "details": re.sub(r"^[^\w(]+", "", text).strip() or code,
+                })
+                continue
+
+            if code == "feed_stale":
+                seen_internet_keys.update(app_keys)
+                internet_explained_warnings += 1
+                m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*<\s*.*?([0-9][0-9a-zA-Z._-]*)', text)
+                vendor_version, installed_version = (m.group(1), m.group(2)) if m else (None, None)
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": None,
+                    "new_version": None,
+                    "installed_version": installed_version,
+                    "vendor_version": vendor_version,
+                    "status": "warning",
+                    "details": re.sub(r"^[^\w(]+", "", text).strip() or "vendor feed stale",
+                })
+                continue
+
+            if code in ("behind", "needs_restart", "update_available", "rollout_hold"):
+                seen_internet_keys.update(app_keys)
+                old_ver = None
+                new_ver = None
+                details = None
+
+                if code == "needs_restart":
+                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*→\s*([0-9][0-9a-zA-Z._-]*)', text)
+                    if m:
+                        old_ver, new_ver = m.group(1), m.group(2)
+                        details = _detail("L_SUMMARY_DETAIL_VENDOR_AHEAD_FMT", "vendor %s > installed %s — quit the app so its updater can install it", new_ver, old_ver)
+                    else:
+                        details = _detail("L_SUMMARY_DETAIL_UPDATE_PENDING_QUIT", "update pending — quit the app so its updater can install it")
+                elif code == "behind":
+                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)\s*<\s*([0-9][0-9a-zA-Z._-]*)', text)
+                    if m:
+                        old_ver, new_ver = m.group(1), m.group(2)
+                        details = f"vendor {new_ver} > installed {old_ver}"
+                    else:
+                        details = "behind vendor version"
+                elif code == "update_available":
+                    m = re.search(r'([0-9][0-9a-zA-Z._-]*)', text)
+                    if m:
+                        new_ver = m.group(1)
+                        details = f"update available: {new_ver}"
+                    else:
+                        details = "update available"
+                elif code == "rollout_hold":
+                    vers = re.findall(r'[0-9]+(?:\.[0-9]+)+[a-zA-Z0-9._-]*', text)
+                    if len(vers) >= 2:
+                        old_ver = vers[0]
+                        pub_ver = vers[1]
+                        details = f"vendor staged rollout (public {pub_ver})"
+                    else:
+                        details = "vendor staged rollout"
+
+                items.append({
+                    "name": app_name,
+                    "id": app_name,
+                    "category": "internet",
+                    "old_version": old_ver,
+                    "new_version": new_ver,
+                    "status": "pending",
+                    "details": details,
+                })
+
+    # 8. Unconfirmed or degraded steps from step_results
+    if step_results:
+        step_labels = {
+            "prescan": "Scan new apps",
+            "appstore": "App Store",
+            "npmcli": "Native CLI + npm",
+            "brew": "Homebrew",
+            "internet": "Internet apps",
+            "postupdate": "Inventory update",
+            "system": "macOS System",
+        }
+        pending_brew_reason = None
+        pbr_file = sdir / "pending_brew_reason"
+        if pbr_file.is_file():
+            pending_brew_reason = pbr_file.read_text(encoding="utf-8", errors="replace").strip()
+
+        xcode_change = None
+        xc_file = sdir / "xcode_changed.txt"
+        if xc_file.is_file():
+            xc_txt = xc_file.read_text(encoding="utf-8", errors="replace").strip()
+            if xc_txt.startswith("xcode_changed="):
+                xcode_change = xc_txt.split("=", 1)[1].strip()
+            elif xc_txt:
+                xcode_change = xc_txt
+
+        for step_key, step_val in step_results.items():
+            status_code = classify_step_status(step_val)
+            if status_code in ("warn", "error", "unconfirmed"):
+                if (step_key == "internet" and status_code == "warn" and
+                        not internet_unexplained_status and
+                        (internet_unconfirmed_apps or internet_explained_warnings)):
+                    # Already itemised per app above.
+                    continue
+                details = str(step_val)
+                if step_key == "brew" and pending_brew_reason == "xcode_license":
+                    if xcode_change:
+                        details = f"Xcode license not accepted (Xcode {xcode_change})"
+                    else:
+                        details = "Xcode license not accepted"
+                items.append({
+                    "name": f"Step: {step_labels.get(step_key, step_key)}",
+                    "id": step_key,
+                    "category": step_key,
+                    "old_version": None,
+                    "new_version": None,
+                    "status": "unconfirmed",
+                    "details": details,
+                })
+
+    return items
+
+
+NEXT_STEP_COPY = {
+    "en": (
+        "Next steps",
+        "Rebuild the inventory and review the affected sources",
+        "Review saved automatic-update preferences and per-app exclusions",
+        "Close the affected running apps when convenient, then retry",
+        "Resolve the source conflict before updating; no source was changed",
+        "Check the vendor updater result, then reconcile pending work",
+        "Compare available stable-release evidence before choosing another source; no migration is automatic",
+    ),
+    "pl": (
+        "Co dalej",
+        "Odbuduj inwentarz i sprawdź źródła z niepełnymi danymi",
+        "Sprawdź zapisane ustawienia automatycznych aktualizacji i wykluczenia aplikacji",
+        "Zamknij wskazane uruchomione aplikacje w dogodnym momencie i ponów aktualizację",
+        "Rozwiąż konflikt źródła przed aktualizacją; źródło nie zostało zmienione",
+        "Sprawdź wynik aktualizatora producenta, następnie rozlicz oczekujące operacje",
+        "Porównaj dostępne dane o stabilnych wydaniach przed wyborem innego źródła; migracja nigdy nie jest automatyczna",
+    ),
+    "de": (
+        "Nächste Schritte", "Inventar neu erstellen und betroffene Quellen prüfen",
+        "Gespeicherte Einstellungen für automatische Updates und App-Ausschlüsse prüfen",
+        "Betroffene laufende Apps bei Gelegenheit schließen und erneut versuchen",
+        "Quellenkonflikt vor dem Update lösen; keine Quelle wurde geändert",
+        "Ergebnis des Hersteller-Updaters prüfen und ausstehende Vorgänge abgleichen",
+        "Verfügbare Daten zu stabilen Versionen vor einem Quellenwechsel vergleichen; keine automatische Migration",
+    ),
+    "es": (
+        "Siguientes pasos", "Reconstruye el inventario y revisa las fuentes afectadas",
+        "Revisa las preferencias guardadas de actualización automática y las exclusiones",
+        "Cierra las aplicaciones afectadas cuando puedas y vuelve a intentarlo",
+        "Resuelve el conflicto de fuentes antes de actualizar; no se cambió ninguna fuente",
+        "Comprueba el resultado del actualizador del fabricante y revisa las operaciones pendientes",
+        "Compara los datos disponibles de versiones estables antes de cambiar de fuente; la migración nunca es automática",
+    ),
+    "fr": (
+        "Prochaines étapes", "Reconstruisez l’inventaire et vérifiez les sources concernées",
+        "Vérifiez les préférences enregistrées de mise à jour automatique et les exclusions",
+        "Fermez les applications concernées au moment qui vous convient, puis réessayez",
+        "Résolvez le conflit de sources avant la mise à jour ; aucune source n’a été modifiée",
+        "Vérifiez le résultat de l’outil du fabricant, puis examinez les opérations en attente",
+        "Comparez les données disponibles sur les versions stables avant de changer de source ; aucune migration automatique",
+    ),
+    "it": (
+        "Prossimi passi", "Ricostruisci l’inventario e controlla le fonti interessate",
+        "Controlla le preferenze salvate per gli aggiornamenti automatici e le esclusioni",
+        "Chiudi le applicazioni interessate quando puoi e riprova",
+        "Risolvi il conflitto delle fonti prima di aggiornare; nessuna fonte è stata modificata",
+        "Controlla il risultato dell’updater del produttore e verifica le operazioni in sospeso",
+        "Confronta i dati disponibili sulle versioni stabili prima di cambiare fonte; nessuna migrazione automatica",
+    ),
+    "pt": (
+        "Próximos passos", "Reconstrua o inventário e verifique as fontes afetadas",
+        "Reveja as preferências guardadas de atualização automática e as exclusões",
+        "Feche as aplicações afetadas quando for conveniente e tente novamente",
+        "Resolva o conflito de fontes antes de atualizar; nenhuma fonte foi alterada",
+        "Verifique o resultado do atualizador do fabricante e reveja as operações pendentes",
+        "Compare os dados disponíveis de versões estáveis antes de mudar de fonte; nenhuma migração é automática",
+    ),
+}
+
+
+def next_step_advice(summary: dict[str, Any], lang: str = "en") -> list[str]:
+    """Bounded, read-only advice derived from outcomes, never an approval."""
+    text = NEXT_STEP_COPY.get(lang, NEXT_STEP_COPY["en"])
+    items = [item for item in summary.get("items", []) if isinstance(item, dict)]
+    statuses = {item.get("action_status") for item in items}
+    reasons = {item.get("details") for item in items if isinstance(item.get("details"), str)}
+    advice = []
+    if "scan_partial" in statuses:
+        advice.append(text[1] + ": bash build_inventory.sh --cli")
+    if statuses & {"manual_by_policy", "ignored_by_policy"} or "consent_required" in reasons:
+        advice.append(text[2] + ": bash update_all.sh --cli --preferences")
+    if "target_running" in reasons:
+        advice.append(text[3] + ".")
+    if "source_conflict" in statuses or "source_conflict" in reasons:
+        advice.append(text[4] + ": bash update_all.sh --cli --plan")
+    if statuses & {"vendor_updater_observing", "observed_version_changed", "legacy_handler_completed_unconfirmed", "recovery_required"}:
+        advice.append(text[5] + ": bash scripts/reconcile_native.sh")
+    advice.append(text[6] + ": bash scripts/report_update_coverage.sh --compare-sources")
+    return advice
+
+
+def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
+    """Format the 4-section terminal summary string."""
+    i18n = SUMMARY_I18N.get(lang, SUMMARY_I18N["en"])
+    title_updated = os.environ.get("L_ALL_SUMMARY_UPDATED_TITLE", i18n["updated_title"])
+    title_pending = os.environ.get("L_ALL_SUMMARY_PENDING_TITLE", i18n["pending_title"])
+    title_unconfirmed = os.environ.get("L_ALL_SUMMARY_UNCONFIRMED_TITLE", i18n["unconfirmed_title"])
+    title_warning = os.environ.get("L_ALL_SUMMARY_WARNING_TITLE", i18n["warning_title"])
+    feed_warning_fmt = os.environ.get("L_ALL_SUMMARY_FEED_WARNING_FMT", i18n["feed_warning"])
+    inv_fmt = os.environ.get("L_ALL_SUMMARY_INVENTORY_CHANGES", i18n["inventory_changes"])
+    inv_apps_fmt = os.environ.get("L_ALL_SUMMARY_INVENTORY_APPS", i18n["inventory_apps"])
+    title_advisories = os.environ.get("L_ALL_SUMMARY_ADVISORIES_TITLE", i18n["advisories_title"])
+    tag_security = os.environ.get("L_ALL_SUMMARY_ADVISORY_SECURITY_TAG", i18n["advisory_security"])
+    none_str = i18n["none"]
+
+    items = summary.get("items", [])
+    updated_items = [it for it in items if it.get("status") == "updated"]
+    pending_items = [it for it in items if it.get("status") == "pending"]
+    unconfirmed_items = [it for it in items if it.get("status") == "unconfirmed"]
+    scan_items = [it for it in items if it.get("status") == "scan_advisory"]
+    warning_items = [it for it in items if it.get("status") == "warning"]
+    counts = summary.get("counts", {})
+    inventory_count = counts.get("inventory_version_fields_changed", 0)
+    flags = summary.get("flags") or {}
+    inventory_only = bool(flags.get("inventory_only")) if isinstance(flags, dict) else False
+
+    if inventory_only:
+        # Nothing was installed or updated; "Updated: (none)" would only mislead.
+        try:
+            inv_line = inv_fmt % inventory_count
+        except Exception:
+            inv_line = f"{inv_fmt}: {inventory_count}"
+        try:
+            apps_line = inv_apps_fmt % (
+                counts.get("inventory_entries_added", 0),
+                counts.get("inventory_entries_removed", 0),
+            )
+        except Exception:
+            apps_line = ""
+        out = [
+            "────────────────────────────────────────────────────────────",
+            f"📝 {inv_line}",
+        ]
+        if apps_line:
+            out.append(f"📝 {apps_line}")
+        out.append("────────────────────────────────────────────────────────────")
+        return "\n".join(out)
+
+    lines: list[str] = [
+        "────────────────────────────────────────────────────────────",
+        f"📌 {title_updated}:",
+    ]
+    if updated_items:
+        for it in updated_items:
+            cat = it.get("category", "")
+            cat_str = f" ({cat})" if cat else ""
+            old_v = it.get("old_version")
+            new_v = it.get("new_version")
+            if old_v and new_v:
+                lines.append(f"   • {it['name']}{cat_str}: {old_v} -> {new_v}")
+            elif new_v:
+                lines.append(f"   • {it['name']}{cat_str}: {new_v}")
+            else:
+                lines.append(f"   • {it['name']}{cat_str}")
+    else:
+        lines.append(f"   • {none_str}")
+
+    lines.append("")
+    lines.append(f"⏳ {title_pending}:")
+    if pending_items:
+        for it in pending_items:
+            details = it.get("details")
+            det_str = f" — {details}" if details else ""
+            lines.append(f"   • {it['name']}{det_str}")
+    else:
+        lines.append(f"   • {none_str}")
+
+    if warning_items:
+        lines.append("")
+        lines.append(f"⚠️  {title_warning}:")
+        for it in warning_items:
+            vendor, installed = it.get("vendor_version"), it.get("installed_version")
+            if vendor and installed:
+                details = feed_warning_fmt % (vendor, installed)
+            else:
+                details = it.get("details") or ""
+            lines.append(f"   • {it['name']} — {details}")
+
+    lines.append("")
+    lines.append(f"⚠️  {title_unconfirmed}:")
+    if unconfirmed_items:
+        for it in unconfirmed_items:
+            details = it.get("details")
+            det_str = f" — {details}" if details else ""
+            lines.append(f"   • {it['name']}{det_str}")
+    else:
+        lines.append(f"   • {none_str}")
+
+    if scan_items:
+        template = os.environ.get("L_PLAN_SCAN_PARTIAL_SUMMARY", "%s targets have incomplete inventory evidence. No update was confirmed; per-target details remain in JSON.")
+        try:
+            lines += ["", template % len(scan_items)]
+        except (TypeError, ValueError):
+            pass
+        for source in summary.get("inventory_sources", []):
+            reasons = ", ".join("%s=%s" % (issue.get("reason_code"), issue.get("count"))
+                                for issue in source.get("issues", []))
+            lines.append("   • %s (%s): %s%s" % (source.get("source_kind"), source.get("source_ref"),
+                         source.get("reason_code"), ("; " + reasons) if reasons else ""))
+    policy_counts = [sum(item.get('action_status') == status for item in items)
+                     for status in ('manual_by_policy', 'ignored_by_policy', 'deferred_by_user')]
+    if any(policy_counts):
+        template = os.environ.get('L_PLAN_POLICY_COUNTS', 'Manual: %s; ignored: %s; deferred: %s. Review with --preferences.')
+        try:
+            lines += ['', template % tuple(policy_counts)]
+        except (TypeError, ValueError):
+            pass
+    advisories = [a for a in (summary.get("advisories") or []) if isinstance(a, dict)]
+    if advisories:
+        # Security advisories first, marked distinctly; order is otherwise stable.
+        ordered = sorted(advisories, key=lambda a: 0 if a.get("severity") == "security" else 1)
+        lines.append("")
+        lines.append(f"🛡️  {title_advisories}:")
+        for adv in ordered:
+            src = adv.get("source", "")
+            src_str = f" ({src})" if src else ""
+            if adv.get("severity") == "security":
+                lines.append(f"   🔒 [{tag_security}] {adv.get('text', '')}{src_str}")
+            else:
+                lines.append(f"   • {adv.get('text', '')}{src_str}")
+
+    lines.extend(["", NEXT_STEP_COPY.get(lang, NEXT_STEP_COPY["en"])[0] + ":"])
+    lines.extend("   • " + advice for advice in next_step_advice(summary, lang))
+    lines.append("")
+    try:
+        inv_line = inv_fmt % inventory_count
+    except Exception:
+        inv_line = f"{inv_fmt}: {inventory_count}"
+    lines.append(f"📝 {inv_line}")
+    lines.append("────────────────────────────────────────────────────────────")
+
+    return "\n".join(lines)
+
+
+def migrate_run_summary(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate older run_summary dict (v1, v2, or v3) to schema v4."""
+    migrated = dict(data)
+    migrated["format_version"] = FORMAT_VERSION
+    if "items" not in migrated or not isinstance(migrated["items"], list):
+        migrated["items"] = []
+    if "verification" not in migrated or not isinstance(migrated["verification"], dict):
+        migrated["verification"] = {}
+    if "run_status" not in migrated:
+        migrated["run_status"] = "completed"
+    if "counts" not in migrated or not isinstance(migrated["counts"], dict):
+        migrated["counts"] = {}
+    else:
+        c = dict(migrated["counts"])
+        if "inventory_version_fields_changed" not in c and "inventory_fields_changed" in c:
+            c["inventory_version_fields_changed"] = c["inventory_fields_changed"]
+        migrated["counts"] = c
+    if "steps" in migrated and isinstance(migrated["steps"], dict):
+        new_steps = {}
+        for step_k, step_v in migrated["steps"].items():
+            if isinstance(step_v, dict) and "code" in step_v:
+                new_steps[step_k] = {
+                    "code": str(step_v["code"]),
+                    "text": str(step_v.get("text", "")),
+                }
+                if isinstance(step_v.get("duration_seconds"), int):
+                    new_steps[step_k]["duration_seconds"] = step_v["duration_seconds"]
+            else:
+                code = classify_step_status(step_v)
+                new_steps[step_k] = {
+                    "code": code,
+                    "text": str(step_v) if step_v is not None else "",
+                }
+        migrated["steps"] = new_steps
+    return migrated
+
+
+def determine_exit_class(overall_exit: int, degraded: int) -> str:
+    """Classify run outcome into clean (0), warnings (10/degraded), or error (1)."""
+    if overall_exit != 0:
+        return "error"
+    if degraded != 0:
+        return "warnings"
+    return "clean"
+
+
+_ACTIONABLE_INTERNET_CODES = frozenset({
+    "unverified", "error_soft", "error_hard", "behind", "needs_restart",
+    "update_available", "feed_unreachable",
+})
+
+
+def degraded_is_warnings_only(session_dir: str | Path) -> bool:
+    """True when a degraded (soft-warning) run has NO unverified or pending work.
+
+    That is: the internet step is the only non-OK step, every per-app internet code is
+    informational (e.g. a stale manufacturer feed), and every pending_* counter is 0.
+    Anything unknown or unreadable returns False, so the caller keeps the generic
+    "could not be verified" wording rather than understating a real problem."""
+    sdir = Path(session_dir)
+    try:
+        steps_file = sdir / "step_status_codes.txt"
+        codes_file = sdir / "internet_status_codes.txt"
+        if not steps_file.is_file() or not codes_file.is_file():
+            return False
+        steps: dict[str, str] = {}
+        for line in steps_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            if "=" in line:
+                key, _, val = line.partition("=")
+                steps[key.strip()] = val.strip()
+        if steps.get("internet") != "warn":
+            return False
+        for key, val in steps.items():
+            if key != "internet" and val not in ("ok", "skipped"):
+                return False
+        saw_warning = False
+        for line in codes_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|", 2)
+            if len(parts) < 3:
+                return False
+            code = parts[1].strip()
+            if code in _ACTIONABLE_INTERNET_CODES:
+                return False
+            if code == "feed_stale":
+                saw_warning = True
+        if not saw_warning:
+            return False
+        for _, fname in PENDING_FILES:
+            pf = sdir / fname
+            if pf.is_file():
+                val = pf.read_text(encoding="utf-8", errors="replace").strip()
+                if val not in ("", "0"):
+                    return False
+        return True
+    except OSError:
+        return False
+
+
+def merge_pending(counts: dict[str, Any], session_dir: str) -> tuple[dict[str, Any], dict[str, str]]:
+    """Attach pending-* measurements. Missing/corrupt values stay unknown, not 0."""
+    merged = dict(counts)
+    verification: dict[str, str] = {}
+    for key, filename in PENDING_FILES:
+        path = Path(session_dir) / filename
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            merged[key] = None
+            verification[key] = "missing"
+            continue
+        if text == "":
+            merged[key] = None
+            verification[key] = "empty"
+            continue
+        if text in {"unknown", "null"}:
+            merged[key] = None
+            verification[key] = "unknown"
+            continue
+        try:
+            merged[key] = int(text)
+            verification[key] = "verified"
+        except ValueError:
+            merged[key] = None
+            verification[key] = "invalid"
+    return merged, verification
+
+
+def build_run_summary(
+    start_time: int,
+    end_time: int,
+    overall_exit: int,
+    degraded: int,
+    blocking_exit: int,
+    step_results: dict[str, Any],
+    counts: dict[str, Any] | None = None,
+    flags: dict[str, Any] | None = None,
+    session_dir: str | None = None,
+    verification: dict[str, str] | None = None,
+    run_status: str = "completed",
+    run_id: str | None = None,
+    items: list[dict[str, Any]] | None = None,
+    step_codes: dict[str, str] | None = None,
+    advisories: list[dict[str, str]] | None = None,
+    step_durations: dict[str, int] | None = None,
+) -> dict[str, Any]:
+    """Compose the structured run summary dict.
+
+    ``advisories`` (additive, format stays 4) lists notes the steps want shown
+    without changing the result; ``step_durations`` adds ``duration_seconds`` to
+    each step object that actually ran (skipped steps carry none).
+    """
+    duration = max(0, end_time - start_time)
+    minutes = duration // 60
+    secs = duration % 60
+
+    start_iso = datetime.datetime.fromtimestamp(start_time, tz=datetime.timezone.utc).isoformat()
+    end_iso = datetime.datetime.fromtimestamp(end_time, tz=datetime.timezone.utc).isoformat()
+
+    steps_v4: dict[str, dict[str, Any]] = {}
+    if step_results:
+        for k, v in step_results.items():
+            if isinstance(v, dict) and "code" in v:
+                steps_v4[k] = {
+                    "code": str(v["code"]),
+                    "text": str(v.get("text", "")),
+                }
+            else:
+                code = None
+                if step_codes and k in step_codes:
+                    code = step_codes[k]
+                if not code or code == "unconfirmed":
+                    code = classify_step_status(v)
+                steps_v4[k] = {
+                    "code": code,
+                    "text": str(v) if v is not None else "",
+                }
+    for k, step_secs in (step_durations or {}).items():
+        if k in steps_v4 and steps_v4[k].get("code") != "skipped" and isinstance(step_secs, int):
+            steps_v4[k]["duration_seconds"] = max(0, step_secs)
+
+    summary: dict[str, Any] = {
+        "format_version": FORMAT_VERSION,
+        "run_id": run_id or str(uuid.uuid4()),
+        "run_status": run_status,
+        "timestamp": start_iso,
+        "completed_at": end_iso if run_status == "completed" else None,
+        "duration_seconds": duration,
+        "duration_formatted": f"{minutes}m {secs}s",
+        "exit_code": overall_exit,
+        "exit_class": determine_exit_class(overall_exit, degraded),
+        "degraded": bool(degraded),
+        "blocking_exit": blocking_exit,
+        "steps": steps_v4,
+        "counts": counts or {},
+        "verification": verification or {},
+        "flags": flags or {},
+        "items": items if items is not None else [],
+        "advisories": list(advisories) if advisories else [],
+        "action_results": read_action_results(session_dir),
+        "provenance": read_provenance(session_dir),
+        "operation_receipts": read_phase_events(session_dir),
+        "inventory_sources": read_source_diagnostics(session_dir),
+    }
+    if session_dir:
+        summary["session_dir"] = session_dir
+        summary["session_dir_note"] = "ephemeral; not a durable archive"
+    return summary
+
+
+def write_run_summary(output_path: str | Path, summary_data: dict[str, Any]) -> str:
+    """Atomically serialize summary_data as formatted JSON to output_path."""
+    target_path = Path(output_path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    json_str = json.dumps(summary_data, indent=2, ensure_ascii=False) + "\n"
+
+    tmp_dir = target_path.parent
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{target_path.name}.", suffix=".tmp", dir=tmp_dir)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
+            tmp_file.write(json_str)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        os.replace(tmp_name, target_path)
+        os.chmod(target_path, 0o600)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+    return str(target_path)

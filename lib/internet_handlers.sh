@@ -1,0 +1,1161 @@
+#!/usr/bin/env bash
+# lib/internet_handlers.sh — shared internet app update handlers (Bash 3.2+)
+# Requires: i18n loaded, internet_i18n.sh, silent_launch_app, app_version, copy_verified_app
+#
+# Handlers communicate status via INTERNET_LAST_STATUS global — NEVER via
+# stdout echo. This prevents UI output (print_info/print_step/print_warn)
+# from polluting the status when called inside command substitution.
+# See: BUG-1 fix (2026-08-05).
+
+INTERNET_LAST_STATUS=""
+_INTERNET_HANDLERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$_INTERNET_HANDLERS_DIR/appstore_ios.sh" ]; then
+    . "$_INTERNET_HANDLERS_DIR/appstore_ios.sh"
+fi
+
+# INTERNET_LAST_VERIFIED — 1 only when the handler actually compared a remote
+# feed version against the installed one and wrote a version-bearing status
+# (L_INTERNET_STATUS_CURRENT_FMT / L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT).
+# Anything else (no feed, feed unreachable, unparseable feed) leaves it 0 so a
+# caller can never present an unverified check as verified.
+INTERNET_LAST_VERIFIED=0
+
+# INTERNET_LAST_LAUNCH_OK — 1 when the handler's trailing silent_launch_app
+# succeeded. Lets a caller downgrade an unverified result to the honest
+# "launched (unverified)" / "launch failed" pair without launching twice.
+INTERNET_LAST_LAUNCH_OK=0
+
+internet_handler_app_installed() {
+    local app_path="$1"
+    [ -n "$app_path" ] && [ -d "$app_path" ]
+}
+
+# internet_status_body <status>
+# The status text without its leading mark (✅ ⚠️ ⏳ ℹ️ ⏸ ❌) and spaces, for
+# print_ok / print_warn / print_info, which add their own mark. Printing the
+# raw status produced "✅ ✅ Up to date" and "⚠️  ⚠️  Vendor feed stale".
+internet_status_body() {
+    local s="$1" g
+    for g in "✅" "⚠️" "⚠" "⏳" "ℹ️" "ℹ" "⏸️" "⏸" "❌"; do
+        case "$s" in
+            "$g"*) s="${s#"$g"}"; break ;;
+        esac
+    done
+    while :; do
+        case "$s" in
+            " "*) s="${s# }" ;;
+            *) break ;;
+        esac
+    done
+    printf '%s' "$s"
+}
+
+internet_handler_silent_launch() {
+    local app_display="$1"
+    local launch_target="$2"
+    local verify_hint="${3:-}"
+    local app_path="$4"
+    local ver
+    ver="$(app_version "$app_path")"
+    INTERNET_LAST_VERIFIED=0
+    print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+    print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
+    if silent_launch_app "$launch_target"; then
+        INTERNET_LAST_LAUNCH_OK=1
+        if [ -n "$verify_hint" ]; then
+            print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
+        fi
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+    else
+        INTERNET_LAST_LAUNCH_OK=0
+        print_warn "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display") — failed"
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+    fi
+}
+
+# internet_feed_source — does this bundle expose a machine-readable version
+# feed? Echoes "sparkle" or "electron" and returns 0; returns 1 when neither
+# exists. Read-only: it never fetches, launches, or mutates anything.
+internet_feed_source() {
+    local app_path="$1"
+    local feed_url
+    [ -n "$app_path" ] && [ -d "$app_path" ] || return 1
+    feed_url="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
+    if [ -n "$feed_url" ]; then
+        echo "sparkle"
+        return 0
+    fi
+    if [ -f "$app_path/Contents/Resources/app-update.yml" ]; then
+        echo "electron"
+        return 0
+    fi
+    return 1
+}
+
+internet_handler_manual() {
+    local app_display="$1"
+    local download_url="$2"
+    local app_path="$3"
+    if [ -n "$app_path" ] && command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$app_path"; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+        INTERNET_LAST_VERIFIED=1
+        print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+        return 0
+    fi
+    local ver
+    ver="$(app_version "$app_path")"
+    print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$ver")"
+    # A vendor that ships no auto-updater is a permanent fact about that vendor, not
+    # a fault in this run. Reported as information for the same reason Antigravity's
+    # 404 feed was demoted on 2026-08-26: a warning the operator can never clear
+    # trains them to ignore warnings that matter. The manual-update line below still
+    # tells them exactly what to do.
+    print_info "$(internet_msg "$L_INTERNET_NO_AUTO_UPDATER" "$app_display")"
+    print_info "$(internet_msg "$L_INTERNET_DOWNLOAD_LATEST" "$download_url")"
+    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANUAL_UPDATE"
+}
+
+internet_handler_set_status() {
+    local var_name="$1"
+    local value="$2"
+    # Guard: only allow STATUS_* variable names (defense against eval injection)
+    case "$var_name" in
+        STATUS_[A-Z0-9_]*) ;;
+        *)
+            echo "internet_handler_set_status: invalid var_name: $var_name" >&2
+            return 1
+            ;;
+    esac
+    eval "${var_name}=\"\${value}\""
+}
+
+internet_handler_fail_scan() {
+    local status="$1"
+    case "$status" in
+        *"⚠️"*) return 1 ;;
+    esac
+    return 0
+}
+
+# Google Keystone (Omaha) — Chrome and Google Drive ONLY.
+# The agent is a Google-product updater: it reads its own ticket store and does
+# nothing at all for a non-Google bundle. Never register a third-party app as
+# `keystone` — running the agent for it would report a check that never
+# happened (see Comet, fixed 2026-08-05).
+#
+# The status now follows the agent's exit code. It used to be hardcoded to
+# L_INTERNET_STATUS_CHECKED_CLI on every path, so a missing agent or a failed
+# run still printed "✅ Checked via CLI".
+internet_handler_keystone() {
+    local app_label="$1"
+    local launch_name="$2"
+    local verify_hint="$3"
+    local keytone_label="$4"
+    KEYSTONE_AGENT="/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/Resources/GoogleSoftwareUpdateAgent.app/Contents/MacOS/GoogleSoftwareUpdateAgent"
+    INTERNET_LAST_VERIFIED=0
+    if [ -f "$KEYSTONE_AGENT" ]; then
+        if [ "$keytone_label" = "drive" ]; then
+            print_step "$L_INTERNET_LAUNCHING_KEYSTONE_DRIVE"
+        else
+            print_step "$L_INTERNET_LAUNCHING_KEYSTONE"
+        fi
+        if run_with_timeout 180 "$KEYSTONE_AGENT" --runMode ondemand >/dev/null 2>&1; then
+            print_ok "$(internet_msg "$L_INTERNET_KEYSTONE_STARTED" "$app_label")"
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_CHECKED_CLI"
+        else
+            print_warn "$L_INTERNET_STATUS_LAUNCH_FAILED"
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    else
+        print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$launch_name")"
+        if silent_launch_app "$launch_name"; then
+            INTERNET_LAST_LAUNCH_OK=1
+            if [ -n "$verify_hint" ]; then
+                print_info "$(internet_msg "$L_INTERNET_MANUAL_VERIFY" "$verify_hint")"
+            fi
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCHED_UNVERIFIED"
+        else
+            INTERNET_LAST_LAUNCH_OK=0
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        fi
+    fi
+}
+
+# Standard silent-launch block with optional extra info line.
+#
+# ── GitHub-hosted apps: lookup failures and running-app deferral ─────────────
+# github_lookup_record <app> <version>: remember a successful GitHub lookup in the
+# persistent feed state (same file and TTL as the vendor feeds).
+github_lookup_record() {
+    command -v vendor_feed_state_record >/dev/null 2>&1 || return 0
+    vendor_feed_state_record "$1" ok "$2"
+    return 0
+}
+
+# github_lookup_handled <app> <installed>: call after a GitHub lookup returned "?".
+# Returns 0 and sets GITHUB_UNAVAILABLE_STATUS when the situation is fully handled:
+#  - a successful lookup younger than MAC_UPDATE_FEED_CACHE_TTL_H listed exactly the
+#    installed version -> current_cached (not counted as verified, no launch);
+#  - the API rate limit is exhausted -> a distinct soft status naming the reset time
+#    and GITHUB_TOKEN (never "no connection").
+# Returns 1 for every other cause; the caller keeps its offline handling.
+github_lookup_handled() {
+    local app="$1" installed="$2" proof age outcome cause rem reset hhmm
+    GITHUB_UNAVAILABLE_STATUS=""
+    if command -v vendor_feed_state_cached_proof >/dev/null 2>&1 \
+        && proof="$(vendor_feed_state_cached_proof "$app" "$installed")" && [ -n "$proof" ]; then
+        age="${proof#*|}"
+        GITHUB_UNAVAILABLE_STATUS="$(printf "$L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT" "$age" "$installed")"
+        INTERNET_LAST_VERIFIED=0
+        print_ok "$(internet_status_body "$GITHUB_UNAVAILABLE_STATUS")"
+        return 0
+    fi
+    outcome="$(github_last_outcome 2>/dev/null)"
+    cause="${outcome%%|*}"
+    if [ "$cause" = "ratelimit" ]; then
+        rem="${outcome#*|}"; rem="${rem#*|}"; rem="${rem%%|*}"
+        reset="${outcome##*|}"
+        hhmm="$(github_reset_time "$reset")"
+        print_warn "$(internet_msg "$L_INTERNET_GITHUB_RATELIMIT_FMT" "$app" "$hhmm")"
+        GITHUB_UNAVAILABLE_STATUS="$(printf "$L_INTERNET_STATUS_GITHUB_RATELIMIT_FMT" "$hhmm")"
+        return 0
+    fi
+    return 1
+}
+
+# internet_defer_running_app <dest .app path> <status_var> <installed> <latest>
+# Handlers that download first and install through copy_verified_app call this
+# BEFORE downloading: a running (or unknown-state) app is reported NEEDS_RESTART
+# without fetching the payload. copy_verified_app still re-checks right before the
+# swap (the app may be opened during the download). Returns 0 when deferred.
+internet_defer_running_app() {
+    local dest="$1" status_var="$2" installed="$3" latest="$4"
+    [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] && return 1
+    command -v replacement_app_is_idle >/dev/null 2>&1 || return 1
+    replacement_app_is_idle "$dest" && return 1
+    print_warn "$(internet_msg "$L_INTERNET_NEW_VERSION_AVAILABLE" "$latest" "$installed")"
+    internet_diag_log "Download skipped for $dest: application is running or its state is unknown"
+    internet_handler_set_status "$status_var" "$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$installed" "${latest:-?}")"
+    return 0
+}
+
+# Opportunistic verification: an app whose only documented update path is its
+# own updater may still publish a machine-readable version feed (Sparkle
+# SUFeedURL, or electron-updater Contents/Resources/app-update.yml). When one
+# exists this reads it and reports the real comparison; when it does not — or
+# the feed cannot be read — it degrades to the historical launch-and-report
+# behaviour. It NEVER installs or replaces a bundle: the app's own updater
+# still does all the installing.
+internet_dispatch_silent_launch() {
+    local header="$1"
+    local app_display="$2"
+    local status_var="$3"
+    local launch_target="$4"
+    local verify_hint="${5:-}"
+    local extra_info="${6:-}"
+    print_header "$header"
+    APP_PATH="$(capture_app_path "$app_display")"
+    if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+        APP_PATH="/Applications/${app_display}.app"
+    fi
+    if [ -d "$APP_PATH" ]; then
+        if command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$APP_PATH"; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+            return 0
+        fi
+        INTERNET_LAST_VERIFIED=0
+        INTERNET_LAST_LAUNCH_OK=0
+        if command -v vendor_feed_row >/dev/null 2>&1 && vendor_feed_row "$app_display" >/dev/null 2>&1; then
+            internet_handler_vendor_truth "$app_display" "$APP_PATH" "$launch_target"
+        elif internet_feed_source "$APP_PATH" >/dev/null 2>&1; then
+            internet_handler_vendor_latest "$app_display" "$APP_PATH" "$launch_target"
+
+        else
+            print_info "$(internet_msg "$L_INTERNET_NO_FEED_FALLBACK" "$app_display")"
+            internet_handler_silent_launch "$app_display" "$launch_target" "$verify_hint" "$APP_PATH"
+        fi
+        if [ -n "$extra_info" ]; then
+            print_info "$extra_info"
+        fi
+        internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
+    fi
+}
+
+# Sparkle Appcast verification handler
+internet_handler_sparkle_check() {
+    local app_display="$1"
+    local app_path="$2"
+    local launch_target="${3:-$app_display}"
+
+    local feed_url
+    INTERNET_LAST_VERIFIED=0
+    feed_url="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
+    if [ -z "$feed_url" ]; then
+        print_warn "$L_INTERNET_SPARKLE_FEED_MISSING"
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
+        return
+    fi
+    print_info "$(internet_msg "$L_INTERNET_SPARKLE_FEED_FOUND" "$feed_url")"
+
+    local xml
+    xml="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "$feed_url" 2>/dev/null || true)"
+    if [ -z "$xml" ]; then
+        print_warn "$L_INTERNET_STATUS_OFFLINE"
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
+        return
+    fi
+
+    local remote_ver
+    remote_ver=$(echo "$xml" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import evaluate_feed
+
+body = sys.stdin.read()
+os_ver = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else None
+res = evaluate_feed("sparkle", body, "-", os_version=os_ver)
+if res and res.get("version"):
+    print(res["version"])
+' "-" "$(sw_vers -productVersion 2>/dev/null)"
+    )
+
+    local local_ver
+    local_ver="$(app_version "$app_path")"
+
+    if [ -z "$remote_ver" ]; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        INTERNET_LAST_VERIFIED=0
+    else
+        local rel
+        rel="$(version_cmp "$remote_ver" "$local_ver")"
+        if [ "$rel" = "newer" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "equal" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "older" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_FEED_STALE_FMT" "$remote_ver" "$local_ver")"
+            INTERNET_LAST_VERIFIED=0
+        else
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+        fi
+    fi
+
+    if [ -z "$remote_ver" ] || [ "${rel:-unknown}" = "unknown" ]; then
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
+        return
+    fi
+    [ "$rel" = "newer" ] || return 0
+    local bid=""
+    if command -v internet_app_bundle_id >/dev/null 2>&1; then
+        bid="$(internet_app_bundle_id "$app_path")"
+    fi
+    if [ -n "$bid" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$bid"; then
+        INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$local_ver" "$remote_ver")"
+        return 0
+    fi
+    print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
+    if silent_launch_app "$launch_target"; then
+        INTERNET_LAST_LAUNCH_OK=1
+    else
+        INTERNET_LAST_LAUNCH_OK=0
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_VERIFIED=0
+    fi
+}
+
+internet_dispatch_sparkle_appcast() {
+    local header="$1"
+    local app_display="$2"
+    local status_var="$3"
+    local launch_target="$4"
+    print_header "$header"
+    APP_PATH="$(capture_app_path "$app_display")"
+    if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+        APP_PATH="/Applications/${app_display}.app"
+    fi
+    if [ -d "$APP_PATH" ]; then
+        if command -v app_store_managed >/dev/null 2>&1 && app_store_managed "$APP_PATH"; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$L_INTERNET_STATUS_MANAGED_APPSTORE"
+            internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+            return 0
+        fi
+        if command -v vendor_feed_row >/dev/null 2>&1 && vendor_feed_row "$app_display" >/dev/null 2>&1; then
+            internet_handler_vendor_truth "$app_display" "$APP_PATH" "$launch_target"
+        else
+            internet_handler_sparkle_check "$app_display" "$APP_PATH" "$launch_target"
+        fi
+        internet_handler_set_status "$status_var" "$INTERNET_LAST_STATUS"
+    else
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app_display")"
+    fi
+}
+
+# Vendor feed verification handler — the single feed-discovery implementation.
+# Reached from internet_dispatch_silent_launch for any app that turns out to
+# publish a feed (internet_feed_source). It only reads a feed, compares
+# versions and reports; installing stays with the app's own updater.
+internet_handler_vendor_latest() {
+    local app_display="$1"
+    local app_path="$2"
+    local launch_target="${3:-$app_display}"
+    local feed_url_override="${4:-}"
+
+    local local_ver
+    local_ver="$(app_version "$app_path")"
+    INTERNET_LAST_VERIFIED=0
+    print_info "$(internet_msg "$L_INTERNET_INSTALLED_VERSION" "$local_ver")"
+
+    local remote_ver=""
+    local feed_url=""
+
+    # 1. Try Sparkle SUFeedURL from Info.plist
+    feed_url="$(defaults read "$app_path/Contents/Info" SUFeedURL 2>/dev/null || true)"
+    if [ -n "$feed_url" ]; then
+        internet_handler_sparkle_check "$app_display" "$app_path" "$launch_target"
+        return
+    fi
+
+    # 2. Try electron-updater (Contents/Resources/app-update.yml)
+    local app_update_yml="$app_path/Contents/Resources/app-update.yml"
+    local feed_unreadable=0
+    if [ -f "$app_update_yml" ]; then
+        local base_url
+        base_url="$(grep -E '^url:' "$app_update_yml" | head -1 | cut -d':' -f2- | tr -d ' "')"
+        if [ -n "$base_url" ]; then
+            base_url="${base_url%/}"
+            local manifest_yml
+            manifest_yml="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "${base_url}/latest-mac.yml" 2>/dev/null || curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "${base_url}/latest.yml" 2>/dev/null || true)"
+            if [ -n "$manifest_yml" ]; then
+                remote_ver="$(echo "$manifest_yml" | grep -E '^version:' | head -1 | cut -d':' -f2 | tr -d ' "')"
+            else
+                # Not every electron-updater endpoint is a static manifest.
+                # Antigravity's hub answers 404 to latest-mac.yml and
+                # latest.yml because it expects platform and arch parameters,
+                # so there is nothing to parse and nothing wrong either. That
+                # is a fact about the feed, not a fault of this run.
+                feed_unreadable=1
+            fi
+        fi
+    fi
+
+    # 3. Try custom feed_url override
+    if [ -z "$remote_ver" ] && [ -n "$feed_url_override" ]; then
+        local body
+        body="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 --retry 2 "$feed_url_override" 2>/dev/null || true)"
+        if [ -n "$body" ]; then
+            remote_ver="$(echo "$body" | grep -o 'sparkle:shortVersionString="[^"]*"' | head -1 | cut -d'"' -f2 || true)"
+            [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | sed -n 's/.*<sparkle:shortVersionString>\([^<]*\)<\/sparkle:shortVersionString>.*/\1/p' | head -1 || true)"
+            [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | grep -E '^version:' | head -1 | cut -d':' -f2 | tr -d ' "')"
+            [ -z "$remote_ver" ] && remote_ver="$(echo "$body" | grep -o '"version": "[^"]*"' | head -1 | cut -d'"' -f4 || true)"
+        fi
+    fi
+
+    if [ -z "$remote_ver" ]; then
+        if [ "$feed_unreadable" -eq 1 ]; then
+            print_info "$(internet_msg "$L_INTERNET_FEED_NOT_MACHINE_READABLE_FMT" "$app_display")"
+        else
+            print_warn "$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        fi
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        INTERNET_LAST_VERIFIED=0
+    else
+        local rel
+        rel="$(version_cmp "$remote_ver" "$local_ver")"
+        if [ "$rel" = "newer" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$local_ver" "$remote_ver")"
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "equal" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_CURRENT_FMT" "$local_ver")"
+            INTERNET_LAST_VERIFIED=1
+        elif [ "$rel" = "older" ]; then
+            INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_FEED_STALE_FMT" "$remote_ver" "$local_ver")"
+            INTERNET_LAST_VERIFIED=0
+        else
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+            INTERNET_LAST_VERIFIED=0
+        fi
+    fi
+
+    if [ -z "$remote_ver" ] || [ "${rel:-unknown}" = "unknown" ]; then
+        internet_handler_silent_launch "$app_display" "$launch_target" "" "$app_path"
+        return
+    fi
+    [ "$rel" = "newer" ] || return 0
+    local bid=""
+    if command -v internet_app_bundle_id >/dev/null 2>&1; then
+        bid="$(internet_app_bundle_id "$app_path")"
+    fi
+    if [ -n "$bid" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$bid"; then
+        INTERNET_LAST_STATUS="$(internet_msg "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$local_ver" "$remote_ver")"
+        return 0
+    fi
+    print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app_display")"
+    if silent_launch_app "$launch_target"; then
+        INTERNET_LAST_LAUNCH_OK=1
+    else
+        INTERNET_LAST_LAUNCH_OK=0
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_VERIFIED=0
+    fi
+}
+
+# internet_launch_policy <app>
+# Prints the app's launch policy from config/vendor_launch_policy.txt:
+# "direct-only" (install only from the verified vendor artifact, never launch),
+# "never-launch" (verify only, never launch or quit) or "default".
+internet_launch_policy() {
+    local app="$1" cfg line name pol
+    cfg="${_INTERNET_HANDLERS_DIR}/../config/vendor_launch_policy.txt"
+    if [ -n "$app" ] && [ -f "$cfg" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            line="${line%%#*}"
+            case "$line" in *'|'*) ;; *) continue ;; esac
+            name="${line%%|*}"
+            pol="${line#*|}"
+            name="${name#"${name%%[![:space:]]*}"}"
+            name="${name%"${name##*[![:space:]]}"}"
+            pol="${pol#"${pol%%[![:space:]]*}"}"
+            pol="${pol%"${pol##*[![:space:]]}"}"
+            if [ "$name" = "$app" ]; then
+                case "$pol" in
+                    direct-only|never-launch) printf '%s\n' "$pol"; return 0 ;;
+                esac
+            fi
+        done < "$cfg"
+    fi
+    printf 'default\n'
+}
+
+# internet_handler_vendor_feed_failed <app> <app_path> <launch_target> <installed> <lookup_rc>
+# The vendor feed could not be used this run (lookup_rc 3 = fetched but no usable
+# version; anything else = fetch failure, see internet_diag.txt for curl/HTTP).
+#
+# 1. Cached proof: a successful check younger than MAC_UPDATE_FEED_CACHE_TTL_H
+#    (default 24 h) listed exactly the installed version -> current, NO launch.
+#    Status code current_cached. It is deliberately NOT counted as "verified":
+#    critical_rules 6b reserves that word for a remote version compared in this
+#    run, and a cached observation is older evidence. It is not a warning either:
+#    the comparison did happen, against the vendor's own feed, within the TTL.
+# 2. Otherwise the historical native-updater fallback runs (the app's own updater
+#    remains the recovery path), but the status says "feed unreachable" /
+#    "feed unreadable" (code feed_unreachable, soft) instead of a bare
+#    "launched (unverified)", so the summary names the real cause. Apps in
+#    config/vendor_launch_policy.txt are never launched: they report
+#    "version not checked (app not launched)" (also feed_unreachable).
+internet_handler_vendor_feed_failed() {
+    local app="$1" app_path="$2" launch_target="$3" I="$4" lrc="${5:-2}"
+    local reason="fetch"
+    [ "$lrc" -eq 3 ] && reason="parse"
+    command -v vendor_feed_state_record >/dev/null 2>&1 && vendor_feed_state_record "$app" fail "$reason"
+
+    local proof=""
+    if command -v vendor_feed_state_cached_proof >/dev/null 2>&1 \
+        && proof="$(vendor_feed_state_cached_proof "$app" "$I")" && [ -n "$proof" ]; then
+        local age="${proof#*|}"
+        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_CACHED_CURRENT_FMT" "$age" "$I")"
+        INTERNET_LAST_VERIFIED=0
+        INTERNET_LAST_LAUNCH_OK=0
+        command -v internet_diag_log >/dev/null 2>&1 && \
+            internet_diag_log "Vendor feed $app: $reason failure; cached proof ${proof%%|*} = installed $I (age ${age} h) - not launched"
+        print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
+        return 0
+    fi
+
+    if [ "$reason" = "parse" ]; then
+        print_warn "$(printf "$L_INTERNET_VENDOR_FEED_UNPARSEABLE_FMT" "$app")"
+    else
+        print_warn "$(printf "${L_INTERNET_VENDOR_FEED_UNREACHABLE_FMT:-Vendor feed for %s unreachable}" "$app")"
+    fi
+    # Apps that must never be launched (config/vendor_launch_policy.txt) get no
+    # native-updater fallback: report the unchecked state honestly instead.
+    if [ "$(internet_launch_policy "$app")" != "default" ]; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_FEED_UNREACHABLE_NOLAUNCH"
+        INTERNET_LAST_VERIFIED=0
+        INTERNET_LAST_LAUNCH_OK=0
+        return 0
+    fi
+    internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
+    if [ "${INTERNET_LAST_LAUNCH_OK:-0}" -eq 1 ]; then
+        if [ "$reason" = "parse" ]; then
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_FEED_UNREADABLE"
+        else
+            INTERNET_LAST_STATUS="$L_INTERNET_STATUS_FEED_UNREACHABLE"
+        fi
+    fi
+    INTERNET_LAST_VERIFIED=0
+    return 0
+}
+
+# ── Vendor Truth Handler (v1.5.0) ───────────────────────────
+# Consults the vendor feed first, launches updater only if needed,
+# and supports vendor direct download/installation when configured.
+internet_handler_vendor_truth() {
+    local app="$1"
+    local app_path="$2"
+    local launch_target="${3:-$app}"
+
+    local I
+    I="$(app_version "$app_path")"
+    INTERNET_LAST_VERIFIED=0
+    INTERNET_LAST_LAUNCH_OK=0
+
+    local row lrc
+    row="$(vendor_feed_lookup "$app" 2>/dev/null)"
+    lrc=$?
+    if [ -z "$row" ]; then
+        [ "$lrc" -eq 0 ] && lrc=2
+        internet_handler_vendor_feed_failed "$app" "$app_path" "$launch_target" "$I" "$lrc"
+        return
+    fi
+
+    local R URL CK CS ART HOST POLICY
+    IFS='|' read -r R URL CK CS ART HOST POLICY <<EOF
+$row
+EOF
+    command -v vendor_feed_state_record >/dev/null 2>&1 && vendor_feed_state_record "$app" ok "$R"
+
+    local rel
+    rel="$(version_cmp "$R" "$I")"
+    if [ "$rel" = "equal" ]; then
+        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CURRENT_FMT" "$I")"
+        INTERNET_LAST_VERIFIED=1
+        print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
+        return 0
+    elif [ "$rel" = "older" ]; then
+        # The primary feed lists only the stable release. Before calling it stale,
+        # check whether the app's own Sparkle appcast publishes the installed
+        # version in another channel (e.g. gradual-rollout). That proves "current";
+        # it is never used as an install target (partial rollouts stay with the
+        # native updater).
+        local _appcast_channel=""
+        if command -v vendor_appcast_published_channel >/dev/null 2>&1 \
+            && _appcast_channel="$(vendor_appcast_published_channel "$app" "$app_path" 2>/dev/null)" \
+            && [ -n "$_appcast_channel" ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_VENDOR_CHANNEL_CURRENT_FMT" "$I")"
+            INTERNET_LAST_VERIFIED=1
+            print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
+            return 0
+        fi
+        # High-water mark (2026-11-08, Proton Mail): the vendor already published
+        # a version >= the installed one, and its feed now lists an older one.
+        # That is a regression of the feed, not of this Mac: report current,
+        # never warn, never launch, never install from it. The status has its own
+        # code (current_feed_regressed) because no live feed confirms the
+        # installed version this run.
+        local _hw=""
+        if command -v vendor_feed_state_high_water >/dev/null 2>&1 \
+            && _hw="$(vendor_feed_state_high_water "$app" "$I")" && [ -n "$_hw" ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_REGRESSED_FMT" "$I" "$_hw" "$R")"
+            INTERNET_LAST_VERIFIED=0
+            command -v internet_diag_log >/dev/null 2>&1 && \
+                internet_diag_log "Vendor feed $app: feed lists $R < installed $I, but the vendor published $_hw before (high-water) - reported current"
+            print_ok "$(internet_status_body "$INTERNET_LAST_STATUS")"
+            return 0
+        fi
+        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_FEED_STALE_FMT" "$R" "$I")"
+        INTERNET_LAST_VERIFIED=0
+        print_warn "$(internet_status_body "$INTERNET_LAST_STATUS")"
+        return 0
+    elif [ "$rel" = "unknown" ]; then
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UNKNOWN_VERSION"
+        INTERNET_LAST_VERIFIED=0
+        print_warn "$(internet_status_body "$INTERNET_LAST_STATUS")"
+        return 0
+    elif [ "$rel" = "newer" ]; then
+        if [ "${MAC_UPDATE_DRY_RUN:-0}" = "1" ] || [ "${MAC_UPDATE_VERIFY_ONLY:-0}" = "1" ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATE_AVAILABLE_FMT" "$I" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            print_info "$(internet_status_body "$INTERNET_LAST_STATUS")"
+            return 0
+        fi
+
+        # Staged releases may be eligible for this user's vendor-assigned
+        # cohort. Keep the native updater, but never bypass it with a direct
+        # public artifact. This decision is freshly re-evaluated every run.
+        local staged_rollout=0
+        if [ "${POLICY:-eligible}" = "rollout_hold" ]; then
+            staged_rollout=1
+            ART="-"
+        fi
+
+        local BID=""
+        if command -v internet_app_bundle_id >/dev/null 2>&1; then
+            BID="$(internet_app_bundle_id "$app_path")"
+        fi
+        if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$I" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            return 0
+        fi
+
+        # Launch policy (config/vendor_launch_policy.txt). never-launch: verify
+        # only, the user opens the app to update. direct-only: the verified
+        # vendor artifact is the only install path; without one (or with direct
+        # installs disabled, or a staged rollout) the app is reported the same
+        # way and never launched.
+        local launch_policy
+        launch_policy="$(internet_launch_policy "$app")"
+        if [ "$launch_policy" = "never-launch" ] || {
+            [ "$launch_policy" = "direct-only" ] && { [ "$ART" = "-" ] || [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" = "0" ]; }; }; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OPEN_TO_UPDATE_FMT" "$I" "$R")"
+            INTERNET_LAST_VERIFIED=1
+            INTERNET_LAST_LAUNCH_OK=0
+            command -v internet_diag_log >/dev/null 2>&1 && \
+                internet_diag_log "Vendor truth $app: $I < $R; launch policy $launch_policy - not launched"
+            print_warn "$(internet_status_body "$INTERNET_LAST_STATUS")"
+            return 0
+        fi
+
+        local is_vdf=0
+        [ "$launch_policy" = "direct-only" ] && is_vdf=1
+        local vdf_file="${_INTERNET_HANDLERS_DIR}/../config/vendor_direct_first.txt"
+        if [ -f "$vdf_file" ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+                line="${line%%#*}"
+                line="${line#"${line%%[![:space:]]*}"}"
+                line="${line%"${line##*[![:space:]]}"}"
+                [ -z "$line" ] && continue
+                if [ "$line" = "$app" ]; then
+                    is_vdf=1
+                    break
+                fi
+            done < "$vdf_file"
+        fi
+
+        local bypass_launch=0
+        if [ "$is_vdf" -eq 1 ] && [ "$ART" != "-" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ]; then
+            local app_running=0
+            if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+                app_running=1
+            fi
+            if [ "$app_running" -eq 0 ]; then
+                bypass_launch=1
+            fi
+        fi
+
+        if [ "$bypass_launch" -eq 0 ] && [ "$launch_policy" = "default" ]; then
+            local WAIT="${MAC_UPDATE_STAGE_WAIT:-90}"
+            case "$WAIT" in ''|*[!0-9]*) WAIT=90 ;; esac
+            [ "$WAIT" -gt 600 ] && WAIT=600
+            if [ "$WAIT" -gt 0 ]; then
+                print_step "$(printf "$L_INTERNET_LAUNCH_CYCLE_FMT" "$app" "$R")"
+                if ! silent_launch_app "$launch_target"; then
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+                    INTERNET_LAST_VERIFIED=0
+                    return 0
+                fi
+                INTERNET_LAST_LAUNCH_OK=1
+                local elapsed=0 I2="$I" rel2
+                while :; do
+                    I2="$(app_version "$app_path")"
+                    rel2="$(version_cmp "$R" "$I2")"
+                    if [ "$rel2" = "equal" ] || [ "$rel2" = "older" ]; then
+                        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I2")"
+                        INTERNET_LAST_VERIFIED=1
+                        return 0
+                    fi
+                    [ "$elapsed" -ge "$WAIT" ] && break
+                    sleep 1
+                    elapsed=$((elapsed + 1))
+                done
+                # A launch racing with the user opening this app must never
+                # authorize a quit. The launcher records only toolkit ownership.
+                local owned=0
+                if [ -n "$BID" ] && [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] &&
+                    [ -f "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt" ] &&
+                    grep -Fqx "$BID" "$MAC_UPDATE_SESSION_DIR/toolkit_launched.txt"; then
+                    owned=1
+                fi
+                if [ "$owned" -eq 1 ] && command -v internet_app_quit_gracefully >/dev/null 2>&1; then
+                    internet_app_quit_gracefully "$BID" 2>/dev/null || true
+                    # Some native updaters finalize on quit; stop polling as
+                    # soon as the offered version lands, with a short bound.
+                    elapsed=0
+                    while [ "$elapsed" -lt 10 ]; do
+                        I2="$(app_version "$app_path")"
+                        rel2="$(version_cmp "$R" "$I2")"
+                        if [ "$rel2" = "equal" ] || [ "$rel2" = "older" ]; then
+                            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I2")"
+                            INTERNET_LAST_VERIFIED=1
+                            return 0
+                        fi
+                        sleep 1
+                        elapsed=$((elapsed + 1))
+                    done
+                fi
+            fi
+        fi
+
+        if [ "$ART" != "-" ] && [ "${MAC_UPDATE_VENDOR_DIRECT:-1}" != "0" ]; then
+            local still_running=0
+            if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+                still_running=1
+            fi
+            if [ "$still_running" -eq 0 ] && command -v vendor_direct_install >/dev/null 2>&1; then
+                print_step "$(printf "$L_INTERNET_VENDOR_DIRECT_FMT" "$app" "$R" "$HOST")"
+                vendor_direct_install "$app_path" "$URL" "$ART" "$CK" "$CS" "$HOST" "$R"
+                local vrc=$?
+                if [ "$vrc" -eq 0 ]; then
+                    local I3
+                    I3="$(app_version "$app_path")"
+                    local rel3
+                    rel3="$(version_cmp "$R" "$I3")"
+                    if [ "$rel3" = "equal" ] || [ "$rel3" = "older" ]; then
+                        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$I3")"
+                        INTERNET_LAST_VERIFIED=1
+                        return 0
+                    else
+                        INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$I3" "$R")"
+                        INTERNET_LAST_VERIFIED=1
+                        return 0
+                    fi
+                elif [ "$vrc" -eq 4 ]; then
+                    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$I" "$R")"
+                    INTERNET_LAST_VERIFIED=1
+                    return 0
+                elif [ "$vrc" -eq 3 ]; then
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_INSTALL_ERROR"
+                    INTERNET_LAST_VERIFIED=0
+                    INTERNET_HARD_FAIL=1
+                    return 1
+                else
+                    INTERNET_LAST_STATUS="$L_INTERNET_STATUS_DOWNLOAD_ERROR"
+                    INTERNET_LAST_VERIFIED=0
+                    INTERNET_SOFT_FAIL=1
+                    # A failed public download must not remove the vendor's
+                    # supported updater as a recovery path. Report only the
+                    # launch; a later verified version check proves completion.
+                    # direct-only apps are never launched (vendor_launch_policy.txt).
+                    if [ "$bypass_launch" -eq 1 ] && [ "$launch_policy" != "direct-only" ]; then
+                        internet_handler_silent_launch "$app" "$launch_target" "" "$app_path"
+                    fi
+                    return 0
+                fi
+            fi
+        fi
+
+        if [ -n "$BID" ] && command -v internet_app_is_running >/dev/null 2>&1 && internet_app_is_running "$BID"; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_NEEDS_RESTART_FMT" "$I" "$R")"
+        elif [ "$staged_rollout" -eq 1 ]; then
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_ROLLOUT_HOLD_FMT" "$I" "$R")"
+        else
+            INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_BEHIND_FMT" "$I" "$R")"
+        fi
+        INTERNET_LAST_VERIFIED=1
+        return 0
+    fi
+}
+
+# ── Omaha / Chromium Updaters (v1.5.0) ──────────────────────
+omaha_read_increment() {
+    local log_file="$1"
+    local init_size="${2:-0}"
+    [ -f "$log_file" ] || return 0
+    local cur_size
+    cur_size=$(wc -c < "$log_file" 2>/dev/null | tr -d ' ' || echo 0)
+    if [ "$cur_size" -lt "$init_size" ]; then
+        local old_file="${log_file}.old"
+        if [ -f "$old_file" ]; then
+            tail -c +$((init_size + 1)) "$old_file" 2>/dev/null || true
+        fi
+        cat "$log_file" 2>/dev/null || true
+    elif [ "$cur_size" -gt "$init_size" ]; then
+        tail -c +$((init_size + 1)) "$log_file" 2>/dev/null || true
+    fi
+}
+
+omaha_chrome_version_history_public() {
+    local vh_url="https://versionhistory.googleapis.com/v1/chrome/platforms/mac_arm64/channels/stable/versions/all/releases?filter=endtime=none"
+    local vh_json=""
+    vh_json="$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 --max-time 15 "$vh_url" 2>/dev/null || true)"
+    [ -n "$vh_json" ] || return 0
+    printf '%s\n' "$vh_json" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import version_history_public
+print(version_history_public(sys.stdin.read()) or "")
+' 2>/dev/null || true
+}
+
+# ── Omaha proof from updater_history.jsonl (2026-09-28) ─────
+# Chromium updaters (GoogleUpdater, CometUpdater) write a structured
+# updater_history.jsonl next to updater.log. It records every scheduled
+# check's per-app outcome (NO_UPDATE / UPDATED) with the build it saw, which
+# the text log no longer does reliably: GoogleUpdater 156 prints the Omaha
+# response body on its own unprefixed line. The history file for each log is
+# derived from the log path, so tests that point the log at /dev/null stay
+# hermetic.
+omaha_history_files_for_logs() {
+    local log dir
+    for log in "$@"; do
+        [ -n "$log" ] || continue
+        dir="$(dirname "$log")"
+        [ -f "$dir/updater_history.jsonl.old" ] && printf '%s\n' "$dir/updater_history.jsonl.old"
+        [ -f "$dir/updater_history.jsonl" ] && printf '%s\n' "$dir/updater_history.jsonl"
+    done
+    return 0
+}
+
+google_updater_logs() {
+    printf '%s\n' "${MAC_UPDATE_GOOGLE_USER_LOG:-$HOME/Library/Application Support/Google/GoogleUpdater/updater.log}"
+    printf '%s\n' "${MAC_UPDATE_GOOGLE_SYS_LOG:-/Library/Application Support/Google/GoogleUpdater/updater.log}"
+}
+
+# omaha_history_proof <appid> <app_path> <log>...
+# Sets INTERNET_LAST_STATUS / INTERNET_LAST_VERIFIED=1 and returns 0 when the
+# updater recorded NO_UPDATE (or UPDATED) for exactly the installed build
+# within MAC_UPDATE_OMAHA_MAX_AGE_H hours. Returns 1 otherwise, untouched.
+omaha_history_proof() {
+    local appid="$1" app_path="$2"
+    shift 2
+    local files short build max_age res
+    files="$(omaha_history_files_for_logs "$@")"
+    if [ -z "$files" ]; then
+        command -v internet_diag_log >/dev/null 2>&1 && \
+            internet_diag_log "Omaha history proof refused for $appid: no updater_history.jsonl next to: $*"
+        return 1
+    fi
+    short="$(app_version "$app_path")"
+    build=""
+    if command -v app_build_version >/dev/null 2>&1; then
+        build="$(app_build_version "$app_path")"
+    fi
+    max_age="${MAC_UPDATE_OMAHA_MAX_AGE_H:-6}"
+    # Line 1: HH:MM when proven, empty otherwise. Line 2: why (logged on refusal).
+    local out why
+    out="$(printf '%s\n' "$files" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import omaha_history_explain
+appid, short, build = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    max_age = float(sys.argv[4])
+except Exception:
+    max_age = 6.0
+paths = sys.stdin.read().splitlines()
+chunks = []
+for path in paths:
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            chunks.append(fh.read())
+    except Exception:
+        pass
+ex = omaha_history_explain("\n".join(chunks), appid, [short, build], max_age)
+proof = ex["proof"]
+print(proof[1] if proof else "")
+print("reason=%s state=%s version=%s age_h=%s max_age_h=%s installed=%s/%s files=%d" % (
+    ex["reason"], ex.get("state", "-") or "-", ex.get("version", "-") or "-",
+    ex.get("age_h", "-"), max_age, short or "-", build or "-", len(paths)))
+' "$appid" "$short" "$build" "$max_age" 2>/dev/null || true)"
+    res="$(printf '%s\n' "$out" | sed -n 1p)"
+    why="$(printf '%s\n' "$out" | sed -n 2p)"
+    if [ -z "$res" ]; then
+        command -v internet_diag_log >/dev/null 2>&1 && \
+            internet_diag_log "Omaha history proof refused for $appid: ${why:-history unreadable}"
+        return 1
+    fi
+    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OMAHA_RECENT_FMT" "$res")"
+    INTERNET_LAST_VERIFIED=1
+    return 0
+}
+
+evaluate_omaha_status() {
+    local app="$1"
+    local app_path="$2"
+    local log_inc="$3"
+    local appid="$4"
+
+    local st=""
+    if [ -n "$log_inc" ]; then
+        st=$(printf '%s\n' "$log_inc" | PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from vendor_feeds import omaha_last_status
+log = sys.stdin.read()
+appid = sys.argv[1]
+res = omaha_last_status(log, appid)
+print(res if res else "")
+' "$appid" 2>/dev/null || true)
+    fi
+
+    if [ "$st" = "noupdate" ]; then
+        if [ "$appid" = "com.google.chrome" ]; then
+            local pub_ver=""
+            pub_ver="$(omaha_chrome_version_history_public)"
+            local inst_ver
+            inst_ver="$(app_version "$app_path")"
+            if [ -n "$pub_ver" ] && [ "$(version_cmp "$pub_ver" "$inst_ver")" = "newer" ]; then
+                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_ROLLOUT_HOLD_FMT" "$inst_ver" "$pub_ver")"
+                INTERNET_LAST_VERIFIED=1
+                return 0
+            fi
+        fi
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_VENDOR_NOUPDATE"
+        INTERNET_LAST_VERIFIED=1
+        return 0
+    elif [ "$st" = "ok" ]; then
+        local initial_ver
+        initial_ver="$(app_version "$app_path")"
+        local cur_ver="$initial_ver"
+        local elapsed=0
+        while [ "$elapsed" -lt 60 ]; do
+            sleep 5
+            elapsed=$((elapsed + 5))
+            cur_ver="$(app_version "$app_path")"
+            if [ "$cur_ver" != "$initial_ver" ] && [ -n "$cur_ver" ]; then
+                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_UPDATED_FMT" "$cur_ver")"
+                INTERNET_LAST_VERIFIED=1
+                return 0
+            fi
+        done
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UPDATE_IN_PROGRESS"
+        INTERNET_LAST_VERIFIED=0
+        return 0
+    else
+        local user_log="${MAC_UPDATE_GOOGLE_USER_LOG:-$HOME/Library/Application Support/Google/GoogleUpdater/updater.log}"
+        local sys_log="${MAC_UPDATE_GOOGLE_SYS_LOG:-/Library/Application Support/Google/GoogleUpdater/updater.log}"
+        # Structured history first: it survives log rotation and carries the
+        # checked build. $5 names the updater's own log (Comet); default is
+        # both GoogleUpdater scopes (Drive lives in the system one).
+        if [ -n "${5:-}" ]; then
+            omaha_history_proof "$appid" "$app_path" "$5" && return 0
+        else
+            omaha_history_proof "$appid" "$app_path" "$user_log" "$sys_log" && return 0
+        fi
+        local max_age="${MAC_UPDATE_OMAHA_MAX_AGE_H:-6}"
+        local recent_result=""
+        recent_result=$(PYTHONPATH="$_INTERNET_HANDLERS_DIR/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys, os
+from vendor_feeds import omaha_recent_status
+
+user_log = sys.argv[1]
+sys_log = sys.argv[2]
+appid = sys.argv[3]
+try:
+    max_age = float(sys.argv[4])
+except Exception:
+    max_age = 6.0
+log_inc = sys.argv[5] if len(sys.argv) > 5 else ""
+
+chunks = []
+for p in [user_log + ".old", user_log, sys_log + ".old", sys_log]:
+    if os.path.isfile(p):
+        try:
+            with open(p, "r", encoding="utf-8", errors="replace") as f:
+                chunks.append(f.read())
+        except Exception:
+            pass
+if log_inc:
+    chunks.append(log_inc)
+
+full_text = "\n".join(chunks)
+res = omaha_recent_status(full_text, appid, max_age_h=max_age)
+if res:
+    print(f"{res[0]} {res[1]}")
+' "$user_log" "$sys_log" "$appid" "$max_age" "$log_inc" 2>/dev/null || true)
+
+        if [ -n "$recent_result" ]; then
+            local r_st="${recent_result%% *}"
+            local r_time="${recent_result#* }"
+            if [ "$r_st" = "noupdate" ]; then
+                INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_OMAHA_RECENT_FMT" "$r_time")"
+                INTERNET_LAST_VERIFIED=1
+                return 0
+            fi
+        fi
+
+        if [ "$appid" = "com.google.chrome" ]; then
+            local pub_ver=""
+            pub_ver="$(omaha_chrome_version_history_public)"
+            if [ -n "$pub_ver" ]; then
+                local inst_ver
+                inst_ver="$(app_version "$app_path")"
+                if [ "$(version_cmp "$pub_ver" "$inst_ver")" = "newer" ]; then
+                    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_ROLLOUT_HOLD_FMT" "$inst_ver" "$pub_ver")"
+                    INTERNET_LAST_VERIFIED=1
+                    return 0
+                else
+                    INTERNET_LAST_STATUS="$(printf "$L_INTERNET_STATUS_CURRENT_FMT" "$inst_ver, Google VersionHistory")"
+                    INTERNET_LAST_VERIFIED=1
+                    return 0
+                fi
+            fi
+        fi
+
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_UPDATER_TRIGGERED"
+        INTERNET_LAST_VERIFIED=0
+        return 0
+    fi
+}
+
+internet_handler_chromium_updater() {
+    local app="$1"
+    local app_path="$2"
+    local bin="$3"
+    local log="$4"
+    local appid="$5"
+
+    INTERNET_LAST_VERIFIED=0
+    INTERNET_LAST_LAUNCH_OK=0
+
+    if [ ! -d "$app_path" ]; then
+        print_info "$(internet_msg "$L_INTERNET_NOT_INSTALLED" "$app")"
+        return 0
+    fi
+
+    if [ ! -x "$bin" ]; then
+        internet_handler_silent_launch "$app" "$app" "" "$app_path"
+        return 0
+    fi
+
+    # Check before action: a recent scheduled check for this exact build is
+    # proof enough; waking the updater would only add MAC_UPDATE_OMAHA_WAIT.
+    if omaha_history_proof "$appid" "$app_path" "$log"; then
+        print_ok "${INTERNET_LAST_STATUS#✅ }"
+        return 0
+    fi
+
+    local init_size=0
+    [ -f "$log" ] && init_size=$(wc -c < "$log" 2>/dev/null | tr -d ' ' || echo 0)
+
+    print_step "$(internet_msg "$L_INTERNET_LAUNCHING_HIDDEN" "$app")"
+    if ! run_with_timeout 120 "$bin" --wake-all >/dev/null 2>&1; then
+        print_warn "$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_STATUS="$L_INTERNET_STATUS_LAUNCH_FAILED"
+        INTERNET_LAST_LAUNCH_OK=0
+        return 0
+    fi
+    INTERNET_LAST_LAUNCH_OK=1
+
+    local wait_limit="${MAC_UPDATE_OMAHA_WAIT:-45}"
+    case "$wait_limit" in ''|*[!0-9]*) wait_limit=45 ;; esac
+    [ "$wait_limit" -lt 0 ] && wait_limit=0
+    [ "$wait_limit" -gt 180 ] && wait_limit=180
+
+    local elapsed=0
+    local inc=""
+    while [ "$elapsed" -lt "$wait_limit" ]; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        inc=$(omaha_read_increment "$log" "$init_size")
+        if echo "$inc" | grep -E -q '"updatecheck"\s*:\s*\{"status"' 2>/dev/null; then
+            break
+        fi
+    done
+    inc=$(omaha_read_increment "$log" "$init_size")
+
+    if [ -n "${MAC_UPDATE_SESSION_DIR:-}" ] && [ -d "$MAC_UPDATE_SESSION_DIR" ]; then
+        printf '%s\n' "$inc" >> "$MAC_UPDATE_SESSION_DIR/chromium_updater_log.txt"
+    fi
+
+    evaluate_omaha_status "$app" "$app_path" "$inc" "$appid" "$log"
+}
+
+
+
