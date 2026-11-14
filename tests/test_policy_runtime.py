@@ -4,6 +4,7 @@ import copy
 import json
 import os
 import plistlib
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,18 @@ from inventory_providers import read_cli_manifests
 from source_resolver import resolve_target
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def bundle_version_update_command(path, version="2.0.0"):
+    """Mutate only a fixture plist without requiring macOS's plutil."""
+    code = (
+        "import pathlib, plistlib, sys; "
+        "path = pathlib.Path(sys.argv[1]); "
+        "data = plistlib.loads(path.read_bytes()); "
+        "data['CFBundleShortVersionString'] = sys.argv[2]; "
+        "path.write_bytes(plistlib.dumps(data))"
+    )
+    return shlex.join([sys.executable, "-c", code, str(path), version])
 
 
 class RuntimeTests(unittest.TestCase):
@@ -159,6 +172,9 @@ esac""",
         self.assertFalse(self.log.exists())
 
     def test_yes_without_plan_cannot_run_legacy_bootstrap(self):
+        # Exercise the plan guard after the supported-platform guard on any host.
+        self.tool("uname", 'test "$1" = -m || exit 1; echo arm64')
+        self.tool("sw_vers", 'test "$1" = -productVersion || exit 1; echo 13.0')
         for script in ["update_brew.sh", "update_npm_cli.sh", "update_appstore.sh"]:
             with self.subTest(script=script):
                 env = dict(os.environ, MAC_UPDATE_YES="1")
@@ -243,7 +259,7 @@ class ManagerFixtureTests(unittest.TestCase):
         if kind == "formula":
             update = f"""mkdir -p '{self.prefix}/Cellar/sample/2.0.0'; printf '%s' '{{"installed_on_request":true}}' > '{self.prefix}/Cellar/sample/2.0.0/INSTALL_RECEIPT.json'; rm '{receipt}'; rmdir '{receipt.parent}' """
         else:
-            update = f"""mkdir -p '{self.prefix}/Caskroom/sample/.metadata/2.0.0/20261114/Casks' '{self.prefix}/Caskroom/sample/2.0.0'; cp '{receipt}' '{self.prefix}/Caskroom/sample/.metadata/2.0.0/20261114/Casks/sample.json'; ln -s '{self.app}' '{self.prefix}/Caskroom/sample/2.0.0/Sample.app'; /usr/bin/plutil -replace CFBundleShortVersionString -string 2.0.0 '{self.app}/Contents/Info.plist' """
+            update = f"""mkdir -p '{self.prefix}/Caskroom/sample/.metadata/2.0.0/20261114/Casks' '{self.prefix}/Caskroom/sample/2.0.0'; cp '{receipt}' '{self.prefix}/Caskroom/sample/.metadata/2.0.0/20261114/Casks/sample.json'; ln -s '{self.app}' '{self.prefix}/Caskroom/sample/2.0.0/Sample.app'; {bundle_version_update_command(self.app / 'Contents/Info.plist')} """
         brew.write_text(
             '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\ncase "$1" in\ninfo) printf \'%s\' \''
             + info
@@ -333,6 +349,12 @@ class ManagerFixtureTests(unittest.TestCase):
     def test_cask_update_reobserves_all_existing_app_artifacts(self):
         self.brew_fixture("cask")
         self.assertEqual(runtime.run_adapter(str(self.path), "homebrew"), 0)
+        self.assertEqual(
+            plistlib.loads((self.app / "Contents/Info.plist").read_bytes())[
+                "CFBundleShortVersionString"
+            ],
+            "2.0.0",
+        )
         self.assertIn(
             "upgrade --cask --appdir=" + str(self.app.parent) + " sample",
             self.log.read_text(),
@@ -401,7 +423,7 @@ class ManagerFixtureTests(unittest.TestCase):
 case "$1" in
  list) echo '[{{"id":123,"bundleID":"fixture.store","version":"1.0.0","name":"Store"}}]' ;;
  outdated) echo '123 Store (1.0.0 -> 2.0.0)' ;;
- upgrade) test "$2" = 123 || exit 7; /usr/bin/plutil -replace CFBundleShortVersionString -string 2.0.0 '{info}' ;;
+ upgrade) test "$2" = 123 || exit 7; {bundle_version_update_command(info)} ;;
  *) exit 1;;
 esac""",
         )
@@ -427,6 +449,9 @@ esac""",
         )
         self.install_plan(target)
         self.assertEqual(runtime.run_adapter(str(self.path), "app_store"), 0)
+        self.assertEqual(
+            plistlib.loads(info.read_bytes())["CFBundleShortVersionString"], "2.0.0"
+        )
         calls = self.log.read_text().splitlines()
         self.assertEqual([c for c in calls if c.startswith("upgrade")], ["upgrade 123"])
         self.assertFalse(any(c.startswith(("install", "get", "search")) for c in calls))

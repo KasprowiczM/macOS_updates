@@ -12,6 +12,8 @@ The owner authorized merging the completed local checkpoints to main on 2026-11-
 
 - Close the A-E source-aware inventory implementation after local checkpoints 1.6.1 through 1.6.5. This final version change adds no execution authority or public installation recipes.
 - Final guarded integration: 1178 collected cases, 1177 passed and one expected private-inventory skip; zero unexpected host-command or network guard hits. Python 3.9 critical checks, warning-level ShellCheck, syntax, module compilation and secret scans pass.
+- Make manager test fixtures portable to Linux: simulate the supported platform and edit fixture plists with Python instead of a macOS-only command. Runtime guards are unchanged.
+- Add the dated [recipe verification plan](docs/superpowers/plans/2026-11-14-recipe-verification-and-native-updaters.md), research and 48-product candidate matrix. This is a proposal, not activation of native updaters or installation recipes.
 - See [implementation and acceptance boundaries](docs/implementation/FINAL_1.7.0.md). Linux, supported-OS/live installation acceptance, publication, Ascendo parity and landing synchronization remain separate. No real application updates or installations were performed.
 
 
