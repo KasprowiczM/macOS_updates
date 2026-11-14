@@ -1004,6 +1004,7 @@ L_INVENTORY_MIGRATION_ACCEPT="Accepter cet aperçu : bash build_inventory.sh --m
 L_INVENTORY_CONFLICT="Inventaire inchangé. Examiner les notes via build_inventory.sh --migration --preview ; analyse locale complète requise."
 L_PLAN_NO_CHOICES="Aucune nouvelle décision requise. Utilisez --preferences pour revoir les choix enregistrés."
 L_PLAN_POLICY_COUNTS="Manuel : %s ; ignorés : %s ; différés : %s. Revoir avec --preferences."
+L_PLAN_SCAN_PARTIAL_SUMMARY="Les preuves d’inventaire sont incomplètes pour %s cibles. Aucune mise à jour n’a été confirmée ; les détails par cible restent dans le JSON."
 
 # Optional catalog and first-install preview
 

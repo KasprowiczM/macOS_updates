@@ -155,7 +155,7 @@ _RECORD_FIELDS = frozenset((
 _EFFECTS = {
     'update': frozenset(('replace_existing_app', 'native_update', 'manager_update')),
     'install': frozenset(('install_app', 'install_dependency')),
-    'lifecycle': frozenset(('launch_app', 'quit_owned_app')),
+    'lifecycle': frozenset(('launch_app', 'quit_owned_app', 'restart_owned_app')),
 }
 
 

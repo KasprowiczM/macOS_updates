@@ -14,7 +14,7 @@ import re
 import shutil
 import subprocess
 from datetime import datetime
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import brew_casks
 from inventory import APP_ALIASES, norm_name

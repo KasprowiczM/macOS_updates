@@ -114,13 +114,39 @@ def source_fingerprint(target, resolution):
             adapter_id=resolution.get("adapter_id"),
             candidate_sources=sorted(resolution.get("candidate_sources", [])),
             claims=sorted(claims, key=lambda x: json.dumps(x, sort_keys=True)),
+            **(
+                {
+                    "recipe_fingerprint": resolution["recipe_fingerprint"],
+                    "candidate_fingerprint": resolution.get("candidate_fingerprint"),
+                }
+                if resolution.get("recipe_fingerprint")
+                else {}
+            ),
         )
     )
 
 
 def make_decision(
-    target, resolution, choice, action_scope, now, expires_at=None, reason=None
+    target,
+    resolution,
+    choice,
+    action_scope,
+    now,
+    expires_at=None,
+    reason=None,
+    lifecycle_permissions=None,
 ):
+    lifecycle_permissions = lifecycle_permissions or []
+    if (
+        not isinstance(lifecycle_permissions, list)
+        or any(
+            p not in ("quit_owned_app", "restart_owned_app")
+            for p in lifecycle_permissions
+        )
+        or lifecycle_permissions
+        and choice != "allow_native_launch"
+    ):
+        raise ValueError("invalid_lifecycle_permissions")
     if choice not in CHOICES or action_scope not in SCOPES:
         raise ValueError("invalid_decision")
     if choice == "allow_update_same_source" and action_scope not in (
@@ -145,6 +171,11 @@ def make_decision(
         source_fingerprint=source_fingerprint(target, resolution),
         action_scope=action_scope,
         choice=choice,
+        **(
+            {"lifecycle_permissions": sorted(set(lifecycle_permissions))}
+            if lifecycle_permissions
+            else {}
+        ),
         created_at=now,
         expires_at=expires_at,
         reason=reason,

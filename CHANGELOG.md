@@ -6,6 +6,16 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.7.4] - 2026-11-14 (local checkpoint T4)
+
+- Add observable native sessions, separate accepted lifecycle effects and consent, owned-process checks, durable helper barriers and recovery regression coverage.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
+## [1.7.3] - 2026-11-14 (local checkpoint T3)
+
+- Add exact-candidate ZIP acquisition and separate consent-bound update and first-install execution, with shared resource admission foundations.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
 ## [1.7.2] - 2026-11-14 (local checkpoint T2)
 
 - Add strict schema v2 and exact release, identity, source, requirements and evidence bindings. Update, first-install and lifecycle acceptance are separate; the public executable recipe catalog remains empty. Thirty-seven focused guarded evidence tests passed.

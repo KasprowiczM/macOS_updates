@@ -29,6 +29,17 @@ class TransactionTests(unittest.TestCase):
         result=self.run_tx(); self.assertEqual(result['state'],'verified'); self.assertEqual((self.dest/'version').read_text(),'2')
         journal=pathlib.Path(result['journal_path']); self.assertEqual(journal.stat().st_mode & 0o777,0o600)
         self.assertEqual(json.loads(journal.read_text())['state'],'verified')
+
+    def test_recipe_rejects_changed_build_before_replacing_target(self):
+        self.action['recipe_candidate']=dict(version='2',build='200',bundle_id='org.example',
+            team_id='TEAM',minimum_os='13.0',architecture='arm64')
+        original=self.observe
+        def observed(path):
+            return dict(original(path),build='201')
+        with self.assertRaisesRegex(tx.TransactionDeferred,'approved_candidate_changed'):
+            tx.execute_transaction(self.action,str(self.source),str(self.journals),lambda:self.current,
+                lambda:True,observed,allowed_roots=[str(self.dest.parent)])
+        self.assertEqual((self.dest/'version').read_text(),'1')
     def test_absolute_existing_destination_required(self):
         for path in ['Example.app',str(self.root/'missing.app')]:
             action=dict(self.action,target_path=path)

@@ -1,12 +1,12 @@
 # Guía de usuario (Español)
 
-**Versión:** 1.7.2 · **Apple Silicon, macOS 13+**
+**Versión:** 1.7.4 · **Apple Silicon, macOS 13+**
 
 ## Configuración segura y fuentes de aplicaciones
 
 `bash setup.sh --inspect` comprueba la preparación sin instalar dependencias, cambiar perfiles ni configurar Touch ID. Una herramienta ausente deja su función no disponible. En un terminal, `bash setup.sh --install-dependencies` muestra dependencias opcionales y pregunta antes de cada instalación; `bash setup.sh --configure-shell` presenta por separado el cambio de perfil. Rechazar una dependencia no bloquea funciones independientes. Si falta Python, instálalo explícitamente antes de crear el inventario. Un `mas` ausente o antiguo se indica sin instalarlo ni actualizarlo automáticamente.
 
-Esta es la versión del código 1.7.2 en main, sin una etiqueta de lanzamiento separada. El gestor actúa solo sobre objetivos instalados con fuente observada y tras una nueva aprobación. Los adaptadores genéricos nativos y de proveedores siguen siendo manuales hasta disponer de recetas revisadas. El catálogo público opcional abarca 48 productos y ofrece enlaces oficiales revisados para la obtención manual; no hay recetas aprobadas de primera instalación automática. La lista de métodos siguiente describe capacidades, no autoriza su ejecución. El informe normal incluye aplicaciones instaladas. `bash scripts/report_update_coverage.sh --show-supported` sigue siendo una lista de referencia. El menú opcional se abre con `bash setup.sh --catalog` y no selecciona nada de entrada. Tras la vista previa y una nueva aprobación, puedes obtener manualmente una app mediante un enlace oficial revisado. Cambiar la fuente de una app existente requiere migración manual. Un recibo de App Store para CapCut conserva esa fuente. Una app local sin propiedad Homebrew confirmada nunca se adopta automáticamente.
+Este es un checkpoint local del código, sin publicar ni etiquetar. El gestor actúa solo sobre objetivos instalados con fuente observada y tras una nueva aprobación. Los adaptadores genéricos nativos y de proveedores siguen siendo manuales hasta disponer de recetas revisadas. El catálogo público opcional abarca 48 productos y ofrece enlaces oficiales revisados para la obtención manual; no hay recetas aprobadas de primera instalación automática. La lista de métodos siguiente describe capacidades, no autoriza su ejecución. El informe normal incluye aplicaciones instaladas. `bash scripts/report_update_coverage.sh --show-supported` sigue siendo una lista de referencia. El menú opcional se abre con `bash setup.sh --catalog` y no selecciona nada de entrada. Tras la vista previa y una nueva aprobación, puedes obtener manualmente una app mediante un enlace oficial revisado. Cambiar la fuente de una app existente requiere migración manual. Un recibo de App Store para CapCut conserva esa fuente. Una app local sin propiedad Homebrew confirmada nunca se adopta automáticamente.
 
 ## Qué hace
 
@@ -16,7 +16,7 @@ macOS Updates orquesta actualizaciones en **Macs Apple Silicon con macOS 13+**:
 2. App Store (`sudo mas upgrade <app-id>` + Track 2 GUI separado)
 3. Primero las CLI nativas existentes, después Node/Bun y alternativas npm
 4. Homebrew (greedy solo para los casks registrados como `brew_cask`)
-5. Apps instaladas: handlers directos, CLI o activadores integrados
+5. Apps instaladas: operaciones con alcance tras consentimiento; actualizaciones de proveedores no aceptadas manuales
 6. Post-actualización atómica del inventario/historial
 7. macOS (`softwareupdate -i <label> -R`) al final; aplazado ante un error bloqueante o falta de autorización
 
@@ -34,7 +34,6 @@ macOS Updates orquesta actualizaciones en **Macs Apple Silicon con macOS 13+**:
 bash scripts/report_update_coverage.sh
 ```
 
-Estados: **verified direct**, **triggered-unverified**, **externally managed**, **manual**, **unknown**. Un inicio silencioso no prueba una actualización. Inkscape usa Homebrew; UniFi/WiFiman/Picsart Track 2; Office `msupdate`; Teams su propio updater con fallback MAU `TEAMS21` observado y verificado. Actualmente ninguna app registrada es «manual»; IPMIView usa App Store Track 2.
 
 ## Añadir app de Internet
 
@@ -54,7 +53,7 @@ Estados: **verified direct**, **triggered-unverified**, **externally managed**, 
 
 Completo: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
 
-La etapa C activa inventario JSON local y planes con permisos específicos. `bash update_all.sh --plan` y `--dry-run` muestran las mismas decisiones sin guardar. Un proceso interactivo pregunta una vez por los alcances mostrados; `-y`, EOF y ejecución desatendida no conceden permisos nuevos. Use `--preferences` para revisar o restablecer decisiones. Las actualizaciones conservan origen y destino observados; conflictos, destinos ausentes o evidencia incierta aplazan ese destino. `build_inventory.sh --migration --preview` conserva bytes originales de Markdown y notas; acepte expresamente el ID mostrado. Las actualizaciones genéricas del proveedor siguen siendo manuales hasta verificar identidad y adaptador. Una entrada de catálogo no demuestra instalación ni consentimiento.
+El inventario JSON local y los planes de acciones delimitadas están disponibles. `bash update_all.sh --plan` y `--dry-run` muestran las mismas decisiones sin guardar. Un proceso interactivo pregunta una vez por los alcances mostrados; `-y`, EOF y ejecución desatendida no conceden permisos nuevos. Use `--preferences` para revisar o restablecer decisiones. Las actualizaciones conservan origen y destino observados; conflictos, destinos ausentes o evidencia incierta aplazan ese destino. `build_inventory.sh --migration --preview` conserva bytes originales de Markdown y notas; acepte expresamente el ID mostrado. Las actualizaciones genéricas del proveedor siguen siendo manuales hasta verificar identidad y adaptador. Una entrada de catálogo no demuestra instalación ni consentimiento.
 
 
 ## Catálogo opcional y primera instalación
@@ -62,3 +61,7 @@ La etapa C activa inventario JSON local y planes con permisos específicos. `bas
 Las nuevas señales de aplicaciones son propuestas para revisar, no recetas ejecutables. `bash scripts/scan_update_feeds.sh` muestra un resumen agregado. La exportación permite previsualizar y aceptar explícitamente; se redacta, permanece local y nunca se sube. `bash setup.sh --catalog` abre el catálogo sin elementos seleccionados. `-y`, las ejecuciones no interactivas y EOF no instalan nada. En el menú, `check <number>` compara solo las fuentes elegidas. Los resultados indican la última versión estable compatible confirmada y fecha, con caché de 24 horas. Lo desconocido sigue siendo desconocido. Una ficha pública de Mac App Store no demuestra que la app esté disponible para tu cuenta.
 
 El catálogo público contiene 47 filas de registro para 48 productos y cero recetas aprobadas de instalación automática inicial. Tras la vista previa y una nueva confirmación, elige enlaces oficiales revisados para obtener la aplicación manualmente. Abrir una página no instala la app. Cambiar la fuente de una app existente requiere migración manual. El InstallPlan separado muestra fuente, destino, versión, requisitos y permisos; licencia y coste desconocidos se indican como tales. Las futuras recetas automáticas necesitarán aprobación de primera instalación. El catálogo no promete instalar automáticamente todos los productos.
+
+## Estado local de las actualizaciones por receta
+
+Este es un checkpoint local del código, sin publicar ni etiquetar. El catálogo público contiene 48 productos en 47 filas de registro y cero recetas automáticas aprobadas para proveedores, motor nativo o primera instalación. El gestor admite operaciones con alcance sobre objetivos instalados tras consentimiento; las actualizaciones de proveedores sin receta aceptada siguen siendo manuales. Los 48 expedientes y fixtures sintéticos no demuestran aceptación en vivo. La adquisición directa de ZIP, la instalación explícita y el motor nativo están implementados; la aceptación en vivo T6 y la activación T7 siguen pendientes. No existe ruta force, adopt, migración ni bootstrap de dependencias. Las apps existentes del usuario están protegidas. Las recomendaciones son estables por producto, sin clasificación universal del canal más rápido. Un escaneo incompleto es un aviso, pero se bloquean objetivos inseguros; consulta el JSON. Los metadatos Cask del host no se reparan. El planificador permite como máximo dos mutaciones independientes entre checkouts cooperantes del mismo usuario del sistema; la ejecución pública sigue secuencial hasta aceptar efectos independientes. La actualización del sistema toma al final el bloqueo global exclusivo. Un reinicio pendiente o helper desconocido puede bloquear mutaciones hasta una nueva prueba revisada de reconciliación. Aún no hay timeout automático ni reconciliación al inicio. Consulta el [recibo central de implementación](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Las apps abiertas están protegidas. DeepSeek Harness se excluye hasta que sea estable.

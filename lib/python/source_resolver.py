@@ -51,6 +51,7 @@ def resolve_target(target, snapshot, recipes):
     adapter = None
     ownership_conflict = False
     capability = "inventory_only"
+    verified_recipe = None
     if ref["kind"] == "app":
         if "app_store_receipt" in kinds or any(
             e.get("kind") == "mas"
@@ -224,6 +225,68 @@ def resolve_target(target, snapshot, recipes):
             for e in evidence
         )
     )
+    # v2 profiles never inherit execution authority from legacy capability rows.
+    if ref["kind"] == "app" and not degraded and source in ("unknown", "vendor"):
+        from app_recipes import validate_recipe
+        from recipe_acceptance import recipe_fingerprint, candidate_binding
+
+        matches = []
+        for recipe in recipes.get("verified_recipes", []):
+            try:
+                validate_recipe(recipe)
+            except (ValueError, TypeError, KeyError):
+                continue
+            candidate = recipe["candidate"]
+            if (
+                target.get("bundle_id") != candidate["bundle_id"]
+                or target.get("team_id") != candidate["team_id"]
+                or target.get("channel") != candidate["channel"]
+            ):
+                continue
+            signed = any(
+                e.get("kind") == "vendor_signature"
+                and e.get("bundle_id") == candidate["bundle_id"]
+                and e.get("team_id") == candidate["team_id"]
+                for e in evidence
+            )
+            if not signed or recipe["installation_source"] != "vendor":
+                continue
+            # Preview eligibility only. Runtime revalidates all exact evidence,
+            # OS, requirements, expiry and consent immediately before mutation.
+            accepted = any(
+                r.get("kind") == "live"
+                and r.get("result") == "passed"
+                and r.get("recipe_sha256") == recipe_fingerprint(recipe)
+                and r.get("candidate_sha256") == candidate_binding(candidate)
+                for r in recipe["acceptance_records"]["update"]
+            )
+            from native_update_session import NATIVE_DRIVERS
+
+            direct = (
+                recipe["adapter_id"] in ("github_dmg", "mozilla_dmg")
+                and recipe["update_mechanism"] == "direct_artifact"
+            )
+            native = (
+                recipe["adapter_id"] in NATIVE_DRIVERS
+                and recipe["update_mechanism"] == "native_updater"
+            )
+            if accepted and (direct or native):
+                matches.append(recipe)
+        if len(matches) == 1 and "duplicate_bundle_id" not in reasons:
+            verified_recipe = matches[0]
+            source, grade, capability = "vendor", "probable", "reviewed_direct"
+            if verified_recipe["update_mechanism"] == "native_updater":
+                capability = "reviewed_native"
+            sources.add("vendor")
+            adapter = verified_recipe["adapter_id"]
+        elif len(matches) > 1:
+            source, grade, capability, adapter = (
+                "conflict",
+                "conflicting",
+                "inventory_only",
+                None,
+            )
+            reasons.append("ambiguous_verified_recipe")
     if degraded:
         capability, adapter = "inventory_only", None
         if grade == "confirmed":
@@ -250,7 +313,7 @@ def resolve_target(target, snapshot, recipes):
             elif resolution["capability"] == "inventory_only":
                 capability, adapter = "inventory_only", None
                 reasons.append("related_target_unavailable")
-    return {
+    result = {
         "target": dict(ref),
         "source": source,
         "capability": capability,
@@ -259,6 +322,16 @@ def resolve_target(target, snapshot, recipes):
         "reason_codes": reasons,
         "candidate_sources": sorted(sources),
     }
+    if verified_recipe is not None and capability in (
+        "reviewed_direct",
+        "reviewed_native",
+    ):
+        result["verified_recipe"] = verified_recipe
+        result["recipe_fingerprint"] = recipe_fingerprint(verified_recipe)
+        result["candidate_fingerprint"] = candidate_binding(
+            verified_recipe["candidate"]
+        )
+    return result
 
 
 def resolve_snapshot(snapshot, recipes):
