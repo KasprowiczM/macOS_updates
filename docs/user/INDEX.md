@@ -1,6 +1,6 @@
 # User documentation
 
-**Version 1.7.0** · [Website](https://macos-updates.64bit.site) · [Install](../INSTALL.md) · [Uninstall](../UNINSTALL.md) · [Public release](../PUBLIC_RELEASE.md) · [Changelog](../../CHANGELOG.md) · [README](../../README.md)
+**Version 1.7.1** · [Website](https://macos-updates.64bit.site) · [Install](../INSTALL.md) · [Uninstall](../UNINSTALL.md) · [Public release](../PUBLIC_RELEASE.md) · [Changelog](../../CHANGELOG.md) · [README](../../README.md)
 
 | Language | Quick start | Guide | Operations |
 |----------|-------------|-------|------------|

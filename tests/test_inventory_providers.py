@@ -12,6 +12,35 @@ sys.path.insert(0, str(ROOT / "lib/python"))
 
 
 class ProviderTests(unittest.TestCase):
+    def test_npm_hidden_lockfile_is_not_an_installed_package(self):
+        from inventory_providers import read_cli_manifests
+        self.write_json(self.root / "lib/node_modules/tool/package.json", {"name": "tool", "version": "1"})
+        self.write_json(self.root / "lib/node_modules/.package-lock.json", {"lockfileVersion": 3})
+        result = read_cli_manifests(str(self.root))
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual([x["source_identity"] for x in result["items"]], ["tool"])
+
+    def test_malformed_cask_keeps_healthy_formula_peer_partial(self):
+        from inventory_providers import read_brew_receipts
+        self.write_json(self.root / "Cellar/healthy/1/INSTALL_RECEIPT.json", {"installed_on_request": True})
+        self.write_json(self.root / "Caskroom/broken/.metadata/1/20261114/Casks/broken.json", {})
+        result = read_brew_receipts(str(self.root))
+        self.assertEqual(result["status"], "partial")
+        self.assertFalse(result["complete"])
+        self.assertEqual([x["source_identity"] for x in result["items"]], ["formula:healthy"])
+        self.assertEqual(result["issues"], [{"reason_code": "cask_metadata_invalid", "count": 1}])
+
+    def test_symlink_lockfile_and_missing_package_remain_partial(self):
+        from inventory_providers import read_cli_manifests
+        self.write_json(self.root / "outside.json", {})
+        modules = self.root / "lib/node_modules"
+        modules.mkdir(parents=True)
+        (modules / ".package-lock.json").symlink_to(self.root / "outside.json")
+        (modules / "broken").mkdir()
+        result = read_cli_manifests(str(self.root))
+        self.assertEqual(result["status"], "partial")
+        self.assertFalse(result["complete"])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

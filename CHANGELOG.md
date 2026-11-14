@@ -6,6 +6,13 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-11-14 (local checkpoint T1)
+
+- Fix duration formatting and record monotonic phase timings, source provenance and explicit evidence freshness without inferring update success.
+- Group incomplete inventory evidence as scan advisories, retaining per-target JSON and source-level diagnostic counts. Empty or malformed manager receipts still block execution.
+- Ignore npm's regular hidden package lockfile during package discovery; preserve safeguards for malformed metadata and symlinks.
+- Fixture-only verification; no real updates, installation acceptance or publication. See [T1-T5b implementation](docs/implementation/RECIPE_VERIFICATION_2026-11-14.md).
+
 ## [1.7.0] - 2026-11-14 (main source snapshot, untagged)
 
 The owner authorized merging the completed local checkpoints to main on 2026-11-14. No release tag or new live update acceptance is implied. Earlier implementation reports remain dated records of their local gates.

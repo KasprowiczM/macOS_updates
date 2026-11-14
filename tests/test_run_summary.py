@@ -47,6 +47,31 @@ class PendingMeasurementTests(unittest.TestCase):
 
 
 class InventoryCountHonestyTests(unittest.TestCase):
+    def test_duration_778_formats_12m58s_with_final_step_3s(self):
+        summary = build_run_summary(100, 878, 0, 0, 0, {"internet": "OK", "system": "OK"},
+                                    step_durations={"internet": 625, "system": 3})
+        self.assertEqual(summary["duration_seconds"], 778)
+        self.assertEqual(summary["duration_formatted"], "12m 58s")
+
+    def test_scan_partial_is_inventory_advisory_not_an_unconfirmed_mutation(self):
+        from run_summary import action_result_items, format_terminal_summary
+        results = [dict(target={"kind": "package", "id": str(n)}, name="fixture" + str(n),
+                        status="scan_partial", reason_code="scan_partial") for n in range(219)]
+        items = action_result_items(results)
+        summary = build_run_summary(1, 2, 0, 1, 0, {}, items=items)
+        self.assertTrue(all(item["status"] == "scan_advisory" for item in items))
+        text = format_terminal_summary(summary)
+        self.assertIn("219", text)
+        self.assertNotIn("fixture218", text)
+        self.assertEqual(len(summary["items"]), 219)
+
+    def test_action_freshness_does_not_promote_history_or_unconfirmed_quit(self):
+        from run_summary import action_result_items
+        results = [dict(target={"kind": "app", "id": kind}, status="current_verified",
+                        verified=True, evidence_type=kind) for kind in ("updater_history", "live_version_comparison", "quit_request")]
+        items = action_result_items(results)
+        self.assertEqual([i["evidence_freshness"] for i in items], ["historical", "fresh", "unconfirmed"])
+
     def test_table_edits_are_not_named_installs(self) -> None:
         from plan_orchestration import inventory_counts
         before = {'instances': [{'instance_id':'x','presence':'present','freshness':'fresh','short_version':'1'}]}
