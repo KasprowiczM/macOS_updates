@@ -1,0 +1,7 @@
+[
+  {"case": "document_opened", "changes": {"user_engaged": true}},
+  {"case": "save_dialog", "changes": {"save_dialog": true}},
+  {"case": "engagement_unknown", "changes": {"engagement_known": false}},
+  {"case": "existing_user_process", "changes": {"preexisting": true}},
+  {"case": "process_disappeared", "changes": {"process_exists": false}}
+]

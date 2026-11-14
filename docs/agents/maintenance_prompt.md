@@ -1,69 +1,35 @@
-# Universal maintenance prompt
+# Uniwersalny prompt pełnego audytu
 
-A harness-agnostic prompt for a fresh agent session (any model, any harness). Paste the block below as the first message in a new session opened in this repository. It makes the agent verify the last update run against the live system, review the toolkit, fix what it finds and record the evidence.
-
-Keep this file current when the workflow changes. It must stay free of private data and of tool names that exist in only one harness.
+Prompt dla dowolnego przyszłego modelu i narzędzia. Wklej blok w sesji projektu. Audyt nie jest zgodą na aktualizowanie komputera ani publikację zmian.
 
 ```text
-You are maintaining "macOS Updates", a Bash 3.2 + Python 3 update orchestrator for Apple Silicon Macs.
-Work in this repository. Follow its contract exactly: read AGENTS.md first, then docs/agents/critical_rules.md,
-docs/agents/exit_codes.md and docs/agents/architecture.md. If you have a private project memory or handoff
-system available, load the latest handoff for this project before anything else and treat it as a hint, not a fact.
+Przeprowadź dogłębny, oparty na dowodach ultra-review projektu macOS Updates. Pracuj w trybie orkiestra zgodnie z rzeczywiście dostępnymi modelami i drabiną kosztów. Nie zakładaj nazwy ani możliwości swojego modelu. Dobierz dostępne zaufane skills do audytu, debugowania, bezpieczeństwa, testów i aktualnej dokumentacji. Nie instaluj narzędzi ani skills bez odpowiedniej autoryzacji.
 
-Goal: verify how the last real update run went, review the toolkit, fix what is wrong, and leave evidence.
+Najpierw załaduj najnowszy kontekst/handoff projektu, przeczytaj AGENTS.md i właściwe dokumenty architektury, bezpieczeństwa oraz kodów wyjścia. Zweryfikuj pamięć względem repozytorium. Ustal właściwy publiczny checkout, stan zmian użytkownika, branch, remote, VERSION, najnowszy tag i wyniki CI. Nie przepisuj historii i nie nadpisuj cudzej pracy.
 
-Phase 1 - ground truth (read-only, no assumptions)
-1. git status, current branch, last commits, whether main matches the remote, state of CI on main.
-2. bash run_tests.sh (full suite, ShellCheck-relevant checks and secret scan). Record the exact result.
-3. bash update_all.sh --doctor (read-only readiness report). Record its exit code and every warning.
-4. Find the newest real run: the newest logs/update_all_*.log whose run summary (logs/run_summary_*.json)
-   has flags.dry_run = false and flags.inventory_only = false. Read the whole log and the summary.
-   Also skim the previous three real runs so you can tell a one-off from a recurring problem.
-5. bash scripts/check_vendor_feeds.sh, bash scripts/report_update_coverage.sh and
-   bash scripts/report_chronic_warnings.sh.
-6. Compare what the run claimed with the live machine: for every item reported as updated, pending,
-   unverified or warned, check the installed version and the vendor's current version yourself.
-   A claim in a log, a document or a handoff is not evidence until you have checked it.
+Cel: znaleźć rzeczywiste błędy i luki, sprawdzić założenia poprzednich modeli oraz zaproponować uzasadniony rozwój produktu. Nie zakładaj, że wcześniejszy audyt był poprawny albo że nowszy model musi znaleźć więcej błędów.
 
-Phase 2 - review
-7. List every defect with evidence (file and line, log line, command output). Separate: confirmed by a
-   command you ran / follows from the code / hypothesis. Rank: blocks or mis-reports an update / wastes time
-   or misleads / cosmetic. Pay particular attention to: statuses that claim more than was verified; apps
-   that were launched, quit, or replaced while the user had them open; warnings that repeat across runs;
-   steps that waited on input; English text in a localized run; anything the previous handoff listed as
-   "not verified live".
-8. Check that the macOS and third-party behaviour the toolkit relies on is still current: look up the
-   release notes of the installed macOS version and of Homebrew and mas, and the documentation of any
-   update framework involved, instead of relying on memory.
-9. Tell the owner what you found before changing anything large. Small, clearly correct fixes may proceed.
+A. Dowody i architektura
+- Zmapuj wejścia programu, źródła inventory, resolver, polityki/zgody, plany, acquisition, wykonawców, recovery, scheduler, raporty i instalator.
+- Przeczytaj najnowsze realne logi z JSON; odróżnij błędy, odmowy, niepełną obserwację, ostrzeżenia i potwierdzone zmiany. Nie uznawaj samych kodów wyjścia ani historycznych receipt za świeży sukces.
+- Sprawdź spójność źródeł, testów, README, siedmiu języków, instrukcji instalacji i landing page. Osobno licz produkty katalogowe, aktywne receptury i operacje zaakceptowane na żywo.
 
-Phase 3 - fix
-10. Work on a new branch, never directly on main. Keep changes scoped to the defects found.
-11. Every fix needs a regression test that fails without it. Tests must be hermetic (no real brew, mas,
-    sudo, launchctl, softwareupdate; no dependence on this Mac's apps) and must also pass on the Linux CI job.
-12. Never run a real update, install, quit or relaunch of the owner's apps, or anything needing sudo,
-    as part of testing. Use --dry-run, --doctor and the test suite. A real bash update_all.sh run is the
-    owner's to start; ask for it when live confirmation is needed.
-13. New user-facing strings go into all seven language files. No private data, home paths, machine
-    inventory or raw log excerpts in tracked files.
-14. If you can delegate, split independent work into file-disjoint packages, give each its own isolated
-    working copy, use the cheapest model that can do each package well, and have one independent review
-    of the merged diff followed by a single fix round. Re-run the full suite yourself on the merged result
-    in the owner's main checkout, not only in a clean copy.
+B. Scenariusze i bezpieczeństwo
+- Nowy Mac, brak brew/mas/Pythona, standardowy użytkownik, offline/429, locale/Unicode, potoki, brak TTY, ścieżki ze spacjami, wiele checkoutów i niestandardowe katalogi.
+- Tożsamość bundle/Team, App Store versus brew/vendor, duplikaty, aplikacje spoza katalogu, stable versus preview, rollout/offered versus listed, wersja/build i minimum OS.
+- Zmiana feedu po zgodzie, źródła, artefaktu lub zależności; downgrade; źle podpisany pakiet; ZIP traversal/symlinki; nieznane efekty instalatora; brak automatycznej adopcji, migracji i instalacji nieobecnego celu.
+- Otwarte dokumenty, przejęcie aplikacji przez użytkownika, PID reuse, save dialog, helper żywy po wyjściu CLI, timeout/crash/restart, jedyna dobra kopia, odzyskiwanie i wyścigi.
+- Globalna kolejka i współdzielone zasoby, anulowanie, świeża zgoda przed mutacją, atomowy zapis inventory oraz uczciwe raporty. Nie pozwól, by blokada uniemożliwiała zebranie dowodu potrzebnego do jej zwolnienia.
 
-Phase 4 - close
-15. Update the documentation that describes current behaviour: CHANGELOG.md ([Unreleased], dated section),
-    the affected files under docs/agents/, the acceptance checklist status, README files in all languages
-    when something user-visible changed.
-    Leave dated historical sections unchanged.
-16. Do not push, open a pull request, merge, tag or delete anything unless the owner asks. When asked to
-    merge: require green CI first, then verify that local main equals the remote.
-17. Finish with a short report: what the last run really did; what you fixed (with test results);
-    what is still unverified live and how to verify it; decisions that are the owner's. If a handoff or
-    memory system is available, store a handoff with the same content. End your final message with this
-    prompt again, updated if the workflow changed.
+C. Weryfikacja
+- Używaj aktualnej oficjalnej dokumentacji producentów/managerów/frameworków; odnotuj datę i rozróżnij publiczny kontrakt od hipotezy.
+- Odtwarzaj defekty na izolowanych fixture z guard runnerem. Dodawaj testy rzeczywistych granic, nie testy kopiujące implementację. Pełny zestaw uruchom po integracji; nie powtarzaj kosztownych kontroli bez powodu.
+- Nie wykonuj prawdziwych aktualizacji, instalacji, sudo, mount, launch/quit ani restartu na Macu właściciela. T6/live testy wymagają osobnego, wskazanego środowiska i zakresu. Nie fabrykuj live acceptance i nie aktywuj nieprzetestowanych receptur. Feedback jest wskazówką, nie automatycznym dowodem.
 
-Rules that override convenience: softwareupdate always with -R and per label; mas upgrade with sudo and
-explicit IDs; apps the user has open are never quit or replaced; only installed software is updated;
-"verified" means a remote version was actually compared in this run; soft warnings never block the macOS step.
+D. Wynik i rozwój
+- Każde ustalenie: priorytet P0-P3, konkretny scenariusz, plik/linia, dowód, wpływ, proponowana poprawka i test. Oddziel potwierdzone defekty, wnioski z kodu i hipotezy. Nie produkuj ustaleń na siłę.
+- Zaproponuj usprawnienia wydajności, UX, niezawodności i obsługi nowych aplikacji. Dla każdej idei podaj wartość dla użytkownika, koszt, ryzyko, zależności i mierzalne kryterium sukcesu. Bez obietnic szybkości opartych na pojedynczym przebiegu.
+- Przygotuj plan etapami w Markdown: szybkie naprawy, istotne zmiany, eksperymenty i tematy odłożone. Wyraźnie wskaż decyzje właściciela i brakujące dowody.
+- Domyślnie wykonaj audyt i przygotuj plan. Implementację, publikację, merge, tag i deploy wykonuj w zakresie udzielonej zgody, nie dlatego, że wspomina o nich ten prompt. Aktualizuj bieżącą dokumentację razem ze zmianą; nie zmieniaj historycznych receipt.
+- Na końcu podaj wykonane i niewykonane kontrole, ograniczenia, role subagentów oraz własną weryfikację. Zapisz handoff z dokładnymi następnymi krokami. Nie wklejaj prywatnych ścieżek, inventory ani danych kont do publicznego repozytorium.
 ```

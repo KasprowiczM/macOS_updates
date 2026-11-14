@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "product_id": "firefox-developer-edition-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://product-details.mozilla.org/1.0/firefox_versions.json",
+        "allowed_hosts": [
+          "product-details.mozilla.org"
+        ],
+        "parser": "json_path",
+        "stable_policy": "beta_only",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "firefox",
+        "observed_at": "2026-11-13T20:44:07.784928+00:00",
+        "version_path": [
+          "FIREFOX_DEVEDITION"
+        ]
+      },
+      "evidence_reference": {
+        "key": "firefox",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:07.784928+00:00",
+        "public_response_sha256": "2cd8f1b3cf72eb8f632bd05b0416c499d2c2f6a8e57ef4db62b3e7954e8dfd16",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "161.0b3"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://www.mozilla.org/firefox/developer/"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/firefox@developer-edition.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "firefox@developer-edition",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:firefox@developer-edition",
+        "observed_at": "2026-11-13T20:43:59.361704+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:firefox@developer-edition",
+        "status": 200,
+        "observed_at": "2026-11-13T20:43:59.361704+00:00",
+        "public_response_sha256": "96c3bed5e608370e46a746e8b0b0fc4357a04f8c58a6fb5241312b56d7d35119",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "161.0b2"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/firefox@developer-edition"
+    }
+  ],
+  "channel_intent": "preview_separate_from_stable",
+  "adapter_contract": {
+    "update_candidate": "Osobny kanał Developer Edition",
+    "install_candidate": "Oficjalny artefakt preview",
+    "known_scope_blocker": "To nie stable Firefox; osobna zgoda i tożsamość kanału",
+    "wave": 4
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "To nie stable Firefox; osobna zgoda i tożsamość kanału"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

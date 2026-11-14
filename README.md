@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **License:** [MIT](LICENSE) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.7.0** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
+> **v1.7.7** : One-command update orchestrator for **Apple Silicon Macs running macOS 13-27**. It coordinates verified package updates and honest in-app update triggers for **software already installed on this Mac**. **Multilingual** (7 languages). Optional private overlay via [`dev_sync/`](dev_sync/README.md).
 
 | At a glance | |
 |-------------|--|
@@ -14,11 +14,11 @@
 | Pipeline | 7 steps (0–6), macOS system update always last |
 | Registry | 47 internet apps · 11 update methods (see [Update methods](#update-methods)) |
 | Languages | EN, PL, ES, FR, DE, IT, PT (CLI and docs) |
-| Tests | 1178 automated tests (`bash run_tests.sh`) |
+| Tests | 1350 automated tests (`bash run_tests.sh`) |
 
 Stage C activates local JSON inventory and scoped update plans. `bash update_all.sh --plan` and `--dry-run` show the same read-only decisions. A normal interactive run asks once for the displayed scopes; `-y`, EOF and unattended runs grant no new permission. Use `--preferences` to review or reset choices. Updates keep the observed source and exact destination; conflicts, missing targets and uncertain evidence defer that target. `build_inventory.sh --migration --preview` preserves old Markdown bytes and notes; accept the displayed proposal ID explicitly. Generic vendor updates remain manual until a reviewed identity and adapter are available. An old catalog entry is neither proof of installation nor consent.
 
-This is the 1.7.0 source snapshot on main, without a separate release tag. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority.
+This documentation covers macOS Updates 1.7.7. No separate release tag has been created. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority.
 
 **New in v1.6.0:** Scheduled (launchd) runs find Homebrew and `mas`, and the installer verifies that the job is loaded (`--minute` and `--once-in` added). Apps you have open are never closed or replaced, Homebrew casks included. Every mid-run question times out with the safe answer "no". `bash update_all.sh --doctor` is a read-only readiness report, and real runs add pre-flight checks. Persistent vendor-feed state replaces opaque "stale feed" warnings, and HyperFrames, Superset and Open Design are installed or checked without hidden launches. Earlier 1.5.x releases are described in [CHANGELOG.md](CHANGELOG.md).
 
@@ -327,12 +327,14 @@ Full script reference: [docs/agents/scripts.md](docs/agents/scripts.md).
 
 1. Install the app yourself (the updater never installs it for you).
 2. Run `bash build_inventory.sh` to add it to `APPLICATIONS.md`.
-3. For auto-updates, ask an AI agent or follow [docs/user/en/GUIDE.md](docs/user/en/GUIDE.md):
+3. To review support for the app, follow [docs/user/en/GUIDE.md](docs/user/en/GUIDE.md) or ask an AI agent:
 
 ```bash
-bash scripts/scaffold_internet_app.sh "App Name" silent_launch
+bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json
 bash run_tests.sh
 ```
+
+Replace the example with the exact installed application path. The command previews a redacted, non-executable review proposal. Optional export requires repeating it with `--export --accept PREVIEW_ID` after reviewing the displayed preview ID. Enabling updates requires a reviewed implementation and separate acceptance evidence.
 
 Coverage methods are mapped to the user-facing states above. Examples: `github_dmg` and a confirmed vendor CLI are **verified direct**; `silent_launch` is **triggered-unverified**; App Store/vendor-owned flows can be **externally managed**; `manual` and missing registry entries remain explicit.
 
@@ -417,3 +419,5 @@ Full list: [docs/agents/troubleshooting.md](docs/agents/troubleshooting.md)
 New app signals are review proposals, not executable recipes. `bash scripts/scan_update_feeds.sh` prints an aggregated summary. Proposal export supports preview and explicit acceptance; it is redacted, stays local, and is never uploaded. `bash setup.sh --catalog` opens the optional catalog with no selection. `-y`, noninteractive runs, and EOF install nothing. In the menu, `check <number>` compares only selected sources. Results show the latest confirmed compatible stable version and date, cached for 24 hours. Unknown stays unknown. A public Mac App Store listing does not prove availability to your account, and no channel is always fastest.
 
 The public catalog has 47 registry rows for 48 separate products and zero approved automatic first-install recipes. After preview and fresh confirmation, you can choose reviewed official links for manual acquisition. Opening a page does not install the app. Changing an existing app's source requires manual migration. The separate InstallPlan shows source, destination, version, requirements, and permissions; unknown license or cost stays labeled unknown. Any future automatic recipe needs fresh-install acceptance before enablement. The catalog does not promise automatic installation for all 48 products.
+
+Plain `--dry-run` shows a readable preview of up to 25 targets. Use `--dry-run --json-summary` or `--plan` for the complete JSON plan. A preview grants no permission and performs no updates.

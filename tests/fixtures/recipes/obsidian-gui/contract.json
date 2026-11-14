@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "product_id": "obsidian-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://raw.githubusercontent.com/obsidianmd/obsidian-releases/master/desktop-releases.json",
+        "allowed_hosts": [
+          "raw.githubusercontent.com"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "obsidian",
+        "observed_at": "2026-11-13T20:44:08.942765+00:00"
+      },
+      "evidence_reference": {
+        "key": "obsidian",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:08.942765+00:00",
+        "public_response_sha256": "67755befc525d0d61213141012e81382cd1a6843f5963b4ff7a88abfa0d9dbd5",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://obsidian.md/"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/obsidian.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "obsidian",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:obsidian",
+        "observed_at": "2026-11-13T20:44:01.555068+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:obsidian",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:01.555068+00:00",
+        "public_response_sha256": "ea8b26074f43ccb8a75425b15c091b4a6ac7c2e9740c231675cc9d5cb18ab239",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "1.15.1"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/obsidian"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Updater lub artefakt",
+    "install_candidate": "Oficjalny artefakt",
+    "known_scope_blocker": "Wersja aplikacji kontra instalator/Electron; ochrona otwartych vaultów",
+    "wave": 2
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Wersja aplikacji kontra instalator/Electron; ochrona otwartych vaultów"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

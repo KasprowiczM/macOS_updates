@@ -1,6 +1,6 @@
 # Avvio rapido (Italiano)
 
-**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.7.0**
+**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.7.7**
 
 ## Configurazione sicura e fonti delle applicazioni
 

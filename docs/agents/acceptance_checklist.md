@@ -1,5 +1,9 @@
 # Production Acceptance Checklist — Live Execution Paths (v1.5.x to v1.6.0)
 
+## Local recipe checkpoint 1.7.6
+
+T1-T5 and T5b add evidence-bound acquisition/execution, native supervision, product source contracts and durable scheduler/system barriers. See the [implementation record](../implementation/RECIPE_VERIFICATION_2026-11-14.md). These are guarded fixture and parser results, not live acceptance. Public executable recipes and native drivers remain empty; T6 and T7 are still separate gates. The final guarded local run passed 1329 tests with zero host/network guard hits; this is not a live product acceptance result.
+
 ## Local source-aware candidate 1.7.0
 
 Stages C-E activate source-bound plans, review-only adaptation and the separate manual-acquisition catalog. The final [1.7.0 report](../implementation/FINAL_1.7.0.md) records 1178 collected cases, 1177 passed and one expected skip, with zero command/network guard hits. The 29 synthetic profiles and sealed runner are recorded in [stage C](../implementation/STAGE_C_1.6.3.md) and [stage D](../implementation/STAGE_D_1.6.4.md). Historical live checks below do not automatically certify the new executor or approve a first-install recipe. The Linux container engine was unavailable and was not started. Disposable-Mac, supported-OS and real-update acceptance remain open.

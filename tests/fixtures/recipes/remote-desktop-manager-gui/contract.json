@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "product_id": "remote-desktop-manager-gui",
+  "edition": "gui",
+  "version_comparison_policy": "numeric",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://devolutions.net/productinfo.htm",
+        "allowed_hosts": [
+          "devolutions.net"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "feed:Remote Desktop Manager",
+        "observed_at": "2026-11-13T20:44:07.689480+00:00"
+      },
+      "evidence_reference": {
+        "key": "feed:Remote Desktop Manager",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:07.689480+00:00",
+        "public_response_sha256": "e131cd6b6e6cf95cac40a18146d7df0714e677b0479a0ffeb19adcb96b9a28f4",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://mac.remotedesktopmanager.com/"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/remote-desktop-manager.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "remote-desktop-manager",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:remote-desktop-manager",
+        "observed_at": "2026-11-13T20:44:06.012473+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:remote-desktop-manager",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:06.012473+00:00",
+        "public_response_sha256": "7ea9072369843cf6b71ddf76febfaccd3407cf35e60073bf4eb3c72a5409e4ec",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "2026.3.3.1"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/remote-desktop-manager"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Updater producenta lub artefakt",
+    "install_candidate": "Oficjalny artefakt",
+    "known_scope_blocker": "Edycja/licencja, aktywne połączenia i dane poświadczeń",
+    "wave": 3
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Edycja/licencja, aktywne połączenia i dane poświadczeń"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [
+    {
+      "path": "vendor_feeds/productinfo.htm",
+      "parser": "parse_devolutions_productinfo",
+      "version": "2026.3.0.5",
+      "format": "text",
+      "scope": "Existing historical sanitized parser fixture; not current product payload or signature evidence.",
+      "kwargs": {
+        "prefix": "RDMMacbin"
+      },
+      "checksum_inadequate": true
+    }
+  ],
+  "live_acceptance": false
+}

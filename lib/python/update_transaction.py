@@ -120,6 +120,22 @@ def _replacement(candidate, previous):
     )
 
 
+def _exact_recipe_candidate(observed, action):
+    candidate = action.get("recipe_candidate")
+    if candidate is None:
+        return
+    _require(
+        observed.get("good") is True
+        and observed.get("receipt_present") is False
+        and all(
+            observed.get(key) == candidate.get(key) and candidate.get(key)
+            for key in ("bundle_id", "team_id", "version", "build", "minimum_os")
+        )
+        and candidate.get("architecture") in observed.get("architectures", []),
+        "approved_candidate_changed",
+    )
+
+
 def _rename_exclusive(source, destination):
     # A user recreating the destination between our observation and the rename
     # must never be overwritten. Both supported kernels offer no-replace rename.
@@ -272,6 +288,13 @@ def recover_journal(path, observe, allowed_roots=None):
                 record.get(k) != identity.get(k) for k in ("bundle_id", "team_id")
             ) or record.get("receipt_present") is not journal.get("receipt_present"):
                 record["good"] = False
+            if journal.get("recipe_candidate") and record.get("version") == journal.get(
+                "candidate_version"
+            ):
+                try:
+                    _exact_recipe_candidate(record, journal)
+                except TransactionDeferred:
+                    record["good"] = False
             observed[name] = record
         else:
             observed[name] = {"exists": False, "good": False, "running": False}
@@ -300,7 +323,9 @@ def execute_transaction(
     observe,
     allowed_roots=None,
     fault=None,
+    progress=None,
 ):
+    progress = progress if progress is not None else {}
     roots = allowed_roots or approved_roots()
     dest = action.get("target_path", "")
     _allowed(dest, roots)
@@ -343,6 +368,7 @@ def execute_transaction(
         _require(previous.get("running") is False, "running_or_unknown")
         candidate = observe(source)
         _replacement(candidate, previous)
+        _exact_recipe_candidate(candidate, action)
         initial = os.stat(dest)
         parent = os.path.dirname(dest)
         staging_root = tempfile.mkdtemp(prefix=".macupd-stage-", dir=parent)
@@ -353,6 +379,8 @@ def execute_transaction(
             staging=staging,
             backup=backup,
             candidate_version=candidate["version"],
+            candidate_build=candidate.get("build"),
+            recipe_candidate=action.get("recipe_candidate"),
             previous_version=previous["version"],
             expected_source=action.get("expected_source"),
             receipt_present=previous["receipt_present"],
@@ -364,17 +392,27 @@ def execute_transaction(
             fault("journal_created", journal)
         # ditto preserves macOS bundle metadata; injectable pure filesystem copy
         # is used off macOS and does not change production verification rules.
-        if sys_platform_darwin():
-            subprocess.run(
-                ["ditto", source, staging],
-                check=True,
-                timeout=300,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        else:
-            shutil.copytree(source, staging, symlinks=True)
-        _replacement(observe(staging), previous)
+        progress["copy_started"] = True
+        try:
+            if sys_platform_darwin():
+                subprocess.run(
+                    ["ditto", source, staging],
+                    check=True,
+                    timeout=300,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                shutil.copytree(source, staging, symlinks=True)
+        finally:
+            # ditto is a synchronous file copier; subprocess.run waits for its
+            # exit, including TimeoutExpired cleanup. It is never an updater.
+            progress["copy_completed"] = True
+        staged_observation = observe(staging)
+        _replacement(staged_observation, previous)
+        _exact_recipe_candidate(staged_observation, action)
+        journal["copy_completed"] = True
+        _write(path, journal)
         if fault:
             fault("prepared", journal)
         _require(authorize() is True, "authorization_deferred")
@@ -397,6 +435,7 @@ def execute_transaction(
             == (before_swap.st_dev, before_swap.st_ino),
             "target_changed",
         )
+        progress["target_mutation_started"] = True
         _rename_exclusive(dest, backup)
         _sync_dir(parent)
         if fault:
@@ -415,7 +454,9 @@ def execute_transaction(
             _write(path, journal)
             if fault:
                 fault("swapped", journal)
-            _replacement(observe(dest), previous)
+            final_observation = observe(dest)
+            _replacement(final_observation, previous)
+            _exact_recipe_candidate(final_observation, action)
             journal["state"] = "verified"
             _write(path, journal)
             if fault:
@@ -501,6 +542,7 @@ def observe_bundle(path):
             bundle_id=bid,
             team_id=teams[0],
             version=info.get("CFBundleShortVersionString"),
+            build=info.get("CFBundleVersion"),
             architectures=arch,
             minimum_os=info.get("LSMinimumSystemVersion")
             or info.get("LSMinimumSystemVersionByArchitecture", {}).get("arm64"),
@@ -530,6 +572,7 @@ def recover_pending_transactions(
     explicitly and all copies remain available for manual recovery.
     """
     from inventory_store import _root
+    from update_scheduler import claim_recovery_resources, pending_sessions
 
     if lock is None:
         from policy_runtime import TargetLock
@@ -554,11 +597,41 @@ def recover_pending_transactions(
             )
             with path.open() as stream:
                 journal = json.load(stream)
-            if journal.get("state") in ("verified", "rolled_back"):
+            original_pending = any(
+                r["action_id"] == journal.get("action_id")
+                for r in pending_sessions(root)
+            )
+            if (
+                journal.get("state") in ("verified", "rolled_back")
+                and not original_pending
+            ):
                 continue
             _validate_journal(journal, allowed_roots or approved_roots())
-            with lock(journal["destination"], root):
-                results.append(recover_journal(str(path), observe, allowed_roots))
+            recovery_action = dict(
+                action_id="recover:" + journal["transaction_id"],
+                target_path=journal["destination"],
+                scope_complete=True,
+                parallel_safe=False,
+            )
+            with claim_recovery_resources(
+                recovery_action,
+                journal["action_id"],
+                journal.get("copy_completed") is True or not original_pending,
+                root,
+            ) as lease:
+                # Test-injected locks keep their historical two-argument contract.
+                from policy_runtime import TargetLock
+
+                target_lock = (
+                    lock(journal["destination"], root, lease.action_id)
+                    if lock is TargetLock
+                    else lock(journal["destination"], root)
+                )
+                with target_lock:
+                    result = recover_journal(str(path), observe, allowed_roots)
+                    results.append(result)
+                    if result["state"] in ("verified", "rolled_back", "prepared"):
+                        lease.finish(result["state"], helpers_complete=True)
         except (OSError, ValueError, TypeError, KeyError, TransactionDeferred):
             results.append(
                 {

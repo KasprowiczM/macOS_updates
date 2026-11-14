@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "product_id": "chatgpt-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/chatgpt.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "chatgpt",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": false,
+        "evidence_key": "brew:chatgpt",
+        "observed_at": "2026-11-13T20:43:59.706331+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:chatgpt",
+        "status": 200,
+        "observed_at": "2026-11-13T20:43:59.706331+00:00",
+        "public_response_sha256": "4373ba4b48c392b49dece39343d892fc0eda629ad172cd9004f8ea73d8ca5047",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "26.1111.21308"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/chatgpt"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Po ponownym identity review",
+    "install_candidate": "Po ponownym identity review",
+    "known_scope_blocker": "Classic/nowy desktop, bundle, Team ID i relacja do Codex",
+    "wave": 4
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Classic/nowy desktop, bundle, Team ID i relacja do Codex"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [
+    {
+      "path": "vendor_feeds/chatgpt_elements.xml",
+      "parser": "parse_sparkle_appcast",
+      "version": "26.917.62051",
+      "format": "text",
+      "scope": "Existing historical sanitized parser fixture; not current product payload or signature evidence."
+    }
+  ],
+  "live_acceptance": false
+}

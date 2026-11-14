@@ -68,7 +68,13 @@ def build_plan(snapshot, resolutions, policies, now):
         scope = (
             "manager_update"
             if source in ("homebrew", "npm", "app_store")
-            else "direct_update" if cap == "reviewed_direct" else "local_observation"
+            else (
+                "direct_update"
+                if cap == "reviewed_direct"
+                else (
+                    "native_launch" if cap == "reviewed_native" else "local_observation"
+                )
+            )
         )
         kind = "update" if scope != "local_observation" else "manual"
         reasons = []
@@ -141,6 +147,32 @@ def build_plan(snapshot, resolutions, policies, now):
                 if a["instance_id"] in target.get("related_instance_ids", [])
             ],
         )
+        if resolution.get("verified_recipe"):
+            from recipe_acceptance import (
+                recipe_fingerprint,
+                candidate_binding,
+                requirements_fingerprint,
+            )
+
+            recipe = copy.deepcopy(resolution["verified_recipe"])
+            action.update(
+                recipe=recipe,
+                recipe_sha256=recipe_fingerprint(recipe),
+                candidate_sha256=candidate_binding(recipe["candidate"]),
+                requirements_sha256=requirements_fingerprint(recipe),
+                to_version=recipe["candidate"]["version"],
+                to_build=recipe["candidate"]["build"],
+            )
+            if scope == "native_launch":
+                action.update(
+                    kind="open_native_updater",
+                    candidate=copy.deepcopy(recipe["candidate"]),
+                    allow_native_quit="quit_owned_app"
+                    in (decision or {}).get("lifecycle_permissions", []),
+                    allow_native_restart="restart_owned_app"
+                    in (decision or {}).get("lifecycle_permissions", [])
+                    and "restart_owned_app" in recipe["effect_scope"]["lifecycle"],
+                )
         plan["actions"].append(action)
     return plan
 
@@ -221,6 +253,11 @@ def authorize_action(action, current, policy, now):
         if (
             action["action_scope"] == "direct_update"
             and resolution.get("capability") != "reviewed_direct"
+        ):
+            return deny("scope_mismatch")
+        if (
+            action["action_scope"] == "native_launch"
+            and resolution.get("capability") != "reviewed_native"
         ):
             return deny("scope_mismatch")
         result.update(allowed=True, reason_code="allowed")

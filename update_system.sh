@@ -35,6 +35,37 @@ mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/lib/ui.sh"
 . "$SCRIPT_DIR/i18n/loader.sh"
 
+# A standalone invocation and update_all share the same durable exclusive lease.
+# Only an inherited authenticated socket bound to this child can continue here.
+if [ "${MAC_UPDATE_DRY_RUN:-0}" != "1" ]; then
+    PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from system_update_guard import guard_entry
+sys.exit(guard_entry(sys.argv[1], int(sys.argv[2]), int(sys.argv[3])))' "$SCRIPT_DIR/update_system.sh" "$$" "$PPID"
+    _system_guard_rc=$?
+    [ "$_system_guard_rc" -eq 96 ] || exit "$_system_guard_rc"
+fi
+
+system_guard_mark_mutation() {
+    local restart="$1"
+    shift
+    PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from system_update_guard import send_event
+ok = send_event(int(sys.argv[1]), int(sys.argv[2]), "mutation_started",
+                dict(restart=sys.argv[3] == "1", labels=sys.argv[4:]))
+sys.exit(0 if ok else 10)' "$$" "$PPID" "$restart" "$@"
+}
+
+system_guard_verify_nonrestart() {
+    PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from system_update_guard import send_event
+ok = send_event(int(sys.argv[1]), int(sys.argv[2]), "verified_nonrestart",
+                dict(query_exit=int(sys.argv[3]), listing=sys.argv[4]))
+sys.exit(0 if ok else 10)' "$$" "$PPID" "$1" "$2"
+}
+
 print_header() { ui_print_header "$1"; }
 
 
@@ -279,6 +310,7 @@ INSTALL_FAILED=0
 # First, install no-restart updates individually
 for lbl in "${NORESTART_LABELS[@]}"; do
     print_step "Installing: $lbl..."
+    system_guard_mark_mutation 0 "$lbl" || exit 10
     if ! sudo -n softwareupdate -i "$lbl" -R --verbose; then
         INSTALL_FAILED=1
         print_warn "Failed to install: $lbl"
@@ -292,6 +324,7 @@ done
 # Then, install restart-required updates in ONE batch call
 if [ "${#RESTART_LABELS[@]}" -gt 0 ]; then
     print_step "$(printf "$L_SYSTEM_INSTALLING_RESTART_BATCH_FMT" "${RESTART_LABELS[*]}")"
+    system_guard_mark_mutation 1 "${RESTART_LABELS[@]}" || exit 10
     if ! sudo -n softwareupdate -i "${RESTART_LABELS[@]}" -R --verbose; then
         INSTALL_FAILED=1
         print_warn "$(printf "$L_SYSTEM_RESTART_BATCH_FAILED_FMT" "${RESTART_LABELS[*]}")"
@@ -315,10 +348,14 @@ else
     print_ok "$L_SYSTEM_DONE_OK"
     print_ok "$L_SYSTEM_NO_RESTART_NEEDED"
     # Remeasure pending updates after install without restart
+    POST_UPDATES_EXIT=0
+    POST_UPDATES=$(env LANG=C LC_ALL=C softwareupdate -l 2>&1) || POST_UPDATES_EXIT=$?
+    system_guard_verify_nonrestart "$POST_UPDATES_EXIT" "$POST_UPDATES" || true
     if [ -n "$MAC_UPDATE_SESSION_DIR" ]; then
-        POST_UPDATES=$(env LANG=C LC_ALL=C softwareupdate -l 2>&1) || true
         echo "$POST_UPDATES" > "$MAC_UPDATE_SESSION_DIR/system_available.txt" 2>/dev/null || true
-        if echo "$POST_UPDATES" | grep -q "No new software available"; then
+        if [ "$POST_UPDATES_EXIT" -ne 0 ]; then
+            echo "unknown" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
+        elif echo "$POST_UPDATES" | grep -q "No new software available"; then
             echo "0" > "$MAC_UPDATE_SESSION_DIR/pending_system" 2>/dev/null || true
         else
             rem_cnt=$(python3 - "$SCRIPT_DIR" "$POST_UPDATES" <<'PYEOF'

@@ -63,9 +63,11 @@ def load_setup_catalog(script_dir=None):
                     source_id=source["source_id"],
                     official_url=safe_official_url(link),
                     architectures=source.get("architectures", []),
-                    evidence="reviewed_metadata"
-                    if source.get("identity_reviewed")
-                    else "unknown",
+                    evidence=(
+                        "reviewed_metadata"
+                        if source.get("identity_reviewed")
+                        else "unknown"
+                    ),
                     observed_at=source.get("observed_at"),
                     updater_id=source.get("updater_id"),
                 )
@@ -109,13 +111,76 @@ def load_setup_catalog(script_dir=None):
                 revision=manifest.get("reviewed_at"),
             )
         )
-    return dict(
+    catalog = dict(
         schema_version=1,
         recipes=recipes,
         requirements={},
         registry_rows=len(manifest["registry_rows"]),
         channel_manifest=manifest,
     )
+    from app_recipes import load_verified_recipes
+
+    return attach_verified_install_recipes(
+        catalog, load_verified_recipes(str(root / "config/verified_recipes.json"))
+    )
+
+
+def attach_verified_install_recipes(
+    catalog, verified_catalog, applications_root="/Applications"
+):
+    """Attach reviewed v2 candidates without minting legacy acceptance flags.
+
+    This is metadata preparation only. Eligibility, consent, acquisition and
+    staged-candidate observation remain independent execution gates.
+    """
+    from app_recipes import validate_recipe
+
+    value = copy.deepcopy(catalog)
+    candidates = {}
+    for recipe in verified_catalog.get("recipes", []):
+        validate_recipe(recipe)
+        for product_id in recipe["matrix_ids"]:
+            candidates.setdefault(product_id, []).append(recipe)
+    for row in value.get("recipes", []):
+        matches = [
+            r
+            for r in candidates.get(row["product_id"], [])
+            if r["edition"] == row["edition"]
+            and r["channel"] == "stable"
+            and r["installation_source"] == "vendor"
+        ]
+        # Ambiguous editions/channels never select the first matching recipe.
+        if len(matches) != 1 or len(matches[0]["matrix_ids"]) != 1:
+            continue
+        recipe = matches[0]
+        candidate = recipe["candidate"]
+        destination = str(Path(applications_root) / candidate["bundle_name"])
+        row.update(
+            verified_recipe=copy.deepcopy(recipe),
+            install_adapter="verified_recipe_zip",
+            installation_source=recipe["installation_source"],
+            revision=recipe["revision"],
+            version=candidate["version"],
+            build=candidate["build"],
+            channel=recipe["channel"],
+            bundle_id=candidate["bundle_id"],
+            team_id=candidate["team_id"],
+            architectures=recipe["architectures"][:],
+            minimum_os=candidate["minimum_os"],
+            download_hosts=recipe["download_hosts"][:],
+            artifact_type=candidate["artifact_type"],
+            destination=destination,
+            artifact_effects=[destination],
+            requires_administrator=False,
+            requirements_known=True,
+            requirements=[],
+            permissions=[
+                n["value"]
+                for n in recipe["requirement_graph"]["nodes"]
+                if n["kind"] == "permission" and "install" in n["operations"]
+            ],
+        )
+    return value
 
 
 def match_catalog_snapshot(snapshot, recipes):
@@ -170,11 +235,17 @@ def build_catalog_view(snapshot, recipes, recommendations, filters):
                 edition=recipe["edition"],
                 selected=False,
                 installed=copy.deepcopy(present),
-                installation_status="already_installed"
-                if present
-                else "automatic"
-                if install_recipe_eligible(recipe)
-                else "manual",
+                installation_status=(
+                    "already_installed"
+                    if present
+                    else (
+                        "automatic"
+                        if install_recipe_eligible(
+                            recipe, snapshot.get("environment", {})
+                        )
+                        else "manual"
+                    )
+                ),
                 sources=copy.deepcopy(recipe.get("sources", [])),
                 recommendation=copy.deepcopy(recommendation),
                 recommended_source_id=recommendation.get("recommended_source_id"),
@@ -182,9 +253,11 @@ def build_catalog_view(snapshot, recipes, recommendations, filters):
                 recommended_release=recommendation.get("recommended_release"),
                 latest_compatible_stable=recommendation.get("latest_compatible_stable"),
                 as_of=recommendation.get("as_of"),
-                evidence_level="first_install_verified"
-                if install_recipe_eligible(recipe)
-                else "metadata_only",
+                evidence_level=(
+                    "first_install_verified"
+                    if install_recipe_eligible(recipe, snapshot.get("environment", {}))
+                    else "metadata_only"
+                ),
                 license_review=recipe.get("license_review", "unknown"),
                 limitations=["manual_migration_only"] if present else [],
             )
@@ -342,10 +415,12 @@ def print_catalog(view, output):
                     _label(source["source_id"]),
                     _label(source.get("evidence")),
                     _text(source.get("observed_at")),
-                    _text(source.get("official_url"))
-                    if source.get("official_url")
-                    else _message(
-                        "L_CATALOG_LINK_PENDING", "Official link pending review"
+                    (
+                        _text(source.get("official_url"))
+                        if source.get("official_url")
+                        else _message(
+                            "L_CATALOG_LINK_PENDING", "Official link pending review"
+                        )
                     ),
                 ),
                 file=output,
@@ -438,9 +513,11 @@ def print_install_preview(plan, output):
             "    {} | {} | {} | {}".format(
                 _message("L_INSTALL_REQUIREMENT", "Requirement"),
                 _text(node["id"]),
-                _message("L_INSTALL_SATISFIED", "Already satisfied")
-                if node["status"] == "satisfied"
-                else _message("L_INSTALL_MISSING", "Manual prerequisite required"),
+                (
+                    _message("L_INSTALL_SATISFIED", "Already satisfied")
+                    if node["status"] == "satisfied"
+                    else _message("L_INSTALL_MISSING", "Manual prerequisite required")
+                ),
                 _text(node.get("observed_version") or node.get("minimum_version")),
             ),
             file=output,

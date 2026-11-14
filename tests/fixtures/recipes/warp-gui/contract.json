@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "product_id": "warp-gui",
+  "edition": "gui",
+  "version_comparison_policy": "warp_stable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://releases.warp.dev/channel_versions.json",
+        "allowed_hosts": [
+          "releases.warp.dev"
+        ],
+        "parser": "json_path",
+        "stable_policy": "reviewed_field",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "feed:Warp",
+        "observed_at": "2026-11-13T20:44:06.279753+00:00",
+        "version_path": [
+          "stable",
+          "version"
+        ]
+      },
+      "evidence_reference": {
+        "key": "feed:Warp",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:06.279753+00:00",
+        "public_response_sha256": "b08652c4b1dfb1ec781ddbbf98ec8b2d60d867b236fcce8a9af52b735e171dfa",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "v0.2026.11.11.08.17.stable_01"
+        ],
+        "stable_confirmed": [
+          true
+        ]
+      },
+      "official_url": "https://www.warp.dev/terminal"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/warp.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "warp",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:warp",
+        "observed_at": "2026-11-13T20:44:04.387197+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:warp",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:04.387197+00:00",
+        "public_response_sha256": "54564225f312bc1f8f32caaf6a24d27be62035e97f783556366be1a2d8f67a24",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "0.2026.11.11.08.17.stable_01"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/warp"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Natywny updater lub artefakt",
+    "install_candidate": "Oficjalny artefakt",
+    "known_scope_blocker": "Nie zamykać sesji terminala; menu/powiadomienie nie daje zewnętrznego ready API",
+    "wave": 4
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Nie zamykać sesji terminala; menu/powiadomienie nie daje zewnętrznego ready API"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [
+    {
+      "path": "vendor_feeds/warp_channels.json",
+      "parser": "select_warp_channels",
+      "version": "0.2026.09.16.08.27.02",
+      "format": "json",
+      "scope": "Existing historical sanitized parser fixture; not current product payload or signature evidence."
+    }
+  ],
+  "live_acceptance": false
+}

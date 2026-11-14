@@ -14,6 +14,7 @@ import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
+from operation_receipts import evidence_freshness, read_phase_events, read_provenance, read_source_diagnostics
 
 
 FORMAT_VERSION = 4
@@ -412,6 +413,8 @@ def action_result_items(results):
         status = 'unconfirmed'
         if state in ('manual_by_policy', 'ignored_by_policy', 'deferred_by_user'):
             status = 'skipped'
+        elif state == 'scan_partial':
+            status = 'scan_advisory'
         elif state in ('update_failed', 'recovery_required', 'source_conflict'):
             status = 'pending'
         elif state == 'current_verified' and result.get('verified') is True:
@@ -423,7 +426,9 @@ def action_result_items(results):
                           status=status, action_status=state, target=result['target'],
                           before=result.get('before'), after=result.get('after'),
                           details=result.get('reason_code', ''), old_version=result.get('before'),
-                          new_version=result.get('after'), verified=result.get('verified') is True))
+                          new_version=result.get('after'), verified=result.get('verified') is True,
+                          evidence_type=result.get('evidence_type', 'unknown'),
+                          evidence_freshness=evidence_freshness(result.get('evidence_type'))))
     return items
 
 
@@ -1136,6 +1141,7 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     updated_items = [it for it in items if it.get("status") == "updated"]
     pending_items = [it for it in items if it.get("status") == "pending"]
     unconfirmed_items = [it for it in items if it.get("status") == "unconfirmed"]
+    scan_items = [it for it in items if it.get("status") == "scan_advisory"]
     warning_items = [it for it in items if it.get("status") == "warning"]
     counts = summary.get("counts", {})
     inventory_count = counts.get("inventory_version_fields_changed", 0)
@@ -1214,6 +1220,17 @@ def format_terminal_summary(summary: dict[str, Any], lang: str = "en") -> str:
     else:
         lines.append(f"   • {none_str}")
 
+    if scan_items:
+        template = os.environ.get("L_PLAN_SCAN_PARTIAL_SUMMARY", "%s targets have incomplete inventory evidence. No update was confirmed; per-target details remain in JSON.")
+        try:
+            lines += ["", template % len(scan_items)]
+        except (TypeError, ValueError):
+            pass
+        for source in summary.get("inventory_sources", []):
+            reasons = ", ".join("%s=%s" % (issue.get("reason_code"), issue.get("count"))
+                                for issue in source.get("issues", []))
+            lines.append("   • %s (%s): %s%s" % (source.get("source_kind"), source.get("source_ref"),
+                         source.get("reason_code"), ("; " + reasons) if reasons else ""))
     policy_counts = [sum(item.get('action_status') == status for item in items)
                      for status in ('manual_by_policy', 'ignored_by_policy', 'deferred_by_user')]
     if any(policy_counts):
@@ -1426,9 +1443,9 @@ def build_run_summary(
                     "code": code,
                     "text": str(v) if v is not None else "",
                 }
-    for k, secs in (step_durations or {}).items():
-        if k in steps_v4 and steps_v4[k].get("code") != "skipped" and isinstance(secs, int):
-            steps_v4[k]["duration_seconds"] = max(0, secs)
+    for k, step_secs in (step_durations or {}).items():
+        if k in steps_v4 and steps_v4[k].get("code") != "skipped" and isinstance(step_secs, int):
+            steps_v4[k]["duration_seconds"] = max(0, step_secs)
 
     summary: dict[str, Any] = {
         "format_version": FORMAT_VERSION,
@@ -1449,6 +1466,9 @@ def build_run_summary(
         "items": items if items is not None else [],
         "advisories": list(advisories) if advisories else [],
         "action_results": read_action_results(session_dir),
+        "provenance": read_provenance(session_dir),
+        "operation_receipts": read_phase_events(session_dir),
+        "inventory_sources": read_source_diagnostics(session_dir),
     }
     if session_dir:
         summary["session_dir"] = session_dir

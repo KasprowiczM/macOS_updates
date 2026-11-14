@@ -7,6 +7,7 @@ and discovered executables are never evaluated. No vendor URL is fetched.
 from __future__ import annotations
 
 import datetime
+from collections import Counter
 import json
 import os
 import stat
@@ -17,7 +18,7 @@ MAX_BYTES = 1024 * 1024
 MAX_ENTRIES = 4096
 
 
-def _result(items=None, status="ok", roots=None, reason=None):
+def _result(items=None, status="ok", roots=None, reason=None, issues=None):
     return dict(
         schema_version=1,
         status=status,
@@ -26,6 +27,7 @@ def _result(items=None, status="ok", roots=None, reason=None):
         covered_roots=roots or [],
         complete=status == "ok",
         reason_code=reason,
+        issues=[dict(reason_code=key, count=value) for key, value in sorted((issues or {}).items())],
     )
 
 
@@ -87,6 +89,7 @@ def read_brew_receipts(prefix):
             status="unavailable", roots=[str(root)], reason="manager_metadata_missing"
         )
     items, partial = [], False
+    issues = Counter()
     budget = [MAX_ENTRIES]
     for room in rooms:
         if not room.exists() and not room.is_symlink():
@@ -95,6 +98,7 @@ def read_brew_receipts(prefix):
             tokens = _entries(room, budget)
         except (OSError, ValueError):
             partial = True
+            issues["manager_directory_unreadable"] += 1
             continue
         for token_dir in tokens:
             try:
@@ -209,6 +213,8 @@ def read_brew_receipts(prefix):
                             )
                         ]
                     partial = partial or unresolved
+                    if unresolved:
+                        issues["cask_artifacts_unresolved"] += 1
                     items.append(
                         dict(
                             name=token,
@@ -225,13 +231,20 @@ def read_brew_receipts(prefix):
                     return _result(
                         items[:MAX_ENTRIES], "partial", [str(root)], "record_limit"
                     )
-            except (OSError, ValueError, TypeError):
+            except (OSError, ValueError, TypeError) as exc:
                 partial = True
+                reason = str(exc) if isinstance(exc, ValueError) else "manager_metadata_unreadable"
+                if reason not in {"cask_metadata_missing", "cask_metadata_invalid", "invalid_manager_directory",
+                                  "unsafe_metadata_path", "linked_metadata_directory", "invalid_metadata_file",
+                                  "metadata_too_large", "invalid_metadata_object", "scan_budget", "record_limit"}:
+                    reason = "manager_metadata_unreadable"
+                issues[reason] += 1
     return _result(
         items,
         "partial" if partial else "ok",
         [str(root)],
         "manager_metadata_incomplete" if partial else None,
+        issues,
     )
 
 
@@ -239,11 +252,16 @@ def read_cli_manifests(prefix):
     root = Path(os.path.realpath(prefix))
     modules = root / "lib/node_modules"
     items, partial = [], False
+    issues = Counter()
     budget = [MAX_ENTRIES]
     try:
         candidates = []
         if modules.exists() or modules.is_symlink():
             for entry in _entries(modules, budget):
+                # npm's hidden lockfile describes the directory, not a package.
+                # A symlink or directory with this name is still suspicious.
+                if entry.name == ".package-lock.json" and not entry.is_symlink() and entry.is_file():
+                    continue
                 candidates.extend(
                     _entries(entry, budget) if entry.name.startswith("@") else [entry]
                 )
@@ -276,8 +294,13 @@ def read_cli_manifests(prefix):
                         ],
                     )
                 )
-            except (OSError, ValueError, TypeError):
+            except (OSError, ValueError, TypeError) as exc:
                 partial = True
+                reason = str(exc) if isinstance(exc, ValueError) else "package_metadata_unreadable"
+                if reason not in {"invalid_package_identity", "unsafe_metadata_path", "invalid_metadata_file",
+                                  "metadata_too_large", "invalid_metadata_object"}:
+                    reason = "package_metadata_unreadable"
+                issues[reason] += 1
         binary = root / "bin/node"
         # An unmanaged executable is observable but supplies no version or authority.
         if binary.exists() or binary.is_symlink():
@@ -295,6 +318,7 @@ def read_cli_manifests(prefix):
             )
     except (OSError, ValueError):
         partial = True
+        issues["package_directory_unreadable"] += 1
     if not root.exists():
         return _result(status="unavailable", roots=[str(root)], reason="prefix_missing")
     return _result(
@@ -302,6 +326,7 @@ def read_cli_manifests(prefix):
         "partial" if partial else "ok",
         [str(root)],
         "package_metadata_incomplete" if partial else None,
+        issues,
     )
 
 

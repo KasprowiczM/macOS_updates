@@ -6,6 +6,46 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.7.7] - 2026-11-14
+
+- Add read-only operation readiness reports, timing summaries requiring five comparable independent runs, and a redacted feedback contract. Feedback never grants recipe acceptance or execution authority. Live T6 and recipe activation remain deferred.
+
+- Show a bounded, readable plain dry-run preview instead of a large escaped JSON line. Keep full JSON for `--plan` and `--dry-run --json-summary`.
+- Handle Unicode output and a closed output pipe without a shutdown traceback; preserve read-only preview and consent boundaries.
+- Publish the preceding recipe execution and durable scheduling checkpoints. No production recipe or native driver is activated by this publication.
+
+## [1.7.6] - 2026-11-14 (local checkpoint T5b)
+
+- Complete two-slot durable scheduling, per-action receipts, cancellation and shared recovery barriers; protect standalone and final system updates with an authenticated exclusive lease.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
+## [1.7.5] - 2026-11-14 (local checkpoint T5)
+
+- Add 48 product dossiers, real source/parser contracts and synthetic safety scenarios; preserve unknown identity and unaccepted native/payload behavior as manual.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
+## [1.7.4] - 2026-11-14 (local checkpoint T4)
+
+- Add observable native sessions, separate accepted lifecycle effects and consent, owned-process checks, durable helper barriers and recovery regression coverage.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
+## [1.7.3] - 2026-11-14 (local checkpoint T3)
+
+- Add exact-candidate ZIP acquisition and separate consent-bound update and first-install execution, with shared resource admission foundations.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
+## [1.7.2] - 2026-11-14 (local checkpoint T2)
+
+- Add strict schema v2 and exact release, identity, source, requirements and evidence bindings. Update, first-install and lifecycle acceptance are separate; the public executable recipe catalog remains empty. Thirty-seven focused guarded evidence tests passed.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
+## [1.7.1] - 2026-11-14 (local checkpoint T1)
+
+- Fix duration formatting and record monotonic phase timings, source provenance and explicit evidence freshness without inferring update success.
+- Group incomplete inventory evidence as scan advisories, retaining per-target JSON and source-level diagnostic counts. Empty or malformed manager receipts still block execution.
+- Ignore npm's regular hidden package lockfile during package discovery; preserve safeguards for malformed metadata and symlinks.
+- Fixture-only verification; no real updates, installation acceptance or publication. See [T1-T5b implementation](docs/implementation/RECIPE_VERIFICATION_2026-11-14.md).
+
 ## [1.7.0] - 2026-11-14 (main source snapshot, untagged)
 
 The owner authorized merging the completed local checkpoints to main on 2026-11-14. No release tag or new live update acceptance is implied. Earlier implementation reports remain dated records of their local gates.

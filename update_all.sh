@@ -203,8 +203,10 @@ mark_stale_summary_failed() {
 # (read back by write_machine_summary and the closing summary lines). Dry runs
 # and skipped steps never call it, so only steps that really ran carry a time.
 _STEP_T0=0
+_STEP_MONOTONIC=""
 step_timer_start() {
     _STEP_T0="$(date +%s)"
+    _STEP_MONOTONIC="$(python3 -c 'import time; print(time.monotonic())')"
 }
 step_timer_stop() {
     local key="$1" now
@@ -212,6 +214,19 @@ step_timer_stop() {
     [ -n "${SESSION_DIR:-}" ] && [ -d "$SESSION_DIR" ] || return 0
     now="$(date +%s)"
     echo "$key=$((now - _STEP_T0))" >> "$SESSION_DIR/step_durations.txt"
+    PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import datetime, os, sys, time
+from operation_receipts import append_phase_event
+try:
+    elapsed = max(0, round((time.monotonic() - float(sys.argv[4])) * 1000))
+    start = datetime.datetime.fromtimestamp(int(sys.argv[3]), datetime.timezone.utc).isoformat()
+    append_phase_event(sys.argv[1], dict(run_id=os.environ.get("MAC_UPDATE_RUN_ID", "unknown"),
+        action_id="orchestrator", recipe_revision="unknown", phase=sys.argv[2], start=start,
+        end=datetime.datetime.now(datetime.timezone.utc).isoformat(), elapsed_ms=elapsed,
+        outcome="completed", evidence_type="phase_timing"))
+except (OSError, ValueError):
+    print("Phase timing unavailable; no operation success inferred.", file=sys.stderr)
+' "$SESSION_DIR" "$key" "$_STEP_T0" "$_STEP_MONOTONIC"
 }
 _fmt_duration() {
     local s="$1"
@@ -402,14 +417,28 @@ SESSION_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mac_update.XXXXXX")"
 chmod 700 "$SESSION_DIR" 2>/dev/null || true
 export MAC_UPDATE_SESSION_DIR="$SESSION_DIR"
 export MAS_NO_AUTO_INDEX=1
+export MAC_UPDATE_RUN_ID="${MAC_UPDATE_RUN_ID:-$(python3 -c 'import uuid; print(uuid.uuid4())' 2>/dev/null || echo "run-$START_TIME")}"
+PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from operation_receipts import capture_provenance, write_provenance
+write_provenance(sys.argv[2], capture_provenance(sys.argv[1]))' "$SCRIPT_DIR" "$SESSION_DIR"
 
 # First consent belongs to a concrete per-target plan, never to -y.
 export MAC_UPDATE_PLAN_PATH="$SESSION_DIR/update-plan.json"
+step_timer_start
 PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
 import sys
 from plan_orchestration import main
 sys.exit(main(sys.argv[1], "prepare", sys.argv[2]))' "$SCRIPT_DIR" "$SESSION_DIR"
 PLAN_PREPARE_EXIT=$?
+step_timer_stop prescan
+PYTHONPATH="$SCRIPT_DIR/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from inventory_store import load_snapshot
+from operation_receipts import write_source_diagnostics
+snapshot = load_snapshot()
+if snapshot:
+    write_source_diagnostics(sys.argv[1], snapshot)' "$SESSION_DIR"
 if [ "$PLAN_PREPARE_EXIT" -ne 0 ]; then
     print_warn "$L_PLAN_NO_CONSENT"
 fi

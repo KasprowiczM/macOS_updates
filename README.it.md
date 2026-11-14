@@ -6,7 +6,7 @@
 
 **Sito web:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licenza:** [MIT](LICENSE) · **Modifiche:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.7.0** : Orchestratore di aggiornamenti con un solo comando, per **Mac Apple Silicon con macOS 13-27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
+> **v1.7.7** : Orchestratore di aggiornamenti con un solo comando, per **Mac Apple Silicon con macOS 13-27**. Coordina aggiornamenti di pacchetti verificati e avvii onesti degli updater delle app per il **software già installato su questo Mac**. **Multilingue** (7 lingue). Overlay privato facoltativo tramite [`dev_sync/`](dev_sync/README.md).
 
 La fase C attiva inventario JSON locale e piani con permessi specifici. `bash update_all.sh --plan` e `--dry-run` mostrano le stesse decisioni senza scrivere. Una sessione interattiva chiede una volta gli ambiti mostrati; `-y`, EOF e sessioni senza terminale non concedono nuovi permessi. Usa `--preferences` per rivedere o reimpostare le scelte. Gli aggiornamenti conservano fonte e destinazione osservate; conflitti, destinazioni assenti e prove incerte rinviano quel destinatario. `build_inventory.sh --migration --preview` conserva i byte Markdown originali e le note; accetta esplicitamente l’ID mostrato. Gli aggiornamenti generici del produttore restano manuali finché identità e adattatore non sono verificati. Una voce di catalogo non prova installazione né consenso.
 
@@ -16,9 +16,9 @@ La fase C attiva inventario JSON locale e piani con permessi specifici. `bash up
 | Flusso | 7 passaggi (0–6), l'aggiornamento di macOS è sempre l'ultimo |
 | Registro | 47 app da Internet · 11 metodi di aggiornamento (vedi [Metodi di aggiornamento](#metodi-di-aggiornamento)) |
 | Lingue | EN, PL, ES, FR, DE, IT, PT (CLI e documentazione) |
-| Test | 1178 test automatici (`bash run_tests.sh`) |
+| Test | 1350 test automatici (`bash run_tests.sh`) |
 
-Questa è la versione sorgente 1.7.0 su main, senza un tag di rilascio separato. Il gestore agisce solo su obiettivi installati con fonte osservata e dopo una nuova approvazione. Gli adattatori generici nativi e dei produttori restano manuali finché non sono disponibili ricette verificate. Il catalogo pubblico facoltativo comprende 48 prodotti e offre link ufficiali verificati per l’acquisizione manuale; non esistono ricette approvate per la prima installazione automatica. L’elenco dei metodi qui sotto descrive capacità, non autorizza l’esecuzione.
+Questa documentazione descrive macOS Updates 1.7.7. Non è stato creato un tag di rilascio separato. Il gestore agisce solo su obiettivi installati con fonte osservata e dopo una nuova approvazione. Gli adattatori generici nativi e dei produttori restano manuali finché non sono disponibili ricette verificate. Il catalogo pubblico facoltativo comprende 48 prodotti e offre link ufficiali verificati per l’acquisizione manuale; non esistono ricette approvate per la prima installazione automatica. L’elenco dei metodi qui sotto descrive capacità, non autorizza l’esecuzione.
 
 **Novità della v1.6.0:** Le esecuzioni pianificate (launchd) trovano Homebrew e `mas`, e l'installer verifica che il job sia caricato (aggiunti `--minute` e `--once-in`). Le app aperte non vengono mai chiuse né sostituite, cask Homebrew inclusi. Ogni domanda durante l'esecuzione scade con la risposta sicura «no». `bash update_all.sh --doctor` è un rapporto di prontezza in sola lettura e le esecuzioni reali aggiungono controlli preliminari. Lo stato persistente dei feed dei produttori sostituisce gli opachi avvisi di «feed obsoleto», e HyperFrames, Superset e Open Design vengono installati o verificati senza avvii nascosti. Le versioni 1.5.x precedenti sono descritte in [CHANGELOG.md](CHANGELOG.md).
 
@@ -329,12 +329,14 @@ Riferimento completo degli script: [docs/agents/scripts.md](docs/agents/scripts.
 
 1. Installa l'app da solo (l'updater non la installa mai al posto tuo).
 2. Esegui `bash build_inventory.sh` per aggiungerla a `APPLICATIONS.md`.
-3. Per l'aggiornamento automatico, chiedi a un agente IA o segui [docs/user/it/GUIDE.md](docs/user/it/GUIDE.md):
+3. Per esaminare il supporto, segui [docs/user/it/GUIDE.md](docs/user/it/GUIDE.md) o consulta un agente IA:
 
 ```bash
-bash scripts/scaffold_internet_app.sh "Nome app" silent_launch
+bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json
 bash run_tests.sh
 ```
+
+Sostituisci l’esempio con il percorso esatto dell’app installata. Il comando mostra una proposta con dati privati rimossi e non eseguibile da esaminare. L’esportazione facoltativa richiede di ripeterlo con `--export --accept PREVIEW_ID` dopo aver verificato l’identificatore mostrato. L’attivazione degli aggiornamenti richiede un’implementazione revisionata e prove di accettazione separate.
 
 I metodi del registro sono associati agli stati di copertura sopra descritti. Ad esempio `github_dmg` e una CLI del produttore confermata sono **verified direct**; `silent_launch` è **triggered-unverified**; i flussi gestiti dall'App Store o dal produttore possono essere **externally managed**; `manual` e le voci mancanti nel registro restano esplicite.
 
@@ -419,3 +421,5 @@ Elenco completo: [docs/agents/troubleshooting.md](docs/agents/troubleshooting.md
 I nuovi segnali sulle app sono proposte da verificare, non ricette eseguibili. `bash scripts/scan_update_feeds.sh` mostra un riepilogo aggregato. L’esportazione permette di visualizzare e accettare esplicitamente la proposta; è redatta, resta locale e non viene mai caricata. `bash setup.sh --catalog` apre il catalogo senza selezioni. `-y`, le esecuzioni non interattive e EOF non installano nulla. Nel menu, `check <number>` confronta solo le fonti scelte. I risultati indicano l’ultima versione stabile compatibile confermata e la data, con cache di 24 ore. Un dato sconosciuto resta tale. Una scheda pubblica del Mac App Store non dimostra che l’app sia offerta al tuo account.
 
 Il catalogo pubblico conta 47 righe del registro per 48 prodotti e zero ricette approvate per la prima installazione automatica. Dopo l’anteprima e una nuova conferma, puoi scegliere link ufficiali verificati per l’acquisizione manuale. Aprire una pagina non installa l’app. Cambiare la fonte di un’app esistente richiede migrazione manuale. L’InstallPlan separato mostra fonte, destinazione, versione, requisiti e permessi; licenza e costo sconosciuti sono indicati come tali. Ogni ricetta futura richiederà approvazione prima dell’attivazione. Il catalogo non promette l’installazione automatica di tutti i prodotti.
+
+`--dry-run` mostra un riepilogo leggibile di massimo 25 elementi. `--dry-run --json-summary` o `--plan` fornisce il piano JSON completo. L’anteprima non concede permessi e non esegue aggiornamenti.

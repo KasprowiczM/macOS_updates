@@ -1029,6 +1029,7 @@ L_INVENTORY_MIGRATION_ACCEPT="Aceitar a prévia: bash build_inventory.sh --migra
 L_INVENTORY_CONFLICT="Inventário inalterado. Reveja notas com build_inventory.sh --migration --preview; é necessária uma análise local completa."
 L_PLAN_NO_CHOICES="Nenhuma nova decisão necessária. Use --preferences para rever escolhas guardadas."
 L_PLAN_POLICY_COUNTS="Manual: %s; ignorados: %s; adiados: %s. Rever com --preferences."
+L_PLAN_SCAN_PARTIAL_SUMMARY="As evidências do inventário estão incompletas para %s alvos. Nenhuma atualização foi confirmada; os detalhes por alvo permanecem no JSON."
 
 # Optional catalog and first-install preview
 
@@ -1081,3 +1082,13 @@ L_CATALOG_STABLE="Estável"
 L_CATALOG_BETA="Beta"
 L_CATALOG_NATIVE="Atualizador nativo"
 L_INSTALL_PLAN_PATH_REQUIRED="É necessário indicar o caminho do plano de instalação."
+
+# Read-only terminal plan preview
+L_PLAN_PREVIEW_ONLY="Somente prévia. Nenhuma atualização, abertura de app ou alteração de arquivo."
+L_PLAN_PREVIEW_COUNT_FMT="Alvos locais: %s"
+L_PLAN_PREVIEW_MANUAL="Revisão manual"
+L_PLAN_PREVIEW_SKIPPED="Ignorado pela política"
+L_PLAN_PREVIEW_PENDING="Decisão ou evidência necessária"
+L_PLAN_PREVIEW_ELIGIBLE="Escopo permitido; nenhuma atualização executada"
+L_PLAN_PREVIEW_MORE_FMT="Mais %s alvos no JSON."
+L_PLAN_PREVIEW_JSON_HINT="Plano completo: --dry-run --json-summary (ou --plan)."

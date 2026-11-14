@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "product_id": "google-drive-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://support.google.com/a/answer/7577057",
+        "allowed_hosts": [
+          "support.google.com"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "google-drive",
+        "observed_at": "2026-11-13T20:44:10.259314+00:00"
+      },
+      "evidence_reference": {
+        "key": "google-drive",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:10.259314+00:00",
+        "public_response_sha256": "e17def8d610011585e30fbd0e5af3d8e2eaba0932d40eb0fae8dc3bba24a1613",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://www.google.com/drive/"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/google-drive.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "google-drive",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:google-drive",
+        "observed_at": "2026-11-13T20:44:02.472452+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:google-drive",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:02.472452+00:00",
+        "public_response_sha256": "c1d08f4eda56fc8878decf84d61b05bd7d35ee68358ff1e060a39a8f413dbc21",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "134.0.1"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/google-drive"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Updater producenta",
+    "install_candidate": "Instalator po pełnym scope review",
+    "known_scope_blocker": "Aktywna synchronizacja, rozszerzenia i współdzielony updater",
+    "wave": 3
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Aktywna synchronizacja, rozszerzenia i współdzielony updater"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

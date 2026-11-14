@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "product_id": "deepseek-harness-gui",
+  "scope": "synthetic_fail_closed_contract_only",
+  "review_state": "deferred_pending_stable",
+  "fixture_identity": "Reserved org.example.fixture and EXAMPL1234 are synthetic test identities, never this product identity.",
+  "actual_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "artifact_sha256": null,
+    "candidate_minimum_os": null
+  },
+  "live_acceptance": false,
+  "limitations": [
+    "Uses the shared synthetic schema fixture, not a captured vendor payload.",
+    "Offline and 429 represent unavailable candidate observations; no product HTTP protocol is certified.",
+    "Crash and rerun cover conservative incomplete-observation and stale-consent gates, not a product recovery guarantee.",
+    "No updater, installation, launch or network request was executed."
+  ],
+  "scenarios": [
+    {
+      "id": "stable_exclusion",
+      "expected_reasons": [
+        "product_excluded_pending_stable"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "product_id": "trezor-suite-gui",
+  "scope": "synthetic_fail_closed_contract_only",
+  "review_state": "metadata_review_pending_product_acceptance",
+  "fixture_identity": "Reserved org.example.fixture and EXAMPL1234 are synthetic test identities, never this product identity.",
+  "actual_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "artifact_sha256": null,
+    "candidate_minimum_os": null
+  },
+  "live_acceptance": false,
+  "limitations": [
+    "Uses the shared synthetic schema fixture, not a captured vendor payload.",
+    "Offline and 429 represent unavailable candidate observations; no product HTTP protocol is certified.",
+    "Crash and rerun cover conservative incomplete-observation and stale-consent gates, not a product recovery guarantee.",
+    "No updater, installation, launch or network request was executed."
+  ],
+  "scenarios": [
+    {
+      "id": "absent",
+      "environment": {
+        "target": {
+          "presence": "absent"
+        }
+      },
+      "expected_reasons": [
+        "target_not_present",
+        "live_acceptance_required"
+      ],
+      "resolver_case": "absent"
+    },
+    {
+      "id": "current",
+      "environment": {
+        "target": {
+          "short_version": "2.0"
+        }
+      },
+      "expected_reasons": [
+        "live_acceptance_required"
+      ],
+      "version_comparison": {
+        "candidate": "2.0",
+        "installed": "2.0",
+        "expected": 0
+      }
+    },
+    {
+      "id": "newer",
+      "environment": {},
+      "expected_reasons": [
+        "live_acceptance_required"
+      ],
+      "version_comparison": {
+        "candidate": "2.0",
+        "installed": "1.0",
+        "expected": 1
+      }
+    },
+    {
+      "id": "older",
+      "environment": {
+        "target": {
+          "short_version": "3.0"
+        }
+      },
+      "expected_reasons": [
+        "live_acceptance_required"
+      ],
+      "version_comparison": {
+        "candidate": "2.0",
+        "installed": "3.0",
+        "expected": -1
+      }
+    },
+    {
+      "id": "offline",
+      "environment": {
+        "candidate": null
+      },
+      "expected_reasons": [
+        "candidate_binding_mismatch",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "http_429",
+      "environment": {
+        "candidate": null
+      },
+      "expected_reasons": [
+        "candidate_binding_mismatch",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "partial_download",
+      "environment": {
+        "candidate": {
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "expected_reasons": [
+        "candidate_binding_mismatch",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "bad_signature",
+      "environment": {
+        "target": {
+          "signature_valid": false
+        }
+      },
+      "expected_reasons": [
+        "signature_unverified",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "wrong_identity",
+      "environment": {
+        "target": {
+          "team_id": "OTHER12345"
+        }
+      },
+      "expected_reasons": [
+        "target_identity_mismatch",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "wrong_os",
+      "environment": {
+        "os_version": "12.9"
+      },
+      "expected_reasons": [
+        "environment_incompatible",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "wrong_arch",
+      "environment": {
+        "architecture": "x86_64"
+      },
+      "expected_reasons": [
+        "environment_incompatible",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "running",
+      "environment": {
+        "target": {
+          "running": true
+        }
+      },
+      "expected_reasons": [
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "duplicate",
+      "environment": {},
+      "expected_reasons": [
+        "live_acceptance_required"
+      ],
+      "resolver_case": "duplicate",
+      "expected_resolver_reason": "duplicate_bundle_id"
+    },
+    {
+      "id": "source_conflict",
+      "environment": {},
+      "expected_reasons": [
+        "live_acceptance_required"
+      ],
+      "resolver_case": "source_conflict",
+      "expected_resolver_reason": "conflicting_sources"
+    },
+    {
+      "id": "permission_denial",
+      "environment": {
+        "granted_permissions": []
+      },
+      "expected_reasons": [
+        "requirements_not_authorized",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "crash",
+      "environment": {
+        "target": {
+          "presence": "unknown"
+        }
+      },
+      "expected_reasons": [
+        "target_not_present",
+        "live_acceptance_required"
+      ],
+      "resolver_case": "crash",
+      "expected_resolver_reason": "target_or_evidence_incomplete"
+    },
+    {
+      "id": "rerun",
+      "environment": {
+        "approved_recipe_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expected_reasons": [
+        "approval_binding_mismatch",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "unknown_min_os",
+      "environment": {
+        "candidate": {
+          "minimum_os": null
+        }
+      },
+      "expected_reasons": [
+        "candidate_binding_mismatch",
+        "live_acceptance_required"
+      ]
+    },
+    {
+      "id": "prerelease",
+      "environment": {
+        "candidate": {
+          "version": "2.1-rc.1",
+          "channel": "rc"
+        }
+      },
+      "expected_reasons": [
+        "candidate_binding_mismatch",
+        "live_acceptance_required"
+      ]
+    }
+  ]
+}

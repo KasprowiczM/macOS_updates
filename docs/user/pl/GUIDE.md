@@ -1,12 +1,11 @@
 # Przewodnik użytkownika (Polski)
 
-**Wersja:** 1.7.0 · **Apple Silicon, macOS 13+**
+**Wersja:** 1.7.7 · **Apple Silicon, macOS 13+**
 
 ## Bezpieczny setup i źródła aplikacji
 
 `bash setup.sh --inspect` sprawdza gotowość bez instalowania zależności, zmiany profilu powłoki i konfiguracji Touch ID. Brak narzędzia oznacza niedostępność zależnej funkcji. W terminalu `bash setup.sh --install-dependencies` pokazuje plan opcjonalnych zależności i pyta przed każdą instalacją; `bash setup.sh --configure-shell` osobno pokazuje zmianę profilu powłoki. Odrzucenie zależności nie blokuje niezależnych funkcji. Jeśli brak Pythona, zainstaluj go świadomie przed budowaniem inventory. Brakujący lub stary `mas` jest zgłaszany podczas aktualizacji, bez automatycznej instalacji lub aktualizacji narzędzia.
 
-To wersja źródłowa 1.7.0 na main, bez osobnego tagu wydania. Menedżer aktualizacji działa w określonym zakresie tylko dla zainstalowanych celów o wykrytym źródle i po nowej zgodzie. Ogólne adaptery natywne i producentów pozostają ręczne do czasu przygotowania sprawdzonych receptur. Opcjonalny katalog publiczny obejmuje 48 produktów i udostępnia sprawdzone oficjalne linki do ręcznego pobrania; nie ma zatwierdzonych automatycznych receptur pierwszej instalacji. Poniższa lista metod jest wykazem możliwości, nie upoważnieniem do ich wykonania. Zwykły raport aktualizacji obejmuje zainstalowane aplikacje. `bash scripts/report_update_coverage.sh --show-supported` pozostaje wykazem informacyjnym. Opcjonalne menu wyboru otwiera `bash setup.sh --catalog`; początkowo nic nie jest wybrane. Po podglądzie i ponownej zgodzie można ręcznie pobrać wybraną aplikację ze sprawdzonego oficjalnego linku. Zmiana źródła istniejącej aplikacji wymaga ręcznej migracji. Receipt App Store dla CapCut zachowuje źródło App Store. Lokalna aplikacja bez potwierdzonego przypisania Homebrew nie jest automatycznie przejmowana.
 
 ## Co robi ten zestaw
 
@@ -16,7 +15,7 @@ macOS Updates koordynuje aktualizacje na **Macach Apple Silicon z macOS 13+** w 
 2. App Store (`sudo mas upgrade <app-id>` + osobny GUI Track 2 dla aplikacji iPad)
 3. Najpierw istniejące natywne CLI, potem Node/Bun i zapasowe instalacje npm
 4. Homebrew (formuły i caski; `--greedy` tylko dla casków zarejestrowanych jako `brew_cask`)
-5. Zainstalowane aplikacje internetowe: bezpośrednie handlery, CLI lub wyzwalanie aktualizatora
+5. Zainstalowane aplikacje: zakresowe działania po zgodzie; niezaakceptowane aktualizacje producentów pozostają ręczne
 6. Atomowy postupdate inwentarza i historii
 7. macOS (`softwareupdate -i <label> -R`) na końcu; odraczany po blokującym błędzie lub bez autoryzacji
 
@@ -34,14 +33,15 @@ macOS Updates koordynuje aktualizacje na **Macach Apple Silicon z macOS 13+** w 
 bash scripts/report_update_coverage.sh
 ```
 
-Pokazuje stany: **verified direct**, **triggered-unverified**, **externally managed**, **manual** i **unknown**. Ciche uruchomienie nie jest dowodem zakończonej aktualizacji. Inkscape obsługuje Homebrew; UniFi/WiFiman/Picsart — App Store Track 2; Office — `msupdate`; Teams — własny updater z obserwowanym, weryfikowanym fallbackiem MAU `TEAMS21`. Obecnie żadna zarejestrowana aplikacja nie jest „manual”; IPMIView obsługuje App Store Track 2.
 
 ## Dodawanie aplikacji z internetu
 
 1. Zainstaluj aplikację na Macu.
 2. `bash build_inventory.sh`
-3. `bash scripts/scaffold_internet_app.sh "Nazwa" silent_launch`
-4. `bash run_tests.sh`
+3. `bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json`
+4. Przejrzyj niewykonywalną propozycję JSON; późniejsza implementacja wymaga przeglądu i `bash run_tests.sh`.
+
+Zastąp przykład dokładną ścieżką zainstalowanej aplikacji. Polecenie pokazuje zredagowaną, niewykonywalną propozycję do przeglądu. Opcjonalny eksport wymaga ponowienia go z `--export --accept PREVIEW_ID` po sprawdzeniu wyświetlonego identyfikatora podglądu. Włączenie aktualizacji wymaga przeglądu implementacji i osobnych dowodów akceptacji.
 
 ## Rozwiązywanie problemów
 
@@ -54,7 +54,7 @@ Pokazuje stany: **verified direct**, **triggered-unverified**, **externally mana
 
 Pełna lista: [../../agents/troubleshooting.md](../../agents/troubleshooting.md)
 
-Etap C aktywuje lokalny inwentarz JSON i plan ze zgodami na konkretne działania. `bash update_all.sh --plan` oraz `--dry-run` pokazują ten sam podgląd bez zapisu. Zwykły przebieg interaktywny pyta raz o pokazane zakresy; `-y`, EOF i działanie bez terminala nie nadają nowych zgód. `--preferences` pozwala przejrzeć lub wyzerować wybory. Aktualizacje zachowują wykryte źródło i dokładną lokalizację; konflikt, zniknięcie aplikacji albo niepewne dane odraczają dany cel. `build_inventory.sh --migration --preview` zachowuje oryginalne bajty Markdown i notatki; akceptacja wymaga podania identyfikatora propozycji. Generyczne aktualizacje producenta pozostają ręczne do czasu weryfikacji tożsamości i adaptera. Dawny wpis katalogowy nie jest dowodem instalacji ani zgodą.
+Lokalny inwentarz JSON i zakresowy plan działań są dostępne. `bash update_all.sh --plan` oraz `--dry-run` pokazują ten sam podgląd bez zapisu. Zwykły przebieg interaktywny pyta raz o pokazane zakresy; `-y`, EOF i działanie bez terminala nie nadają nowych zgód. `--preferences` pozwala przejrzeć lub wyzerować wybory. Aktualizacje zachowują wykryte źródło i dokładną lokalizację; konflikt, zniknięcie aplikacji albo niepewne dane odraczają dany cel. `build_inventory.sh --migration --preview` zachowuje oryginalne bajty Markdown i notatki; akceptacja wymaga podania identyfikatora propozycji. Generyczne aktualizacje producenta pozostają ręczne do czasu weryfikacji tożsamości i adaptera. Dawny wpis katalogowy nie jest dowodem instalacji ani zgodą.
 
 
 ## Opcjonalny katalog i pierwsza instalacja
@@ -62,3 +62,9 @@ Etap C aktywuje lokalny inwentarz JSON i plan ze zgodami na konkretne działania
 Nowe sygnały o aplikacjach są propozycjami do sprawdzenia, a nie recepturami instalacji. `bash scripts/scan_update_feeds.sh` wyświetla zbiorcze podsumowanie. Eksport propozycji umożliwia podgląd i jawne zatwierdzenie; jest zredagowany, pozostaje lokalnie i nigdy nie jest wysyłany. `bash setup.sh --catalog` otwiera katalog z pustym wyborem. `-y`, tryb bez interakcji i EOF niczego nie instalują. W menu `check <number>` porównuje tylko wybrane źródła. Wyniki pokazują najnowszą potwierdzoną zgodną wersję stabilną i jej datę, z pamięcią podręczną na 24 godziny. Nieznane pozostaje nieznane. Publiczna oferta w Mac App Store nie dowodzi dostępności aplikacji na koncie. Żaden kanał nie jest zawsze najszybszy.
 
 Katalog publiczny obejmuje 47 wierszy rejestru i 48 osobnych produktów, a liczba zatwierdzonych automatycznych receptur pierwszej instalacji wynosi zero. Po podglądzie i ponownym jawnym potwierdzeniu można wybrać sprawdzone oficjalne linki do ręcznego pobrania. Otwarcie strony nie instaluje aplikacji. Zmiana źródła istniejącej aplikacji wymaga ręcznej migracji. Osobny InstallPlan pokazuje źródło, miejsce docelowe, wersję, wymagania i uprawnienia; nieznana licencja lub cena są tak oznaczane. Każda przyszła automatyczna receptura wymaga osobnej akceptacji pierwszej instalacji. Katalog nie obiecuje automatycznej instalacji wszystkich produktów.
+
+## Lokalny status receptur aktualizacji
+
+Przewodnik dotyczy macOS Updates 1.7.7. Publiczny katalog obejmuje 48 produktów w 47 wierszach rejestru i ma zero zatwierdzonych automatycznych receptur producentów, natywnych i pierwszej instalacji. Menedżer obsługuje zakresowe działania na zainstalowanych celach po zgodzie; niezaakceptowane aktualizacje producentów pozostają ręczne. 48 dossier i syntetyczne fixtures nie oznaczają akceptacji na żywo. Bezpośrednie pobieranie ZIP, jawna instalacja i silnik natywny są zaimplementowane; testy na osobnym Macu w T6 i aktywacja T7 pozostają do wykonania. Brak ścieżki force, adopt, migracji i bootstrapu zależności. Istniejące aplikacje użytkownika są chronione. Rekomendacje dotyczą najnowszej wersji stable konkretnego produktu. Żaden kanał nie jest zawsze najszybszy. Niepełny skan dostawcy jest ostrzeżeniem, ale niebezpieczne cele są blokowane; sprawdź źródła w JSON. Metadane Cask hosta nie są naprawiane. Scheduler dopuszcza najwyżej dwie niezależne mutacje w checkoutach tego samego użytkownika systemu; publiczne wykonanie pozostaje sekwencyjne do akceptacji niezależnych efektów. Aktualizacja systemu pobiera wyłączną blokadę globalną na końcu. Oczekujący restart lub nieznany helper może blokować mutacje do nowego, sprawdzonego dowodu uzgodnienia. Blokada nie wygasa po czasie. Automatyczne uzgadnianie stanu przy starcie nie jest jeszcze dostępne. Zobacz [centralny zapis implementacji](../../implementation/RECIPE_VERIFICATION_2026-11-14.md). Otwarte aplikacje pozostają chronione. DeepSeek Harness jest wykluczony do czasu stabilności.
+
+Zwykły `--dry-run` pokazuje czytelny podgląd maksymalnie 25 celów. Pełny plan JSON jest dostępny przez `--dry-run --json-summary` lub `--plan`. Podgląd nie nadaje zgody i nie wykonuje aktualizacji.

@@ -20,6 +20,54 @@ def safe_text(value):
     return "".join(c for c in str(value or "") if c.isprintable())[:500]
 
 
+def format_preview(plan):
+    """Bound terminal output; the complete immutable plan stays available as JSON."""
+    actions = plan["actions"]
+    lines = [
+        message("L_PLAN_TITLE", "Local update plan"),
+        message("L_PLAN_PREVIEW_ONLY", "Preview only. No updates, app launches or files changed."),
+        message("L_PLAN_PREVIEW_COUNT_FMT", "Local targets: %s") % len(actions),
+        message("L_PLAN_NO_CONSENT", "No new permission granted. Pending choices remain deferred."),
+        "",
+    ]
+    ordered = sorted(actions, key=lambda a: a["kind"] in ("manual", "skip"))
+    for action in ordered[:25]:
+        target = action["expected_target"]
+        name = (target.get("name") or target.get("source_identity")
+                or target.get("bundle_id") or action["target_path"])
+        if action["kind"] == "manual":
+            label = message("L_PLAN_PREVIEW_MANUAL", "Manual review")
+        elif action["kind"] == "skip":
+            label = message("L_PLAN_PREVIEW_SKIPPED", "Skipped by policy")
+        elif action["reason_codes"]:
+            label = message("L_PLAN_PREVIEW_PENDING", "Decision or evidence required")
+        else:
+            label = message("L_PLAN_PREVIEW_ELIGIBLE", "Eligible scope; no update executed")
+        version = safe_text(action.get("from_version")) or "?"
+        if action.get("to_version"):
+            version += " -> " + safe_text(action["to_version"])
+        lines.append("  {} ({}) | {}".format(safe_text(name), version, label))
+        lines.append("    " + safe_text(action["target_path"]))
+    if len(actions) > 25:
+        lines.append(message("L_PLAN_PREVIEW_MORE_FMT", "%s more targets in JSON.") % (len(actions) - 25))
+    lines.extend(["", message("L_PLAN_PREVIEW_JSON_HINT", "Full plan: --dry-run --json-summary (or --plan).")])
+    return "\n".join(lines)
+
+
+def write_preview(text):
+    # Explicit ASCII output settings must not turn an observed Unicode app name
+    # into a traceback. Normal UTF-8 terminals retain the original characters.
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    try:
+        sys.stdout.write((text + "\n").encode(encoding, "backslashreplace").decode(encoding))
+        sys.stdout.flush()  # Observe a closed reader here, before interpreter shutdown.
+    except BrokenPipeError:
+        # Prevent a second failure when Python flushes stdout on exit (for
+        # example when the user pipes a preview to head).
+        with open(os.devnull, "w") as sink:
+            os.dup2(sink.fileno(), sys.stdout.fileno())
+
+
 def apply_filters(plan):
     skipped = {
         adapter
@@ -256,11 +304,10 @@ def prepare_run(script_dir, session_dir, stream=None, output=None):
 def main(script_dir, mode, session_dir=None):
     try:
         if mode == "preview":
-            print(
-                json.dumps(
-                    apply_filters(build_runtime_plan(script_dir)), ensure_ascii=True
-                )
-            )
+            plan = apply_filters(build_runtime_plan(script_dir))
+            machine = (os.environ.get("MAC_UPDATE_PLAN_ONLY") == "1"
+                       or os.environ.get("MAC_UPDATE_JSON_SUMMARY") == "1")
+            write_preview(json.dumps(plan, ensure_ascii=True) if machine else format_preview(plan))
             return 0
         if mode == "prepare":
             return prepare_run(script_dir, session_dir)

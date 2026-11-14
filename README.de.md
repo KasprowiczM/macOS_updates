@@ -6,7 +6,7 @@
 
 **Website:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repository:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Lizenz:** [MIT](LICENSE) · **Änderungen:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.7.0** : Ein-Befehl-Orchestrator für Updates auf **Apple-Silicon-Macs mit macOS 13-27**. Er koordiniert verifizierte Paketaktualisierungen und ehrliche Auslöser der app-eigenen Updater für **Software, die bereits auf diesem Mac installiert ist**. **Mehrsprachig** (7 Sprachen). Optionales privates Overlay über [`dev_sync/`](dev_sync/README.md).
+> **v1.7.7** : Ein-Befehl-Orchestrator für Updates auf **Apple-Silicon-Macs mit macOS 13-27**. Er koordiniert verifizierte Paketaktualisierungen und ehrliche Auslöser der app-eigenen Updater für **Software, die bereits auf diesem Mac installiert ist**. **Mehrsprachig** (7 Sprachen). Optionales privates Overlay über [`dev_sync/`](dev_sync/README.md).
 
 | Auf einen Blick | |
 |-----------------|--|
@@ -14,11 +14,11 @@
 | Ablauf | 7 Schritte (0–6), das macOS-Systemupdate kommt immer zuletzt |
 | Registry | 47 Internet-Apps · 11 Update-Methoden (siehe [Update-Methoden](#update-methoden)) |
 | Sprachen | EN, PL, ES, FR, DE, IT, PT (CLI und Dokumentation) |
-| Tests | 1178 automatisierte Tests (`bash run_tests.sh`) |
+| Tests | 1350 automatisierte Tests (`bash run_tests.sh`) |
 
 Phase C aktiviert lokales JSON-Inventar und ausdrücklich genehmigte Aktionen. `bash update_all.sh --plan` und `--dry-run` zeigen denselben Plan ohne Speicherung. Ein interaktiver Lauf fragt einmal nach den angezeigten Umfängen; `-y`, EOF und unbeaufsichtigte Läufe erteilen keine neue Erlaubnis. Mit `--preferences` Entscheidungen prüfen oder zurücksetzen. Updates erhalten beobachtete Quelle und Zielpfad; Konflikte, fehlende Ziele und unsichere Belege stellen nur das betroffene Ziel zurück. `build_inventory.sh --migration --preview` erhält ursprüngliche Markdown-Bytes und Notizen; die angezeigte Vorschlags-ID ausdrücklich bestätigen. Allgemeine Herstellerupdates bleiben bis zur Prüfung von Identität und Adapter manuell. Ein Katalogeintrag belegt weder Installation noch Zustimmung.
 
-Dies ist der Quellstand 1.7.0 auf main, ohne eigenes Release-Tag. Der Update-Manager arbeitet nur für installierte Ziele mit beobachteter Quelle und neuer Zustimmung. Allgemeine native und Hersteller-Updater bleiben manuell, bis geprüfte Rezepte vorliegen. Der optionale öffentliche Katalog umfasst 48 Produkte und bietet geprüfte offizielle Links zur manuellen Beschaffung; es gibt null freigegebene automatische Erstinstallationsrezepte. Die folgende Methodenliste beschreibt Fähigkeiten, keine Ausführungsberechtigung.
+Diese Dokumentation beschreibt macOS Updates 1.7.7. Ein separates Release-Tag wurde nicht erstellt. Der Update-Manager arbeitet nur für installierte Ziele mit beobachteter Quelle und neuer Zustimmung. Allgemeine native und Hersteller-Updater bleiben manuell, bis geprüfte Rezepte vorliegen. Der optionale öffentliche Katalog umfasst 48 Produkte und bietet geprüfte offizielle Links zur manuellen Beschaffung; es gibt null freigegebene automatische Erstinstallationsrezepte. Die folgende Methodenliste beschreibt Fähigkeiten, keine Ausführungsberechtigung.
 
 **Neu in v1.6.0:** Geplante Läufe (launchd) finden Homebrew und `mas`, und der Installer prüft, dass der Job geladen ist (neu: `--minute`, `--once-in`). Geöffnete Apps werden nie geschlossen oder ersetzt, auch Homebrew-Casks nicht. Jede Rückfrage während des Laufs läuft mit der sicheren Antwort „nein“ ab. `bash update_all.sh --doctor` ist ein schreibgeschützter Bereitschaftsbericht, und echte Läufe haben Vorabprüfungen. Ein dauerhafter Feed-Zustand ersetzt unklare „veralteter Feed“-Warnungen, und HyperFrames, Superset und Open Design werden ohne versteckte Starts installiert bzw. geprüft. Frühere 1.5.x-Versionen stehen im [CHANGELOG.md](CHANGELOG.md).
 
@@ -329,12 +329,14 @@ Vollständige Skriptreferenz: [docs/agents/scripts.md](docs/agents/scripts.md).
 
 1. Installiere die App selbst (der Updater installiert sie nie für dich).
 2. Führe `bash build_inventory.sh` aus, um sie in `APPLICATIONS.md` aufzunehmen.
-3. Für automatische Updates frage einen KI-Agenten oder folge [docs/user/de/GUIDE.md](docs/user/de/GUIDE.md):
+3. Prüfe die App-Unterstützung mit [docs/user/de/GUIDE.md](docs/user/de/GUIDE.md) oder einem KI-Agenten:
 
 ```bash
-bash scripts/scaffold_internet_app.sh "App-Name" silent_launch
+bash scripts/scaffold_internet_app.sh "/path/to/Observed.app" --json
 bash run_tests.sh
 ```
+
+Ersetze das Beispiel durch den genauen Pfad der installierten App. Der Befehl zeigt einen redigierten, nicht ausführbaren Prüfvorschlag. Ein optionaler Export erfordert nach Prüfung der angezeigten Vorschau-ID einen erneuten Aufruf mit `--export --accept PREVIEW_ID`. Updates benötigen eine geprüfte Implementierung und gesonderte Akzeptanznachweise.
 
 Die Methoden der Registry werden auf die oben genannten Abdeckungsstufen abgebildet. Beispiele: `github_dmg` und eine bestätigte Hersteller-CLI sind **verified direct**; `silent_launch` ist **triggered-unverified**; vom App Store oder Hersteller verwaltete Abläufe können **externally managed** sein; `manual` und fehlende Registry-Einträge bleiben ausdrücklich sichtbar.
 
@@ -419,3 +421,5 @@ Vollständige Liste: [docs/agents/troubleshooting.md](docs/agents/troubleshootin
 Neue App-Hinweise sind Vorschläge zur Prüfung, keine ausführbaren Rezepte. `bash scripts/scan_update_feeds.sh` gibt eine zusammengefasste Übersicht aus. Ein Proposal-Export ermöglicht Vorschau und ausdrückliche Annahme; er ist bereinigt, bleibt lokal und wird nie hochgeladen. `bash setup.sh --catalog` öffnet den Katalog ohne Vorauswahl. `-y`, nichtinteraktive Läufe und EOF installieren nichts. Im Menü vergleicht `check <number>` nur ausgewählte Quellen. Ergebnisse zeigen die neueste bestätigte kompatible stabile Version samt Datum; der Cache gilt 24 Stunden. Unbekannt bleibt unbekannt. Ein öffentlicher Mac-App-Store-Eintrag beweist nicht, dass die App für Ihr Konto angeboten wird. Kein Kanal ist immer am schnellsten.
 
 Der öffentliche Katalog umfasst 47 Registry-Zeilen für 48 Produkte und null freigegebene automatische Erstinstallationsrezepte. Nach Vorschau und erneuter Bestätigung können Sie geprüfte offizielle Links zur manuellen Beschaffung auswählen. Das Öffnen einer Seite installiert die App nicht. Ein Quellenwechsel für eine bestehende App erfordert manuelle Migration. Der separate InstallPlan zeigt Quelle, Ziel, Version, Voraussetzungen und Berechtigungen; unbekannte Lizenz oder Kosten bleiben als unbekannt markiert. Jedes künftige automatische Rezept braucht vor der Aktivierung eine neue Erstinstallationsfreigabe. Der Katalog verspricht keine automatische Installation aller Produkte.
+
+`--dry-run` zeigt eine lesbare Vorschau mit bis zu 25 Zielen. `--dry-run --json-summary` oder `--plan` liefert den vollständigen JSON-Plan. Die Vorschau erteilt keine Zustimmung und führt keine Updates aus.

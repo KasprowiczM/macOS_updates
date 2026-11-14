@@ -20,7 +20,11 @@ from install_plan import (
     validate_install_plan,
     resolve_requirements,
     install_recipe_eligible,
+    verified_install_bindings,
 )
+from artifact_acquisition import acquire_candidate
+from recipe_acceptance import validate_recipe_evidence
+from update_scheduler import claim_action_resources, claim_recovery_resources
 from inventory_collect import read_bundle_static
 from inventory_store import _root, StoreError
 from policy_runtime import TargetLock, utc_now, _read_json, _atomic_json
@@ -47,6 +51,11 @@ def make_install_consent(plan, action_ids, now):
         expires_at=(timestamp(now) + datetime.timedelta(minutes=15))
         .isoformat()
         .replace("+00:00", "Z"),
+        verified_recipe_bindings={
+            a["action_id"]: copy.deepcopy(a["verified_recipe_bindings"])
+            for a in plan["actions"]
+            if a["action_id"] in action_ids and "verified_recipe_bindings" in a
+        },
     )
 
 
@@ -105,10 +114,20 @@ def authorize_install(action, current, consent, now):
             return result
         if (
             action["kind"] != "install"
-            or action.get("adapter_id") != "vendor_bundle"
-            or not install_recipe_eligible(action.get("recipe", {}))
+            or action.get("adapter_id") not in ("vendor_bundle", "verified_recipe_zip")
+            or not install_recipe_eligible(
+                action.get("recipe", {}), current.get("verified_environment"), now
+            )
         ):
             return deny("install_adapter_unreviewed")
+        if "verified_recipe" in action["recipe"]:
+            bindings = verified_install_bindings(action["recipe"])
+            if (
+                action.get("verified_recipe_bindings") != bindings
+                or consent.get("verified_recipe_bindings", {}).get(action["action_id"])
+                != bindings
+            ):
+                return deny("install_candidate_consent_changed")
         if current.get("destination_symlink") or current.get(
             "canonical_destination"
         ) != action.get("destination"):
@@ -131,6 +150,10 @@ def record_install_result(action, observed, journal):
         and observed.get("bundle_id") == recipe.get("bundle_id")
         and observed.get("team_id") == recipe.get("team_id")
         and observed.get("version") == action.get("version")
+        and (
+            "verified_recipe" not in recipe
+            or observed.get("build") == recipe.get("build")
+        )
         and "arm64" in observed.get("architectures", [])
         and version_compare(observed.get("host_os"), observed.get("minimum_os"))
         in (0, 1)
@@ -145,6 +168,7 @@ def record_install_result(action, observed, journal):
                 "bundle_id",
                 "team_id",
                 "version",
+                "build",
                 "architectures",
                 "minimum_os",
             )
@@ -194,6 +218,7 @@ def _current(action, plan, recipes, environment, snapshot, roots):
         destination_symlink=bool(destination and os.path.islink(destination)),
         canonical_destination=os.path.realpath(destination) if destination else None,
         source_conflict=False,
+        verified_environment=copy.deepcopy(environment),
     )
     installed = [
         target
@@ -265,12 +290,55 @@ def _candidate(action, observed):
         raise ValueError("candidate_identity_changed")
     if observed.get("version") != action["version"]:
         raise ValueError("candidate_version_changed")
+    if "verified_recipe" in recipe and observed.get("build") != recipe["build"]:
+        raise ValueError("candidate_build_changed")
+    if (
+        "verified_recipe" in recipe
+        and observed.get("minimum_os") != recipe["minimum_os"]
+    ):
+        raise ValueError("candidate_minimum_os_changed")
     if "arm64" not in observed.get("architectures", []) or version_compare(
         observed.get("host_os"), observed.get("minimum_os")
     ) not in (0, 1):
         raise ValueError("candidate_incompatible")
     if version_compare(observed.get("minimum_os"), recipe["minimum_os"]) is None:
         raise ValueError("candidate_minimum_os_unknown")
+
+
+def _verified_install_acceptance(
+    action, environment, consent, observed, artifact_sha256
+):
+    recipe = action["recipe"]["verified_recipe"]
+    bindings = consent.get("verified_recipe_bindings", {}).get(action["action_id"], {})
+    facts = copy.deepcopy(environment)
+    facts.update(
+        target=dict(presence="absent"),
+        candidate=copy.deepcopy(recipe["candidate"]),
+        now=timestamp(utc_now()).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        granted_permissions=action["permissions"][:],
+        granted_effects=["install_app"],
+        available_requirements=[],
+        approved_recipe_sha256=bindings.get("recipe_sha256"),
+        approved_candidate_sha256=bindings.get("candidate_sha256"),
+        approved_requirements_sha256=bindings.get("requirements_sha256"),
+        candidate_observation=dict(
+            signature_valid=observed.get("good"),
+            app_store_receipt=observed.get("receipt_present"),
+            artifact_sha256=artifact_sha256,
+            bundle_id=observed.get("bundle_id"),
+            team_id=observed.get("team_id"),
+            version=observed.get("version"),
+            build=observed.get("build"),
+            architecture=(
+                "arm64" if "arm64" in observed.get("architectures", []) else None
+            ),
+            minimum_os=observed.get("minimum_os"),
+        ),
+    )
+    checked = validate_recipe_evidence(recipe, "install", facts)
+    if not checked["allowed"]:
+        raise ValueError("install_candidate_evidence_changed")
+    return checked["evidence_ids"]
 
 
 def _validate_bundle_tree(source):
@@ -361,13 +429,17 @@ def execute_install_action(
     stage_root = None
     stage_owner = None
     committed = False
+    commit_attempted = False
+    completed = False
+    lease = None
+    acquired = None
 
     def persist():
         if journal_path:
             _atomic_json(journal_path, journal)
 
     def fail(reason):
-        status = "recovery_required" if committed else "deferred"
+        status = "recovery_required" if committed or commit_attempted else "deferred"
         result = dict(
             action_id=action_id,
             product_id=action.get("product_id") if action else None,
@@ -375,7 +447,7 @@ def execute_install_action(
             status=status,
             verified=False,
             reason_code=reason,
-            recovery_required=committed,
+            recovery_required=committed or commit_attempted,
         )
         if journal is not None:
             journal.update(result)
@@ -448,12 +520,43 @@ def execute_install_action(
             persist()
             return copy.deepcopy(journal)
         destination = _destination(action, roots)
-        with TargetLock(destination, root):
+        lease = claim_action_resources(
+            dict(
+                action_id=action_id,
+                target_path=destination,
+                artifact_effects=[destination],
+                scope_complete=True,
+                parallel_safe=False,
+            ),
+            root,
+        )
+        with TargetLock(destination, root, owner_action_id=action_id):
             current = _current(action, plan, recipes, environment, snapshot, roots)
             guard = authorize_install(action, current, consent, utc_now())
             if not guard["allowed"]:
                 return fail(guard["reason_code"])
-            if not staged_app:
+            if action.get("adapter_id") == "verified_recipe_zip":
+                if staged_app is not None:
+                    raise ValueError("verified_install_requires_bound_acquisition")
+                verified = action["recipe"]["verified_recipe"]
+                acquired = acquire_candidate(
+                    dict(
+                        candidate=verified["candidate"],
+                        limits=verified["limits"],
+                        download_hosts=verified["download_hosts"],
+                    ),
+                    root,
+                    observer=observer,
+                )
+                staged_app = acquired["bundle_path"]
+                journal["evidence_ids"] = _verified_install_acceptance(
+                    action,
+                    environment,
+                    consent,
+                    acquired["observed"],
+                    acquired["artifact_sha256"],
+                )
+            elif not staged_app:
                 raise ValueError("reviewed_staged_bundle_required")
             _candidate(action, observer(staged_app))
             stage_root = tempfile.mkdtemp(
@@ -467,7 +570,16 @@ def execute_install_action(
             journal["stage_owner"] = list(stage_owner)
             persist()
             _copy_bundle(staged_app, stage)
-            _candidate(action, observer(stage))
+            staged_observation = observer(stage)
+            _candidate(action, staged_observation)
+            if acquired is not None:
+                _verified_install_acceptance(
+                    action,
+                    environment,
+                    consent,
+                    staged_observation,
+                    acquired["artifact_sha256"],
+                )
             if fault:
                 fault("before_commit", journal)
             current = _current(action, plan, recipes, environment, snapshot, roots)
@@ -475,6 +587,21 @@ def execute_install_action(
             if not guard["allowed"]:
                 return fail(guard["reason_code"])
             _destination(action, roots)
+            immediate_observation = observer(stage)
+            _candidate(action, immediate_observation)
+            if acquired is not None:
+                _verified_install_acceptance(
+                    action,
+                    environment,
+                    consent,
+                    immediate_observation,
+                    acquired["artifact_sha256"],
+                )
+            journal["status"] = "install_commit_intent"
+            candidate_stat = os.stat(stage)
+            journal["candidate_inode"] = [candidate_stat.st_dev, candidate_stat.st_ino]
+            persist()
+            commit_attempted = True
             _rename_exclusive(stage, destination)
             committed = True
             journal["created_paths"].append(destination)
@@ -496,6 +623,7 @@ def execute_install_action(
             journal["snapshot_id"] = capture["snapshot_id"]
             journal = record_install_result(action, observed, journal)
             persist()
+            completed = journal.get("verified") is True
             return copy.deepcopy(journal)
     except (
         ValueError,
@@ -511,6 +639,16 @@ def execute_install_action(
             reason = "install_unverified"
         return fail(reason)
     finally:
+        if lease is not None:
+            if completed or not commit_attempted:
+                lease.finish(
+                    "installed_verified" if completed else "no_mutation",
+                    helpers_complete=True,
+                )
+            else:
+                lease.pending("install_commit_unverified")
+        if acquired is not None:
+            shutil.rmtree(acquired["staging_path"], ignore_errors=True)
         # Only this attempt's private, unfinalized staging is removed. A newly
         # appeared destination or a partially successful install is preserved.
         if stage_root and os.path.isdir(stage_root) and not os.path.islink(stage_root):
@@ -551,9 +689,7 @@ def shell_execute(argv):
         return (
             0
             if result["status"] in ("installed_verified", "manual_acquisition_opened")
-            else 1
-            if result["status"] == "recovery_required"
-            else 10
+            else 1 if result["status"] == "recovery_required" else 10
         )
     except (ValueError, OSError, KeyError, TypeError, IndexError, StopIteration):
         return 10
@@ -601,6 +737,7 @@ def recover_installations(
                 entries.append(entry.path)
     for path in sorted(entries):
         journal = None
+        recovery_lease = None
         try:
             info = os.lstat(path)
             if (
@@ -613,6 +750,7 @@ def recover_installations(
             journal = _read_json(path)
             if journal.get("schema_version") != 1 or journal.get("status") not in (
                 "prepared",
+                "install_commit_intent",
                 "installed_unverified",
                 "recovery_required",
                 "installed_verified",
@@ -636,7 +774,28 @@ def recover_installations(
             ):
                 raise ValueError("invalid_install_journal_action")
             destination = _destination(action, roots, require_absent=False)
-            with TargetLock(destination, root):
+            if os.path.lexists(destination):
+                candidate_stat = os.stat(destination)
+                if journal.get("candidate_inode") != [
+                    candidate_stat.st_dev,
+                    candidate_stat.st_ino,
+                ]:
+                    raise ValueError("recovery_destination_not_owned")
+            recovery_lease = claim_recovery_resources(
+                dict(
+                    action_id=action["action_id"],
+                    target_path=destination,
+                    scope_complete=True,
+                    parallel_safe=False,
+                ),
+                action["action_id"],
+                journal.get("candidate_inode") is not None
+                or journal["status"] == "prepared",
+                root,
+            )
+            with TargetLock(
+                destination, root, owner_action_id=recovery_lease.action_id
+            ):
                 if not os.path.lexists(destination):
                     journal.update(
                         status="deferred",
@@ -645,6 +804,12 @@ def recover_installations(
                         reason_code="interrupted_install_requires_new_preview",
                     )
                 else:
+                    candidate_stat = os.stat(destination)
+                    if journal.get("candidate_inode") != [
+                        candidate_stat.st_dev,
+                        candidate_stat.st_ino,
+                    ]:
+                        raise ValueError("recovery_destination_not_owned")
                     observed = observer(destination)
                     _candidate(action, observed)
                     capture = (
@@ -660,6 +825,10 @@ def recover_installations(
                     journal = record_install_result(action, observed, journal)
                     journal["reason_code"] = "interrupted_install_observed_verified"
                 _atomic_json(path, journal)
+                # Only this recorded action's lease may be reconciled, after
+                # observing absence or its exact completed installation. These
+                # adapters have no external mutating helper to outlive them.
+                recovery_lease.finish("reconciled", helpers_complete=True)
                 results.append(copy.deepcopy(journal))
         except (
             ValueError,
@@ -685,4 +854,7 @@ def recover_installations(
                 _atomic_json(path, journal)
                 result = copy.deepcopy(journal)
             results.append(result)
+        finally:
+            if recovery_lease is not None and not recovery_lease.closed:
+                recovery_lease.pending("install_recovery_unconfirmed")
     return results

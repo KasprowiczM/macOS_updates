@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "product_id": "megasync-gui",
+  "edition": "gui",
+  "version_comparison_policy": "incomparable",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://mega.io/desktop",
+        "allowed_hosts": [
+          "mega.io"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "mega",
+        "observed_at": "2026-11-13T20:44:09.677149+00:00"
+      },
+      "evidence_reference": {
+        "key": "mega",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:09.677149+00:00",
+        "public_response_sha256": "35dd6a65e62e3926cf96c78b84223d990ed643a0b6b83c8189b4889366dd9630",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://mega.nz/sync"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/megasync.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "megasync",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:megasync",
+        "observed_at": "2026-11-13T20:44:02.686801+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:megasync",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:02.686801+00:00",
+        "public_response_sha256": "ec6274169b5dd713457cec0df9c09532d7f6433d3f37ae8a842b9db51cc95059",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "6.7.0.3"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/megasync"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "Updater producenta lub manager",
+    "install_candidate": "Instalator po scope review",
+    "known_scope_blocker": "Synchronizacja, rozszerzenia i odzyskanie po przerwaniu",
+    "wave": 3
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Synchronizacja, rozszerzenia i odzyskanie po przerwaniu"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}

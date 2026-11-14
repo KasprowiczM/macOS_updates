@@ -4,6 +4,7 @@ import copy
 import os
 import re
 import uuid
+import datetime
 from user_policy import digest, timestamp
 from vendor_feeds import version_compare
 from setup_catalog import safe_official_url, match_catalog_snapshot
@@ -22,7 +23,112 @@ DEFAULT_REQUIREMENTS = {
 }
 
 
-def install_recipe_eligible(recipe):
+def verified_install_bindings(recipe):
+    from recipe_acceptance import (
+        recipe_fingerprint,
+        candidate_binding,
+        requirements_fingerprint,
+    )
+
+    value = recipe["verified_recipe"]
+    return dict(
+        recipe_sha256=recipe_fingerprint(value),
+        candidate_sha256=candidate_binding(value["candidate"]),
+        requirements_sha256=requirements_fingerprint(value),
+    )
+
+
+def verified_install_recipe_eligible(recipe, environment=None, now=None):
+    """Planning evidence only: no signature or consent for an absent target.
+
+    A live install record must bind the exact v2 candidate. Full acceptance is
+    evaluated again with actual staged observations after consent/acquisition.
+    """
+    from app_recipes import validate_recipe, _os
+    from recipe_acceptance import _record_matches
+
+    try:
+        value = recipe["verified_recipe"]
+        validate_recipe(value)
+        names = [value["id"], value["product"]] + value["matrix_ids"]
+        if any(
+            n.casefold().replace("-", "").replace(" ", "").startswith("deepseek")
+            for n in names
+        ):
+            return False
+        if (
+            recipe.get("install_adapter") != "verified_recipe_zip"
+            or value["channel"] != "stable"
+            or value["installation_source"] != "vendor"
+            or value["update_mechanism"] != "direct_artifact"
+            or value["adapter_id"] not in ("github_dmg", "mozilla_dmg")
+            or value["candidate"]["artifact_type"] != "zip"
+            or value["effect_scope"]["install"] != ["install_app"]
+            or any(
+                n["kind"] == "dependency" for n in value["requirement_graph"]["nodes"]
+            )
+            or recipe.get("destination") is None
+            or not os.path.isabs(recipe["destination"])
+            or recipe.get("artifact_effects") != [recipe["destination"]]
+        ):
+            return False
+        candidate = value["candidate"]
+        if (
+            recipe.get("product_id") not in value["matrix_ids"]
+            or recipe.get("edition") != value["edition"]
+            or recipe.get("channel") != value["channel"]
+            or recipe.get("installation_source") != value["installation_source"]
+            or recipe.get("requires_administrator") is not False
+            or recipe.get("architectures") != value["architectures"]
+            or recipe.get("download_hosts") != value["download_hosts"]
+            or os.path.basename(recipe["destination"]) != candidate["bundle_name"]
+            or any(
+                recipe.get(key) != candidate[key]
+                for key in (
+                    "version",
+                    "build",
+                    "bundle_id",
+                    "team_id",
+                    "minimum_os",
+                    "artifact_type",
+                )
+            )
+        ):
+            return False
+        permissions = {
+            n["value"]
+            for n in value["requirement_graph"]["nodes"]
+            if n["kind"] == "permission" and "install" in n["operations"]
+        }
+        if not permissions.issubset({"install_app"}):
+            return False
+        moment = timestamp(now) if now else datetime.datetime.now(datetime.timezone.utc)
+        for record in value["acceptance_records"]["install"]:
+            host = (
+                environment
+                if environment is not None
+                else dict(os_version=record["os_version"], architecture="arm64")
+            )
+            if (
+                _os(host.get("os_version")) < _os(candidate["minimum_os"])
+                or host.get("architecture") != candidate["architecture"]
+            ):
+                continue
+            facts = dict(
+                host,
+                now=moment.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                granted_permissions=sorted(permissions),
+            )
+            if _record_matches(record, value, "install", facts, permissions):
+                return True
+    except (KeyError, TypeError, ValueError, AttributeError):
+        pass
+    return False
+
+
+def install_recipe_eligible(recipe, environment=None, now=None):
+    if "verified_recipe" in recipe:
+        return verified_install_recipe_eligible(recipe, environment, now)
     acceptance = recipe.get("first_install_acceptance")
     return bool(
         recipe.get("install_adapter") == "vendor_bundle"
@@ -175,9 +281,7 @@ def resolve_requirements(selections, environment, recipes):
         status = (
             "satisfied"
             if satisfied
-            else "manual"
-            if spec["kind"] != "tool"
-            else "missing"
+            else "manual" if spec["kind"] != "tool" else "missing"
         )
         nodes.append(
             dict(
@@ -255,7 +359,7 @@ def build_install_plan(selections, snapshot, recipes, now):
             [selection], snapshot.get("environment", {}), recipes
         )
         eligible = (
-            install_recipe_eligible(recipe)
+            install_recipe_eligible(recipe, snapshot.get("environment", {}), now)
             and own_requirements["complete"]
             and selection["source_id"] == recipe.get("installation_source")
             and selection["source_id"] != "app_store"
@@ -263,16 +367,16 @@ def build_install_plan(selections, snapshot, recipes, now):
         reason = (
             "already_installed_manual_migration"
             if installed
-            else "first_install_acceptance_missing"
-            if not eligible
-            else "approved_recipe_requires_fresh_consent"
+            else (
+                "first_install_acceptance_missing"
+                if not eligible
+                else "approved_recipe_requires_fresh_consent"
+            )
         )
         kind = (
             "manual_migration"
             if installed
-            else "install"
-            if eligible
-            else "manual_acquisition"
+            else "install" if eligible else "manual_acquisition"
         )
         action = dict(
             action_id=str(uuid.uuid4()),
@@ -285,14 +389,15 @@ def build_install_plan(selections, snapshot, recipes, now):
             edition=recipe["edition"],
             kind=kind,
             source_id=selection["source_id"],
-            adapter_id=recipe.get("install_adapter")
-            if eligible
-            else "manual_acquisition",
+            adapter_id=(
+                recipe.get("install_adapter") if eligible else "manual_acquisition"
+            ),
             version=recipe.get("version"),
+            build=recipe.get("build"),
             destination=recipe.get("destination"),
-            artifact_effects=copy.deepcopy(recipe.get("artifact_effects", []))
-            if eligible
-            else [],
+            artifact_effects=(
+                copy.deepcopy(recipe.get("artifact_effects", [])) if eligible else []
+            ),
             recipe=copy.deepcopy(recipe),
             recipe_fingerprint=digest(recipe),
             requirement_graph_digest=plan["requirement_graph_digest"],
@@ -306,6 +411,11 @@ def build_install_plan(selections, snapshot, recipes, now):
             reason_codes=[reason],
             installed=copy.deepcopy(installed),
         )
+        if eligible and "verified_recipe" in recipe:
+            action["verified_recipe_bindings"] = verified_install_bindings(recipe)
+            action["verified_environment"] = copy.deepcopy(
+                snapshot.get("environment", {})
+            )
         plan["actions"].append(action)
     plan["plan_digest"] = plan_digest(plan)
     for action in plan["actions"]:
@@ -361,7 +471,9 @@ def validate_install_plan(plan):
         ):
             raise ValueError("install_action_changed")
         if action["kind"] == "install" and (
-            not install_recipe_eligible(action["recipe"])
+            not install_recipe_eligible(
+                action["recipe"], action.get("verified_environment"), plan["created_at"]
+            )
             or action.get("destination") != action["recipe"]["destination"]
             or action.get("version") != action["recipe"]["version"]
             or action.get("artifact_effects") != [action["destination"]]
@@ -373,4 +485,14 @@ def validate_install_plan(plan):
             )
         ):
             raise ValueError("install_recipe_unreviewed")
+        if (
+            action["kind"] == "install"
+            and "verified_recipe" in action["recipe"]
+            and (
+                action.get("verified_recipe_bindings")
+                != verified_install_bindings(action["recipe"])
+                or action.get("build") != action["recipe"]["build"]
+            )
+        ):
+            raise ValueError("install_candidate_changed")
     return plan

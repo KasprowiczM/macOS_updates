@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "product_id": "microsoft-outlook-gui",
+  "edition": "gui",
+  "version_comparison_policy": "office_release_family",
+  "review_scope": "Existing source and channel contract, no native command, payload installation or live acceptance.",
+  "sources": [
+    {
+      "manifest": {
+        "source_id": "vendor",
+        "updater_id": null,
+        "url": "https://learn.microsoft.com/en-us/officeupdates/update-history-office-for-mac",
+        "allowed_hosts": [
+          "learn.microsoft.com"
+        ],
+        "parser": "unknown",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "office",
+        "observed_at": "2026-11-13T20:44:11.168091+00:00"
+      },
+      "evidence_reference": {
+        "key": "office",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:11.168091+00:00",
+        "public_response_sha256": "dd5f3a787fe09f85ee331f3ec3232df4695c05031da019d69bac8f8b3e1183b7",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parser_unreviewed"
+      },
+      "official_url": "https://www.microsoft.com/en-us/microsoft-365/outlook/outlook-for-business"
+    },
+    {
+      "manifest": {
+        "source_id": "homebrew",
+        "updater_id": "homebrew",
+        "url": "https://formulae.brew.sh/api/cask/microsoft-outlook.json",
+        "allowed_hosts": [
+          "formulae.brew.sh"
+        ],
+        "parser": "brew_cask",
+        "token": "microsoft-outlook",
+        "stable_policy": "unknown",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "evidence_key": "brew:microsoft-outlook",
+        "observed_at": "2026-11-13T20:44:03.420465+00:00"
+      },
+      "evidence_reference": {
+        "key": "brew:microsoft-outlook",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:03.420465+00:00",
+        "public_response_sha256": "6c849b89f1dc3cfa5860ddcf35366955c9b319c6b5bd24f3bc955b54b2b23752",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "parsed",
+        "versions": [
+          "16.115.26110837"
+        ],
+        "stable_confirmed": [
+          false
+        ]
+      },
+      "official_url": "https://formulae.brew.sh/cask/microsoft-outlook"
+    },
+    {
+      "manifest": {
+        "source_id": "app_store",
+        "updater_id": "app_store",
+        "url": "https://itunes.apple.com/lookup?id=985367838&entity=macSoftware&country=us",
+        "allowed_hosts": [
+          "itunes.apple.com"
+        ],
+        "parser": "app_store_mac",
+        "stable_policy": "public_store_listing",
+        "architectures": [],
+        "minimum_os": null,
+        "identity_reviewed": true,
+        "store_id": 985367838,
+        "bundle_id": "com.microsoft.Outlook",
+        "region": "us",
+        "evidence_key": "mas-office-us",
+        "observed_at": "2026-11-13T20:44:40.512715+00:00"
+      },
+      "evidence_reference": {
+        "key": "mas-office-us",
+        "status": 200,
+        "observed_at": "2026-11-13T20:44:40.512715+00:00",
+        "public_response_sha256": "467825cc73c8e6a66e1e4762ceb7ce1aafc982cb0887d119d6c013066cb30a43",
+        "scope": "Existing metadata projection; response hash is not an application artifact digest."
+      },
+      "expected": {
+        "decision": "store_platform_unverified"
+      },
+      "official_url": "https://apps.apple.com/app/id985367838"
+    }
+  ],
+  "channel_intent": "stable_default_requires_evidence",
+  "adapter_contract": {
+    "update_candidate": "MAU dla vendor; App Store dla receipt",
+    "install_candidate": "Vendor installer lub App Store",
+    "known_scope_blocker": "Aktywna sesja, źródło i dokładny MAU app ID",
+    "wave": 2
+  },
+  "driver_pinning_blockers": [
+    "Unknown actual installed identity and ownership.",
+    "No reviewed immutable candidate bundle/signature/version/build/artifact binding.",
+    "No product-specific native trigger/readiness/complete-effect contract with live acceptance.",
+    "Aktywna sesja, źródło i dokładny MAU app ID"
+  ],
+  "actual_installed_identity": {
+    "bundle_id": null,
+    "team_id": null,
+    "source": null
+  },
+  "expected_runtime_decision": "manual_pending_product_acceptance",
+  "historical_parser_fixtures": [],
+  "live_acceptance": false
+}
