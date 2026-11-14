@@ -141,6 +141,8 @@ Najpierw jeden plan i zgoda, następnie kolejka bez konkurujących promptów. Za
 
 **Interfaces:** `schedule_ready_actions(actions, resource_state, limits) -> list`; `claim_action_resources(action, journal) -> lease`. Scheduler dopuszcza maksymalnie dwa rozłączne zbiory zasobów. Blokady mają wspólną przestrzeń między checkoutami i procesami; acquire w stabilnej kolejności lub atomowo, bez deadlock. Journal jest sprawdzany przed i po acquire.
 
+Limit dwóch mutacji jest globalny dla współpracujących checkoutów na tym Macu, nie per proces. Slot pozostaje zajęty, gdy mutujący helper działa lub jego stan jest nierozstrzygnięty po wyjściu CLI, timeout albo crash obserwatora. Reconcile zwalnia go dopiero na podstawie dowodu zakończenia. Fixture: dwa checkouty i trzy niezależne akcje; trzecia nie startuje, dopóki jeden z dwóch zajętych slotów nie zostanie poprawnie zwolniony.
+
 - [ ] RED: dwie niezależne aplikacje nakładają się w czasie; wspólny brew prefix, MAU, App Store, zależność lub helper wymuszają kolejność; unknown scope nie jest parallel-safe.
 - [ ] RED: dwa checkouty, anulowanie, utrata procesu, pomocnik żywy po timeout, konflikt nowych zależności i aplikacja otwarta w czasie oczekiwania w kolejce. Brak podwójnego triggera lub zwolnienia zasobu pending.
 - [ ] Wyłącznie akcje z kompletnym planem i zgodą; nowy efekt/wersja wymaga nowego planu. `cancel` blokuje start następnych, ale nie zabija trwających instalatorów. Uruchomione akcje kończą obserwację albo pozostają recovery_required.
@@ -168,5 +170,7 @@ Najpierw jeden plan i zgoda, następnie kolejka bez konkurujących promptów. Za
 ## 5. Akceptacja planu
 
 Najpierw zatwierdzić T1-T5 wraz z T5b jako pracę lokalną z fixture. T6 wymaga osobnego środowiska i osobnej zgody na konkretne rzeczywiste operacje; ten plan ich nie autoryzuje. T7 może włączyć tylko ścieżki z wymaganymi dowodami. Nie należy obchodzić tej kolejności, aby DeepSeek RC zniknął z ostrzeżeń.
+
+Doprecyzowanie właściciela 2026-11-14: DeepSeek Harness RC/nightly pozostaje poza zakresem wdrożenia. Wrócić do weryfikacji po udostępnieniu stable; nie projektować teraz obejścia ani automatyzacji kanału RC. Pozycja w macierzy zachowuje jedynie historyczny stan katalogu.
 
 Macierz wszystkich produktów stanowi [załącznik](../../catalog/RECIPE_VERIFICATION_MATRIX_2026-11-14.md). Wpis „kandydat” oznacza kolejkę badań, nie gotowy adapter.
