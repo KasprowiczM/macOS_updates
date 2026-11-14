@@ -8,6 +8,8 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [1.7.7] - 2026-11-14
 
+- Add read-only operation readiness reports, timing summaries requiring five comparable independent runs, and a redacted feedback contract. Feedback never grants recipe acceptance or execution authority. Live T6 and recipe activation remain deferred.
+
 - Show a bounded, readable plain dry-run preview instead of a large escaped JSON line. Keep full JSON for `--plan` and `--dry-run --json-summary`.
 - Handle Unicode output and a closed output pipe without a shutdown traceback; preserve read-only preview and consent boundaries.
 - Publish the preceding recipe execution and durable scheduling checkpoints. No production recipe or native driver is activated by this publication.

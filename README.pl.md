@@ -16,7 +16,7 @@ Etap C aktywuje lokalny inwentarz JSON i plan ze zgodami na konkretne działania
 | Potok | 7 kroków (0–6), aktualizacja systemu macOS zawsze na końcu |
 | Rejestr | 47 aplikacje internetowe · 11 metod aktualizacji (zob. [Metody aktualizacji](#metody-aktualizacji)) |
 | Języki | EN, PL, ES, FR, DE, IT, PT (CLI i dokumentacja) |
-| Testy | 1334 testów automatycznych (`bash run_tests.sh`) |
+| Testy | 1350 testów automatycznych (`bash run_tests.sh`) |
 
 Ta dokumentacja dotyczy macOS Updates 1.7.7. Nie utworzono osobnego tagu wydania. Menedżer aktualizacji działa w określonym zakresie tylko dla zainstalowanych celów o wykrytym źródle i po nowej zgodzie. Ogólne adaptery natywne i producentów pozostają ręczne do czasu przygotowania sprawdzonych receptur. Opcjonalny katalog publiczny obejmuje 48 produktów i udostępnia sprawdzone oficjalne linki do ręcznego pobrania; nie ma zatwierdzonych automatycznych receptur pierwszej instalacji. Poniższa lista metod jest wykazem możliwości, nie upoważnieniem do ich wykonania.
 

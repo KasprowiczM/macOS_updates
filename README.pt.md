@@ -16,7 +16,7 @@ A etapa C ativa inventário JSON local e planos com permissões específicas. `b
 | Fluxo | 7 passos (0–6); a atualização do macOS vem sempre em último |
 | Registo | 47 aplicações da Internet · 11 métodos de atualização (ver [Métodos de atualização](#métodos-de-atualização)) |
 | Idiomas | EN, PL, ES, FR, DE, IT, PT (CLI e documentação) |
-| Testes | 1334 testes automáticos (`bash run_tests.sh`) |
+| Testes | 1350 testes automáticos (`bash run_tests.sh`) |
 
 Esta documentação descreve o macOS Updates 1.7.7. Não foi criada uma etiqueta de lançamento separada. O gestor atua apenas sobre alvos instalados com origem observada e após nova aprovação. Os adaptadores genéricos nativos e dos fornecedores permanecem manuais até existirem receitas revistas. O catálogo público opcional abrange 48 produtos e oferece ligações oficiais revistas para obtenção manual; não há receitas aprovadas de primeira instalação automática. A lista de métodos abaixo descreve capacidades, não autoriza a execução.
 
