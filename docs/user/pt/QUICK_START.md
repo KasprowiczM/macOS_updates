@@ -1,6 +1,6 @@
 # Início rápido (Português)
 
-**Mac com Apple Silicon obrigatório** · macOS 13+ · **v1.7.5**
+**Mac com Apple Silicon obrigatório** · macOS 13+ · **v1.7.6**
 
 ## Configuração segura e fontes das aplicações
 

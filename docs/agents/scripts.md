@@ -83,6 +83,13 @@
 | `lib/python/inventory_render.py` | Local snapshot view and separately fenced preserved notes in seven languages |
 | `lib/python/download_policy.py` | Per-hop HTTPS and public-address validation, DNS pinning and reviewed artifact host allowlists |
 | `lib/python/update_transaction.py` | Same-volume bundle staging and backup, identity checks and conservative startup recovery |
+| `lib/python/artifact_acquisition.py` | Hash-bound HTTPS ZIP acquisition with bounded extraction, path/symlink checks and signed bundle observation |
+| `lib/python/recipe_acceptance.py` | Separate exact-candidate live evidence predicates for update, first install and lifecycle |
+| `lib/python/recipe_adapters.py` | Closed recipe dispatch into direct transactions or supervised native drivers; no JSON commands |
+| `lib/python/native_update_session.py` | Owned-process lifecycle, readiness versus completion, durable helper sessions and observed reconciliation |
+| `lib/python/update_scheduler.py` | At most two independent durable mutation leases, shared resource admission, cancellation and recovery across cooperating checkouts |
+| `lib/python/system_update_guard.py` | Authenticated exclusive system-update supervisor and proof-based restart reconciliation API |
+| `lib/python/operation_receipts.py` | Private monotonic phase timings, provenance, evidence classes and grouped inventory-source diagnostics |
 | `lib/python/app_capabilities.py` | Static updater signals and review-only redacted recipe proposals |
 | `lib/python/coverage_report.py` | Common-resolver coverage, capability scans and explicit proposal exports |
 | `lib/python/channel_advisor.py` | Compatible stable recommendations and conservative local delay evidence |

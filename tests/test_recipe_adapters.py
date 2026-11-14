@@ -24,7 +24,7 @@ class AdapterTests(unittest.TestCase):
         self.env = environment(self.r)
         self.target = dict(
             self.env["target"],
-            real_path="/Applications/Fixture.app",
+            real_path="/fixture/apps/Fixture.app",
             version="1.0",
             build="100",
             running=False,

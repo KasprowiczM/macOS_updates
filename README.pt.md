@@ -6,7 +6,7 @@
 
 **Site:** [macos-updates.64bit.site](https://macos-updates.64bit.site) · **Repositório:** [github.com/KasprowiczM/macOS_updates](https://github.com/KasprowiczM/macOS_updates) · **Licença:** [MIT](LICENSE) · **Alterações:** [CHANGELOG.md](CHANGELOG.md)
 
-> **v1.7.5** : Orquestrador de atualizações com um só comando, para **Macs com Apple Silicon e macOS 13-27**. Coordena atualizações de pacotes verificadas e acionamentos honestos dos atualizadores das aplicações para o **software já instalado neste Mac**. **Multilingue** (7 idiomas). Camada privada opcional através de [`dev_sync/`](dev_sync/README.md).
+> **v1.7.6** : Orquestrador de atualizações com um só comando, para **Macs com Apple Silicon e macOS 13-27**. Coordena atualizações de pacotes verificadas e acionamentos honestos dos atualizadores das aplicações para o **software já instalado neste Mac**. **Multilingue** (7 idiomas). Camada privada opcional através de [`dev_sync/`](dev_sync/README.md).
 
 A etapa C ativa inventário JSON local e planos com permissões específicas. `bash update_all.sh --plan` e `--dry-run` mostram as mesmas decisões sem gravar. Uma execução interativa pergunta uma vez pelos âmbitos mostrados; `-y`, EOF e execução sem terminal não concedem novas permissões. Use `--preferences` para rever ou repor escolhas. As atualizações preservam origem e destino observados; conflitos, destinos ausentes e provas incertas adiam esse destino. `build_inventory.sh --migration --preview` preserva bytes Markdown originais e notas; aceite explicitamente o ID mostrado. Atualizações genéricas do fabricante permanecem manuais até verificar identidade e adaptador. Uma entrada no catálogo não comprova instalação nem consentimento.
 
@@ -16,9 +16,9 @@ A etapa C ativa inventário JSON local e planos com permissões específicas. `b
 | Fluxo | 7 passos (0–6); a atualização do macOS vem sempre em último |
 | Registo | 47 aplicações da Internet · 11 métodos de atualização (ver [Métodos de atualização](#métodos-de-atualização)) |
 | Idiomas | EN, PL, ES, FR, DE, IT, PT (CLI e documentação) |
-| Testes | 1178 testes automáticos (`bash run_tests.sh`) |
+| Testes | 1329 testes automáticos (`bash run_tests.sh`) |
 
-Esta é a versão do código 1.7.5 local, não publicada e sem etiqueta de lançamento. O gestor atua apenas sobre alvos instalados com origem observada e após nova aprovação. Os adaptadores genéricos nativos e dos fornecedores permanecem manuais até existirem receitas revistas. O catálogo público opcional abrange 48 produtos e oferece ligações oficiais revistas para obtenção manual; não há receitas aprovadas de primeira instalação automática. A lista de métodos abaixo descreve capacidades, não autoriza a execução.
+Esta é a versão do código 1.7.6 local, não publicada e sem etiqueta de lançamento. O gestor atua apenas sobre alvos instalados com origem observada e após nova aprovação. Os adaptadores genéricos nativos e dos fornecedores permanecem manuais até existirem receitas revistas. O catálogo público opcional abrange 48 produtos e oferece ligações oficiais revistas para obtenção manual; não há receitas aprovadas de primeira instalação automática. A lista de métodos abaixo descreve capacidades, não autoriza a execução.
 
 **Novidades da v1.6.0:** As execuções agendadas (launchd) encontram o Homebrew e o `mas`, e o instalador verifica que a tarefa está carregada (acrescentados `--minute` e `--once-in`). As aplicações abertas nunca são fechadas nem substituídas, incluindo os casks do Homebrew. Cada pergunta durante a execução expira com a resposta segura «não». `bash update_all.sh --doctor` é um relatório de prontidão só de leitura e as execuções reais acrescentam verificações prévias. O estado persistente dos feeds dos fabricantes substitui os avisos opacos de «feed desatualizado», e o HyperFrames, o Superset e o Open Design são instalados ou verificados sem arranques ocultos. As versões 1.5.x anteriores estão descritas no [CHANGELOG.md](CHANGELOG.md).
 

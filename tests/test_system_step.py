@@ -80,6 +80,7 @@ class SystemStepBehavioralTests(unittest.TestCase):
 
     def setup_mocks(self, log_file: Path) -> None:
         self.create_mock_script("uname", "echo arm64")
+        self.create_mock_script("sysctl", "echo '{ sec = 100, usec = 0 }'")
         self.create_mock_script(
             "sw_vers",
             """
@@ -108,11 +109,18 @@ class SystemStepBehavioralTests(unittest.TestCase):
             f"""
             echo "softwareupdate $@" >> "{log_file}"
             if [ "$1" = "-l" ]; then
+                if [ -f "{log_file}.installed" ]; then
+                    cat << 'EOF'
+{SAMPLE_LISTING.split('* Label: Safari')[0] + '* Label: macOS' + SAMPLE_LISTING.split('* Label: macOS', 1)[1]}
+EOF
+                    exit 0
+                fi
                 cat << 'EOF'
 {SAMPLE_LISTING}
 EOF
                 exit 0
             fi
+            if [ "$1" = "-i" ]; then touch "{log_file}.installed"; fi
             exit 0
             """,
         )
@@ -134,7 +142,8 @@ EOF
             capture_output=True,
             text=True,
         )
-        self.assertEqual(res.returncode, 0, f"Output:\n{res.stdout}\n{res.stderr}")
+        self.assertEqual(res.returncode, 10, f"Output:\n{res.stdout}\n{res.stderr}")
+        self.assertTrue((self.session_dir / "system_helper_pending").exists())
 
         calls = log_file.read_text()
         self.assertNotIn("-ia", calls)
@@ -159,7 +168,7 @@ EOF
             capture_output=True,
             text=True,
         )
-        self.assertEqual(res.returncode, 0, f"Output:\n{res.stdout}\n{res.stderr}")
+        self.assertEqual(res.returncode, 10, f"Output:\n{res.stdout}\n{res.stderr}")
 
         calls = log_file.read_text()
         self.assertIn('macOS 27-26A428', calls)
@@ -299,7 +308,7 @@ EOF
             capture_output=True,
             text=True,
         )
-        self.assertEqual(res.returncode, 0, f"Output:\n{res.stdout}\n{res.stderr}")
+        self.assertEqual(res.returncode, 10, f"Output:\n{res.stdout}\n{res.stderr}")
 
         calls = [
             line.strip()
@@ -315,6 +324,40 @@ EOF
         self.assertIn("macOS Tahoe 26.7-25G229", calls[1])
         self.assertIn("macOS 27-26A428", calls[1])
         self.assertTrue(calls[1].endswith("-R --verbose"))
+
+    def test_standalone_system_cannot_bypass_pending_lease_with_environment_boolean(self):
+        from update_scheduler import claim_action_resources
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        lease = claim_action_resources(dict(action_id="fixture-pending", resources=["path:/fixture/App.app"],
+                                             scope_complete=True, parallel_safe=True))
+        lease.pending("fixture-helper")
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}", MAC_UPDATE_YES="1",
+                   MAC_UPDATE_SYSTEM_GUARDED="1", MAC_UPDATE_SYSTEM_GUARD_FD="123")
+        result = subprocess.run(["bash", str(REPO_ROOT / "update_system.sh")], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 10, result.stdout + result.stderr)
+        self.assertFalse(log_file.exists())
+
+    def test_nonrestart_sync_install_requires_fresh_selected_label_absence(self):
+        from update_scheduler import pending_sessions
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        listing = SAMPLE_LISTING.split("* Label: macOS", 1)[0]
+        self.create_mock_script("softwareupdate", f'''
+echo "softwareupdate $@" >> "{log_file}"
+if [ "$1" = "-l" ]; then
+    if [ -f "{log_file}.installed" ]; then echo "No new software available."; exit 0; fi
+    cat <<'EOF'
+{listing}
+EOF
+elif [ "$1" = "-i" ]; then touch "{log_file}.installed"; fi
+exit 0''')
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}", MAC_UPDATE_YES="1",
+                   MAC_UPDATE_SESSION_DIR=str(self.session_dir))
+        result = subprocess.run(["bash", str(REPO_ROOT / "update_system.sh")], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(pending_sessions(), [])
+        self.assertFalse((self.session_dir / "system_helper_pending").exists())
 
 
 if __name__ == "__main__":

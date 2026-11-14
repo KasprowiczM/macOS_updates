@@ -21,8 +21,8 @@ class RecipePolicyTests(unittest.TestCase):
         self.r["acceptance_records"]["update"] = [record(self.r)]
         self.target = dict(
             instance_id="fixture",
-            path="/Applications/Fixture.app",
-            real_path="/Applications/Fixture.app",
+            path="/fixture/apps/Fixture.app",
+            real_path="/fixture/apps/Fixture.app",
             bundle_id=self.r["candidate"]["bundle_id"],
             team_id=self.r["candidate"]["team_id"],
             channel="stable",
@@ -90,7 +90,7 @@ class RecipePolicyTests(unittest.TestCase):
             lease = claim_action_resources(
                 dict(
                     action_id="native",
-                    resources=["path:/Applications/Fixture.app"],
+                    resources=["path:/fixture/apps/Fixture.app"],
                     scope_complete=True,
                     parallel_safe=True,
                 ),
@@ -102,7 +102,7 @@ class RecipePolicyTests(unittest.TestCase):
                     dict(
                         action_id="manager",
                         target={"kind": "app", "id": "fixture"},
-                        target_path="/Applications/Fixture.app",
+                        target_path="/fixture/apps/Fixture.app",
                         expected_target=self.target,
                     )
                 ],

@@ -81,7 +81,8 @@ def append_phase_event(session_dir, event):
         import fcntl
         fcntl.flock(fd, fcntl.LOCK_EX)
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_size + len(payload) > MAX_BYTES:
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1
+            or info.st_size + len(payload) > MAX_BYTES):
             raise ValueError("invalid_receipt_file")
         os.fchmod(fd, 0o600)
         if os.write(fd, payload) != len(payload):

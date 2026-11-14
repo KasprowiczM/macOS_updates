@@ -342,6 +342,15 @@ def _call(driver_call, action, state, receipt_dir, phase, *args):
     ) as event:
         result = driver_call(action, state, *args)
         event["outcome"] = "observed" if phase == "observe" else "requested"
+        event["evidence_type"] = (
+            "live_version_comparison"
+            if phase == "observe" and _target_verified(state, result)
+            else (
+                "quit_request"
+                if phase == "quit"
+                else "launch_request" if phase in ("trigger", "restart") else "none"
+            )
+        )
         return result
 
 

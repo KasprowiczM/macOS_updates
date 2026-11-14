@@ -429,7 +429,7 @@ class VerifiedInstallTests(unittest.TestCase):
             ("team_id", "OTHER12345"),
             ("minimum_os", "14.0"),
             ("channel", "beta"),
-            ("destination", "/Applications/Other.app"),
+            ("destination", "/fixture/apps/Other.app"),
             ("requires_administrator", True),
         ]:
             with self.subTest(field=field), VerifiedInstallFixture() as f:

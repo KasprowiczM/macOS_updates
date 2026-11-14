@@ -132,7 +132,7 @@ GUARD_LOG="$GUARD_DIR/blocked.log"
 # from or written to the real ~/.local/state during tests.
 export MAC_UPDATE_FEED_STATE_FILE="$GUARD_DIR/feed_state.json"
 export MAC_UPDATE_HOMEBREW_PREFIX="$GUARD_DIR/empty-homebrew"
-for tool in softwareupdate mas brew msupdate installer sudo launchctl docker killall curl wget open osascript defaults hdiutil ditto codesign spctl; do
+for tool in softwareupdate mas brew msupdate installer sudo launchctl docker killall curl wget open osascript defaults hdiutil ditto codesign spctl sysctl; do
     cat > "$GUARD_DIR/$tool" <<GUARD_EOF
 #!/bin/sh
 echo "[\${MAC_UPDATE_TEST_NAME:-unknown}] $tool \$*" >> "\${MAC_UPDATE_TEST_GUARD_LOG:-$GUARD_LOG}"

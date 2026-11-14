@@ -685,12 +685,18 @@ def _append(name, value, state_dir=None):
     if session and os.path.isdir(session) and not os.path.islink(session):
         path = os.path.join(session, name)
         fd = os.open(
-            path, os.O_APPEND | os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600
+            path,
+            os.O_APPEND | os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            0o600,
         )
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
             info = os.fstat(fd)
-            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_uid != os.getuid()
+                or info.st_nlink != 1
+            ):
                 raise ValueError("unsafe_result_file")
             if os.write(fd, payload) != len(payload):
                 raise OSError("incomplete_result_write")

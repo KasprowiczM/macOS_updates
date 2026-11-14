@@ -6,6 +6,11 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.7.6] - 2026-11-14 (local checkpoint T5b)
+
+- Complete two-slot durable scheduling, per-action receipts, cancellation and shared recovery barriers; protect standalone and final system updates with an authenticated exclusive lease.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
 ## [1.7.5] - 2026-11-14 (local checkpoint T5)
 
 - Add 48 product dossiers, real source/parser contracts and synthetic safety scenarios; preserve unknown identity and unaccepted native/payload behavior as manual.
