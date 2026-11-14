@@ -509,6 +509,19 @@ class StaticShellSafetyTests(unittest.TestCase):
             )
             (mock_bin / "brew").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
             (mock_bin / "mas").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            # Keep the severity test independent of the host battery, disk,
+            # network and power-management tools. The system step is a stub.
+            preflight_stubs = {
+                "pmset": "echo \"Now drawing from 'AC Power'\"",
+                "df": "echo 'Filesystem 1024-blocks Used Available Capacity Mounted'; "
+                      "echo '/dev/test 999999999 1 400000000 1% /'",
+                "curl": "exit 0",
+                "caffeinate": "exit 0",
+            }
+            for name, body in preflight_stubs.items():
+                stub = mock_bin / name
+                stub.write_text("#!/bin/sh\n" + body + "\n", encoding="utf-8")
+                stub.chmod(0o755)
             for executable in [*layers.values(), "update_system.sh"]:
                 (root / executable).chmod(0o755)
             (mock_bin / "uname").chmod(0o755)
@@ -1799,7 +1812,7 @@ class StaticShellSafetyTests(unittest.TestCase):
         """
         text = self.read_script("update_all.sh")
         start = text.index("# SUDO ACQUISITION")
-        end = text.index("# Tee everything from this point")
+        end = text.index("# Track wyników")
         return "\n".join(
             line
             for line in text[start:end].splitlines()

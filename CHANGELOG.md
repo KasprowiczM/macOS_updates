@@ -6,6 +6,21 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-14
+
+- Add a seven-language terminal workspace with a first-use wizard, group selection, persistent display settings, contextual details, live output, help and a fixed-action palette.
+- Open the workspace for bare interactive update, setup and inventory commands. `--cli` selects the legacy text interface; explicit CLI flags preserve their existing behavior. `--tui` requires a usable terminal and cannot be combined with other options.
+- Supervise one job at a time through a PTY. Forward answers only from the input dialog, mask secret input when echo is disabled and keep consent checks in the existing engine. Preferences-only review cannot start updates.
+- Support terminals of at least 80 by 24. On supported terminals, request at least 140 by 38 by default and request restoration of the original size on exit; terminal support varies.
+- Preserve serial public execution and existing acceptance boundaries. No product recipe is accepted by this change.
+
+## [1.7.8] - 2026-11-14 (local checkpoint included in 1.8.0)
+
+- Show a concise dry-run summary and at most ten named targets, prioritizing decisions the user can make. Keep complete evidence in explicit JSON mode.
+- Page consent choices in groups of ten, separate blocked targets, and explain waiting, timeout and continuation without new consent in all seven languages. Plain item numbers approve only explicitly displayed scopes.
+- Start private diagnostics before inventory and consent, so an interrupted review leaves a log.
+- Keep healthy Homebrew formula receipts fresh when only Caskroom metadata is incomplete. Incomplete Cellar scans, damaged targets and uncertain absence remain blocked; no host metadata is repaired.
+
 ## [1.7.7] - 2026-11-14
 
 - Add read-only operation readiness reports, timing summaries requiring five comparable independent runs, and a redacted feedback contract. Feedback never grants recipe acceptance or execution authority. Live T6 and recipe activation remain deferred.

@@ -198,6 +198,33 @@ def _file_identity(evidence):
     return None
 
 
+def _complete_formula_domain_package(source, package):
+    """Bind the provider's Cellar proof only to its exact formula receipt.
+
+    No cask, unknown receipt, malformed peer or global traversal failure can
+    inherit this narrower observation. Aggregate absence rules stay unchanged.
+    """
+    if (source.get("formula_domain_complete") is not True
+            or source.get("status") != "partial"
+            or source.get("reason_code") != "manager_metadata_incomplete"
+            or package.get("manager") != "homebrew"):
+        return False
+    identity, version, prefix = (package.get(key) for key in ("source_identity", "version", "prefix"))
+    if not isinstance(identity, str) or not identity.startswith("formula:"):
+        return False
+    token = identity[len("formula:"):]
+    if (any(not isinstance(value, str) or not value or value in (".", "..")
+            or "/" in value for value in (token, version))
+            or source.get("covered_roots") != [prefix]):
+        return False
+    receipt = os.path.join(prefix, "Cellar", token, version, "INSTALL_RECEIPT.json")
+    evidence = package.get("evidence", [])
+    return (package.get("installed_receipt") == receipt and bool(evidence)
+            and all(e.get("kind") == "homebrew" and e.get("token") == token
+                    and e.get("prefix") == prefix and e.get("installed_receipt") == receipt
+                    and e.get("artifact_path") is None for e in evidence))
+
+
 def _package_key(record):
     receipt = record.get("installed_receipt")
     observation = _file_identity(record.get("evidence")) if receipt is None else None
@@ -561,7 +588,18 @@ def collect_snapshot(roots, providers, previous):
             if package["manager"] in ("homebrew", "brew", "brew_formula", "brew_cask")
             else "cli"
         )
-        package_source = sources.get(package_kind + ":" + package["prefix"])
+        source_key = package_kind + ":" + package["prefix"]
+        package_source = sources.get(source_key)
+        if (package_kind == "brew" and package_source
+                and _complete_formula_domain_package(package_source, package)):
+            domain_key = "brew_formula:" + package["prefix"]
+            domain = sources.setdefault(domain_key, source_result(
+                "ok", observed_at=package_source["observed_at"],
+                covered_roots=[os.path.join(package["prefix"], "Cellar")]))
+            for evidence in package["evidence"]:
+                evidence.update(source_key=domain_key, source_status="ok", source_complete=True)
+            package["freshness"] = "fresh"
+            package_source = domain
         if package_source and (
             package_source["status"] != "ok" or not package_source["complete"]
         ):

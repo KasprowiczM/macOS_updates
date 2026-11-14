@@ -17,6 +17,13 @@
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+. "$SCRIPT_DIR/lib/tui.sh" || exit 2
+type mac_update_tui_route >/dev/null 2>&1 || exit 2
+mac_update_tui_route inventory "$@"
+tui_status=$?
+[ "$MAC_UPDATE_TUI_STARTED" = 1 ] && exit "$tui_status"
+set -- "${MAC_UPDATE_TUI_ARGS[@]}"
 . "$SCRIPT_DIR/lib/platform.sh"
 mac_update_require_supported_platform || exit 1
 

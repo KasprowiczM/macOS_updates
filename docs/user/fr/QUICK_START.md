@@ -1,6 +1,14 @@
 # Démarrage rapide (Français)
 
-**Mac Apple Silicon requis** · macOS 13+ · **v1.7.7**
+**Mac Apple Silicon requis** · macOS 13+ · **v1.8.0**
+
+## Interface terminal
+
+Dans un terminal interactif, `bash update_all.sh` ouvre le tableau de bord et affiche l’assistant jusqu’à sa fin. `bash setup.sh` ouvre l’assistant et `bash build_inventory.sh` la vue inventaire. L’assistant reste accessible depuis la navigation. Sa fin et les réglages d’affichage sont enregistrés sans autoriser de mise à jour. `--cli` choisit l’interface texte existante et `--tui` demande explicitement le tableau de bord. Les options comme `--dry-run` restent en CLI ; ne combinez pas `--tui` avec d’autres options. `--tui` exige un terminal utilisable et Python. Les appels non interactifs ou sans TTY restent en CLI.
+
+Choisissez les groupes avant un lancement. La navigation est à gauche, les actions et la sortie au centre, les détails à droite si la place le permet. Une seule tâche est supervisée à la fois ; les confirmations existantes restent nécessaires. Les réglages couvrent langue, thème, ASCII et taille automatique. `?` ouvre l’aide, Ctrl+P la palette et `c` copie la commande, la sortie ou le résumé sélectionné. Ctrl+V colle uniquement dans la fenêtre de réponse ; Entrée envoie. La saisie est masquée si le processus désactive l’écho.
+
+Il faut au moins 80 colonnes et 24 lignes. Par défaut, le programme demande au moins 140 colonnes et 38 lignes aux terminaux compatibles, puis demande la taille initiale à la sortie. Le terminal peut ignorer ces demandes. La taille automatique est désactivable.
 
 ## Configuration sûre et sources des applications
 
@@ -20,7 +28,7 @@ Le rapport normal montre les applications installées. `bash scripts/report_upda
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
 bash setup.sh --inspect
-bash build_inventory.sh
+bash build_inventory.sh --cli
 bash update_all.sh
 ```
 

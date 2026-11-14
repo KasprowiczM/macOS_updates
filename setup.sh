@@ -2,6 +2,13 @@
 # Readiness inspection and explicitly requested dependency setup.
 set -o pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+. "$SCRIPT_DIR/lib/tui.sh" || exit 2
+type mac_update_tui_route >/dev/null 2>&1 || exit 2
+mac_update_tui_route wizard "$@"
+tui_status=$?
+[ "$MAC_UPDATE_TUI_STARTED" = 1 ] && exit "$tui_status"
+set -- "${MAC_UPDATE_TUI_ARGS[@]}"
 . "$SCRIPT_DIR/lib/platform.sh"
 mac_update_require_supported_platform || exit 1
 . "$SCRIPT_DIR/i18n/loader.sh"
@@ -35,7 +42,7 @@ for arg in "$@"; do
         --inspect) ;;
         --install-dependencies) install_deps=1 ;;
         --configure-shell) configure_shell=1 ;;
-        -h|--help) echo "Usage: bash setup.sh [--inspect] [--install-dependencies] [--configure-shell] [--catalog] [--install-plan PATH]"; exit 0 ;;
+        -h|--help) echo "Usage: bash setup.sh [--inspect] [--install-dependencies] [--configure-shell] [--catalog] [--install-plan PATH] [--tui] [--cli]"; exit 0 ;;
         *) echo "Unknown option: $arg" >&2; exit 1 ;;
     esac
 done

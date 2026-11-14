@@ -10,6 +10,9 @@ Options:
   -h, --help                     Show this help
       --plan                     Show the local JSON action plan without writes
       --preferences              Review or reset saved per-app choices
+      --preferences-only         Review saved choices without running updates
+      --tui                      Open the terminal interface
+      --cli                      Use the legacy command-line interface
       --dry-run                  Show the same local plan without writes
       --doctor                   Read-only readiness report (no sudo, no run log); exit 0 ok, 10 warnings, 1 problem
       --verify-only              Verify installed app versions against history without mutating
@@ -52,6 +55,7 @@ mac_update_parse_cli() {
             -h|--help) mac_update_cli_usage; exit 0 ;;
             --plan) export MAC_UPDATE_PLAN_ONLY=1 ;;
             --preferences) export MAC_UPDATE_PREFERENCES=1 ;;
+            --preferences-only) export MAC_UPDATE_PREFERENCES=1 MAC_UPDATE_PREFERENCES_ONLY=1 ;;
             --dry-run) export MAC_UPDATE_DRY_RUN=1 ;;
             --doctor) export MAC_UPDATE_DOCTOR=1 ;;
             --verify-only) export MAC_UPDATE_VERIFY_ONLY=1 ;;

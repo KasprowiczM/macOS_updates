@@ -1,6 +1,14 @@
 # Avvio rapido (Italiano)
 
-**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.7.7**
+**Richiesto Mac con Apple Silicon** · macOS 13+ · **v1.8.0**
+
+## Interfaccia terminale
+
+In un terminale interattivo, `bash update_all.sh` apre il pannello e mostra la procedura iniziale fino al completamento. `bash setup.sh` apre la procedura e `bash build_inventory.sh` la vista inventario. La procedura si riapre dalla navigazione. Completamento e impostazioni visive sono salvati senza autorizzare aggiornamenti. `--cli` seleziona la precedente interfaccia testuale e `--tui` richiede esplicitamente il pannello. Opzioni come `--dry-run` restano nella CLI; non combinare `--tui` con altre opzioni. `--tui` richiede un terminale funzionante e Python. Gli avvii non interattivi o senza TTY restano nella CLI.
+
+Scegli i gruppi prima di iniziare. A sinistra c’è la navigazione, al centro azioni e output, a destra i dettagli se c’è spazio. Un solo lavoro è supervisionato alla volta; restano necessarie le conferme esistenti. Le impostazioni includono lingua, tema, ASCII e dimensione automatica. `?` apre la guida, Ctrl+P la tavolozza e `c` copia comando, output o riepilogo selezionato. Ctrl+V incolla solo nella finestra di risposta; Invio invia. L’input è mascherato quando il processo disabilita l’eco.
+
+Servono almeno 80 colonne e 24 righe. Per impostazione predefinita viene richiesta una dimensione minima di 140 colonne e 38 righe sui terminali compatibili e quella originale all’uscita; il terminale può ignorare le richieste. La dimensione automatica si può disattivare.
 
 ## Configurazione sicura e fonti delle applicazioni
 
@@ -20,7 +28,7 @@ Il rapporto normale mostra le applicazioni installate. `bash scripts/report_upda
 git clone https://github.com/KasprowiczM/macOS_updates.git ~/Dev_Env/macOS_updates
 cd ~/Dev_Env/macOS_updates
 bash setup.sh --inspect
-bash build_inventory.sh
+bash build_inventory.sh --cli
 bash update_all.sh
 ```
 

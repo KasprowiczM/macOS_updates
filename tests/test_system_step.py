@@ -60,6 +60,38 @@ class SystemUpdatesModuleTests(unittest.TestCase):
         self.assertEqual([x["label"] for x in classified["major"]], ["macOS 27-26A428"])
 
 
+class PromptEOFSafetyTests(unittest.TestCase):
+    def script(self):
+        return (f'. "{REPO_ROOT}/lib/ui.sh"\n'
+                'mac_update_prompt_yn "EOF_PROMPT " n y; result=$?; '
+                'printf "RESULT=%s EOF=%s TIMEOUT=%s\\n" "$result" '
+                '"${MAC_UPDATE_PROMPT_EOF:-0}" "$MAC_UPDATE_PROMPT_TIMED_OUT"')
+
+    def test_closed_input_or_incomplete_yes_never_uses_affirmative_enter_default(self):
+        for value in ("", "y", "yes"):
+            with self.subTest(value=value):
+                result = subprocess.run(["/bin/bash", "-c", self.script()], input=value,
+                                        capture_output=True, text=True, timeout=10)
+                self.assertIn("RESULT=1 EOF=1 TIMEOUT=0", result.stdout)
+
+    def test_deliberate_blank_enter_keeps_historical_enter_default(self):
+        result = subprocess.run(["/bin/bash", "-c", self.script()], input="\n",
+                                capture_output=True, text=True, timeout=10)
+        self.assertIn("RESULT=0 EOF=0 TIMEOUT=0", result.stdout)
+
+    def test_closed_pseudoterminal_never_grants_consent(self):
+        import pty
+        master, slave = pty.openpty()
+        try:
+            proc = subprocess.Popen(["/bin/bash", "-c", self.script()], stdin=slave,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        finally:
+            os.close(slave)
+            os.close(master)
+        out, _ = proc.communicate(timeout=10)
+        self.assertIn(b"RESULT=1 EOF=1 TIMEOUT=0", out)
+
+
 class SystemStepBehavioralTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp_dir = tempfile.TemporaryDirectory()
@@ -197,20 +229,58 @@ EOF
         self.assertFalse((self.session_dir / "system_prompt_timeout").exists())
 
     def test_unanswered_prompt_is_reported_as_timeout_not_as_user_choice(self) -> None:
+        import threading
         log_file = self.work_dir / "calls.log"
         self.setup_mocks(log_file)
         env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}",
                    MAC_UPDATE_SESSION_DIR=str(self.session_dir), MAC_UPDATE_YES="0",
                    MAC_LANG="en", MAC_UPDATE_PROMPT_TIMEOUT="10")
-        res = subprocess.run(
-            ["bash", "-c", f'sleep 14 | bash "{REPO_ROOT}/update_system.sh"'],
-            env=env, capture_output=True, text=True, timeout=60)
-        out = res.stdout + res.stderr
-        self.assertEqual(res.returncode, 10, out)
+        # Keep stdin open until the actual prompt times out. A writer started
+        # before script startup can close first on a loaded machine.
+        proc = subprocess.Popen(["bash", str(REPO_ROOT / "update_system.sh")], env=env,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+        chunks = []
+        prompted = threading.Event()
+
+        def drain():
+            while True:
+                chunk = os.read(proc.stdout.fileno(), 4096)
+                if not chunk:
+                    return
+                chunks.append(chunk)
+                if b"[T/n]: " in b"".join(chunks):
+                    prompted.set()
+
+        reader = threading.Thread(target=drain, daemon=True)
+        reader.start()
+        try:
+            self.assertTrue(prompted.wait(30), b"".join(chunks).decode(errors="replace"))
+            proc.wait(timeout=20)  # The observed prompt has a ten-second budget.
+        finally:
+            proc.stdin.close()
+            if proc.poll() is None:
+                proc.terminate()
+                proc.wait(timeout=10)
+            reader.join(timeout=5)
+            proc.stdout.close()
+        out = b"".join(chunks).decode(errors="replace")
+        self.assertEqual(proc.returncode, 10, out)
         self.assertIn("No answer within 10 s — macOS updates not installed this run", out)
         self.assertNotIn("skipped at your request", out)
         self.assertTrue((self.session_dir / "system_skipped_by_user").exists())
         self.assertTrue((self.session_dir / "system_prompt_timeout").exists())
+        self.assertNotIn("softwareupdate -i", log_file.read_text())
+
+    def test_closed_stdin_defers_without_installing_or_claiming_timeout(self) -> None:
+        log_file = self.work_dir / "calls.log"
+        self.setup_mocks(log_file)
+        env = dict(os.environ, PATH=f"{self.bin_dir}:{os.environ['PATH']}",
+                   MAC_UPDATE_SESSION_DIR=str(self.session_dir), MAC_UPDATE_YES="0", MAC_LANG="en")
+        result = subprocess.run(["bash", str(REPO_ROOT / "update_system.sh")], env=env,
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 10, result.stdout + result.stderr)
+        self.assertFalse((self.session_dir / "system_prompt_timeout").exists())
         self.assertNotIn("softwareupdate -i", log_file.read_text())
 
     def test_master_maps_timeout_marker_to_no_answer_text(self) -> None:

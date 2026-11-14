@@ -20,7 +20,7 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual([x["source_identity"] for x in result["items"]], ["tool"])
 
-    def test_malformed_cask_keeps_healthy_formula_peer_partial(self):
+    def test_malformed_cask_preserves_aggregate_warning_and_complete_formula_domain(self):
         from inventory_providers import read_brew_receipts
         self.write_json(self.root / "Cellar/healthy/1/INSTALL_RECEIPT.json", {"installed_on_request": True})
         self.write_json(self.root / "Caskroom/broken/.metadata/1/20261114/Casks/broken.json", {})
@@ -29,6 +29,37 @@ class ProviderTests(unittest.TestCase):
         self.assertFalse(result["complete"])
         self.assertEqual([x["source_identity"] for x in result["items"]], ["formula:healthy"])
         self.assertEqual(result["issues"], [{"reason_code": "cask_metadata_invalid", "count": 1}])
+        self.assertIs(result.get("formula_domain_complete"), True)
+
+    def test_malformed_formula_keeps_entire_formula_domain_incomplete(self):
+        from inventory_providers import read_brew_receipts
+        self.write_json(self.root / "Cellar/healthy/1/INSTALL_RECEIPT.json", {})
+        bad = self.root / "Cellar/broken/1/INSTALL_RECEIPT.json"
+        bad.parent.mkdir(parents=True)
+        bad.write_text("invalid json")
+        result = read_brew_receipts(str(self.root))
+        self.assertIs(result.get("formula_domain_complete"), False)
+        self.assertFalse(result["complete"])
+
+    def test_unreadable_cellar_and_shared_scan_budget_never_prove_formula_domain(self):
+        from unittest.mock import patch
+        import inventory_providers as provider
+        self.write_json(self.root / "Cellar/healthy/1/INSTALL_RECEIPT.json", {})
+        entries = provider._entries
+
+        def unreadable(path, budget=None):
+            if path == self.root / "Cellar":
+                raise PermissionError("fixture unreadable domain")
+            return entries(path, budget)
+
+        with patch.object(provider, "_entries", side_effect=unreadable):
+            result = provider.read_brew_receipts(str(self.root))
+        self.assertIs(result.get("formula_domain_complete"), False)
+        self.assertFalse(result["complete"])
+        with patch.object(provider, "MAX_ENTRIES", 1):
+            result = provider.read_brew_receipts(str(self.root))
+        self.assertIsNot(result.get("formula_domain_complete"), True)
+        self.assertFalse(result["complete"])
 
     def test_symlink_lockfile_and_missing_package_remain_partial(self):
         from inventory_providers import read_cli_manifests
