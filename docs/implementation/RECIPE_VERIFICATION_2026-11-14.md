@@ -9,3 +9,7 @@ The latest public-checkout run lasted 103 seconds and reported no mutations. Its
 Duration formatting no longer reuses the last step's seconds. Additive summary v4 fields record toolkit provenance, observation types and per-phase monotonic receipts. These distinguish historical updater claims, requested lifecycle actions and fresh observations. A timer ending never proves an update succeeded.
 
 Focused guarded tests passed: receipts9, summary23, providers19, collector23. Bash syntax and module compilation passed. Full integrated gate will be recorded after the remaining stages.
+
+## T2, source 1.7.2
+
+Add strict schema v2 and exact release, identity, source, requirements and evidence bindings. Update, first-install and lifecycle acceptance are separate; the public executable recipe catalog remains empty. Thirty-seven focused guarded evidence tests passed.

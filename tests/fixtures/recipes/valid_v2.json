@@ -1,0 +1,37 @@
+{
+  "id": "fixture-editor-stable",
+  "product": "Fixture Editor",
+  "edition": "community",
+  "revision": 1,
+  "bundle_ids": ["org.example.fixture"],
+  "team_ids": ["EXAMPL1234"],
+  "installation_source": "vendor",
+  "update_mechanism": "direct_artifact",
+  "channel": "stable",
+  "minimum_os": "13.0",
+  "architectures": ["arm64"],
+  "allowed_artifacts": ["zip"],
+  "download_hosts": ["downloads.example.org"],
+  "requirement_graph": {
+    "nodes": [{"id": "replace", "kind": "permission", "value": "replace_existing_app", "operations": ["update"]}],
+    "edges": []
+  },
+  "effect_scope": {"update": ["replace_existing_app"], "install": ["install_app"], "lifecycle": []},
+  "adapter_id": "github_dmg",
+  "observation_contract": {
+    "preflight": ["identity", "source", "version", "build", "requirements"],
+    "postflight": ["identity", "source", "version", "build", "signature"],
+    "requires_artifact_hash": true
+  },
+  "limits": {"maximum_bytes": 1048576, "maximum_expanded_bytes": 2097152, "maximum_entries": 32, "maximum_evidence_age_days": 30},
+  "candidate": {
+    "url": "https://downloads.example.org/fixture-2.0.zip",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "version": "2.0", "build": "200", "artifact_type": "zip", "bundle_name": "Fixture.app",
+    "minimum_os": "13.0", "architecture": "arm64", "channel": "stable",
+    "product": "Fixture Editor", "edition": "community", "bundle_id": "org.example.fixture",
+    "team_id": "EXAMPL1234", "installation_source": "vendor", "feed_sequence": 2
+  },
+  "matrix_ids": ["fixture-editor"],
+  "acceptance_records": {"update": [], "install": [], "lifecycle": []}
+}

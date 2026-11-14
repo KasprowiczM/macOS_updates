@@ -6,6 +6,11 @@ semantic-ish versioning tracked in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-11-14 (local checkpoint T2)
+
+- Add strict schema v2 and exact release, identity, source, requirements and evidence bindings. Update, first-install and lifecycle acceptance are separate; the public executable recipe catalog remains empty. Thirty-seven focused guarded evidence tests passed.
+- Fixture-only gate; no public live acceptance or new recipe activation.
+
 ## [1.7.1] - 2026-11-14 (local checkpoint T1)
 
 - Fix duration formatting and record monotonic phase timings, source provenance and explicit evidence freshness without inferring update success.

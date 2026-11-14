@@ -1,12 +1,12 @@
 # User Guide (English)
 
-**Version:** 1.7.1 · **Apple Silicon, macOS 13+**
+**Version:** 1.7.2 · **Apple Silicon, macOS 13+**
 
 ## Safe setup and application sources
 
 `bash setup.sh --inspect` checks readiness without installing dependencies, changing shell profiles or configuring Touch ID. Missing tools leave the affected feature unavailable. In a terminal, `bash setup.sh --install-dependencies` previews optional dependencies and asks before each installation; `bash setup.sh --configure-shell` separately previews a shell profile change. Declining a dependency leaves independent features usable. If Python is unavailable, install it explicitly before building inventory. Missing or outdated `mas` is reported during updates and is never installed or upgraded automatically.
 
-This is the 1.7.1 source snapshot on main, without a separate release tag. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority. The normal update report covers installed applications. `bash scripts/report_update_coverage.sh --show-supported` remains a reference list. Open the optional selection menu with `bash setup.sh --catalog`; it starts with nothing selected. A selected app can be acquired from a reviewed official link after preview and fresh confirmation. Changing an existing app source requires manual migration. A CapCut App Store receipt retains App Store routing. A local app without confirmed Homebrew ownership is never adopted automatically.
+This is the 1.7.2 source snapshot on main, without a separate release tag. Scoped manager updates act only on installed targets with an observed source and fresh approval. Generic native and vendor updater adapters remain manual until reviewed recipes are available. The optional public catalog covers 48 products and offers reviewed official links for manual acquisition, with zero approved automatic first-install recipes. The legacy method list below describes capabilities, not execution authority. The normal update report covers installed applications. `bash scripts/report_update_coverage.sh --show-supported` remains a reference list. Open the optional selection menu with `bash setup.sh --catalog`; it starts with nothing selected. A selected app can be acquired from a reviewed official link after preview and fresh confirmation. Changing an existing app source requires manual migration. A CapCut App Store receipt retains App Store routing. A local app without confirmed Homebrew ownership is never adopted automatically.
 
 ## What this toolkit does
 
