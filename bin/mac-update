@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# mac-update launcher (marker: mac-update launcher)
+#
+# A thin wrapper over the toolkit's entry points. It works out where the
+# program lives from its own path (following symlinks, so ~/.local/bin/mac-update
+# can simply be a link), then hands over with exec. It holds no logic of its own.
+# The installer also links it as ~/.local/bin/macos-update: the same command under a
+# longer name, so it works under any link name and from any folder.
+#
+#   mac-update                 open the interface (same as --tui)
+#   mac-update --cli [options] run all updates in plain text (also --plain; same as run)
+#   mac-update run [options]   run all updates in plain text (same as update_all.sh --cli)
+#   mac-update preview         dry run: show what would update, change nothing
+#   mac-update scan            rebuild the list of installed apps
+#   mac-update doctor          read-only readiness report
+#   mac-update prepare         install missing requirements after one confirmation
+#   mac-update settings        open the interface on the settings screen
+#   mac-update update-self     check for a newer mac-update
+#   mac-update migrate         move settings from an older git-based copy
+#   mac-update uninstall       remove mac-update from this Mac
+#   mac-update version | help
+set -o pipefail
+
+mu_self() {
+    local src="$1" dir link
+    while [ -L "$src" ]; do
+        dir="$(cd -P "$(dirname "$src")" 2>/dev/null && pwd)"
+        link="$(readlink "$src")"
+        case "$link" in
+            /*) src="$link" ;;
+            *) src="$dir/$link" ;;
+        esac
+    done
+    dir="$(cd -P "$(dirname "$src")" 2>/dev/null && pwd)" || return 1
+    printf '%s/%s\n' "$dir" "$(basename "$src")"
+}
+
+SELF="$(mu_self "${BASH_SOURCE[0]:-$0}")" || { echo "mac-update: cannot find its own folder. Reinstall it with install.sh." >&2; exit 1; }
+ROOT="$(dirname "$(dirname "$SELF")")"
+
+mu_version() {
+    tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || echo unknown
+}
+
+mu_usage() {
+    cat <<'USAGE_TEXT'
+mac-update: keep this Mac's apps up to date
+
+Usage: mac-update [command] [options]
+       macos-update is the same command under a longer name.
+
+  (none)          open the interface
+  --tui [options] open the interface (options: --dry-run, --skip-...)
+  --cli [options] run all updates in plain text, without the interface (also --plain)
+  run [options]   the same as --cli; options go to update_all.sh
+                  (for example -y, --skip-system, --non-interactive)
+  preview         dry run: show what would update, change nothing
+  scan            rebuild the list of installed apps (options: --dry-run)
+  doctor          read-only readiness report (doctor --fix = prepare)
+  prepare         install what this Mac is missing (Command Line Tools, Homebrew, Python, mas); asks once, --yes skips the question
+  settings        open the interface on the settings screen
+  update-self     check for a newer mac-update (--check, --prepare)
+  migrate         move settings from an older git-based copy (--preview, --apply, --undo)
+  uninstall       remove mac-update (asks first; --dry-run shows what would go)
+  version         print the version
+  help            this text
+USAGE_TEXT
+}
+
+mu_need() { # mu_need FILE : the program tree must be complete
+    [ -e "$ROOT/$1" ] || {
+        echo "mac-update: ${1} is missing from ${ROOT}." >&2
+        echo "Run the installer again to repair it." >&2
+        exit 1
+    }
+}
+
+cmd="${1:-}"
+[ "$#" -eq 0 ] || shift
+
+case "$cmd" in
+    ""|ui|tui|--tui)
+        mu_need update_all.sh
+        exec bash "$ROOT/update_all.sh" --tui "$@"
+        ;;
+    run|--cli|--plain)
+        mu_need update_all.sh
+        args=()
+        for a in "$@"; do
+            case "$a" in
+                --cli|--plain) ;;
+                *) args[${#args[@]}]="$a" ;;
+            esac
+        done
+        exec bash "$ROOT/update_all.sh" --cli ${args[@]+"${args[@]}"}
+        ;;
+    preview|dry-run)
+        mu_need update_all.sh
+        exec bash "$ROOT/update_all.sh" --dry-run -y "$@"
+        ;;
+    scan)
+        mu_need build_inventory.sh
+        exec bash "$ROOT/build_inventory.sh" -y "$@"
+        ;;
+    doctor)
+        mu_need update_all.sh
+        if [ "${1:-}" = "--fix" ]; then
+            shift
+            exec bash "$ROOT/update_all.sh" --prepare "$@"
+        fi
+        exec bash "$ROOT/update_all.sh" --doctor "$@"
+        ;;
+    prepare)
+        mu_need update_all.sh
+        exec bash "$ROOT/update_all.sh" --prepare "$@"
+        ;;
+    settings)
+        mu_need lib/python/terminal_app.py
+        exec env PYTHONPATH="$ROOT/lib/python${PYTHONPATH:+:$PYTHONPATH}" python3 -c '
+import sys
+from terminal_app import run
+code = run(sys.argv[1], "settings")
+if code == 2:
+    print("The settings screen needs an interactive terminal. Open Terminal and run: mac-update settings", file=sys.stderr)
+sys.exit(code)' "$ROOT"
+        ;;
+    update-self|update_self)
+        mu_need scripts/update_toolkit.sh
+        [ "$#" -gt 0 ] || set -- --check
+        exec bash "$ROOT/scripts/update_toolkit.sh" "$@"
+        ;;
+    migrate)
+        mu_need scripts/layout_migrate.py
+        exec python3 "$ROOT/scripts/layout_migrate.py" "$@"
+        ;;
+    uninstall)
+        mu_need uninstall.sh
+        exec bash "$ROOT/uninstall.sh" "$@"
+        ;;
+    version|--version|-V)
+        echo "mac-update $(mu_version)"
+        ;;
+    help|--help|-h)
+        mu_usage
+        ;;
+    *)
+        echo "mac-update: unknown command \"$cmd\"." >&2
+        echo "Run \"mac-update help\" to see the commands." >&2
+        exit 2
+        ;;
+esac

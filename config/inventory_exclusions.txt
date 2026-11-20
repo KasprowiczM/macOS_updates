@@ -1,0 +1,16 @@
+# config/inventory_exclusions.txt
+#
+# Applications excluded from automated discovery in Step 0 (prescan)
+# and from the update pipeline.
+#
+# Semantics:
+# - Excluded from automated discovery: prescan will not flag these apps as
+#   "🆕 do skategoryzowania" if they are installed in /Applications but missing
+#   from the active categories in APPLICATIONS.md.
+# - Excluded from the update pipeline: not checked or mutated during updates.
+# - The application may still appear in APPLICATIONS.md for human documentation.
+#
+# Format: one application name per line (exact bundle name without .app).
+# Lines starting with '#' and blank lines are ignored.
+
+Ascendo

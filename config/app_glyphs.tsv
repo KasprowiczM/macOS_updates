@@ -1,0 +1,76 @@
+# ============================================================
+# config/app_glyphs.tsv — the ONE place a per-app / per-group emoji is defined
+# Format: name<TAB>emoji   (names match config/internet_apps.txt,
+# config/npm_global_clis.txt and the group names below; # starts a comment)
+# Rules: one codepoint, East_Asian_Width W (two cells), default emoji
+# presentation (no VS16 U+FE0F, no ZWJ, no skin tone, no flag, no keycap),
+# Unicode <= 13 (renders on older macOS), unique across this file.
+# Read by lib/internet_apps.sh (app_glyph) and lib/python/app_glyphs.py.
+# tests/test_app_glyphs.py enforces the rules.
+# ============================================================
+# --- Groups ---
+Homebrew	🍺
+App Store	🍎
+macOS	🍏
+Microsoft 365	💼
+Native CLI & npm	🧰
+Internet apps	🌐
+# --- Internet apps (config/internet_apps.txt) ---
+Google Chrome	🟡
+Firefox Developer Edition	🦊
+Brave Browser	🦁
+ChatGPT / Codex	🤖
+Claude	🟠
+Comet	🌠
+Gemini	✨
+Perplexity	🔍
+Antigravity	🪐
+Antigravity IDE	🚀
+LM Studio	🧠
+OpenCode	🧬
+Cursor	🎯
+Open Design	🎨
+HyperFrames	🎦
+Superset	🧩
+DeepSeek Harness	🐋
+Grok Bot	👾
+Obsidian	💎
+ProtonVPN	🔰
+KeePassXC	🔑
+Proton Mail	📧
+zoom.us	📹
+Google Drive	🟢
+MEGAsync	🔴
+Proton Drive	🔵
+Microsoft Excel	📊
+Microsoft Word	📘
+Microsoft Outlook	📨
+Microsoft PowerPoint	📙
+Microsoft OneNote	📓
+Microsoft Teams	💬
+Visual Studio Code	💻
+Warp	⚡
+CodeEdit	🔨
+Docker Desktop	🐳
+AppCleaner	🧹
+Spotify	🎵
+CapCut	🎥
+Ledger Live	🔐
+Trezor Suite	🔒
+Remote Desktop Manager	📺
+IPMIView	🔧
+Inkscape	🎭
+UniFi	📶
+WiFiman	📡
+Picsart	🌈
+iTerm	📟
+# --- Native CLIs (config/npm_global_clis.txt) ---
+node	🟩
+npm	📦
+pnpm	🧳
+claude-code	🟧
+codex-cli	🦾
+opencode-cli	🧪
+agy-cli	🛸
+cursor-agent	🏹
+bun	🥟

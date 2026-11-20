@@ -1,0 +1,3 @@
+# bundle_id<TAB>registry_name: bundle ids whose app name differs from the row in config/internet_app_methods.txt
+# Matching order: this table by bundle id, then names. Tab-separated.
+com.docker.docker	Docker Desktop

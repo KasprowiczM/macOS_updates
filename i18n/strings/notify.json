@@ -1,0 +1,65 @@
+{
+  "en": {
+    "title": "macOS Updates",
+    "needs_you": "Needs you: {n}",
+    "updated": "Updated: {n}",
+    "failed": "Failed: {n}",
+    "idle": "Everything is up to date",
+    "hint_needs": "Open mac-update to finish.",
+    "run_failed": "The run did not finish"
+  },
+  "pl": {
+    "title": "macOS Updates",
+    "needs_you": "Wymaga Ciebie: {n}",
+    "updated": "Zaktualizowano: {n}",
+    "failed": "Błędy: {n}",
+    "idle": "Wszystko jest aktualne",
+    "hint_needs": "Otwórz mac-update, aby to dokończyć.",
+    "run_failed": "Aktualizacja nie zakończyła się"
+  },
+  "de": {
+    "title": "macOS Updates",
+    "needs_you": "Braucht dich: {n}",
+    "updated": "Aktualisiert: {n}",
+    "failed": "Fehlgeschlagen: {n}",
+    "idle": "Alles ist aktuell",
+    "hint_needs": "Öffne mac-update, um es abzuschließen.",
+    "run_failed": "Der Lauf wurde nicht beendet"
+  },
+  "es": {
+    "title": "macOS Updates",
+    "needs_you": "Te necesita: {n}",
+    "updated": "Actualizado: {n}",
+    "failed": "Fallidos: {n}",
+    "idle": "Todo está al día",
+    "hint_needs": "Abre mac-update para terminar.",
+    "run_failed": "La ejecución no terminó"
+  },
+  "fr": {
+    "title": "macOS Updates",
+    "needs_you": "Besoin de vous : {n}",
+    "updated": "Mis à jour : {n}",
+    "failed": "Échecs : {n}",
+    "idle": "Tout est à jour",
+    "hint_needs": "Ouvrez mac-update pour terminer.",
+    "run_failed": "L'exécution ne s'est pas terminée"
+  },
+  "it": {
+    "title": "macOS Updates",
+    "needs_you": "Serve il tuo intervento: {n}",
+    "updated": "Aggiornati: {n}",
+    "failed": "Falliti: {n}",
+    "idle": "Tutto è aggiornato",
+    "hint_needs": "Apri mac-update per completare.",
+    "run_failed": "L'esecuzione non è terminata"
+  },
+  "pt": {
+    "title": "macOS Updates",
+    "needs_you": "Precisa de você: {n}",
+    "updated": "Atualizados: {n}",
+    "failed": "Falhas: {n}",
+    "idle": "Tudo está atualizado",
+    "hint_needs": "Abra o mac-update para concluir.",
+    "run_failed": "A execução não terminou"
+  }
+}

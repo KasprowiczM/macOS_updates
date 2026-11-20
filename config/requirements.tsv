@@ -1,0 +1,14 @@
+# Requirements manifest: the single source for doctor, "mac-update prepare" and the Diagnostics screen.
+# Columns (tab-separated): id, level (required|optional), groups (comma list of prescan,appstore,cli,brew,internet,inventory,system or core), install (how prepare gets it).
+# Texts live in i18n/lang_*.sh as L_REQ_NAME_<id> and L_REQ_HINT_<id>.
+clt	required	core,brew,inventory	xcode_select
+python3	required	core,inventory	clt_or_brew
+curl	required	core,cli,internet	none
+homebrew	required	brew,internet	homebrew_installer
+mas	required	appstore	brew
+git	optional	cli	clt
+node	optional	cli	none
+rosetta	optional	internet	none
+touchid	optional	system,appstore	none
+accessibility	optional	appstore	manual
+appstore_signin	optional	appstore	manual
